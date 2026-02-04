@@ -291,15 +291,16 @@ extension APIEndpoint {
 // MARK: - Push Notification Endpoints
 extension APIEndpoint {
     /// Register a device token for push notifications
-    static func registerDeviceToken(token: String) -> APIEndpoint {
+    static func registerDeviceToken(token: String, appType: String = "staff") -> APIEndpoint {
         struct DeviceTokenBody: Encodable {
             let deviceToken: String
             let platform: String
+            let appType: String
         }
         return APIEndpoint(
             path: "/api/user/device-token",
             method: .post,
-            body: DeviceTokenBody(deviceToken: token, platform: "ios")
+            body: DeviceTokenBody(deviceToken: token, platform: "ios", appType: appType)
         )
     }
 
@@ -314,6 +315,47 @@ extension APIEndpoint {
             body: DeviceTokenBody(deviceToken: token)
         )
     }
+
+    /// Get push notification preferences
+    static func getPushPreferences() -> APIEndpoint {
+        APIEndpoint(path: "/api/user/push-preferences")
+    }
+
+    /// Update push notification preferences
+    static func updatePushPreferences(preferences: PushNotificationPreferences) -> APIEndpoint {
+        APIEndpoint(
+            path: "/api/user/push-preferences",
+            method: .put,
+            body: preferences
+        )
+    }
+}
+
+/// Push notification preferences model
+struct PushNotificationPreferences: Codable {
+    var notificationsEnabled: Bool
+    var orderStatusChanged: Bool
+    var orderCreated: Bool
+    var orderCollected: Bool
+    var deviceStatusChanged: Bool
+    var quoteApproved: Bool
+    var quoteRejected: Bool
+    var paymentReceived: Bool
+    var newEnquiry: Bool
+    var enquiryReply: Bool
+
+    static let defaultPreferences = PushNotificationPreferences(
+        notificationsEnabled: true,
+        orderStatusChanged: true,
+        orderCreated: true,
+        orderCollected: true,
+        deviceStatusChanged: true,
+        quoteApproved: true,
+        quoteRejected: true,
+        paymentReceived: true,
+        newEnquiry: true,
+        enquiryReply: true
+    )
 }
 
 // MARK: - Customer Portal Authentication Endpoints

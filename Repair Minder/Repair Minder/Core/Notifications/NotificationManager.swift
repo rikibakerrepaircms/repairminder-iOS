@@ -23,6 +23,26 @@ final class NotificationManager: ObservableObject {
     private let logger = Logger(subsystem: "com.mendmyi.Repair-Minder", category: "Notifications")
     private let keychain = KeychainManager.shared
 
+    /// The app type for push notification registration - "staff" or "customer"
+    private var appType: String {
+        #if CUSTOMER_APP
+        return "customer"
+        #else
+        return "staff"
+        #endif
+    }
+
+    /// Check if the user is authenticated (works for both staff and customer apps)
+    private var isUserAuthenticated: Bool {
+        #if CUSTOMER_APP
+        // For customer app, check if we have a stored token
+        return keychain.getString(for: .accessToken) != nil
+        #else
+        // For staff app, use AuthManager
+        return AuthManager.shared.isAuthenticated
+        #endif
+    }
+
     private init() {
         Task {
             await checkAuthorizationStatus()
@@ -117,14 +137,14 @@ final class NotificationManager: ObservableObject {
     // MARK: - Private
 
     private func sendTokenToServer(_ token: String) async {
-        guard AuthManager.shared.isAuthenticated else {
+        guard isUserAuthenticated else {
             logger.debug("Not authenticated, skipping token registration")
             return
         }
 
         do {
-            try await APIClient.shared.requestVoid(.registerDeviceToken(token: token))
-            logger.debug("Device token registered with server")
+            try await APIClient.shared.requestVoid(.registerDeviceToken(token: token, appType: appType))
+            logger.debug("Device token registered with server (appType: \(self.appType))")
         } catch {
             logger.error("Failed to register device token with server: \(error.localizedDescription)")
         }
