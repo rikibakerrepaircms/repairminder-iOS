@@ -65,45 +65,8 @@ struct DeviceHeaderCard: View {
 
 #Preview {
     VStack(spacing: 20) {
-        DeviceHeaderCard(device: Device(
-            id: "1",
-            orderId: "order1",
-            type: "iPhone",
-            brand: "Apple",
-            model: "iPhone 14 Pro",
-            serial: "ABC123",
-            imei: nil,
-            passcode: nil,
-            status: .inRepair,
-            issue: "Cracked screen",
-            diagnosis: nil,
-            resolution: nil,
-            price: 150.00,
-            assignedUserId: "user1",
-            assignedUserName: "John Smith",
-            createdAt: Date(),
-            updatedAt: Date()
-        ))
-
-        DeviceHeaderCard(device: Device(
-            id: "2",
-            orderId: "order1",
-            type: "MacBook",
-            brand: "Apple",
-            model: "MacBook Pro 14\"",
-            serial: nil,
-            imei: nil,
-            passcode: nil,
-            status: .awaitingParts,
-            issue: nil,
-            diagnosis: nil,
-            resolution: nil,
-            price: nil,
-            assignedUserId: nil,
-            assignedUserName: nil,
-            createdAt: Date(),
-            updatedAt: Date()
-        ))
+        DeviceHeaderCard(device: .sample)
+        DeviceHeaderCard(device: .sampleMacBook)
     }
     .padding()
     .background(Color(.systemGroupedBackground))

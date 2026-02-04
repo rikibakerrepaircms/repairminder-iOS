@@ -12,12 +12,11 @@ import Combine
 final class OrderDetailViewModel: ObservableObject {
     @Published var order: Order?
     @Published var devices: [Device] = []
-    @Published var isLoading: Bool = false
+    @Published var isLoading: Bool = true
     @Published var isUpdating: Bool = false
     @Published var error: String?
 
     private let orderId: String
-    private let syncEngine = SyncEngine.shared
 
     init(orderId: String) {
         self.orderId = orderId
@@ -79,8 +78,6 @@ final class OrderDetailViewModel: ObservableObject {
                 createdAt: order.createdAt,
                 updatedAt: Date()
             )
-
-            syncEngine.queueChange(.orderUpdated(id: order.id))
         } catch {
             self.error = error.localizedDescription
         }

@@ -35,46 +35,7 @@ struct DevicesSection: View {
 }
 
 #Preview {
-    DevicesSection(devices: [
-        Device(
-            id: "1",
-            orderId: "order1",
-            type: "iPhone",
-            brand: "Apple",
-            model: "iPhone 14 Pro",
-            serial: nil,
-            imei: nil,
-            passcode: nil,
-            status: .inRepair,
-            issue: "Cracked screen",
-            diagnosis: nil,
-            resolution: nil,
-            price: 150.00,
-            assignedUserId: nil,
-            assignedUserName: nil,
-            createdAt: Date(),
-            updatedAt: Date()
-        ),
-        Device(
-            id: "2",
-            orderId: "order1",
-            type: "iPad",
-            brand: "Apple",
-            model: "iPad Air",
-            serial: nil,
-            imei: nil,
-            passcode: nil,
-            status: .awaitingParts,
-            issue: "Battery replacement",
-            diagnosis: nil,
-            resolution: nil,
-            price: 80.00,
-            assignedUserId: nil,
-            assignedUserName: nil,
-            createdAt: Date(),
-            updatedAt: Date()
-        )
-    ])
-    .padding()
-    .background(Color(.systemGroupedBackground))
+    DevicesSection(devices: [.sample, .sampleMacBook])
+        .padding()
+        .background(Color(.systemGroupedBackground))
 }

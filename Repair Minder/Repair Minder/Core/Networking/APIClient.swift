@@ -181,6 +181,18 @@ actor APIClient {
         // Decode response
         do {
             return try decoder.decode(T.self, from: data)
+        } catch let DecodingError.keyNotFound(key, context) {
+            logger.error("Missing key '\(key.stringValue)' at path: \(context.codingPath.map(\.stringValue).joined(separator: "."))")
+            throw APIError.decodingError(DecodingError.keyNotFound(key, context))
+        } catch let DecodingError.typeMismatch(type, context) {
+            logger.error("Type mismatch: expected \(type) at path: \(context.codingPath.map(\.stringValue).joined(separator: "."))")
+            throw APIError.decodingError(DecodingError.typeMismatch(type, context))
+        } catch let DecodingError.valueNotFound(type, context) {
+            logger.error("Value not found: expected \(type) at path: \(context.codingPath.map(\.stringValue).joined(separator: "."))")
+            throw APIError.decodingError(DecodingError.valueNotFound(type, context))
+        } catch let DecodingError.dataCorrupted(context) {
+            logger.error("Data corrupted at path: \(context.codingPath.map(\.stringValue).joined(separator: "."))")
+            throw APIError.decodingError(DecodingError.dataCorrupted(context))
         } catch {
             logger.error("Decoding error: \(error)")
             throw APIError.decodingError(error)

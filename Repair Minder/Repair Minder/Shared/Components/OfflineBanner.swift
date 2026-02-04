@@ -21,7 +21,7 @@ struct OfflineBanner: View {
 
                 Spacer()
 
-                Text("Changes will sync when reconnected")
+                Text("Check your connection")
                     .font(.caption)
                     .opacity(0.9)
             }
@@ -31,7 +31,7 @@ struct OfflineBanner: View {
             .background(Color.orange.gradient)
             .transition(.move(edge: .top).combined(with: .opacity))
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("You're currently offline. Changes will sync when you reconnect.")
+            .accessibilityLabel("You're currently offline. Check your connection.")
         }
     }
 }

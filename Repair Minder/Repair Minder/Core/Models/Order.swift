@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import CoreData
 
 struct Order: Identifiable, Equatable, Sendable {
     let id: String
@@ -15,7 +14,7 @@ struct Order: Identifiable, Equatable, Sendable {
     let total: Decimal?
     let deposit: Decimal?
     let balance: Decimal?
-    let notes: String?
+    let notes: [OrderNote]?
     let clientId: String
     let clientName: String?
     let clientEmail: String?
@@ -27,6 +26,14 @@ struct Order: Identifiable, Equatable, Sendable {
     let deviceCount: Int
     let createdAt: Date
     let updatedAt: Date
+
+    struct OrderNote: Codable, Equatable, Sendable {
+        let body: String?
+        let createdAt: String?
+        let createdBy: String?
+        let deviceId: String?
+        let deviceName: String?
+    }
 
     var displayRef: String {
         "#\(orderNumber)"
@@ -139,16 +146,36 @@ extension Order: Codable {
         let name: String?
     }
 
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
+    }()
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
         id = try container.decode(String.self, forKey: .id)
         orderNumber = try container.decode(Int.self, forKey: .orderNumber)
         status = try container.decode(OrderStatus.self, forKey: .status)
-        notes = try container.decodeIfPresent(String.self, forKey: .notes)
+        notes = try container.decodeIfPresent([OrderNote].self, forKey: .notes)
         deviceCount = try container.decodeIfPresent(Int.self, forKey: .deviceCount) ?? 0
-        createdAt = try container.decode(Date.self, forKey: .createdAt)
-        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+
+        // Handle SQLite datetime format "YYYY-MM-DD HH:mm:ss"
+        if let createdString = try? container.decode(String.self, forKey: .createdAt),
+           let parsedDate = Order.dateFormatter.date(from: createdString) {
+            createdAt = parsedDate
+        } else {
+            createdAt = try container.decode(Date.self, forKey: .createdAt)
+        }
+
+        if let updatedString = try? container.decode(String.self, forKey: .updatedAt),
+           let parsedDate = Order.dateFormatter.date(from: updatedString) {
+            updatedAt = parsedDate
+        } else {
+            updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        }
 
         // Decode nested client object
         let client = try container.decode(ClientInfo.self, forKey: .client)
@@ -208,7 +235,7 @@ extension Order: Codable {
         try container.encode(id, forKey: .id)
         try container.encode(orderNumber, forKey: .orderNumber)
         try container.encode(status, forKey: .status)
-        try container.encodeIfPresent(notes, forKey: .notes)
+        // Notes are read-only from API, not encoded
         try container.encode(deviceCount, forKey: .deviceCount)
         try container.encodeIfPresent(total, forKey: .orderTotal)
         try container.encodeIfPresent(deposit, forKey: .amountPaid)
@@ -218,47 +245,3 @@ extension Order: Codable {
     }
 }
 
-// MARK: - Core Data Conversion
-extension Order {
-    @MainActor
-    init(from entity: CDOrder) {
-        self.id = entity.id ?? ""
-        self.orderNumber = Int(entity.orderNumber)
-        self.status = OrderStatus(rawValue: entity.status ?? "") ?? .unknown
-        self.total = entity.total as Decimal?
-        self.deposit = entity.deposit as Decimal?
-        self.balance = entity.balance as Decimal?
-        self.notes = entity.notes
-        self.clientId = entity.clientId ?? ""
-        self.clientName = entity.client?.fullName
-        self.clientEmail = entity.client?.email
-        self.clientPhone = entity.client?.phone
-        self.locationId = entity.locationId
-        self.locationName = nil
-        self.assignedUserId = entity.assignedUserId
-        self.assignedUserName = nil
-        self.deviceCount = Int(entity.devices?.count ?? 0)
-        self.createdAt = entity.createdAt ?? Date()
-        self.updatedAt = entity.updatedAt ?? Date()
-    }
-
-    @MainActor
-    func toEntity(in context: NSManagedObjectContext) -> CDOrder {
-        let entity = CDOrder(context: context)
-        entity.id = id
-        entity.orderNumber = Int32(orderNumber)
-        entity.status = status.rawValue
-        entity.total = total as NSDecimalNumber?
-        entity.deposit = deposit as NSDecimalNumber?
-        entity.balance = balance as NSDecimalNumber?
-        entity.notes = notes
-        entity.clientId = clientId
-        entity.locationId = locationId
-        entity.assignedUserId = assignedUserId
-        entity.createdAt = createdAt
-        entity.updatedAt = updatedAt
-        entity.syncedAt = Date()
-        entity.needsSync = false
-        return entity
-    }
-}

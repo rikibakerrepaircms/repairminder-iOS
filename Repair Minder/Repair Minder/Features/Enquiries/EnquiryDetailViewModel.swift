@@ -13,7 +13,7 @@ final class EnquiryDetailViewModel: ObservableObject {
     // MARK: - Published Properties
     @Published var enquiry: Enquiry?
     @Published var messages: [EnquiryMessage] = []
-    @Published var isLoading = false
+    @Published var isLoading = true
     @Published var isSending = false
     @Published var isGeneratingAI = false
     @Published var isExecutingWorkflow = false
@@ -260,44 +260,6 @@ enum OrderPriority: String, CaseIterable, Codable {
         case .normal: return "Normal"
         case .high: return "High"
         case .urgent: return "Urgent"
-        }
-    }
-}
-
-// MARK: - Service Type
-enum ServiceType: String, CaseIterable {
-    case screenRepair = "screen_repair"
-    case batteryReplacement = "battery_replacement"
-    case chargingPort = "charging_port"
-    case waterDamage = "water_damage"
-    case softwareIssue = "software_issue"
-    case diagnostics = "diagnostics"
-    case dataRecovery = "data_recovery"
-    case other = "other"
-
-    var displayName: String {
-        switch self {
-        case .screenRepair: return "Screen Repair"
-        case .batteryReplacement: return "Battery Replacement"
-        case .chargingPort: return "Charging Port"
-        case .waterDamage: return "Water Damage"
-        case .softwareIssue: return "Software Issue"
-        case .diagnostics: return "Diagnostics"
-        case .dataRecovery: return "Data Recovery"
-        case .other: return "Other"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .screenRepair: return "iphone.slash"
-        case .batteryReplacement: return "battery.100"
-        case .chargingPort: return "bolt"
-        case .waterDamage: return "drop"
-        case .softwareIssue: return "gearshape"
-        case .diagnostics: return "magnifyingglass"
-        case .dataRecovery: return "externaldrive"
-        case .other: return "wrench"
         }
     }
 }

@@ -52,6 +52,8 @@ struct DeviceStatusActions: View {
 
     private var nextStatuses: [DeviceStatus] {
         switch currentStatus {
+        case .received:
+            return [.bookedIn]
         case .bookedIn:
             return [.diagnosing]
         case .diagnosing:
@@ -68,7 +70,7 @@ struct DeviceStatusActions: View {
             return [.qualityCheck]
         case .qualityCheck:
             return [.ready, .inRepair]
-        case .ready:
+        case .ready, .repairedReady:
             return [.collected]
         case .collected, .unrepairable:
             return []
@@ -104,6 +106,8 @@ struct DeviceStatusActions: View {
 
     private func iconForStatus(_ status: DeviceStatus) -> String {
         switch status {
+        case .received:
+            return "tray.and.arrow.down"
         case .bookedIn:
             return "tray.and.arrow.down.fill"
         case .diagnosing:
@@ -120,7 +124,7 @@ struct DeviceStatusActions: View {
             return "checkmark.seal.fill"
         case .qualityCheck:
             return "checklist"
-        case .ready:
+        case .ready, .repairedReady:
             return "hand.thumbsup.fill"
         case .collected:
             return "bag.fill"

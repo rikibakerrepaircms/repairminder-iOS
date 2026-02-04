@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import Combine
 import os.log
 
 @MainActor
@@ -19,21 +18,7 @@ final class DashboardViewModel {
     private(set) var error: String?
     var selectedPeriod: DashboardPeriod = .thisMonth
 
-    private let syncEngine = SyncEngine.shared
     private let logger = Logger(subsystem: "com.mendmyi.repairminder", category: "Dashboard")
-    private var cancellables = Set<AnyCancellable>()
-
-    var syncStatus: SyncEngine.SyncStatus {
-        syncEngine.status
-    }
-
-    var pendingChangesCount: Int {
-        syncEngine.pendingChangesCount
-    }
-
-    init() {
-        observeSyncStatus()
-    }
 
     func loadDashboard() async {
         isLoading = true
@@ -79,24 +64,4 @@ final class DashboardViewModel {
             await loadDashboard()
         }
     }
-
-    private func observeSyncStatus() {
-        syncEngine.$status
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                // Trigger view update when sync status changes
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-
-        syncEngine.$pendingChangesCount
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-    }
-
-    // Need to provide ObjectWillChangePublisher for @Observable
-    let objectWillChange = ObservableObjectPublisher()
 }

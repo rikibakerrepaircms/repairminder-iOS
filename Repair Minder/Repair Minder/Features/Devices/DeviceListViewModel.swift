@@ -131,8 +131,8 @@ final class DeviceListViewModel: ObservableObject {
         let query = searchText.lowercased()
         return devices.filter { device in
             device.displayName.lowercased().contains(query) ||
-            (device.issue?.lowercased().contains(query) ?? false) ||
-            (device.serial?.lowercased().contains(query) ?? false) ||
+            (device.clientName?.lowercased().contains(query) ?? false) ||
+            (device.serialNumber?.lowercased().contains(query) ?? false) ||
             (device.imei?.lowercased().contains(query) ?? false)
         }
     }

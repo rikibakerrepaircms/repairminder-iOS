@@ -361,33 +361,52 @@ struct PushNotificationPreferences: Codable {
 // MARK: - Customer Portal Authentication Endpoints
 extension APIEndpoint {
     /// Request a magic link code for customer authentication
-    static func customerRequestMagicLink(email: String) -> APIEndpoint {
+    /// - Parameters:
+    ///   - email: Customer's email address
+    ///   - companyId: Optional company ID (ignored if on custom domain)
+    static func customerRequestMagicLink(email: String, companyId: String? = nil) -> APIEndpoint {
         struct MagicLinkBody: Encodable {
             let email: String
+            let companyId: String?
         }
         return APIEndpoint(
             path: "/api/customer/auth/request-magic-link",
             method: .post,
-            body: MagicLinkBody(email: email)
+            body: MagicLinkBody(email: email, companyId: companyId)
         )
     }
 
     /// Verify the magic link code for customer
-    static func customerVerifyCode(email: String, code: String) -> APIEndpoint {
+    /// - Parameters:
+    ///   - email: Customer's email address
+    ///   - code: The verification code
+    ///   - companyId: Optional company ID (if provided, completes login; if not, returns company list)
+    static func customerVerifyCode(email: String, code: String, companyId: String? = nil) -> APIEndpoint {
         struct VerifyCodeBody: Encodable {
             let email: String
             let code: String
+            let companyId: String?
         }
         return APIEndpoint(
             path: "/api/customer/auth/verify-code",
             method: .post,
-            body: VerifyCodeBody(email: email, code: code)
+            body: VerifyCodeBody(email: email, code: code, companyId: companyId)
         )
+    }
+
+    /// Get current customer session info
+    static func customerGetMe() -> APIEndpoint {
+        APIEndpoint(path: "/api/customer/auth/me")
     }
 
     /// Customer logout
     static func customerLogout() -> APIEndpoint {
         APIEndpoint(path: "/api/customer/auth/logout", method: .post)
+    }
+
+    /// Verify order access token (for magic link direct order access)
+    static func customerOrderAccess(token: String) -> APIEndpoint {
+        APIEndpoint(path: "/api/customer/order-access/\(token)")
     }
 }
 
@@ -401,135 +420,108 @@ extension APIEndpoint {
         )
     }
 
-    /// Get a specific customer order
+    /// Get a specific customer order with full details
+    /// Returns: order info, devices, items, totals, messages, company info
     static func customerOrder(id: String) -> APIEndpoint {
         APIEndpoint(path: "/api/customer/orders/\(id)")
     }
 
-    /// Get order timeline events
-    static func customerOrderTimeline(id: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/customer/orders/\(id)/timeline")
-    }
-
-    /// Get order quote for approval
-    static func customerOrderQuote(orderId: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/customer/orders/\(orderId)/quote")
-    }
-
-    /// Approve an order quote
-    static func customerApproveQuote(orderId: String) -> APIEndpoint {
-        APIEndpoint(
-            path: "/api/customer/orders/\(orderId)/approve-quote",
-            method: .post
-        )
-    }
-
-    /// Reject an order quote
-    static func customerRejectQuote(orderId: String, reason: String) -> APIEndpoint {
-        struct RejectBody: Encodable {
-            let reason: String
-        }
-        return APIEndpoint(
-            path: "/api/customer/orders/\(orderId)/reject-quote",
-            method: .post,
-            body: RejectBody(reason: reason)
-        )
-    }
-}
-
-// MARK: - Customer Enquiries Endpoints
-extension APIEndpoint {
-    /// Get customer's enquiries
-    static func customerEnquiries(page: Int = 1, limit: Int = 20) -> APIEndpoint {
-        APIEndpoint(
-            path: "/api/customer/enquiries",
-            queryParameters: ["page": String(page), "limit": String(limit)]
-        )
-    }
-
-    /// Get a specific enquiry
-    static func customerEnquiry(id: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/customer/enquiries/\(id)")
-    }
-
-    /// Submit a new enquiry
-    static func customerSubmitEnquiry(
-        shopId: String,
-        deviceType: String,
-        deviceBrand: String,
-        deviceModel: String,
-        issueDescription: String,
-        preferredContact: String
+    /// Approve or reject an order quote
+    /// - Parameters:
+    ///   - orderId: The order ID
+    ///   - action: "approve" or "reject"
+    ///   - signatureType: "typed" or "drawn"
+    ///   - signatureData: The signature data (typed name or base64 drawing)
+    ///   - amountAcknowledged: The total amount the customer acknowledges
+    ///   - rejectionReason: Optional reason for rejection (only for reject action)
+    static func customerApproveOrder(
+        orderId: String,
+        action: String,
+        signatureType: String,
+        signatureData: String,
+        amountAcknowledged: Double? = nil,
+        rejectionReason: String? = nil
     ) -> APIEndpoint {
-        struct EnquiryBody: Encodable {
-            let shopId: String
-            let deviceType: String
-            let deviceBrand: String
-            let deviceModel: String
-            let issueDescription: String
-            let preferredContact: String
+        struct ApproveBody: Encodable {
+            let action: String
+            let signature_type: String
+            let signature_data: String
+            let amount_acknowledged: Double?
+            let rejection_reason: String?
         }
         return APIEndpoint(
-            path: "/api/customer/enquiries",
+            path: "/api/customer/orders/\(orderId)/approve",
             method: .post,
-            body: EnquiryBody(
-                shopId: shopId,
-                deviceType: deviceType,
-                deviceBrand: deviceBrand,
-                deviceModel: deviceModel,
-                issueDescription: issueDescription,
-                preferredContact: preferredContact
+            body: ApproveBody(
+                action: action,
+                signature_type: signatureType,
+                signature_data: signatureData,
+                amount_acknowledged: amountAcknowledged,
+                rejection_reason: rejectionReason
             )
         )
     }
 
-    /// Reply to an enquiry
-    static func customerEnquiryReply(enquiryId: String, message: String) -> APIEndpoint {
+    /// Send a reply/message for an order
+    /// - Parameters:
+    ///   - orderId: The order ID
+    ///   - message: The message content
+    ///   - deviceId: Optional device ID if the message is about a specific device
+    static func customerReply(orderId: String, message: String, deviceId: String? = nil) -> APIEndpoint {
         struct ReplyBody: Encodable {
             let message: String
+            let device_id: String?
         }
         return APIEndpoint(
-            path: "/api/customer/enquiries/\(enquiryId)/reply",
+            path: "/api/customer/orders/\(orderId)/reply",
             method: .post,
-            body: ReplyBody(message: message)
+            body: ReplyBody(message: message, device_id: deviceId)
         )
     }
-}
 
-// MARK: - Customer Shops Endpoints
-extension APIEndpoint {
-    /// Get customer's previous shops
-    static func customerShops() -> APIEndpoint {
-        APIEndpoint(path: "/api/customer/shops")
+    /// Download invoice for an order (returns HTML)
+    static func customerDownloadInvoice(orderId: String) -> APIEndpoint {
+        APIEndpoint(path: "/api/customer/orders/\(orderId)/invoice")
     }
 }
 
-// MARK: - Customer Messages Endpoints
+// MARK: - Customer Device Endpoints
 extension APIEndpoint {
-    /// Get customer's conversations/messages
-    static func customerConversations() -> APIEndpoint {
-        APIEndpoint(path: "/api/customer/messages")
-    }
-
-    /// Get messages for a specific order
-    static func customerOrderMessages(orderId: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/customer/orders/\(orderId)/messages")
-    }
-
-    /// Send a message for an order
-    static func customerSendMessage(orderId: String, message: String) -> APIEndpoint {
-        struct MessageBody: Encodable {
-            let message: String
+    /// Authorize a specific device for repair
+    /// - Parameters:
+    ///   - deviceId: The device ID to authorize
+    ///   - authorized: Whether to authorize or reject
+    ///   - signatureType: "typed" or "drawn"
+    ///   - signatureData: The signature data
+    static func customerAuthorizeDevice(
+        deviceId: String,
+        authorized: Bool,
+        signatureType: String,
+        signatureData: String
+    ) -> APIEndpoint {
+        struct AuthorizeBody: Encodable {
+            let authorized: Bool
+            let signature_type: String
+            let signature_data: String
         }
         return APIEndpoint(
-            path: "/api/customer/orders/\(orderId)/messages",
+            path: "/api/customer/devices/\(deviceId)/authorize",
             method: .post,
-            body: MessageBody(message: message)
+            body: AuthorizeBody(
+                authorized: authorized,
+                signature_type: signatureType,
+                signature_data: signatureData
+            )
         )
+    }
+
+    /// Get device image URL for customer portal
+    static func customerDeviceImage(deviceId: String, imageId: String) -> APIEndpoint {
+        APIEndpoint(path: "/api/customer/devices/\(deviceId)/images/\(imageId)/file")
     }
 }
 
-// MARK: - Staff Enquiries Endpoints
+// MARK: - Staff Enquiries Endpoints (uses /api/tickets backend)
 extension APIEndpoint {
     /// Fetch paginated list of enquiries for staff
     static func enquiries(
@@ -542,24 +534,24 @@ extension APIEndpoint {
             "limit": String(limit)
         ]
         if let status = status { params["status"] = status }
-        return APIEndpoint(path: "/api/enquiries", queryParameters: params)
+        return APIEndpoint(path: "/api/tickets", queryParameters: params)
     }
 
     /// Fetch a single enquiry by ID
     static func enquiry(id: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/enquiries/\(id)")
+        APIEndpoint(path: "/api/tickets/\(id)")
     }
 
     /// Fetch messages for an enquiry
     static func enquiryMessages(id: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/enquiries/\(id)/messages")
+        APIEndpoint(path: "/api/tickets/\(id)/messages")
     }
 
     /// Send a reply to an enquiry
     static func sendEnquiryReply(id: String, message: String) -> APIEndpoint {
         struct ReplyBody: Encodable { let message: String }
         return APIEndpoint(
-            path: "/api/enquiries/\(id)/messages",
+            path: "/api/tickets/\(id)/messages",
             method: .post,
             body: ReplyBody(message: message)
         )
@@ -567,27 +559,27 @@ extension APIEndpoint {
 
     /// Fetch enquiry statistics for staff dashboard
     static func enquiryStatsEndpoint() -> APIEndpoint {
-        APIEndpoint(path: "/api/enquiries/stats")
+        APIEndpoint(path: "/api/tickets/stats")
     }
 
     /// Mark an enquiry as read
     static func markEnquiryRead(id: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/enquiries/\(id)/read", method: .post)
+        APIEndpoint(path: "/api/tickets/\(id)/read", method: .post)
     }
 
     /// Archive an enquiry
     static func archiveEnquiry(id: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/enquiries/\(id)/archive", method: .post)
+        APIEndpoint(path: "/api/tickets/\(id)/archive", method: .post)
     }
 
     /// Mark an enquiry as spam
     static func markEnquirySpam(id: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/enquiries/\(id)/spam", method: .post)
+        APIEndpoint(path: "/api/tickets/\(id)/spam", method: .post)
     }
 
     /// Convert an enquiry to an order
     static func convertEnquiryToOrder<T: Encodable>(id: String, body: T) -> APIEndpoint {
-        APIEndpoint(path: "/api/enquiries/\(id)/convert", method: .post, body: body)
+        APIEndpoint(path: "/api/tickets/\(id)/convert", method: .post, body: body)
     }
 
     /// Generate an AI reply for an enquiry

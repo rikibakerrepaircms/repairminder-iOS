@@ -31,9 +31,6 @@ final class DeepLinkHandler {
 
         logger.debug("Handling notification: \(payload.debugDescription)")
 
-        // Trigger data refresh first
-        await SyncEngine.shared.performFullSync()
-
         // Navigate based on notification type
         guard let entityId = payload.entityId else {
             logger.debug("No entity ID in notification, skipping navigation")

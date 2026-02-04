@@ -17,7 +17,7 @@ struct DeviceInfoCard: View {
                 .font(.headline)
 
             VStack(spacing: 0) {
-                if let serial = device.serial, !serial.isEmpty {
+                if let serial = device.serialNumber, !serial.isEmpty {
                     InfoRow(label: "Serial Number", value: serial, icon: "number")
                     Divider()
                 }
@@ -27,14 +27,11 @@ struct DeviceInfoCard: View {
                     Divider()
                 }
 
-                if let passcode = device.passcode, !passcode.isEmpty {
-                    PasscodeRow(
-                        passcode: passcode,
-                        showPasscode: $showPasscode
-                    )
+                if let colour = device.colour, !colour.isEmpty {
+                    InfoRow(label: "Colour", value: colour, icon: "paintpalette")
                 }
 
-                if device.serial == nil && device.imei == nil && device.passcode == nil {
+                if device.serialNumber == nil && device.imei == nil && device.colour == nil {
                     Text("No additional info provided")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -113,45 +110,8 @@ private struct PasscodeRow: View {
 
 #Preview {
     VStack(spacing: 20) {
-        DeviceInfoCard(device: Device(
-            id: "1",
-            orderId: "order1",
-            type: "iPhone",
-            brand: "Apple",
-            model: "iPhone 14 Pro",
-            serial: "ABCD1234567890",
-            imei: "123456789012345",
-            passcode: "1234",
-            status: .inRepair,
-            issue: nil,
-            diagnosis: nil,
-            resolution: nil,
-            price: nil,
-            assignedUserId: nil,
-            assignedUserName: nil,
-            createdAt: Date(),
-            updatedAt: Date()
-        ))
-
-        DeviceInfoCard(device: Device(
-            id: "2",
-            orderId: "order1",
-            type: "iPad",
-            brand: "Apple",
-            model: "iPad Air",
-            serial: nil,
-            imei: nil,
-            passcode: nil,
-            status: .bookedIn,
-            issue: nil,
-            diagnosis: nil,
-            resolution: nil,
-            price: nil,
-            assignedUserId: nil,
-            assignedUserName: nil,
-            createdAt: Date(),
-            updatedAt: Date()
-        ))
+        DeviceInfoCard(device: .sample)
+        DeviceInfoCard(device: .sampleMacBook)
     }
     .padding()
     .background(Color(.systemGroupedBackground))

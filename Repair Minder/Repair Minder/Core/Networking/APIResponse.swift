@@ -45,3 +45,29 @@ struct PaginatedResponse<T: Decodable>: Decodable {
     let items: T
     let pagination: PaginationMeta
 }
+
+// MARK: - Specialized Response Types for Paginated Endpoints
+
+/// Response wrapper for clients endpoint: { data: { clients: [...], pagination: {...} } }
+struct ClientsListData: Decodable {
+    let clients: [Client]
+    let pagination: ClientsPagination?
+
+    struct ClientsPagination: Decodable {
+        let page: Int
+        let limit: Int
+        let total: Int
+        let totalPages: Int
+    }
+}
+
+/// Response wrapper for tickets endpoint: { data: { tickets: [...], page, limit, total, totalPages, ... } }
+struct TicketsListData: Decodable {
+    let tickets: [Ticket]
+    let page: Int?
+    let limit: Int?
+    let total: Int?
+    let totalPages: Int?
+    let statusCounts: [String: Int]?
+    let ticketTypeCounts: [String: Int]?
+}

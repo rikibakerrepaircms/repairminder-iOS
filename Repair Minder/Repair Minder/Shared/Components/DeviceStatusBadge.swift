@@ -54,6 +54,8 @@ struct DeviceStatusBadge: View {
 
     private var foregroundColor: Color {
         switch status {
+        case .received:
+            return .blue
         case .bookedIn:
             return .blue
         case .diagnosing:
@@ -71,6 +73,8 @@ struct DeviceStatusBadge: View {
         case .qualityCheck:
             return .cyan
         case .ready:
+            return .green
+        case .repairedReady:
             return .green
         case .collected:
             return .gray

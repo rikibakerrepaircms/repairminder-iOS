@@ -49,8 +49,10 @@ final class NotificationSettingsViewModel {
             // Use local defaults when offline
             logger.info("Offline - using local preferences")
         } catch {
-            logger.error("Failed to load preferences: \(error)")
-            errorMessage = "Failed to load notification settings"
+            // Use default preferences when API is unavailable
+            logger.warning("Using default preferences - API unavailable: \(error)")
+            preferences = .defaultPreferences
+            // Don't show error - silently use defaults
         }
 
         isLoading = false

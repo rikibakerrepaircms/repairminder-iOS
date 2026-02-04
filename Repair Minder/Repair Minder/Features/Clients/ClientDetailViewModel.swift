@@ -12,7 +12,7 @@ import Combine
 final class ClientDetailViewModel: ObservableObject {
     @Published var client: Client?
     @Published var orders: [Order] = []
-    @Published var isLoading: Bool = false
+    @Published var isLoading: Bool = true
     @Published var error: String?
 
     private let clientId: String

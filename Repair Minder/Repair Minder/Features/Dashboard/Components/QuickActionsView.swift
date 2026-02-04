@@ -6,9 +6,13 @@
 //
 
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct QuickActionsView: View {
     @Environment(AppRouter.self) private var router
+    @State private var showNewOrderSheet = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -21,7 +25,7 @@ struct QuickActionsView: View {
                     icon: "plus.circle.fill",
                     color: .blue
                 ) {
-                    router.selectedTab = .orders
+                    showNewOrderSheet = true
                 }
 
                 QuickActionButton(
@@ -41,6 +45,73 @@ struct QuickActionsView: View {
                 }
             }
         }
+        .sheet(isPresented: $showNewOrderSheet) {
+            NewOrderPlaceholderSheet()
+                .presentationDetents([.medium])
+        }
+    }
+}
+
+// MARK: - New Order Placeholder Sheet
+
+struct NewOrderPlaceholderSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                Spacer()
+
+                Image(systemName: "hammer.fill")
+                    .font(.system(size: 60))
+                    .foregroundStyle(.blue)
+
+                VStack(spacing: 8) {
+                    Text("Create Order")
+                        .font(.title2)
+                        .fontWeight(.bold)
+
+                    Text("Order creation from the app is coming soon. For now, you can create orders via the web app.")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                }
+
+                Button {
+                    openWebApp()
+                    dismiss()
+                } label: {
+                    Label("Open Web App", systemImage: "safari")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(.blue)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .padding(.horizontal, 32)
+
+                Spacer()
+            }
+            .navigationTitle("New Order")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    private func openWebApp() {
+        #if canImport(UIKit)
+        if let url = URL(string: "https://app.repairminder.com/orders/new") {
+            UIApplication.shared.open(url)
+        }
+        #endif
     }
 }
 

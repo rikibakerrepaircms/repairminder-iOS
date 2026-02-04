@@ -20,7 +20,7 @@ struct MyQueueSection: View {
                 Spacer()
 
                 Button("See All") {
-                    router.selectedTab = .orders
+                    router.navigate(to: .devices)
                 }
                 .font(.subheadline)
             }
@@ -72,8 +72,8 @@ struct MyQueueDeviceRow: View {
 
             Spacer()
 
-            if let issue = device.issue, !issue.isEmpty {
-                Text(issue)
+            if let clientName = device.clientName, !clientName.isEmpty {
+                Text(clientName)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -106,6 +106,7 @@ struct MyQueueDeviceRow: View {
 
     private var statusColor: Color {
         switch device.status {
+        case .received: return .blue
         case .bookedIn: return .blue
         case .diagnosing: return .purple
         case .awaitingApproval: return .orange
@@ -115,6 +116,7 @@ struct MyQueueDeviceRow: View {
         case .repaired: return .mint
         case .qualityCheck: return .cyan
         case .ready: return .green
+        case .repairedReady: return .green
         case .collected: return .gray
         case .unrepairable: return .red
         }

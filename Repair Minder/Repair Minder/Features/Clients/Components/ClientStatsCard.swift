@@ -50,22 +50,7 @@ private struct StatItem: View {
 }
 
 #Preview {
-    ClientStatsCard(client: Client(
-        id: "1",
-        email: "john@example.com",
-        firstName: "John",
-        lastName: "Smith",
-        phone: "07123456789",
-        company: nil,
-        address: nil,
-        city: nil,
-        postcode: nil,
-        notes: nil,
-        orderCount: 15,
-        totalSpent: 2450,
-        createdAt: Date().addingTimeInterval(-86400 * 365),
-        updatedAt: Date()
-    ))
-    .padding()
-    .background(Color(.systemGroupedBackground))
+    ClientStatsCard(client: .sample)
+        .padding()
+        .background(Color(.systemGroupedBackground))
 }

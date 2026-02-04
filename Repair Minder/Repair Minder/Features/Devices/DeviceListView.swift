@@ -119,11 +119,11 @@ struct DeviceListRow: View {
                     DeviceStatusBadge(status: device.status)
                 }
 
-                if let issue = device.issue, !issue.isEmpty {
-                    Text(issue)
+                if let clientName = device.clientName, !clientName.isEmpty {
+                    Text(clientName)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(1)
                 }
 
                 if let assignedName = device.assignedUserName {
@@ -136,8 +136,8 @@ struct DeviceListRow: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 4) {
-                if let price = device.price {
-                    Text(formatCurrency(price))
+                if let dueDate = device.dueDate {
+                    Text(dueDate.formatted(as: .short))
                         .font(.subheadline)
                         .fontWeight(.medium)
                 }
@@ -148,13 +148,6 @@ struct DeviceListRow: View {
             }
         }
         .padding(.vertical, 4)
-    }
-
-    private func formatCurrency(_ value: Decimal) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "GBP"
-        return formatter.string(from: value as NSDecimalNumber) ?? "£0"
     }
 }
 

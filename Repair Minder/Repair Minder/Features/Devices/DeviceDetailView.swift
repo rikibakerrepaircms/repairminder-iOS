@@ -39,35 +39,18 @@ struct DeviceDetailView: View {
 
                         DeviceInfoCard(device: device)
 
-                        if let issue = device.issue, !issue.isEmpty {
-                            IssueCard(issue: issue)
+                        if let notes = device.notes, !notes.isEmpty {
+                            NotesCard(notes: notes)
                         }
 
-                        DiagnosisForm(
-                            diagnosis: $viewModel.diagnosis,
-                            resolution: $viewModel.resolution,
-                            isSaving: viewModel.isSavingDiagnosis,
-                            onSave: {
-                                Task { await viewModel.saveDiagnosis() }
-                            }
-                        )
-
-                        PricingCard(
-                            price: device.price,
-                            editedPrice: $viewModel.editedPrice,
-                            isEditing: $viewModel.isEditingPrice,
-                            isSaving: viewModel.isSavingPrice,
-                            onSave: {
-                                Task { await viewModel.savePrice() }
-                            }
-                        )
-
-                        OrderLinkCard(
-                            orderId: device.orderId,
-                            onNavigate: {
-                                router.navigate(to: .orderDetail(id: device.orderId))
-                            }
-                        )
+                        if let orderId = device.orderId {
+                            OrderLinkCard(
+                                orderId: orderId,
+                                onNavigate: {
+                                    router.navigate(to: .orderDetail(id: orderId))
+                                }
+                            )
+                        }
                     }
                     .padding()
                 }
@@ -83,6 +66,44 @@ struct DeviceDetailView: View {
         .task {
             await viewModel.loadDevice()
         }
+    }
+}
+
+// MARK: - Notes Card
+
+private struct NotesCard: View {
+    let notes: [Device.DeviceNote]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Notes", systemImage: "note.text")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(notes.indices, id: \.self) { index in
+                    if let body = notes[index].body, !body.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(body)
+                                .font(.subheadline)
+
+                            if let createdBy = notes[index].createdBy {
+                                Text(createdBy)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(.secondarySystemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 

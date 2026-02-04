@@ -12,11 +12,8 @@ import UIKit
 @Observable
 final class SettingsViewModel {
     var showLogoutConfirmation = false
-    var isSyncing = false
-    var syncError: String?
 
     private let appState: AppState
-    private let syncEngine = SyncEngine.shared
 
     init(appState: AppState) {
         self.appState = appState
@@ -28,31 +25,6 @@ final class SettingsViewModel {
 
     var currentCompany: Company? {
         appState.currentCompany
-    }
-
-    var syncStatus: SyncEngine.SyncStatus {
-        appState.syncStatus
-    }
-
-    var lastSyncDate: Date? {
-        appState.lastSyncDate
-    }
-
-    var pendingChangesCount: Int {
-        appState.pendingChangesCount
-    }
-
-    func syncNow() async {
-        isSyncing = true
-        syncError = nil
-
-        await syncEngine.performFullSync()
-
-        if case .error(let message) = syncEngine.status {
-            syncError = message
-        }
-
-        isSyncing = false
     }
 
     func logout() async {

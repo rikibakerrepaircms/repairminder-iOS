@@ -189,32 +189,26 @@ final class EnquiryListViewModel: ObservableObject {
 }
 
 // MARK: - Response Types
-/// Response wrapper for enquiries list endpoint
+/// Response wrapper for enquiries/tickets list endpoint
 struct EnquiriesResponse: Decodable {
-    let items: [Enquiry]
-    let pagination: EnquiriesPagination
+    let tickets: [Enquiry]
+    let page: Int
+    let totalPages: Int
+    let total: Int
+    let limit: Int
 
-    struct EnquiriesPagination: Decodable {
+    // Computed property to match existing code expectations
+    var items: [Enquiry] { tickets }
+    var pagination: EnquiriesPagination {
+        EnquiriesPagination(page: page, pages: totalPages, total: total, limit: limit)
+    }
+
+    struct EnquiriesPagination {
         let page: Int
         let pages: Int
         let total: Int
         let limit: Int
-        let hasMore: Bool
 
-        enum CodingKeys: String, CodingKey {
-            case page, pages, total, limit
-            case hasMore = "has_more"
-        }
-
-        init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            page = try container.decodeIfPresent(Int.self, forKey: .page) ?? 1
-            pages = try container.decodeIfPresent(Int.self, forKey: .pages) ?? 1
-            total = try container.decodeIfPresent(Int.self, forKey: .total) ?? 0
-            limit = try container.decodeIfPresent(Int.self, forKey: .limit) ?? 20
-            // Calculate hasMore if not provided
-            let providedHasMore = try container.decodeIfPresent(Bool.self, forKey: .hasMore)
-            hasMore = providedHasMore ?? (page < pages)
-        }
+        var hasMore: Bool { page < pages }
     }
 }

@@ -72,12 +72,6 @@ struct DashboardView: View {
     private var dashboardContent: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Sync Status Banner
-                SyncStatusBanner(
-                    status: viewModel.syncStatus,
-                    pendingCount: viewModel.pendingChangesCount
-                )
-
                 // Period Picker
                 PeriodPicker(
                     selectedPeriod: $viewModel.selectedPeriod,
@@ -87,7 +81,14 @@ struct DashboardView: View {
 
                 // Stats Cards
                 if let stats = viewModel.stats {
-                    StatsGridView(stats: stats, currencySymbol: currencySymbol)
+                    StatsGridView(
+                        stats: stats,
+                        currencySymbol: currencySymbol,
+                        onDevicesTap: { router.navigate(to: .devices) },
+                        onRevenueTap: { router.selectedTab = .orders },
+                        onClientsTap: { router.selectedTab = .clients },
+                        onNewClientsTap: { router.selectedTab = .clients }
+                    )
                 } else if viewModel.isLoading {
                     StatsGridPlaceholder()
                 }
@@ -117,6 +118,10 @@ struct DashboardView: View {
 struct StatsGridView: View {
     let stats: DashboardStats
     let currencySymbol: String
+    var onDevicesTap: (() -> Void)?
+    var onRevenueTap: (() -> Void)?
+    var onClientsTap: (() -> Void)?
+    var onNewClientsTap: (() -> Void)?
 
     var body: some View {
         LazyVGrid(columns: [
@@ -128,7 +133,8 @@ struct StatsGridView: View {
                 value: "\(stats.devices.current.count)",
                 change: stats.devices.comparisons.first?.changePercent,
                 icon: "iphone",
-                color: .blue
+                color: .blue,
+                onTap: onDevicesTap
             )
 
             StatCard(
@@ -136,7 +142,8 @@ struct StatsGridView: View {
                 value: "\(currencySymbol)\(formatRevenue(stats.revenue.current.total))",
                 change: stats.revenue.comparisons.first?.changePercent,
                 icon: "sterlingsign.circle",
-                color: .green
+                color: .green,
+                onTap: onRevenueTap
             )
 
             StatCard(
@@ -144,7 +151,8 @@ struct StatsGridView: View {
                 value: "\(stats.clients.current.count)",
                 change: stats.clients.comparisons.first?.changePercent,
                 icon: "person.2",
-                color: .purple
+                color: .purple,
+                onTap: onClientsTap
             )
 
             StatCard(
@@ -152,7 +160,8 @@ struct StatsGridView: View {
                 value: "\(stats.newClients.current.count)",
                 change: stats.newClients.comparisons.first?.changePercent,
                 icon: "person.badge.plus",
-                color: .orange
+                color: .orange,
+                onTap: onNewClientsTap
             )
         }
         .padding(.horizontal)

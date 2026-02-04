@@ -8,6 +8,35 @@
 import Foundation
 import Combine
 
+/// Response wrapper for clients list endpoint
+private struct ClientsResponse: Decodable {
+    let clients: [Client]
+    let pagination: ClientsPagination
+
+    struct ClientsPagination: Decodable {
+        let page: Int
+        let pages: Int
+        let total: Int
+        let limit: Int
+        let hasMore: Bool
+
+        enum CodingKeys: String, CodingKey {
+            case page, pages, total, limit
+            case hasMore = "has_more"
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            page = try container.decodeIfPresent(Int.self, forKey: .page) ?? 1
+            pages = try container.decodeIfPresent(Int.self, forKey: .pages) ?? 1
+            total = try container.decodeIfPresent(Int.self, forKey: .total) ?? 0
+            limit = try container.decodeIfPresent(Int.self, forKey: .limit) ?? 20
+            let providedHasMore = try container.decodeIfPresent(Bool.self, forKey: .hasMore)
+            hasMore = providedHasMore ?? (page < pages)
+        }
+    }
+}
+
 @MainActor
 final class ClientListViewModel: ObservableObject {
     @Published var clients: [Client] = []
@@ -16,12 +45,12 @@ final class ClientListViewModel: ObservableObject {
     @Published var error: String?
 
     private var currentPage = 1
-    private var totalPages = 1
+    private var hasMore = true
     private let pageSize = 20
     private var cancellables = Set<AnyCancellable>()
 
     var hasMorePages: Bool {
-        currentPage < totalPages
+        hasMore
     }
 
     init() {
@@ -34,17 +63,17 @@ final class ClientListViewModel: ObservableObject {
         error = nil
 
         do {
-            let response: [Client] = try await APIClient.shared.request(
+            let response: ClientsResponse = try await APIClient.shared.request(
                 .clients(
                     page: currentPage,
                     limit: pageSize,
                     search: searchText.isEmpty ? nil : searchText
                 ),
-                responseType: [Client].self
+                responseType: ClientsResponse.self
             )
-            clients = response
-            // Estimate if there are more pages based on response count
-            totalPages = response.count == pageSize ? currentPage + 1 : currentPage
+            clients = response.clients
+            hasMore = response.pagination.hasMore
+            currentPage = response.pagination.page
         } catch {
             self.error = error.localizedDescription
         }
@@ -58,16 +87,16 @@ final class ClientListViewModel: ObservableObject {
         currentPage += 1
 
         do {
-            let response: [Client] = try await APIClient.shared.request(
+            let response: ClientsResponse = try await APIClient.shared.request(
                 .clients(
                     page: currentPage,
                     limit: pageSize,
                     search: searchText.isEmpty ? nil : searchText
                 ),
-                responseType: [Client].self
+                responseType: ClientsResponse.self
             )
-            clients.append(contentsOf: response)
-            totalPages = response.count == pageSize ? currentPage + 1 : currentPage
+            clients.append(contentsOf: response.clients)
+            hasMore = response.pagination.hasMore
         } catch {
             currentPage -= 1
         }

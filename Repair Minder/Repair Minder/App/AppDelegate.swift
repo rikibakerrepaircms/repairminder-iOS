@@ -55,11 +55,6 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         let userInfo = notification.request.content.userInfo
         logger.debug("Foreground notification received: \(userInfo)")
 
-        // Trigger a data refresh
-        Task {
-            await SyncEngine.shared.performFullSync()
-        }
-
         // Show banner, play sound, update badge
         completionHandler([.banner, .sound, .badge])
     }

@@ -50,37 +50,6 @@ struct ClientListRow: View {
 
 #Preview {
     List {
-        ClientListRow(client: Client(
-            id: "1",
-            email: "john@example.com",
-            firstName: "John",
-            lastName: "Smith",
-            phone: "07123456789",
-            company: nil,
-            address: nil,
-            city: nil,
-            postcode: nil,
-            notes: nil,
-            orderCount: 5,
-            totalSpent: 450,
-            createdAt: Date(),
-            updatedAt: Date()
-        ))
-        ClientListRow(client: Client(
-            id: "2",
-            email: "jane@example.com",
-            firstName: "Jane",
-            lastName: "Doe",
-            phone: nil,
-            company: "Acme Corp",
-            address: nil,
-            city: nil,
-            postcode: nil,
-            notes: nil,
-            orderCount: 12,
-            totalSpent: 1250,
-            createdAt: Date(),
-            updatedAt: Date()
-        ))
+        ClientListRow(client: .sample)
     }
 }

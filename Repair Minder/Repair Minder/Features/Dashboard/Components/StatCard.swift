@@ -13,35 +13,42 @@ struct StatCard: View {
     let change: Double?
     let icon: String
     let color: Color
+    var onTap: (() -> Void)?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundStyle(color)
+        Button {
+            onTap?()
+        } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: icon)
+                        .font(.title2)
+                        .foregroundStyle(color)
 
-                Spacer()
+                    Spacer()
 
-                if let change = change {
-                    ChangeIndicator(percentage: change)
+                    if let change = change {
+                        ChangeIndicator(percentage: change)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(value)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.primary)
+
+                    Text(title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(value)
-                    .font(.title2)
-                    .fontWeight(.bold)
-
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            .padding()
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .buttonStyle(.plain)
     }
 }
 

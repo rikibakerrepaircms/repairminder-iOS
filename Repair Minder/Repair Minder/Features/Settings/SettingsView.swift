@@ -55,37 +55,6 @@ struct SettingsView: View {
                 }
             }
 
-            // Data Section
-            Section("Data") {
-                SyncStatusRow(
-                    status: vm.syncStatus,
-                    lastSyncDate: vm.lastSyncDate,
-                    pendingCount: vm.pendingChangesCount
-                )
-
-                Button {
-                    Task {
-                        await vm.syncNow()
-                    }
-                } label: {
-                    HStack {
-                        Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
-
-                        if vm.isSyncing {
-                            Spacer()
-                            ProgressView()
-                        }
-                    }
-                }
-                .disabled(vm.isSyncing)
-
-                if let error = vm.syncError {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-            }
-
             // Support Section
             Section("Support") {
                 Button {
@@ -158,7 +127,7 @@ struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Are you sure you want to sign out? Any unsynced changes will be saved locally.")
+            Text("Are you sure you want to logout?")
         }
     }
 }

@@ -28,8 +28,8 @@ struct ClientHeader: View {
                     .foregroundStyle(.secondary)
             }
 
-            if let company = client.company, !company.isEmpty {
-                Text(company)
+            if let groupName = client.clientGroupName, !groupName.isEmpty {
+                Text(groupName)
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
@@ -43,22 +43,7 @@ struct ClientHeader: View {
 
 #Preview {
     VStack(spacing: 20) {
-        ClientHeader(client: Client(
-            id: "1",
-            email: "john@example.com",
-            firstName: "John",
-            lastName: "Smith",
-            phone: "07123456789",
-            company: "Acme Corp",
-            address: nil,
-            city: nil,
-            postcode: nil,
-            notes: nil,
-            orderCount: 5,
-            totalSpent: 450,
-            createdAt: Date(),
-            updatedAt: Date()
-        ))
+        ClientHeader(client: .sample)
     }
     .padding()
     .background(Color(.systemGroupedBackground))

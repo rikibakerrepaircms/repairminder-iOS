@@ -6,14 +6,10 @@
 //
 
 import SwiftUI
-import CoreData
 
 #if DEBUG
 struct DebugView: View {
-    @ObservedObject private var syncEngine = SyncEngine.shared
     @ObservedObject private var networkMonitor = NetworkMonitor.shared
-    @State private var isSyncing = false
-    @State private var isClearing = false
 
     var body: some View {
         List {
@@ -30,25 +26,6 @@ struct DebugView: View {
 
                 LabeledContent("Connection Type") {
                     Text(networkMonitor.connectionType.rawValue.capitalized)
-                }
-            }
-
-            // Sync Status
-            Section("Sync") {
-                LabeledContent("Status") {
-                    Text(statusDescription)
-                        .foregroundStyle(statusColor)
-                }
-
-                LabeledContent("Pending Changes") {
-                    Text("\(syncEngine.pendingChangesCount)")
-                        .foregroundStyle(syncEngine.pendingChangesCount > 0 ? .orange : .secondary)
-                }
-
-                if let lastSync = syncEngine.lastSyncDate {
-                    LabeledContent("Last Sync") {
-                        Text(lastSync.formatted(date: .abbreviated, time: .shortened))
-                    }
                 }
             }
 
@@ -75,43 +52,6 @@ struct DebugView: View {
                 }
             }
 
-            // Debug Actions
-            Section("Actions") {
-                Button {
-                    Task {
-                        isSyncing = true
-                        await syncEngine.performFullSync()
-                        isSyncing = false
-                    }
-                } label: {
-                    HStack {
-                        Label("Force Sync", systemImage: "arrow.triangle.2.circlepath")
-                        if isSyncing {
-                            Spacer()
-                            ProgressView()
-                        }
-                    }
-                }
-                .disabled(isSyncing)
-
-                Button(role: .destructive) {
-                    Task {
-                        isClearing = true
-                        await clearCache()
-                        isClearing = false
-                    }
-                } label: {
-                    HStack {
-                        Label("Clear Local Cache", systemImage: "trash")
-                        if isClearing {
-                            Spacer()
-                            ProgressView()
-                        }
-                    }
-                }
-                .disabled(isClearing)
-            }
-
             // Build Info
             Section("Build") {
                 LabeledContent("Version") {
@@ -130,50 +70,6 @@ struct DebugView: View {
         }
         .navigationTitle("Debug")
         .navigationBarTitleDisplayMode(.inline)
-    }
-
-    private var statusDescription: String {
-        switch syncEngine.status {
-        case .idle:
-            return "Idle"
-        case .syncing(let progress):
-            return "Syncing \(Int(progress * 100))%"
-        case .completed:
-            return "Completed"
-        case .error(let message):
-            return "Error: \(message)"
-        case .offline:
-            return "Offline"
-        }
-    }
-
-    private var statusColor: Color {
-        switch syncEngine.status {
-        case .idle, .completed:
-            return .secondary
-        case .syncing:
-            return .blue
-        case .error:
-            return .red
-        case .offline:
-            return .orange
-        }
-    }
-
-    private func clearCache() async {
-        let context = CoreDataStack.shared.newBackgroundContext()
-        await context.perform {
-            let entities = ["CDOrder", "CDDevice", "CDClient", "CDTicket", "CDTicketMessage"]
-            for entityName in entities {
-                let request = NSFetchRequest<NSFetchRequestResult>(entityName: entityName)
-                let deleteRequest = NSBatchDeleteRequest(fetchRequest: request)
-                _ = try? context.execute(deleteRequest)
-            }
-            try? context.save()
-        }
-
-        // Clear last sync date
-        UserDefaults.standard.removeObject(forKey: "lastSyncDate")
     }
 }
 

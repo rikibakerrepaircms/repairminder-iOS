@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import CoreData
 
 struct TicketMessage: Identifiable, Equatable, Sendable {
     let id: String
@@ -59,33 +58,3 @@ extension TicketMessage: Codable {
     }
 }
 
-// MARK: - Core Data Conversion
-extension TicketMessage {
-    @MainActor
-    init(from entity: CDTicketMessage) {
-        self.id = entity.id ?? ""
-        self.ticketId = entity.ticketId ?? ""
-        self.content = entity.content ?? ""
-        self.senderType = SenderType(rawValue: entity.senderType ?? "") ?? .client
-        self.senderName = entity.senderName
-        self.senderId = entity.senderId
-        self.isInternal = entity.isInternal
-        self.createdAt = entity.createdAt ?? Date()
-    }
-
-    @MainActor
-    func toEntity(in context: NSManagedObjectContext) -> CDTicketMessage {
-        let entity = CDTicketMessage(context: context)
-        entity.id = id
-        entity.ticketId = ticketId
-        entity.content = content
-        entity.senderType = senderType.rawValue
-        entity.senderName = senderName
-        entity.senderId = senderId
-        entity.isInternal = isInternal
-        entity.createdAt = createdAt
-        entity.syncedAt = Date()
-        entity.needsSync = false
-        return entity
-    }
-}

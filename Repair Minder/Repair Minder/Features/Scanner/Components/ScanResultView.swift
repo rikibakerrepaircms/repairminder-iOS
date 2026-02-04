@@ -128,7 +128,7 @@ private struct DeviceResultContent: View {
                 DeviceStatusBadge(status: device.status, size: .large)
             }
 
-            if let serial = device.serial, !serial.isEmpty {
+            if let serial = device.serialNumber, !serial.isEmpty {
                 HStack(spacing: 8) {
                     Image(systemName: "barcode")
                         .foregroundStyle(.secondary)
@@ -138,8 +138,8 @@ private struct DeviceResultContent: View {
                 }
             }
 
-            if let issue = device.issue, !issue.isEmpty {
-                Text(issue)
+            if let clientName = device.clientName, !clientName.isEmpty {
+                Text("Client: \(clientName)")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -224,25 +224,7 @@ private struct UnknownResultContent: View {
 
 #Preview("Device Found") {
     ScanResultView(
-        result: .device(Device(
-            id: "1",
-            orderId: "1",
-            type: "Phone",
-            brand: "Apple",
-            model: "iPhone 15 Pro",
-            serial: "F2LTJG9PNQ",
-            imei: nil,
-            passcode: nil,
-            status: .inRepair,
-            issue: "Cracked screen and battery replacement",
-            diagnosis: nil,
-            resolution: nil,
-            price: Decimal(150),
-            assignedUserId: nil,
-            assignedUserName: nil,
-            createdAt: Date(),
-            updatedAt: Date()
-        )),
+        result: .device(.sample),
         onNavigate: { _ in },
         onRescan: {}
     )

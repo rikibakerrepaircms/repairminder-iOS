@@ -52,22 +52,7 @@ struct ContactButton: View {
 }
 
 #Preview {
-    ContactActionsView(client: Client(
-        id: "1",
-        email: "john@example.com",
-        firstName: "John",
-        lastName: "Smith",
-        phone: "07123456789",
-        company: nil,
-        address: nil,
-        city: nil,
-        postcode: nil,
-        notes: nil,
-        orderCount: 5,
-        totalSpent: 450,
-        createdAt: Date(),
-        updatedAt: Date()
-    ))
-    .padding()
-    .background(Color(.systemGroupedBackground))
+    ContactActionsView(client: .sample)
+        .padding()
+        .background(Color(.systemGroupedBackground))
 }

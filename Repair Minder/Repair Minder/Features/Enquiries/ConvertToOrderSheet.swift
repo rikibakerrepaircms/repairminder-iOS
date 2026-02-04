@@ -50,7 +50,7 @@ struct ConvertToOrderSheet: View {
 
                 // Services
                 Section("Services") {
-                    ForEach(ServiceType.allCases, id: \.self) { service in
+                    ForEach(RepairServiceType.allCases, id: \.self) { service in
                         Toggle(isOn: Binding(
                             get: { selectedServices.contains(service.rawValue) },
                             set: { isSelected in
@@ -156,4 +156,43 @@ struct ConvertToOrderSheet: View {
             print("Converting with data: \(data)")
         }
     )
+}
+
+// MARK: - Repair Service Type (for enquiry conversion)
+
+enum RepairServiceType: String, CaseIterable {
+    case screenRepair = "screen_repair"
+    case batteryReplacement = "battery_replacement"
+    case chargingPort = "charging_port"
+    case waterDamage = "water_damage"
+    case softwareIssue = "software_issue"
+    case diagnostics = "diagnostics"
+    case dataRecovery = "data_recovery"
+    case other = "other"
+
+    var displayName: String {
+        switch self {
+        case .screenRepair: return "Screen Repair"
+        case .batteryReplacement: return "Battery Replacement"
+        case .chargingPort: return "Charging Port"
+        case .waterDamage: return "Water Damage"
+        case .softwareIssue: return "Software Issue"
+        case .diagnostics: return "Diagnostics"
+        case .dataRecovery: return "Data Recovery"
+        case .other: return "Other"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .screenRepair: return "iphone.slash"
+        case .batteryReplacement: return "battery.100"
+        case .chargingPort: return "bolt"
+        case .waterDamage: return "drop"
+        case .softwareIssue: return "gearshape"
+        case .diagnostics: return "magnifyingglass"
+        case .dataRecovery: return "externaldrive"
+        case .other: return "wrench"
+        }
+    }
 }
