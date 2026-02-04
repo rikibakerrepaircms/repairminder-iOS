@@ -110,9 +110,11 @@ final class ScannerViewModel: NSObject {
 
         guard !captureSession.isRunning else { return }
 
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.captureSession.startRunning()
-            Task { @MainActor in
+        // Capture session reference before async closure
+        let session = captureSession
+        DispatchQueue.global(qos: .userInitiated).async {
+            session.startRunning()
+            Task { @MainActor [weak self] in
                 self?.isScanning = true
             }
         }
@@ -121,9 +123,11 @@ final class ScannerViewModel: NSObject {
     func stopScanning() {
         guard captureSession.isRunning else { return }
 
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.captureSession.stopRunning()
-            Task { @MainActor in
+        // Capture session reference before async closure
+        let session = captureSession
+        DispatchQueue.global(qos: .userInitiated).async {
+            session.stopRunning()
+            Task { @MainActor [weak self] in
                 self?.isScanning = false
             }
         }

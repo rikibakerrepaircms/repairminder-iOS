@@ -167,7 +167,7 @@ struct DebugView: View {
             for entityName in entities {
                 let request = NSFetchRequest<NSFetchRequestResult>(entityName: entityName)
                 let deleteRequest = NSBatchDeleteRequest(fetchRequest: request)
-                try? context.execute(deleteRequest)
+                _ = try? context.execute(deleteRequest)
             }
             try? context.save()
         }

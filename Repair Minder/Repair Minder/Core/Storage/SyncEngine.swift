@@ -254,9 +254,12 @@ final class SyncEngine: ObservableObject {
     // MARK: - Push Operations
 
     private func pushOrderUpdate(_ entity: NSManagedObject, context: NSManagedObjectContext) async throws {
+        // Capture the object ID which is Sendable
+        let objectID = entity.objectID
+
         // Extract values on context's queue
         let (id, statusValue, notesValue) = await context.perform {
-            let order = entity as? CDOrder
+            let order = context.object(with: objectID) as? CDOrder
             return (order?.id, order?.status, order?.notes)
         }
 
@@ -272,7 +275,7 @@ final class SyncEngine: ObservableObject {
         try await APIClient.shared.requestVoid(.updateOrder(id: id, body: update))
 
         await context.perform {
-            if let order = entity as? CDOrder {
+            if let order = context.object(with: objectID) as? CDOrder {
                 order.needsSync = false
                 order.syncedAt = Date()
                 try? context.save()
@@ -283,9 +286,12 @@ final class SyncEngine: ObservableObject {
     }
 
     private func pushDeviceUpdate(_ entity: NSManagedObject, context: NSManagedObjectContext) async throws {
+        // Capture the object ID which is Sendable
+        let objectID = entity.objectID
+
         // Extract values on context's queue
         let (id, statusValue, diagnosisValue, resolutionValue) = await context.perform {
-            let device = entity as? CDDevice
+            let device = context.object(with: objectID) as? CDDevice
             return (device?.id, device?.status, device?.diagnosis, device?.resolution)
         }
 
@@ -306,7 +312,7 @@ final class SyncEngine: ObservableObject {
         try await APIClient.shared.requestVoid(.updateDevice(id: id, body: update))
 
         await context.perform {
-            if let device = entity as? CDDevice {
+            if let device = context.object(with: objectID) as? CDDevice {
                 device.needsSync = false
                 device.syncedAt = Date()
                 try? context.save()
@@ -317,9 +323,12 @@ final class SyncEngine: ObservableObject {
     }
 
     private func pushTicketMessage(_ entity: NSManagedObject, context: NSManagedObjectContext) async throws {
+        // Capture the object ID which is Sendable
+        let objectID = entity.objectID
+
         // Extract values on context's queue
         let (ticketId, contentValue, isInternalValue) = await context.perform {
-            let message = entity as? CDTicketMessage
+            let message = context.object(with: objectID) as? CDTicketMessage
             return (message?.ticketId, message?.content ?? "", message?.isInternal ?? false)
         }
 
@@ -343,7 +352,7 @@ final class SyncEngine: ObservableObject {
         try await APIClient.shared.requestVoid(.sendTicketMessage(id: ticketId, body: newMessage))
 
         await context.perform {
-            if let message = entity as? CDTicketMessage {
+            if let message = context.object(with: objectID) as? CDTicketMessage {
                 message.needsSync = false
                 message.syncedAt = Date()
                 try? context.save()
@@ -518,7 +527,7 @@ final class SyncEngine: ObservableObject {
 
     // MARK: - Background Sync
 
-    static let backgroundTaskIdentifier = "com.mendmyi.repairminder.sync"
+    nonisolated static let backgroundTaskIdentifier = "com.mendmyi.repairminder.sync"
 
     nonisolated func scheduleBackgroundSync() {
         let request = BGAppRefreshTaskRequest(identifier: Self.backgroundTaskIdentifier)

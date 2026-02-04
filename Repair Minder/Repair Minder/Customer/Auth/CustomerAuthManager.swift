@@ -34,7 +34,7 @@ final class CustomerAuthManager {
         isLoading = true
         defer { isLoading = false }
 
-        guard let token = keychain.getString(for: .accessToken),
+        guard keychain.getString(for: .accessToken) != nil,
               let email = keychain.getString(for: .userId) else {
             logger.debug("No stored customer token, not authenticated")
             return

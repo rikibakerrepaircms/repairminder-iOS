@@ -9,6 +9,7 @@ import Foundation
 import Network
 import Combine
 
+@MainActor
 final class NetworkMonitor: ObservableObject {
     static let shared = NetworkMonitor()
 
