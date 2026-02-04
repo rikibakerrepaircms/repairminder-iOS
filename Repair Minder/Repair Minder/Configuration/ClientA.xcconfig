@@ -1,0 +1,21 @@
+//
+//  ClientA.xcconfig
+//  Repair Minder
+//
+//  Example client brand configuration (ClientA Repairs)
+//
+
+#include "Base.xcconfig"
+
+// App Identity
+PRODUCT_BUNDLE_IDENTIFIER = com.clienta.repairshop
+PRODUCT_NAME = ClientA Repairs
+MARKETING_VERSION = 1.0.0
+CURRENT_PROJECT_VERSION = 1
+
+// Brand Identifiers (read at runtime via Info.plist)
+BRAND_ID = clienta
+BRAND_API_SUBDOMAIN = clienta.api
+
+// Info.plist Display Values
+INFOPLIST_KEY_CFBundleDisplayName = ClientA Repairs

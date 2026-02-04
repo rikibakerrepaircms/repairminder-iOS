@@ -1,0 +1,21 @@
+//
+//  RepairMinder.xcconfig
+//  Repair Minder
+//
+//  Default brand configuration for Repair Minder
+//
+
+#include "Base.xcconfig"
+
+// App Identity
+PRODUCT_BUNDLE_IDENTIFIER = com.mendmyi.repairminder
+PRODUCT_NAME = Repair Minder
+MARKETING_VERSION = 1.0.0
+CURRENT_PROJECT_VERSION = 1
+
+// Brand Identifiers (read at runtime via Info.plist)
+BRAND_ID = repairminder
+BRAND_API_SUBDOMAIN = api
+
+// Info.plist Display Values
+INFOPLIST_KEY_CFBundleDisplayName = Repair Minder
