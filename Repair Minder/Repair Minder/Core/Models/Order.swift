@@ -38,40 +38,65 @@ struct Order: Identifiable, Equatable, Sendable {
 }
 
 enum OrderStatus: String, Codable, CaseIterable, Sendable {
-    case bookedIn = "booked_in"
+    case awaitingDevice = "awaiting_device"
     case inProgress = "in_progress"
+    case serviceComplete = "service_complete"
+    case awaitingCollection = "awaiting_collection"
+    case collectedDespatched = "collected_despatched"
+    // Legacy statuses for backwards compatibility
+    case bookedIn = "booked_in"
     case awaitingParts = "awaiting_parts"
     case ready = "ready"
     case collected = "collected"
     case cancelled = "cancelled"
+    case complete = "complete"
+    case unknown
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        self = OrderStatus(rawValue: rawValue) ?? .unknown
+    }
 
     var displayName: String {
         switch self {
-        case .bookedIn: return "Booked In"
+        case .awaitingDevice: return "Awaiting Device"
         case .inProgress: return "In Progress"
+        case .serviceComplete: return "Service Complete"
+        case .awaitingCollection: return "Awaiting Collection"
+        case .collectedDespatched: return "Collected/Despatched"
+        case .bookedIn: return "Booked In"
         case .awaitingParts: return "Awaiting Parts"
         case .ready: return "Ready"
         case .collected: return "Collected"
         case .cancelled: return "Cancelled"
+        case .complete: return "Complete"
+        case .unknown: return "Unknown"
         }
     }
 
     var colorName: String {
         switch self {
-        case .bookedIn: return "blue"
+        case .awaitingDevice: return "purple"
         case .inProgress: return "orange"
+        case .serviceComplete: return "blue"
+        case .awaitingCollection: return "green"
+        case .collectedDespatched: return "gray"
+        case .bookedIn: return "blue"
         case .awaitingParts: return "yellow"
         case .ready: return "green"
-        case .collected: return "gray"
+        case .collected, .complete: return "gray"
         case .cancelled: return "red"
+        case .unknown: return "gray"
         }
     }
 
     var isActive: Bool {
         switch self {
-        case .bookedIn, .inProgress, .awaitingParts, .ready:
+        case .awaitingDevice, .inProgress, .serviceComplete, .awaitingCollection,
+             .bookedIn, .awaitingParts, .ready:
             return true
-        case .collected, .cancelled:
+        case .collectedDespatched, .collected, .cancelled, .complete, .unknown:
             return false
         }
     }
@@ -80,10 +105,38 @@ enum OrderStatus: String, Codable, CaseIterable, Sendable {
 // MARK: - Codable
 extension Order: Codable {
     enum CodingKeys: String, CodingKey {
-        case id, status, total, deposit, balance, notes
-        case orderNumber, clientId, clientName, clientEmail, clientPhone
-        case locationId, locationName, assignedUserId, assignedUserName
-        case deviceCount, createdAt, updatedAt
+        case id, status, client, location, notes
+        case orderNumber
+        case orderTotal
+        case amountPaid
+        case balanceDue
+        case deviceCount
+        case assignedUser
+        case createdAt, updatedAt
+    }
+
+    // Nested structures to match backend response
+    struct ClientInfo: Decodable {
+        let id: String
+        let email: String?
+        let firstName: String?
+        let lastName: String?
+        let phone: String?
+
+        var fullName: String? {
+            let parts = [firstName, lastName].compactMap { $0 }.filter { !$0.isEmpty }
+            return parts.isEmpty ? nil : parts.joined(separator: " ")
+        }
+    }
+
+    struct LocationInfo: Decodable {
+        let id: String
+        let name: String?
+    }
+
+    struct AssignedUserInfo: Decodable {
+        let id: String
+        let name: String?
     }
 
     init(from decoder: Decoder) throws {
@@ -93,42 +146,75 @@ extension Order: Codable {
         orderNumber = try container.decode(Int.self, forKey: .orderNumber)
         status = try container.decode(OrderStatus.self, forKey: .status)
         notes = try container.decodeIfPresent(String.self, forKey: .notes)
-        clientId = try container.decode(String.self, forKey: .clientId)
-        clientName = try container.decodeIfPresent(String.self, forKey: .clientName)
-        clientEmail = try container.decodeIfPresent(String.self, forKey: .clientEmail)
-        clientPhone = try container.decodeIfPresent(String.self, forKey: .clientPhone)
-        locationId = try container.decodeIfPresent(String.self, forKey: .locationId)
-        locationName = try container.decodeIfPresent(String.self, forKey: .locationName)
-        assignedUserId = try container.decodeIfPresent(String.self, forKey: .assignedUserId)
-        assignedUserName = try container.decodeIfPresent(String.self, forKey: .assignedUserName)
         deviceCount = try container.decodeIfPresent(Int.self, forKey: .deviceCount) ?? 0
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)
 
-        // Handle Decimal decoding from String or Double
-        if let totalString = try? container.decode(String.self, forKey: .total) {
+        // Decode nested client object
+        let client = try container.decode(ClientInfo.self, forKey: .client)
+        clientId = client.id
+        clientName = client.fullName
+        clientEmail = client.email
+        clientPhone = client.phone
+
+        // Decode optional nested location
+        if let location = try container.decodeIfPresent(LocationInfo.self, forKey: .location) {
+            locationId = location.id
+            locationName = location.name
+        } else {
+            locationId = nil
+            locationName = nil
+        }
+
+        // Decode optional nested assigned_user
+        if let assignedUser = try container.decodeIfPresent(AssignedUserInfo.self, forKey: .assignedUser) {
+            assignedUserId = assignedUser.id
+            assignedUserName = assignedUser.name
+        } else {
+            assignedUserId = nil
+            assignedUserName = nil
+        }
+
+        // Handle Decimal decoding from String or Double for order_total
+        if let totalString = try? container.decode(String.self, forKey: .orderTotal) {
             total = Decimal(string: totalString)
-        } else if let totalDouble = try? container.decode(Double.self, forKey: .total) {
+        } else if let totalDouble = try? container.decode(Double.self, forKey: .orderTotal) {
             total = Decimal(totalDouble)
         } else {
             total = nil
         }
 
-        if let depositString = try? container.decode(String.self, forKey: .deposit) {
-            deposit = Decimal(string: depositString)
-        } else if let depositDouble = try? container.decode(Double.self, forKey: .deposit) {
-            deposit = Decimal(depositDouble)
+        // Handle amount_paid (deposit)
+        if let paidString = try? container.decode(String.self, forKey: .amountPaid) {
+            deposit = Decimal(string: paidString)
+        } else if let paidDouble = try? container.decode(Double.self, forKey: .amountPaid) {
+            deposit = Decimal(paidDouble)
         } else {
             deposit = nil
         }
 
-        if let balanceString = try? container.decode(String.self, forKey: .balance) {
+        // Handle balance_due
+        if let balanceString = try? container.decode(String.self, forKey: .balanceDue) {
             balance = Decimal(string: balanceString)
-        } else if let balanceDouble = try? container.decode(Double.self, forKey: .balance) {
+        } else if let balanceDouble = try? container.decode(Double.self, forKey: .balanceDue) {
             balance = Decimal(balanceDouble)
         } else {
             balance = nil
         }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(orderNumber, forKey: .orderNumber)
+        try container.encode(status, forKey: .status)
+        try container.encodeIfPresent(notes, forKey: .notes)
+        try container.encode(deviceCount, forKey: .deviceCount)
+        try container.encodeIfPresent(total, forKey: .orderTotal)
+        try container.encodeIfPresent(deposit, forKey: .amountPaid)
+        try container.encodeIfPresent(balance, forKey: .balanceDue)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
     }
 }
 
@@ -138,7 +224,7 @@ extension Order {
     init(from entity: CDOrder) {
         self.id = entity.id ?? ""
         self.orderNumber = Int(entity.orderNumber)
-        self.status = OrderStatus(rawValue: entity.status ?? "") ?? .bookedIn
+        self.status = OrderStatus(rawValue: entity.status ?? "") ?? .unknown
         self.total = entity.total as Decimal?
         self.deposit = entity.deposit as Decimal?
         self.balance = entity.balance as Decimal?
@@ -151,7 +237,7 @@ extension Order {
         self.locationName = nil
         self.assignedUserId = entity.assignedUserId
         self.assignedUserName = nil
-        self.deviceCount = entity.devices?.count ?? 0
+        self.deviceCount = Int(entity.devices?.count ?? 0)
         self.createdAt = entity.createdAt ?? Date()
         self.updatedAt = entity.updatedAt ?? Date()
     }

@@ -12,7 +12,7 @@ import Combine
 final class OrderListViewModel: ObservableObject {
     @Published var orders: [Order] = []
     @Published var searchText: String = ""
-    @Published var selectedStatus: OrderStatus?
+    @Published var selectedStatuses: Set<OrderStatus> = []
     @Published var isLoading: Bool = false
     @Published var error: String?
 
@@ -26,7 +26,7 @@ final class OrderListViewModel: ObservableObject {
     }
 
     var hasActiveFilters: Bool {
-        selectedStatus != nil
+        !selectedStatuses.isEmpty
     }
 
     init() {
@@ -39,11 +39,16 @@ final class OrderListViewModel: ObservableObject {
         error = nil
 
         do {
+            // Pass comma-separated statuses if multiple selected
+            let statusParam: String? = selectedStatuses.isEmpty
+                ? nil
+                : selectedStatuses.map { $0.rawValue }.joined(separator: ",")
+
             let response: [Order] = try await APIClient.shared.request(
                 .orders(
                     page: currentPage,
                     limit: pageSize,
-                    status: selectedStatus?.rawValue,
+                    status: statusParam,
                     search: searchText.isEmpty ? nil : searchText
                 ),
                 responseType: [Order].self
@@ -64,11 +69,15 @@ final class OrderListViewModel: ObservableObject {
         currentPage += 1
 
         do {
+            let statusParam: String? = selectedStatuses.isEmpty
+                ? nil
+                : selectedStatuses.map { $0.rawValue }.joined(separator: ",")
+
             let response: [Order] = try await APIClient.shared.request(
                 .orders(
                     page: currentPage,
                     limit: pageSize,
-                    status: selectedStatus?.rawValue,
+                    status: statusParam,
                     search: searchText.isEmpty ? nil : searchText
                 ),
                 responseType: [Order].self
@@ -84,13 +93,17 @@ final class OrderListViewModel: ObservableObject {
         await loadOrders()
     }
 
-    func applyFilter(status: OrderStatus?) {
-        selectedStatus = status
+    func toggleFilter(status: OrderStatus) {
+        if selectedStatuses.contains(status) {
+            selectedStatuses.remove(status)
+        } else {
+            selectedStatuses.insert(status)
+        }
         Task { await loadOrders() }
     }
 
     func clearFilters() {
-        selectedStatus = nil
+        selectedStatuses.removeAll()
         Task { await loadOrders() }
     }
 

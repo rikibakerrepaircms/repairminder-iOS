@@ -54,18 +54,24 @@ struct OrderStatusBadge: View {
 
     private var foregroundColor: Color {
         switch status {
+        case .awaitingDevice:
+            return .purple
         case .bookedIn:
             return .blue
         case .inProgress:
             return .orange
         case .awaitingParts:
             return .yellow
-        case .ready:
+        case .serviceComplete:
+            return .blue
+        case .awaitingCollection, .ready:
             return .green
-        case .collected:
+        case .collectedDespatched, .collected, .complete:
             return .gray
         case .cancelled:
             return .red
+        case .unknown:
+            return .gray
         }
     }
 

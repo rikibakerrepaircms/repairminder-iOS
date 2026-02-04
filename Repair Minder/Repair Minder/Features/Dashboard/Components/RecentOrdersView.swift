@@ -97,12 +97,15 @@ struct RecentOrderRow: View {
 
     private var statusColor: Color {
         switch order.status {
+        case .awaitingDevice: return .purple
         case .bookedIn: return .blue
         case .inProgress: return .orange
         case .awaitingParts: return .yellow
-        case .ready: return .green
-        case .collected: return .gray
+        case .serviceComplete: return .blue
+        case .awaitingCollection, .ready: return .green
+        case .collectedDespatched, .collected, .complete: return .gray
         case .cancelled: return .red
+        case .unknown: return .gray
         }
     }
 }

@@ -35,6 +35,11 @@ struct DashboardView: View {
                 routeDestination(for: route)
             }
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    NavigationLink(value: AppRoute.scanner) {
+                        Image(systemName: "qrcode.viewfinder")
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     UserAvatarButton(user: appState.currentUser)
                 }
@@ -51,6 +56,8 @@ struct DashboardView: View {
     @ViewBuilder
     private func routeDestination(for route: AppRoute) -> some View {
         switch route {
+        case .scanner:
+            ScannerView()
         case .devices:
             DeviceListView()
         case .deviceDetail(let id):

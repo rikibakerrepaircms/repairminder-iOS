@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct ContactPill: View {
     let icon: String
@@ -22,11 +23,11 @@ struct ContactPill: View {
             switch action {
             case .call:
                 if let url = URL(string: "tel:\(value.replacingOccurrences(of: " ", with: ""))") {
-                    UIApplication.shared.open(url)
+                    openURL(url)
                 }
             case .email:
                 if let url = URL(string: "mailto:\(value)") {
-                    UIApplication.shared.open(url)
+                    openURL(url)
                 }
             }
         } label: {
@@ -54,6 +55,10 @@ struct ContactPill: View {
             }
             return value
         }
+    }
+
+    private func openURL(_ url: URL) {
+        UIApplication.shared.open(url)
     }
 }
 

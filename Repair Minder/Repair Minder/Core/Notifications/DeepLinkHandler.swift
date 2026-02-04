@@ -183,8 +183,9 @@ final class DeepLinkHandler {
             }
 
         case .scanner:
-            router.selectedTab = .scanner
+            router.selectedTab = .dashboard
             router.popToRoot()
+            router.navigate(to: .scanner)
 
         case .settings:
             router.selectedTab = .settings

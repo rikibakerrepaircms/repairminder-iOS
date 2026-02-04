@@ -7,6 +7,12 @@
 
 import SwiftUI
 import os.log
+#if canImport(UIKit)
+import UIKit
+#endif
+#if canImport(AppKit)
+import AppKit
+#endif
 
 // MARK: - View Model
 
@@ -25,14 +31,20 @@ final class NotificationSettingsViewModel {
         errorMessage = nil
 
         do {
-            struct PreferencesResponse: Decodable {
-                let preferences: PushNotificationPreferences
+            // Backend returns { success: true, preferences: {...} } - NOT wrapped in data
+            struct PushPreferencesAPIResponse: Decodable {
+                let success: Bool
+                let preferences: PushNotificationPreferences?
+                let error: String?
             }
-            let response: PreferencesResponse = try await APIClient.shared.request(
-                .getPushPreferences(),
-                responseType: PreferencesResponse.self
+            let response: PushPreferencesAPIResponse = try await APIClient.shared.requestDirect(
+                .getPushPreferences()
             )
-            preferences = response.preferences
+            if response.success, let prefs = response.preferences {
+                preferences = prefs
+            } else if let error = response.error {
+                throw APIError.httpError(statusCode: 400, message: error)
+            }
         } catch APIError.offline {
             // Use local defaults when offline
             logger.info("Offline - using local preferences")
@@ -231,9 +243,15 @@ struct StaffNotificationSettingsView: View {
     }
 
     private func openSystemSettings() {
+        #if canImport(UIKit)
         if let url = URL(string: UIApplication.openSettingsURLString) {
             UIApplication.shared.open(url)
         }
+        #elseif canImport(AppKit)
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
+            NSWorkspace.shared.open(url)
+        }
+        #endif
     }
 }
 

@@ -5,7 +5,7 @@
 //  Created by Claude on 04/02/2026.
 //
 
-import AVFoundation
+@preconcurrency import AVFoundation
 import UIKit
 
 @MainActor

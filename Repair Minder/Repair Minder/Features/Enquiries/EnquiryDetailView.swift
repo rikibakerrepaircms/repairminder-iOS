@@ -12,6 +12,7 @@ struct EnquiryDetailView: View {
     @StateObject private var viewModel: EnquiryDetailViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var showConvertSheet = false
+    @State private var showWorkflowSheet = false
     @State private var replyText = ""
     @FocusState private var isReplyFocused: Bool
 
@@ -64,8 +65,20 @@ struct EnquiryDetailView: View {
                                 replyText = ""
                             }
                         },
+                        onGenerateAI: {
+                            Task {
+                                if let generatedText = await viewModel.generateAIReply() {
+                                    replyText = generatedText
+                                }
+                            }
+                        },
+                        onSelectWorkflow: {
+                            showWorkflowSheet = true
+                        },
                         templates: viewModel.replyTemplates,
-                        isSending: viewModel.isSending
+                        workflows: viewModel.workflows,
+                        isSending: viewModel.isSending,
+                        isGeneratingAI: viewModel.isGeneratingAI
                     )
                 }
             } else {
@@ -94,6 +107,20 @@ struct EnquiryDetailView: View {
                     }
                 )
             }
+        }
+        .sheet(isPresented: $showWorkflowSheet) {
+            WorkflowSelectionSheet(
+                workflows: viewModel.workflows,
+                onSelect: { workflow in
+                    Task {
+                        let success = await viewModel.executeWorkflow(workflow)
+                        if success {
+                            showWorkflowSheet = false
+                        }
+                    }
+                },
+                isExecuting: viewModel.isExecutingWorkflow
+            )
         }
         .task {
             await viewModel.load()

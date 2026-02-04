@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct PermissionDeniedView: View {
     let onManualEntry: () -> Void

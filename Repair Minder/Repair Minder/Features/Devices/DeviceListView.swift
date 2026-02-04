@@ -167,22 +167,30 @@ struct DeviceFilterSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Status") {
+                Section {
                     ForEach(DeviceStatus.allCases, id: \.self) { status in
                         Button {
-                            viewModel.applyFilter(status: status)
-                            dismiss()
+                            viewModel.toggleFilter(status: status)
                         } label: {
                             HStack {
+                                Image(systemName: viewModel.selectedStatuses.contains(status)
+                                    ? "checkmark.square.fill"
+                                    : "square")
+                                    .foregroundStyle(viewModel.selectedStatuses.contains(status) ? .blue : .secondary)
+                                    .font(.title3)
+
                                 DeviceStatusBadge(status: status)
-                                Spacer()
-                                if viewModel.selectedStatus == status {
-                                    Image(systemName: "checkmark")
-                                        .foregroundStyle(.blue)
-                                }
                             }
                         }
                         .foregroundStyle(.primary)
+                    }
+                } header: {
+                    Text("Status")
+                } footer: {
+                    if viewModel.selectedStatuses.isEmpty {
+                        Text("No filters applied - showing all devices")
+                    } else {
+                        Text("\(viewModel.selectedStatuses.count) status\(viewModel.selectedStatuses.count == 1 ? "" : "es") selected")
                     }
                 }
             }
@@ -193,7 +201,6 @@ struct DeviceFilterSheet: View {
                     if viewModel.hasActiveFilters {
                         Button("Clear") {
                             viewModel.clearFilters()
-                            dismiss()
                         }
                     }
                 }

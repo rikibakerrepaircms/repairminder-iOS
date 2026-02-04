@@ -55,8 +55,8 @@ struct MainTabView: View {
             DashboardView()
         case .orders:
             OrderListView()
-        case .scanner:
-            ScannerView()
+        case .enquiries:
+            EnquiryListView()
         case .clients:
             ClientListView()
         case .settings:

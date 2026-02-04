@@ -14,15 +14,24 @@ struct StatusActionsView: View {
 
     var nextStatuses: [OrderStatus] {
         switch currentStatus {
-        case .bookedIn:
+        case .awaitingDevice:
             return [.inProgress]
         case .inProgress:
-            return [.awaitingParts, .ready]
+            return [.serviceComplete]
+        case .serviceComplete:
+            return [.awaitingCollection]
+        case .awaitingCollection:
+            return [.collectedDespatched]
+        case .collectedDespatched:
+            return []
+        // Legacy statuses
+        case .bookedIn:
+            return [.inProgress]
         case .awaitingParts:
             return [.inProgress]
         case .ready:
             return [.collected]
-        case .collected, .cancelled:
+        case .collected, .complete, .cancelled, .unknown:
             return []
         }
     }

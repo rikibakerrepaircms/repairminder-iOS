@@ -589,4 +589,51 @@ extension APIEndpoint {
     static func convertEnquiryToOrder<T: Encodable>(id: String, body: T) -> APIEndpoint {
         APIEndpoint(path: "/api/enquiries/\(id)/convert", method: .post, body: body)
     }
+
+    /// Generate an AI reply for an enquiry
+    static func generateEnquiryReply(id: String, locationId: String? = nil) -> APIEndpoint {
+        struct GenerateBody: Encodable {
+            let locationId: String?
+            enum CodingKeys: String, CodingKey {
+                case locationId = "location_id"
+            }
+        }
+        return APIEndpoint(
+            path: "/api/tickets/\(id)/generate-response",
+            method: .post,
+            body: GenerateBody(locationId: locationId)
+        )
+    }
+
+    /// Execute a workflow on an enquiry
+    static func executeEnquiryWorkflow(enquiryId: String, workflowId: String, variableOverrides: [String: String]? = nil) -> APIEndpoint {
+        struct ExecuteBody: Encodable {
+            let macroId: String
+            let variableOverrides: [String: String]?
+            enum CodingKeys: String, CodingKey {
+                case macroId = "macro_id"
+                case variableOverrides = "variable_overrides"
+            }
+        }
+        return APIEndpoint(
+            path: "/api/tickets/\(enquiryId)/macro",
+            method: .post,
+            body: ExecuteBody(macroId: workflowId, variableOverrides: variableOverrides)
+        )
+    }
+}
+
+// MARK: - Workflow (Macro) Endpoints
+extension APIEndpoint {
+    /// Fetch list of available workflows
+    static func workflows(includeStages: Bool = true) -> APIEndpoint {
+        var params: [String: String] = [:]
+        if includeStages { params["include_stages"] = "true" }
+        return APIEndpoint(path: "/api/macros", queryParameters: params)
+    }
+
+    /// Fetch a single workflow by ID
+    static func workflow(id: String) -> APIEndpoint {
+        APIEndpoint(path: "/api/macros/\(id)")
+    }
 }

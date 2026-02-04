@@ -31,7 +31,7 @@ final class AppRouter {
     enum Tab: Int, CaseIterable, Sendable {
         case dashboard
         case orders
-        case scanner
+        case enquiries
         case clients
         case settings
 
@@ -39,7 +39,7 @@ final class AppRouter {
             switch self {
             case .dashboard: return "Dashboard"
             case .orders: return "Orders"
-            case .scanner: return "Scan"
+            case .enquiries: return "Enquiries"
             case .clients: return "Clients"
             case .settings: return "Settings"
             }
@@ -49,7 +49,7 @@ final class AppRouter {
             switch self {
             case .dashboard: return "chart.bar.fill"
             case .orders: return "doc.text.fill"
-            case .scanner: return "qrcode.viewfinder"
+            case .enquiries: return "envelope.fill"
             case .clients: return "person.2.fill"
             case .settings: return "gearshape.fill"
             }

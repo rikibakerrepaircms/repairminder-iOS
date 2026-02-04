@@ -12,7 +12,7 @@ import Combine
 final class DeviceListViewModel: ObservableObject {
     @Published var devices: [Device] = []
     @Published var searchText: String = ""
-    @Published var selectedStatus: DeviceStatus?
+    @Published var selectedStatuses: Set<DeviceStatus> = []
     @Published var isQueueMode: Bool = true
     @Published var isLoading: Bool = false
     @Published var error: String?
@@ -27,7 +27,7 @@ final class DeviceListViewModel: ObservableObject {
     }
 
     var hasActiveFilters: Bool {
-        selectedStatus != nil
+        !selectedStatuses.isEmpty
     }
 
     init() {
@@ -48,11 +48,16 @@ final class DeviceListViewModel: ObservableObject {
                     responseType: [Device].self
                 )
             } else {
+                // Pass comma-separated statuses if multiple selected
+                let statusParam: String? = selectedStatuses.isEmpty
+                    ? nil
+                    : selectedStatuses.map { $0.rawValue }.joined(separator: ",")
+
                 response = try await APIClient.shared.request(
                     .devices(
                         page: currentPage,
                         limit: pageSize,
-                        status: selectedStatus?.rawValue
+                        status: statusParam
                     ),
                     responseType: [Device].self
                 )
@@ -81,11 +86,15 @@ final class DeviceListViewModel: ObservableObject {
                     responseType: [Device].self
                 )
             } else {
+                let statusParam: String? = selectedStatuses.isEmpty
+                    ? nil
+                    : selectedStatuses.map { $0.rawValue }.joined(separator: ",")
+
                 response = try await APIClient.shared.request(
                     .devices(
                         page: currentPage,
                         limit: pageSize,
-                        status: selectedStatus?.rawValue
+                        status: statusParam
                     ),
                     responseType: [Device].self
                 )
@@ -102,13 +111,17 @@ final class DeviceListViewModel: ObservableObject {
         await loadDevices()
     }
 
-    func applyFilter(status: DeviceStatus?) {
-        selectedStatus = status
+    func toggleFilter(status: DeviceStatus) {
+        if selectedStatuses.contains(status) {
+            selectedStatuses.remove(status)
+        } else {
+            selectedStatuses.insert(status)
+        }
         Task { await loadDevices() }
     }
 
     func clearFilters() {
-        selectedStatus = nil
+        selectedStatuses.removeAll()
         Task { await loadDevices() }
     }
 

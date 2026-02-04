@@ -14,38 +14,31 @@ struct OrderFilterSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Status") {
-                    Button {
-                        viewModel.applyFilter(status: nil)
-                        dismiss()
-                    } label: {
-                        HStack {
-                            Text("All Statuses")
-                                .foregroundStyle(.primary)
-                            Spacer()
-                            if viewModel.selectedStatus == nil {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(.blue)
-                            }
-                        }
-                    }
-
+                Section {
                     ForEach(OrderStatus.allCases, id: \.self) { status in
                         Button {
-                            viewModel.applyFilter(status: status)
-                            dismiss()
+                            viewModel.toggleFilter(status: status)
                         } label: {
                             HStack {
+                                Image(systemName: viewModel.selectedStatuses.contains(status)
+                                    ? "checkmark.square.fill"
+                                    : "square")
+                                    .foregroundStyle(viewModel.selectedStatuses.contains(status) ? .blue : .secondary)
+                                    .font(.title3)
+
                                 OrderStatusBadge(status: status, size: .small)
                                 Text(status.displayName)
                                     .foregroundStyle(.primary)
-                                Spacer()
-                                if viewModel.selectedStatus == status {
-                                    Image(systemName: "checkmark")
-                                        .foregroundStyle(.blue)
-                                }
                             }
                         }
+                    }
+                } header: {
+                    Text("Status")
+                } footer: {
+                    if viewModel.selectedStatuses.isEmpty {
+                        Text("No filters applied - showing all orders")
+                    } else {
+                        Text("\(viewModel.selectedStatuses.count) status\(viewModel.selectedStatuses.count == 1 ? "" : "es") selected")
                     }
                 }
             }
@@ -62,13 +55,12 @@ struct OrderFilterSheet: View {
                     if viewModel.hasActiveFilters {
                         Button("Clear") {
                             viewModel.clearFilters()
-                            dismiss()
                         }
                     }
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
     }
 }
 

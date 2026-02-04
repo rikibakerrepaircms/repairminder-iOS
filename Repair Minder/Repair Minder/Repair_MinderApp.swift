@@ -11,6 +11,7 @@ import BackgroundTasks
 @main
 struct Repair_MinderApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     @State private var appState = AppState()
     @State private var router = AppRouter()
     @AppStorage("appearance") private var appearance: Appearance = .system

@@ -15,6 +15,9 @@ final class EnquiryDetailViewModel: ObservableObject {
     @Published var messages: [EnquiryMessage] = []
     @Published var isLoading = false
     @Published var isSending = false
+    @Published var isGeneratingAI = false
+    @Published var isExecutingWorkflow = false
+    @Published var workflows: [Workflow] = []
     @Published var error: Error?
 
     // MARK: - Properties
@@ -57,6 +60,7 @@ final class EnquiryDetailViewModel: ObservableObject {
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.loadEnquiry() }
             group.addTask { await self.loadMessages() }
+            group.addTask { await self.loadWorkflows() }
         }
 
         isLoading = false
@@ -84,6 +88,63 @@ final class EnquiryDetailViewModel: ObservableObject {
         } catch {
             // Messages might not exist yet, that's okay
             messages = []
+        }
+    }
+
+    func loadWorkflows() async {
+        do {
+            struct WorkflowsResponse: Decodable {
+                let macros: [Workflow]
+            }
+            let endpoint = APIEndpoint.workflows(includeStages: true)
+            let response: WorkflowsResponse = try await APIClient.shared.request(
+                endpoint,
+                responseType: WorkflowsResponse.self
+            )
+            workflows = response.macros.filter { $0.isActive }
+        } catch {
+            // Non-critical, workflows are optional
+            workflows = []
+        }
+    }
+
+    /// Generate an AI reply for this enquiry
+    func generateAIReply() async -> String? {
+        isGeneratingAI = true
+        defer { isGeneratingAI = false }
+
+        do {
+            let endpoint = APIEndpoint.generateEnquiryReply(id: enquiryId)
+            let response: AIReplyResponse = try await APIClient.shared.request(
+                endpoint,
+                responseType: AIReplyResponse.self
+            )
+            return response.text
+        } catch {
+            self.error = error
+            return nil
+        }
+    }
+
+    /// Execute a workflow on this enquiry
+    func executeWorkflow(_ workflow: Workflow, variableOverrides: [String: String]? = nil) async -> Bool {
+        isExecutingWorkflow = true
+        defer { isExecutingWorkflow = false }
+
+        do {
+            let endpoint = APIEndpoint.executeEnquiryWorkflow(
+                enquiryId: enquiryId,
+                workflowId: workflow.id,
+                variableOverrides: variableOverrides
+            )
+            try await APIClient.shared.requestVoid(endpoint)
+            // Reload messages and enquiry to show executed workflow
+            await loadMessages()
+            await loadEnquiry()
+            return true
+        } catch {
+            self.error = error
+            return false
         }
     }
 

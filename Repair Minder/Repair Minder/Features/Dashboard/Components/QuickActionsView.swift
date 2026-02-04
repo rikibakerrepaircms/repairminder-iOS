@@ -29,12 +29,12 @@ struct QuickActionsView: View {
                     icon: "qrcode.viewfinder",
                     color: .green
                 ) {
-                    router.selectedTab = .scanner
+                    router.navigate(to: .scanner)
                 }
 
                 QuickActionButton(
-                    title: "My Queue",
-                    icon: "list.bullet.rectangle",
+                    title: "Devices",
+                    icon: "iphone",
                     color: .orange
                 ) {
                     router.navigate(to: .devices)
