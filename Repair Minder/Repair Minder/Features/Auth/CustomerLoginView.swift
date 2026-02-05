@@ -14,11 +14,13 @@ struct CustomerLoginView: View {
 
     @State private var email = ""
     @State private var codeDigits: [String] = Array(repeating: "", count: 6)
+    @State private var hiddenCode: String = "" // For auto-fill
     @State private var isResending = false
     @State private var resendCooldown = 0
 
     @FocusState private var focusedField: CustomerLoginField?
     @FocusState private var focusedCodeIndex: Int?
+    @FocusState private var hiddenFieldFocused: Bool
 
     private enum CustomerLoginField {
         case email
@@ -26,6 +28,10 @@ struct CustomerLoginView: View {
 
     private var code: String {
         codeDigits.joined()
+    }
+
+    private var nextEmptyIndex: Int {
+        codeDigits.firstIndex(where: { $0.isEmpty }) ?? 5
     }
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -139,6 +145,7 @@ struct CustomerLoginView: View {
             .frame(height: 50)
             .background(isValidEmail && !customerAuth.isLoading ? Color.blue : Color.blue.opacity(0.4))
             .foregroundStyle(.white)
+            .contentShape(Rectangle())
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .disabled(!isValidEmail || customerAuth.isLoading)
         }
@@ -163,22 +170,36 @@ struct CustomerLoginView: View {
             .multilineTextAlignment(.center)
 
             // 6-digit code input boxes
-            HStack(spacing: 8) {
-                ForEach(0..<6, id: \.self) { index in
-                    CodeDigitBox(
-                        digit: $codeDigits[index],
-                        isFocused: focusedCodeIndex == index,
-                        onTap: {
-                            focusedCodeIndex = index
-                        },
-                        onDigitEntered: { digit in
-                            handleDigitEntry(digit, at: index)
-                        },
-                        onBackspace: {
-                            handleBackspace(at: index)
-                        }
-                    )
-                    .focused($focusedCodeIndex, equals: index)
+            ZStack {
+                // Hidden TextField for auto-fill support
+                TextField("", text: $hiddenCode)
+                    .keyboardType(.numberPad)
+                    .textContentType(.oneTimeCode)
+                    .focused($hiddenFieldFocused)
+                    .opacity(0.01)
+                    .frame(width: 1, height: 1)
+                    .onChange(of: hiddenCode) { _, newValue in
+                        handleAutoFill(newValue)
+                    }
+
+                HStack(spacing: 8) {
+                    ForEach(0..<6, id: \.self) { index in
+                        CodeDigitBox(
+                            digit: $codeDigits[index],
+                            isFocused: focusedCodeIndex == index || (hiddenFieldFocused && index == nextEmptyIndex),
+                            onTap: {
+                                hiddenFieldFocused = true
+                                focusedCodeIndex = index
+                            },
+                            onDigitEntered: { digit in
+                                handleDigitEntry(digit, at: index)
+                            },
+                            onBackspace: {
+                                handleBackspace(at: index)
+                            }
+                        )
+                        .focused($focusedCodeIndex, equals: index)
+                    }
                 }
             }
 
@@ -201,6 +222,7 @@ struct CustomerLoginView: View {
             .frame(height: 50)
             .background(code.count == 6 && !customerAuth.isLoading ? Color.blue : Color.blue.opacity(0.4))
             .foregroundStyle(.white)
+            .contentShape(Rectangle())
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .disabled(code.count != 6 || customerAuth.isLoading)
 
@@ -221,8 +243,45 @@ struct CustomerLoginView: View {
         }
         .padding(.horizontal, 24)
         .onAppear {
+            hiddenFieldFocused = true
             focusedCodeIndex = 0
             startResendCooldown()
+        }
+    }
+
+    private func handleAutoFill(_ value: String) {
+        let digits = value.filter { $0.isNumber }
+
+        if digits.count >= 6 {
+            let codeArray = Array(digits.prefix(6))
+            for (index, char) in codeArray.enumerated() {
+                codeDigits[index] = String(char)
+            }
+            hiddenCode = ""
+            hiddenFieldFocused = false
+            focusedCodeIndex = nil
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                if code.count == 6 {
+                    verifyCode()
+                }
+            }
+        } else if digits.count == 1 {
+            let index = nextEmptyIndex
+            codeDigits[index] = digits
+            hiddenCode = ""
+
+            if index < 5 {
+                focusedCodeIndex = index + 1
+            } else {
+                hiddenFieldFocused = false
+                focusedCodeIndex = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    if code.count == 6 {
+                        verifyCode()
+                    }
+                }
+            }
         }
     }
 

@@ -106,6 +106,7 @@ struct StaffLoginView: View {
                             .frame(height: 50)
                             .background(isFormValid && !authManager.isLoading ? Color.blue : Color.blue.opacity(0.4))
                             .foregroundStyle(.white)
+                            .contentShape(Rectangle())
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                             .disabled(!isFormValid || authManager.isLoading)
                         }
@@ -139,6 +140,7 @@ struct StaffLoginView: View {
                         .frame(height: 50)
                         .background(isValidEmail && !authManager.isLoading ? Color.blue : Color.blue.opacity(0.4))
                         .foregroundStyle(.white)
+                        .contentShape(Rectangle())
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                         .padding(.horizontal, 24)
                         .disabled(!isValidEmail || authManager.isLoading)

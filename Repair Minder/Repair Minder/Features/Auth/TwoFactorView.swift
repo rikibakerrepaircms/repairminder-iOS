@@ -17,15 +17,21 @@ struct TwoFactorView: View {
     let useMagicLink: Bool
 
     @State private var codeDigits: [String] = Array(repeating: "", count: 6)
+    @State private var hiddenCode: String = "" // For auto-fill
     @State private var isResending = false
     @State private var resendCooldown = 0
 
     @FocusState private var focusedIndex: Int?
+    @FocusState private var hiddenFieldFocused: Bool
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     private var code: String {
         codeDigits.joined()
+    }
+
+    private var nextEmptyIndex: Int {
+        codeDigits.firstIndex(where: { $0.isEmpty }) ?? 5
     }
 
     var body: some View {
@@ -69,22 +75,37 @@ struct TwoFactorView: View {
                     .padding(.top, 40)
 
                     // 6-digit code input boxes
-                    HStack(spacing: 8) {
-                        ForEach(0..<6, id: \.self) { index in
-                            CodeDigitBox(
-                                digit: $codeDigits[index],
-                                isFocused: focusedIndex == index,
-                                onTap: {
-                                    focusedIndex = index
-                                },
-                                onDigitEntered: { digit in
-                                    handleDigitEntry(digit, at: index)
-                                },
-                                onBackspace: {
-                                    handleBackspace(at: index)
-                                }
-                            )
-                            .focused($focusedIndex, equals: index)
+                    ZStack {
+                        // Hidden TextField for auto-fill support
+                        TextField("", text: $hiddenCode)
+                            .keyboardType(.numberPad)
+                            .textContentType(.oneTimeCode)
+                            .focused($hiddenFieldFocused)
+                            .opacity(0.01) // Nearly invisible but still functional
+                            .frame(width: 1, height: 1)
+                            .onChange(of: hiddenCode) { _, newValue in
+                                handleAutoFill(newValue)
+                            }
+
+                        HStack(spacing: 8) {
+                            ForEach(0..<6, id: \.self) { index in
+                                CodeDigitBox(
+                                    digit: $codeDigits[index],
+                                    isFocused: focusedIndex == index || (hiddenFieldFocused && index == nextEmptyIndex),
+                                    onTap: {
+                                        // Focus the hidden field for auto-fill, but track which box visually
+                                        hiddenFieldFocused = true
+                                        focusedIndex = index
+                                    },
+                                    onDigitEntered: { digit in
+                                        handleDigitEntry(digit, at: index)
+                                    },
+                                    onBackspace: {
+                                        handleBackspace(at: index)
+                                    }
+                                )
+                                .focused($focusedIndex, equals: index)
+                            }
                         }
                     }
                     .padding(.horizontal, 24)
@@ -111,6 +132,7 @@ struct TwoFactorView: View {
                     .frame(height: 50)
                     .background(code.count == 6 && !authManager.isLoading ? Color.blue : Color.blue.opacity(0.4))
                     .foregroundStyle(.white)
+                    .contentShape(Rectangle())
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                     .padding(.horizontal, 24)
                     .disabled(code.count < 6 || authManager.isLoading)
@@ -145,12 +167,56 @@ struct TwoFactorView: View {
             }
         }
         .onAppear {
+            // Focus hidden field for auto-fill support
+            hiddenFieldFocused = true
             focusedIndex = 0
             startResendCooldown()
         }
         .onReceive(timer) { _ in
             if resendCooldown > 0 {
                 resendCooldown -= 1
+            }
+        }
+    }
+
+    private func handleAutoFill(_ value: String) {
+        // Filter to only digits
+        let digits = value.filter { $0.isNumber }
+
+        // If we got a full 6-digit code (auto-fill), distribute it
+        if digits.count >= 6 {
+            let codeArray = Array(digits.prefix(6))
+            for (index, char) in codeArray.enumerated() {
+                codeDigits[index] = String(char)
+            }
+            // Clear hidden field and dismiss keyboard
+            hiddenCode = ""
+            hiddenFieldFocused = false
+            focusedIndex = nil
+
+            // Auto verify
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                if code.count == 6 {
+                    verifyCode()
+                }
+            }
+        } else if digits.count == 1 {
+            // Single digit entered - put it in the next empty box
+            let index = nextEmptyIndex
+            codeDigits[index] = digits
+            hiddenCode = "" // Clear for next input
+
+            if index < 5 {
+                focusedIndex = index + 1
+            } else {
+                // Last digit - auto verify
+                hiddenFieldFocused = false
+                focusedIndex = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    if code.count == 6 {
+                        verifyCode()
+                    }
+                }
             }
         }
     }

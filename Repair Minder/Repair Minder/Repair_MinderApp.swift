@@ -52,14 +52,28 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         _ application: UIApplication,
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
+        let tokenString = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
+        print("🔔 [AppDelegate] Got APNs token: \(tokenString.prefix(20))...")
+
         Task { @MainActor in
             PushNotificationService.shared.didRegisterForRemoteNotifications(deviceToken: deviceToken)
 
             // Auto-register token if user is authenticated
             if AuthManager.shared.authState == .authenticated {
+                print("🔔 [AppDelegate] User authenticated, registering token with backend...")
                 await PushNotificationService.shared.registerToken(appType: "staff")
+
+                // Show feedback to user
+                if PushNotificationService.shared.errorMessage == nil {
+                    print("🔔 [AppDelegate] Token registered successfully!")
+                } else {
+                    print("🔔 [AppDelegate] Token registration failed: \(PushNotificationService.shared.errorMessage ?? "unknown")")
+                }
             } else if CustomerAuthManager.shared.authState == .authenticated {
+                print("🔔 [AppDelegate] Customer authenticated, registering token with backend...")
                 await PushNotificationService.shared.registerToken(appType: "customer")
+            } else {
+                print("🔔 [AppDelegate] User not authenticated, skipping token registration")
             }
         }
     }
@@ -68,6 +82,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         _ application: UIApplication,
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
+        print("❌ [AppDelegate] Failed to register for push notifications: \(error.localizedDescription)")
         Task { @MainActor in
             PushNotificationService.shared.didFailToRegisterForRemoteNotifications(error: error)
         }
