@@ -182,7 +182,13 @@ private struct LoadingView: View {
 private struct StaffMainView: View {
     @ObservedObject private var authManager = AuthManager.shared
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var deepLinkHandler = DeepLinkHandler.shared
     @State private var selectedTab: StaffTab = .dashboard
+
+    // Deep link navigation state
+    @State private var deepLinkOrderId: String?
+    @State private var deepLinkEnquiryId: String?
+    @State private var deepLinkDeviceId: String?
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -198,23 +204,73 @@ private struct StaffMainView: View {
                 }
                 .tag(StaffTab.queue)
 
-            OrderListView()
-                .tabItem {
-                    Label("Orders", systemImage: "doc.text.fill")
-                }
-                .tag(StaffTab.orders)
+            NavigationStack {
+                OrderListView()
+                    .navigationDestination(item: $deepLinkOrderId) { orderId in
+                        OrderDetailView(orderId: orderId)
+                    }
+            }
+            .tabItem {
+                Label("Orders", systemImage: "doc.text.fill")
+            }
+            .tag(StaffTab.orders)
 
-            EnquiryListView()
-                .tabItem {
-                    Label("Enquiries", systemImage: "envelope.fill")
-                }
-                .tag(StaffTab.enquiries)
+            NavigationStack {
+                EnquiryListView()
+                    .navigationDestination(item: $deepLinkEnquiryId) { ticketId in
+                        EnquiryDetailView(ticketId: ticketId)
+                    }
+            }
+            .tabItem {
+                Label("Enquiries", systemImage: "envelope.fill")
+            }
+            .tag(StaffTab.enquiries)
 
             SettingsView()
                 .tabItem {
                     Label("More", systemImage: "ellipsis.circle.fill")
                 }
                 .tag(StaffTab.more)
+        }
+        .onChange(of: deepLinkHandler.pendingDestination) { _, destination in
+            handleDeepLink(destination)
+        }
+        .onAppear {
+            // Handle any pending deep link when view appears
+            if let destination = deepLinkHandler.pendingDestination {
+                handleDeepLink(destination)
+            }
+        }
+    }
+
+    private func handleDeepLink(_ destination: DeepLinkDestination?) {
+        guard let destination = destination else { return }
+
+        print("[StaffMainView] Handling deep link: \(destination)")
+
+        // Small delay to ensure tab switch completes
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            switch destination {
+            case .order(let id):
+                selectedTab = .orders
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    deepLinkOrderId = id
+                }
+
+            case .enquiry(let id), .ticket(let id):
+                selectedTab = .enquiries
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    deepLinkEnquiryId = id
+                }
+
+            case .device(let id):
+                // Devices are typically shown within orders, navigate to queue
+                selectedTab = .queue
+                deepLinkDeviceId = id
+            }
+
+            // Clear the pending destination
+            deepLinkHandler.clearPendingDestination()
         }
     }
 }
