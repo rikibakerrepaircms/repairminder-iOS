@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 // MARK: - Ticket Message
 
@@ -215,6 +216,31 @@ struct MessageEvent: Codable, Identifiable, Equatable, Sendable {
         case "bounced": return "Bounced"
         case "blocked": return "Blocked"
         default: return eventType.capitalized
+        }
+    }
+
+    /// SF Symbol icon for the event type
+    var icon: String {
+        switch eventType {
+        case "sent": return "paperplane"
+        case "delivered": return "checkmark.circle"
+        case "opened": return "envelope.open"
+        case "clicked": return "hand.tap"
+        case "bounced": return "exclamationmark.triangle"
+        case "blocked": return "xmark.shield"
+        default: return "questionmark.circle"
+        }
+    }
+
+    /// Color for the event type
+    var color: Color {
+        switch eventType {
+        case "sent": return .secondary
+        case "delivered": return .green
+        case "opened": return .blue
+        case "clicked": return .purple
+        case "bounced", "blocked": return .red
+        default: return .secondary
         }
     }
 }

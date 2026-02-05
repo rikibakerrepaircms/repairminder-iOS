@@ -12,14 +12,60 @@ import UserNotifications
 struct Repair_MinderApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var appState = AppState.shared
+    @ObservedObject private var passcodeService = PasscodeService.shared
+    @Environment(\.scenePhase) private var scenePhase
+
+    @State private var backgroundTime: Date?
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environmentObject(appState)
-                .onOpenURL { url in
-                    _ = DeepLinkHandler.shared.handleURL(url)
+            ZStack {
+                RootView()
+                    .environmentObject(appState)
+                    .onOpenURL { url in
+                        _ = DeepLinkHandler.shared.handleURL(url)
+                    }
+
+                if passcodeService.isLocked {
+                    PasscodeLockView()
+                        .transition(.asymmetric(
+                            insertion: .identity,
+                            removal: .opacity
+                        ))
                 }
+            }
+            .animation(passcodeService.isLocked ? nil : .easeInOut(duration: 0.25), value: passcodeService.isLocked)
+            .onChange(of: scenePhase) { _, newPhase in
+                handleScenePhaseChange(newPhase)
+            }
+        }
+    }
+
+    private func handleScenePhaseChange(_ newPhase: ScenePhase) {
+        switch newPhase {
+        case .background:
+            backgroundTime = Date()
+            // Always lock when going to background so content is never visible on return
+            passcodeService.lockApp()
+        case .active:
+            if passcodeService.isLocked {
+                if passcodeService.timeoutMinutes == 0 {
+                    // "On App Close" — always stay locked
+                } else if let bg = backgroundTime {
+                    let duration = Date().timeIntervalSince(bg)
+                    if !passcodeService.shouldLockOnForeground(backgroundDuration: duration) {
+                        // Timeout not reached — unlock silently
+                        passcodeService.unlockApp()
+                    }
+                } else {
+                    // No background time recorded (cold launch) — stay locked
+                }
+            }
+            backgroundTime = nil
+        case .inactive:
+            break
+        @unknown default:
+            break
         }
     }
 }
@@ -143,6 +189,9 @@ struct RootView: View {
 
             case .customerLogin:
                 CustomerLoginView()
+
+            case .passcodeSetup:
+                PasscodeSetupView()
 
             case .staffDashboard:
                 StaffMainView()
@@ -282,6 +331,32 @@ private enum StaffTab: Hashable {
     case orders
     case enquiries
     case more
+}
+
+// MARK: - Passcode Setup View
+
+/// Shown after first login when user hasn't set a passcode.
+/// Has a "Set up later" button — passcode setup is optional.
+private struct PasscodeSetupView: View {
+    @ObservedObject private var appState = AppState.shared
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            SetPasscodeView(mode: .create) { success in
+                if success {
+                    appState.onPasscodeSet()
+                }
+                // Cancel (success=false) is ignored — only "Set up later" skips
+            }
+
+            Button("Set up later") {
+                appState.onPasscodeSetupSkipped()
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .padding(.bottom, 32)
+        }
+    }
 }
 
 // MARK: - Quarantine View

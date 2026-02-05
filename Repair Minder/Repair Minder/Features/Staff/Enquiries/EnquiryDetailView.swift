@@ -57,6 +57,11 @@ struct EnquiryDetailView: View {
                 }
             )
         }
+        .sheet(item: $viewModel.selectedWorkflowMacro) { macro in
+            WorkflowExecutionSheet(macro: macro) { overrides in
+                Task { await viewModel.executeMacro(macro, overrides: overrides) }
+            }
+        }
     }
 
     // MARK: - Loading & Error Views
@@ -249,7 +254,7 @@ struct EnquiryDetailView: View {
                 .padding(.top, 8)
             }
 
-            // Mode picker
+            // Mode picker row with workflow and AI buttons
             HStack {
                 Picker("Mode", selection: $viewModel.replyMode) {
                     ForEach(EnquiryDetailViewModel.ReplyMode.allCases, id: \.self) { mode in
@@ -260,6 +265,32 @@ struct EnquiryDetailView: View {
                 .frame(width: 180)
 
                 Spacer()
+
+                // Workflow button
+                if !viewModel.macros.isEmpty {
+                    Menu {
+                        ForEach(viewModel.macros.prefix(8)) { macro in
+                            Button {
+                                viewModel.selectedWorkflowMacro = macro
+                            } label: {
+                                Label(macro.name, systemImage: macro.isEmailMacro ? "envelope" : "note.text")
+                            }
+                        }
+
+                        if viewModel.macros.count > 8 {
+                            Divider()
+                        }
+
+                        Button {
+                            viewModel.showingMacroPicker = true
+                        } label: {
+                            Label("Browse All...", systemImage: "ellipsis.circle")
+                        }
+                    } label: {
+                        Image(systemName: "bolt.circle")
+                            .font(.title3)
+                    }
+                }
 
                 // AI generate button
                 Button {
@@ -277,48 +308,60 @@ struct EnquiryDetailView: View {
             .padding(.horizontal)
             .padding(.top, 8)
 
-            // Text input
+            // Text input with status dropdown and send button
             HStack(alignment: .bottom, spacing: 8) {
                 TextField(viewModel.replyMode.placeholder, text: $viewModel.replyText, axis: .vertical)
                     .textFieldStyle(.roundedBorder)
-                    .lineLimit(1...6)
+                    .lineLimit(3...6)
                     .focused($isReplyFocused)
 
-                // Send button
-                Button {
-                    Task { await viewModel.sendMessage() }
-                } label: {
-                    if viewModel.isSending {
-                        ProgressView()
-                    } else {
-                        Image(systemName: viewModel.replyMode == .reply ? "paperplane.fill" : "plus.circle.fill")
-                            .font(.title2)
-                    }
-                }
-                .disabled(!viewModel.canSendReply)
-            }
-            .padding()
-
-            // Status selector for replies
-            if viewModel.replyMode == .reply {
-                HStack {
-                    Text("Set status to:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    Picker("Status", selection: $viewModel.selectedReplyStatus) {
-                        Text("No change").tag(nil as TicketStatus?)
-                        ForEach(TicketStatus.allCases, id: \.self) { status in
-                            Text(status.label).tag(status as TicketStatus?)
+                // Right side: status dropdown above send button
+                VStack(spacing: 4) {
+                    // Status dropdown (only for replies)
+                    if viewModel.replyMode == .reply {
+                        Menu {
+                            ForEach(TicketStatus.allCases, id: \.self) { status in
+                                Button {
+                                    viewModel.selectedReplyStatus = status
+                                } label: {
+                                    HStack {
+                                        Image(systemName: status.icon)
+                                        Text(status.label)
+                                        if viewModel.selectedReplyStatus == status {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        } label: {
+                            Text(viewModel.selectedReplyStatus?.label ?? "Status")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background((viewModel.selectedReplyStatus?.color ?? .secondary).opacity(0.15))
+                                .foregroundStyle(viewModel.selectedReplyStatus?.color ?? .secondary)
+                                .clipShape(Capsule())
                         }
                     }
-                    .pickerStyle(.menu)
 
-                    Spacer()
+                    // Send button (iOS blue style)
+                    Button {
+                        Task { await viewModel.sendMessage() }
+                    } label: {
+                        if viewModel.isSending {
+                            ProgressView()
+                                .frame(width: 32, height: 32)
+                        } else {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.system(size: 32))
+                                .foregroundStyle(viewModel.canSendReply ? .blue : Color(.systemGray4))
+                        }
+                    }
+                    .disabled(!viewModel.canSendReply)
                 }
-                .padding(.horizontal)
-                .padding(.bottom, 8)
             }
+            .padding()
         }
         .background(Color(.systemBackground))
     }
@@ -508,6 +551,120 @@ private struct WorkflowCard: View {
         .padding()
         .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(12)
+    }
+}
+
+// MARK: - Workflow Execution Sheet
+
+private struct WorkflowExecutionSheet: View {
+    let macro: Macro
+    let onExecute: ([String: String]?) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var variableValues: [String: String] = [:]
+
+    private var templateVariables: [String] {
+        let pattern = "\\{\\{([^}]+)\\}\\}"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let content = macro.initialContent + (macro.initialSubject ?? "")
+        let matches = regex.matches(in: content, range: NSRange(content.startIndex..., in: content))
+        let vars = matches.compactMap { match -> String? in
+            guard let range = Range(match.range(at: 1), in: content) else { return nil }
+            return String(content[range]).trimmingCharacters(in: .whitespaces)
+        }
+        return Array(Set(vars)).sorted()
+    }
+
+    private func displayName(for variable: String) -> String {
+        variable.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                // Macro info
+                Section {
+                    if let description = macro.description, !description.isEmpty {
+                        Text(description)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack {
+                        Image(systemName: macro.isEmailMacro ? "envelope" : "note.text")
+                            .foregroundStyle(.blue)
+                        Text(macro.isEmailMacro ? "Sends Email" : "Adds Note")
+                            .font(.subheadline)
+                    }
+
+                    if macro.hasFollowUps {
+                        HStack {
+                            Image(systemName: "arrow.triangle.branch")
+                                .foregroundStyle(.orange)
+                            Text("\(macro.stageCount ?? 0) follow-up stage\(macro.stageCount == 1 ? "" : "s")")
+                                .font(.subheadline)
+                        }
+                    }
+
+                    if let behavior = macro.replyBehavior, behavior != "continue" {
+                        HStack {
+                            Image(systemName: behavior == "cancel" ? "xmark.circle" : "pause.circle")
+                                .foregroundStyle(.secondary)
+                            Text(macro.replyBehaviorDescription)
+                                .font(.subheadline)
+                        }
+                    }
+                }
+
+                // Variable inputs
+                if !templateVariables.isEmpty {
+                    Section("Variables") {
+                        ForEach(templateVariables, id: \.self) { variable in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(displayName(for: variable))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                TextField(displayName(for: variable), text: Binding(
+                                    get: { variableValues[variable] ?? "" },
+                                    set: { variableValues[variable] = $0 }
+                                ))
+                            }
+                        }
+                    }
+                }
+
+                // Preview
+                Section("Preview") {
+                    if let subject = macro.initialSubject, macro.isEmailMacro {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Subject")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(subject)
+                                .font(.subheadline)
+                        }
+                    }
+
+                    Text(macro.initialContent)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle(macro.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Execute") {
+                        let nonEmpty = variableValues.filter { !$0.value.isEmpty }
+                        onExecute(nonEmpty.isEmpty ? nil : nonEmpty)
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
     }
 }
 

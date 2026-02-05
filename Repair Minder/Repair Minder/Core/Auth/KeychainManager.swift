@@ -25,6 +25,11 @@ final class KeychainManager {
         static let userData = "com.repairminder.userData"
         static let customerData = "com.repairminder.customerData"
         static let companyData = "com.repairminder.companyData"
+        static let passcodeHash = "com.repairminder.passcodeHash"
+        static let passcodeSalt = "com.repairminder.passcodeSalt"
+        static let biometricEnabled = "com.repairminder.biometricEnabled"
+        static let passcodeTimeout = "com.repairminder.passcodeTimeout"
+        static let passcodeEnabled = "com.repairminder.passcodeEnabled"
     }
 
     // MARK: - Initialization
@@ -112,12 +117,41 @@ final class KeychainManager {
         getDecodable(forKey: Keys.companyData)
     }
 
+    // MARK: - Passcode Cache
+
+    func setPasscodeHash(_ hash: String) { set(hash, forKey: Keys.passcodeHash) }
+    func getPasscodeHash() -> String? { get(forKey: Keys.passcodeHash) }
+
+    func setPasscodeSalt(_ salt: String) { set(salt, forKey: Keys.passcodeSalt) }
+    func getPasscodeSalt() -> String? { get(forKey: Keys.passcodeSalt) }
+
+    func setBiometricEnabled(_ enabled: Bool) { set(enabled ? "1" : "0", forKey: Keys.biometricEnabled) }
+    func isBiometricEnabled() -> Bool { get(forKey: Keys.biometricEnabled) == "1" }
+
+    func setPasscodeEnabled(_ enabled: Bool) { set(enabled ? "1" : "0", forKey: Keys.passcodeEnabled) }
+    func isPasscodeEnabled() -> Bool { get(forKey: Keys.passcodeEnabled) == "1" }
+
+    func setPasscodeTimeout(_ minutes: Int) { set(String(minutes), forKey: Keys.passcodeTimeout) }
+    func getPasscodeTimeout() -> Int? {
+        guard let str = get(forKey: Keys.passcodeTimeout) else { return nil }
+        return Int(str)
+    }
+
+    func clearPasscodeData() {
+        delete(forKey: Keys.passcodeHash)
+        delete(forKey: Keys.passcodeSalt)
+        delete(forKey: Keys.biometricEnabled)
+        delete(forKey: Keys.passcodeTimeout)
+        delete(forKey: Keys.passcodeEnabled)
+    }
+
     // MARK: - Clear All
 
     /// Clears all stored data (full logout)
     func clearAll() {
         clearStaffTokens()
         clearCustomerTokens()
+        clearPasscodeData()
     }
 
     // MARK: - Private Keychain Operations

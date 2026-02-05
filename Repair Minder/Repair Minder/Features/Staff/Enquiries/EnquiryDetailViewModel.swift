@@ -28,8 +28,9 @@ final class EnquiryDetailViewModel: ObservableObject {
     // MARK: - Reply State
 
     @Published var replyText = ""
-    @Published var selectedReplyStatus: TicketStatus?
+    @Published var selectedReplyStatus: TicketStatus? = .pending
     @Published var replyMode: ReplyMode = .reply
+    @Published var selectedWorkflowMacro: Macro?
 
     enum ReplyMode: String, CaseIterable {
         case reply = "Reply"
@@ -90,17 +91,31 @@ final class EnquiryDetailViewModel: ObservableObject {
 
     // MARK: - Loading
 
-    /// Load ticket details
+    /// Load ticket details (initial load, skips if already loading)
     func loadTicket() async {
         guard !isLoading else { return }
+        await performLoad()
+    }
 
+    /// Refresh ticket (pull-to-refresh, always reloads)
+    func refresh() async {
+        await performLoad()
+    }
+
+    private func performLoad() async {
         isLoading = true
         error = nil
 
         do {
+            try Task.checkCancellation()
             ticket = try await APIClient.shared.request(.ticket(id: ticketId))
+            try Task.checkCancellation()
             await loadMacros()
             await loadExecutions()
+        } catch is CancellationError {
+            // Task was cancelled (e.g. view lifecycle), ignore
+        } catch let urlError as URLError where urlError.code == .cancelled {
+            // URL request cancelled, ignore
         } catch let apiError as APIError {
             error = apiError.localizedDescription
         } catch {
@@ -117,7 +132,9 @@ final class EnquiryDetailViewModel: ObservableObject {
                 .macros(category: nil, includeStages: true)
             )
             macros = response.macros.filter { $0.isEnabled }
-        } catch {
+        } catch is CancellationError { }
+        catch let urlError as URLError where urlError.code == .cancelled { }
+        catch {
             print("Failed to load macros: \(error)")
         }
     }
@@ -129,14 +146,11 @@ final class EnquiryDetailViewModel: ObservableObject {
                 .ticketMacroExecutions(id: ticketId)
             )
             activeExecutions = response.executions.filter { $0.status.isModifiable }
-        } catch {
+        } catch is CancellationError { }
+        catch let urlError as URLError where urlError.code == .cancelled { }
+        catch {
             print("Failed to load executions: \(error)")
         }
-    }
-
-    /// Refresh ticket
-    func refresh() async {
-        await loadTicket()
     }
 
     // MARK: - Actions
@@ -177,7 +191,7 @@ final class EnquiryDetailViewModel: ObservableObject {
 
             // Clear and reload
             replyText = ""
-            selectedReplyStatus = nil
+            selectedReplyStatus = .pending
             aiGeneratedText = nil
             await loadTicket()
 

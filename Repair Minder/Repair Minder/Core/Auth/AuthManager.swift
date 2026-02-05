@@ -110,6 +110,12 @@ final class AuthManager: ObservableObject, TokenProvider {
                 company: response.company,
                 hasPassword: response.hasPassword
             )
+            // Sync passcode state from server
+            PasscodeService.shared.syncFromAuthResponse(
+                hasPasscode: response.hasPasscode,
+                passcodeEnabled: response.passcodeEnabled,
+                timeoutMinutes: response.passcodeTimeoutMinutes ?? 15
+            )
         } catch {
             // Token is invalid, clear it
             clearTokens()

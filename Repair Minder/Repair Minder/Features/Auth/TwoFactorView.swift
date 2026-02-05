@@ -264,7 +264,7 @@ struct TwoFactorView: View {
                     try await authManager.verify2FACode(code)
                 }
                 // Success - notify app state
-                appState.onStaffAuthenticated()
+                await appState.onStaffAuthenticated()
             } catch {
                 // Error is handled by authManager.errorMessage
                 codeDigits = Array(repeating: "", count: 6)

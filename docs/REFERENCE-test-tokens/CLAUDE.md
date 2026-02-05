@@ -84,15 +84,15 @@ eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiIxYjhlNjE4MTE1OTAxYzZkZTk4YzI5Y2I3YjlmZmM0NyI
 
 | Field | Value |
 |-------|-------|
-| **Last Updated** | 2026-02-03 00:11 UTC |
-| **Expires** | 2026-02-03 00:26 UTC (15 min TTL) |
+| **Last Updated** | 2026-02-05 17:25 UTC |
+| **Expires** | 2026-02-05 17:40 UTC (15 min TTL) |
 | **User** | rikibaker+admin@gmail.com |
 | **Role** | admin |
 | **Company ID** | 4b63c1e6ade1885e73171e10221cac53 |
 | **Status** | ⚠️ SHORT-LIVED - Check expiry before using |
 
 ```
-eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiI0YmM1OGViODYyNjE0ZTFlOWZjMmU0MGZlZGE4NTVmMyIsImNvbXBhbnlJZCI6IjRiNjNjMWU2YWRlMTg4NWU3MzE3MWUxMDIyMWNhYzUzIiwicm9sZSI6ImFkbWluIiwicGhpQWNjZXNzTGV2ZWwiOiJmdWxsIiwiaXNNb2JpbGUiOmZhbHNlLCJpc3N1ZWRBdCI6MTc3MDA3NzQ1OCwiZGF0YUNsYXNzaWZpY2F0aW9uIjoiY29uZmlkZW50aWFsIiwic2Vzc2lvbklkIjoiMzRjMDlkNTQtMDhhOC00ZTYyLWI1MmQtODM5MDNkYWI1OTcxIiwiY29tcGFueUNvbnRleHQiOnsiaWQiOiI0YjYzYzFlNmFkZTE4ODVlNzMxNzFlMTAyMjFjYWM1MyIsInJvbGUiOiJhZG1pbiIsInBlcm1pc3Npb25zIjpbXX0sImlhdCI6MTc3MDA3NzQ1OCwiZXhwIjoxNzcwMDc4MzU4LCJpc3MiOiJodHRwczovL2FwaS5yZXBhaXJtaW5kZXIuY29tIiwiYXVkIjoiaHR0cHM6Ly9hcHAucmVwYWlybWluZGVyLmNvbSIsImp0aSI6IjU2ZDkyN2M0LTRlNjgtNGIxYy1iNmUzLThmNzIzMDZiNWU3YyJ9.COB1XjuaKi57ngvjigqmkOIPHv8x4gVDmD_mAJmh_gc
+eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiI0YmM1OGViODYyNjE0ZTFlOWZjMmU0MGZlZGE4NTVmMyIsImNvbXBhbnlJZCI6IjRiNjNjMWU2YWRlMTg4NWU3MzE3MWUxMDIyMWNhYzUzIiwicm9sZSI6ImFkbWluIiwicGhpQWNjZXNzTGV2ZWwiOiJmdWxsIiwiaXNNb2JpbGUiOmZhbHNlLCJpc3N1ZWRBdCI6MTc3MDMxMjMzOCwiZGF0YUNsYXNzaWZpY2F0aW9uIjoiY29uZmlkZW50aWFsIiwic2Vzc2lvbklkIjoiMDI2ZDBkNjEtMzJlYi00ZjRhLWJkYmQtMDNjNTIyYmVkMDI3IiwiY29tcGFueUNvbnRleHQiOnsiaWQiOiI0YjYzYzFlNmFkZTE4ODVlNzMxNzFlMTAyMjFjYWM1MyIsInJvbGUiOiJhZG1pbiIsInBlcm1pc3Npb25zIjpbXX0sImlhdCI6MTc3MDMxMjMzOCwiZXhwIjoxNzcwMzEzMjM4LCJpc3MiOiJodHRwczovL2FwaS5yZXBhaXJtaW5kZXIuY29tIiwiYXVkIjoiaHR0cHM6Ly9hcHAucmVwYWlybWluZGVyLmNvbSIsImp0aSI6IjJkMTdkNTA2LWRjM2UtNGJjMS1hODkyLTUxMGVlYzM2NzRhMSJ9.E9-d72sMd0hjwWVbWdMN3BIz8rrwIiu6FIB7YcPOBSs
 ```
 
 > **REMINDER**: If you generate a new token, you MUST update this file with the new token, timestamps, and role. See "Rule 1: Token Management" at the top of this file.

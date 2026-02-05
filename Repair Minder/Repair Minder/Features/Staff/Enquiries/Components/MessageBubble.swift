@@ -109,18 +109,27 @@ struct MessageBubble: View {
         .padding(.top, 8)
     }
 
-    // MARK: - Delivery Status
+    // MARK: - Delivery Events
 
     @ViewBuilder
     private var deliveryStatus: some View {
-        HStack(spacing: 4) {
-            Image(systemName: message.deliveryStatus.icon)
-                .font(.caption2)
-            Text(message.deliveryStatus.label)
-                .font(.caption2)
+        if let events = message.events, !events.isEmpty {
+            VStack(alignment: .trailing, spacing: 2) {
+                ForEach(events) { event in
+                    HStack(spacing: 4) {
+                        Image(systemName: event.icon)
+                            .font(.caption2)
+                        Text(event.label)
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                        Text(event.formattedDate)
+                            .font(.caption2)
+                    }
+                    .foregroundColor(event.color)
+                }
+            }
+            .padding(.top, 4)
         }
-        .foregroundColor(message.deliveryStatus.isSuccess ? .green : .orange)
-        .padding(.top, 4)
     }
 
     // MARK: - Styling
@@ -230,7 +239,13 @@ private struct AttachmentRow: View {
             deviceName: nil,
             createdAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-1800)),
             createdBy: CreatedByUser(id: "user1", firstName: "Jane", lastName: "Doe"),
-            events: [MessageEvent(id: "e1", eventType: "delivered", eventData: nil, createdAt: ISO8601DateFormatter().string(from: Date()))],
+            events: [
+                MessageEvent(id: "e1", eventType: "sent", eventData: nil, createdAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-1800))),
+                MessageEvent(id: "e2", eventType: "delivered", eventData: nil, createdAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-1790))),
+                MessageEvent(id: "e3", eventType: "opened", eventData: nil, createdAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-900))),
+                MessageEvent(id: "e4", eventType: "opened", eventData: nil, createdAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-300))),
+                MessageEvent(id: "e5", eventType: "clicked", eventData: nil, createdAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-290)))
+            ],
             attachments: nil
         ))
 

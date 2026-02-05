@@ -34,6 +34,16 @@ enum APIEndpoint {
     case totpDisable
     case totpStatus
 
+    // MARK: - Passcode
+
+    case setPasscode
+    case verifyPasscode
+    case changePasscode
+    case resetPasscodeRequest
+    case resetPasscode
+    case togglePasscodeEnabled
+    case passcodeTimeout
+
     // MARK: - Customer Auth
 
     case customerMagicLinkRequest
@@ -171,6 +181,22 @@ enum APIEndpoint {
             return "/api/auth/totp/disable"
         case .totpStatus:
             return "/api/auth/totp/status"
+
+        // Passcode
+        case .setPasscode:
+            return "/api/auth/set-passcode"
+        case .verifyPasscode:
+            return "/api/auth/verify-passcode"
+        case .changePasscode:
+            return "/api/auth/change-passcode"
+        case .resetPasscodeRequest:
+            return "/api/auth/reset-passcode-request"
+        case .resetPasscode:
+            return "/api/auth/reset-passcode"
+        case .togglePasscodeEnabled:
+            return "/api/auth/toggle-passcode-enabled"
+        case .passcodeTimeout:
+            return "/api/user/passcode-timeout"
 
         // Customer Auth
         case .customerMagicLinkRequest:
@@ -341,6 +367,8 @@ enum APIEndpoint {
              .magicLinkRequest, .magicLinkVerifyCode, .refreshToken, .logout,
              .totpSetup, .totpVerifySetup, .totpDisable,
              .customerMagicLinkRequest, .customerVerifyCode, .customerLogout,
+             .setPasscode, .verifyPasscode, .changePasscode,
+             .resetPasscodeRequest, .resetPasscode,
              .createOrderDevice, .executeDeviceAction,
              .createOrder, .createOrderItem, .createOrderPayment, .createOrderSignature,
              .sendQuote, .authorizeOrder, .despatchOrder, .collectOrder,
@@ -360,7 +388,8 @@ enum APIEndpoint {
             return .patch
 
         // PUT endpoints
-        case .updatePushPreferences:
+        case .togglePasscodeEnabled, .passcodeTimeout,
+             .updatePushPreferences:
             return .put
 
         // DELETE endpoints

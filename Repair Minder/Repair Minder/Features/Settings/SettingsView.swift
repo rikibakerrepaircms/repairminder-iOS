@@ -27,6 +27,9 @@ struct SettingsView: View {
                 // Notifications section
                 notificationsSection
 
+                // Security section
+                securitySection
+
                 // About section
                 aboutSection
 
@@ -117,6 +120,22 @@ struct SettingsView: View {
                 NotificationSettingsView()
             } label: {
                 Label("Push Notifications", systemImage: "bell.badge")
+            }
+        }
+    }
+
+    // MARK: - Security Section
+
+    private var securitySection: some View {
+        Section("Security") {
+            NavigationLink {
+                PasscodeSettingsView()
+            } label: {
+                Label {
+                    Text("Passcode & \(PasscodeService.shared.biometricType.displayName)")
+                } icon: {
+                    Image(systemName: "lock.shield")
+                }
             }
         }
     }

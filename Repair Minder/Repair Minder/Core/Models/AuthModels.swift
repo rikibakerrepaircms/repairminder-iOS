@@ -159,6 +159,9 @@ struct GetCurrentUserResponse: Decodable {
     let user: User
     let company: Company
     let hasPassword: Bool
+    let hasPasscode: Bool
+    let passcodeEnabled: Bool
+    let passcodeTimeoutMinutes: Int?
 }
 
 // MARK: - Customer Get Current User Response

@@ -46,6 +46,8 @@ final class AppState: ObservableObject {
         case staffLogin
         /// Customer user needs to log in
         case customerLogin
+        /// User needs to set up a passcode (first login)
+        case passcodeSetup
         /// Staff user is authenticated - show staff dashboard
         case staffDashboard
         /// Customer user is authenticated - show customer portal
@@ -87,7 +89,12 @@ final class AppState: ObservableObject {
 
         switch authManager.authState {
         case .authenticated:
-            currentState = .staffDashboard
+            await syncPasscodeState()
+            if !PasscodeService.shared.hasPasscode && !hasSeenPasscodeSetup {
+                currentState = .passcodeSetup
+            } else {
+                currentState = .staffDashboard
+            }
         case .quarantined(let reason):
             currentState = .quarantine(reason: reason)
         default:
@@ -134,14 +141,35 @@ final class AppState: ObservableObject {
     // MARK: - Auth State Changes
 
     /// Called when staff authentication succeeds
-    func onStaffAuthenticated() {
+    func onStaffAuthenticated() async {
+        // Sync passcode state from server (magic link response doesn't include passcode fields)
+        await syncPasscodeState()
+
         switch authManager.authState {
         case .authenticated:
-            currentState = .staffDashboard
+            if !PasscodeService.shared.hasPasscode && !hasSeenPasscodeSetup {
+                currentState = .passcodeSetup
+            } else {
+                currentState = .staffDashboard
+            }
         case .quarantined(let reason):
             currentState = .quarantine(reason: reason)
         default:
             break
+        }
+    }
+
+    /// Fetches /me to sync passcode state from the server
+    private func syncPasscodeState() async {
+        do {
+            let response: GetCurrentUserResponse = try await APIClient.shared.request(.me)
+            PasscodeService.shared.syncFromAuthResponse(
+                hasPasscode: response.hasPasscode,
+                passcodeEnabled: response.passcodeEnabled,
+                timeoutMinutes: response.passcodeTimeoutMinutes ?? 15
+            )
+        } catch {
+            // Fall back to local state if /me fails
         }
     }
 
@@ -158,6 +186,31 @@ final class AppState: ObservableObject {
     /// Called when customer logs out
     func onCustomerLogout() {
         currentState = .customerLogin
+    }
+
+    // MARK: - Passcode Setup
+
+    /// Whether the user has already seen the passcode setup prompt (persisted per user)
+    private var hasSeenPasscodeSetup: Bool {
+        guard let userId = authManager.currentUser?.id else { return false }
+        return UserDefaults.standard.bool(forKey: "passcodeSetup_seen_\(userId)")
+    }
+
+    private func markPasscodeSetupSeen() {
+        guard let userId = authManager.currentUser?.id else { return }
+        UserDefaults.standard.set(true, forKey: "passcodeSetup_seen_\(userId)")
+    }
+
+    /// Called after user sets a passcode during first-login setup
+    func onPasscodeSet() {
+        markPasscodeSetupSeen()
+        currentState = .staffDashboard
+    }
+
+    /// Called when user taps "Set up later" to skip passcode setup
+    func onPasscodeSetupSkipped() {
+        markPasscodeSetupSeen()
+        currentState = .staffDashboard
     }
 
     // MARK: - Full Logout

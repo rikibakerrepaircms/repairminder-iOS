@@ -400,21 +400,31 @@ private struct TicketRow: View {
         VStack(alignment: .leading, spacing: 8) {
             // Header row
             HStack {
-                // Ticket number and type badge
-                HStack(spacing: 8) {
-                    Text(ticket.displayNumber)
-                        .font(.subheadline.monospaced())
-                        .foregroundColor(.secondary)
+                Text(ticket.displayNumber)
+                    .font(.subheadline.monospaced())
+                    .foregroundColor(.secondary)
 
-                    TypeBadge(type: ticket.ticketType)
-                }
+                TypeBadge(type: ticket.ticketType)
 
-                Spacer()
-
-                // Time ago
+                Text("·")
+                    .foregroundColor(.secondary)
                 Text(ticket.formattedLastUpdate)
                     .font(.caption)
                     .foregroundColor(.secondary)
+
+                Spacer()
+
+                // Status badge
+                HStack(spacing: 4) {
+                    Image(systemName: ticket.status.icon)
+                    Text(ticket.status.label)
+                }
+                .font(.caption.weight(.medium))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(ticket.status.color.opacity(0.15))
+                .foregroundColor(ticket.status.color)
+                .clipShape(Capsule())
             }
 
             // Subject
