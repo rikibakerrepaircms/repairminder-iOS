@@ -18,7 +18,7 @@ Create the initial service type selection screen that launches the appropriate b
 
 | File | Purpose |
 |------|---------|
-| `Features/Booking/BookingView.swift` | Service type selection with 4 cards |
+| `Features/Staff/Booking/BookingView.swift` | Service type selection with 4 cards |
 
 ---
 
@@ -295,4 +295,4 @@ xcodebuild -scheme "Repair Minder" -destination 'platform=iOS Simulator,name=iPh
 - `ServiceType` enum is used throughout the booking flow
 - Navigation uses `navigationDestination(item:)` pattern
 - [See: Stage 04] will implement `BookingWizardView` that this navigates to
-- [See: Stage 10] will wire this up to dashboard "New Booking" button
+- [See: Stage 10] will wire this up to blue plus icon in toolbar

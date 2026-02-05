@@ -20,10 +20,10 @@ Create the device entry form allowing users to add multiple devices with brand, 
 
 | File | Purpose |
 |------|---------|
-| `Features/Booking/Steps/DevicesStepView.swift` | Main devices step with list and entry |
-| `Features/Booking/Components/DeviceEntryFormView.swift` | Form for adding/editing a device |
-| `Features/Booking/Components/DeviceListItemView.swift` | Display added device in list |
-| `Features/Booking/Components/BrandModelPicker.swift` | Cascading brand → model selection |
+| `Features/Staff/Booking/Steps/DevicesStepView.swift` | Main devices step with list and entry |
+| `Features/Staff/Booking/Components/DeviceEntryFormView.swift` | Form for adding/editing a device |
+| `Features/Staff/Booking/Components/DeviceListItemView.swift` | Display added device in list |
+| `Features/Staff/Booking/Components/BrandModelPicker.swift` | Cascading brand → model selection |
 
 ---
 

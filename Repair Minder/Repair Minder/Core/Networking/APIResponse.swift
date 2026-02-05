@@ -2,72 +2,128 @@
 //  APIResponse.swift
 //  Repair Minder
 //
-//  Created by Claude on 03/02/2026.
+//  Created on 04/02/2026.
 //
 
 import Foundation
 
-/// Standard API response wrapper matching backend format
+/// Standard API response wrapper
+/// All backend endpoints return this envelope structure:
+/// ```json
+/// {
+///   "success": true | false,
+///   "data": T,
+///   "pagination": { ... },  // Optional, only on list endpoints
+///   "error": "..."          // Optional, only when success=false
+/// }
+/// ```
 struct APIResponse<T: Decodable>: Decodable {
     let success: Bool
     let data: T?
+    let pagination: Pagination?
     let error: String?
-    let message: String?
+
+    /// Additional error code for specific scenarios (e.g., "ACCOUNT_PENDING_APPROVAL")
+    let code: String?
 }
 
-/// Empty response for endpoints that return no data
+/// API response wrapper for endpoints that include filters (e.g., device list, my-queue)
+struct APIResponseWithFilters<T: Decodable, F: Decodable>: Decodable {
+    let success: Bool
+    let data: T?
+    let pagination: Pagination?
+    let filters: F?
+    let error: String?
+    let code: String?
+}
+
+/// Empty response for endpoints that return no data in the response body
 struct EmptyResponse: Decodable {}
 
-/// Pagination metadata
-struct PaginationMeta: Decodable {
-    let total: Int
-    let limit: Int
-    let offset: Int
-    let hasMore: Bool
+/// API error types
+enum APIError: Error, LocalizedError {
+    /// Network connectivity issues
+    case networkError(Error)
 
-    enum CodingKeys: String, CodingKey {
-        case total, limit, offset
-        case hasMore = "has_more"
+    /// Server returned an error in the response envelope
+    case serverError(message: String, code: String?)
+
+    /// HTTP status code indicates failure (non-2xx)
+    case httpError(statusCode: Int, message: String?)
+
+    /// Failed to decode the response
+    case decodingError(Error)
+
+    /// Authentication required - token missing or invalid
+    case unauthorized
+
+    /// Access denied - insufficient permissions
+    case forbidden(message: String?, code: String?)
+
+    /// Resource not found
+    case notFound
+
+    /// Rate limited - too many requests
+    case rateLimited
+
+    /// Request was cancelled
+    case cancelled
+
+    /// Invalid request (client-side error)
+    case invalidRequest(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .networkError(let error):
+            return "Network error: \(error.localizedDescription)"
+        case .serverError(let message, _):
+            return message
+        case .httpError(let statusCode, let message):
+            if let message = message {
+                return message
+            }
+            return "HTTP error \(statusCode)"
+        case .decodingError(let error):
+            return "Failed to decode response: \(error.localizedDescription)"
+        case .unauthorized:
+            return "Authentication required"
+        case .forbidden(let message, _):
+            return message ?? "Access denied"
+        case .notFound:
+            return "Resource not found"
+        case .rateLimited:
+            return "Too many requests. Please try again later."
+        case .cancelled:
+            return "Request was cancelled"
+        case .invalidRequest(let message):
+            return message
+        }
     }
 
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        total = try container.decode(Int.self, forKey: .total)
-        limit = try container.decode(Int.self, forKey: .limit)
-        offset = try container.decode(Int.self, forKey: .offset)
-        hasMore = try container.decodeIfPresent(Bool.self, forKey: .hasMore)
-            ?? (offset + limit < total)
+    /// Whether this error should trigger a logout
+    var requiresLogout: Bool {
+        if case .unauthorized = self {
+            return true
+        }
+        return false
+    }
+
+    /// Error code from server (e.g., "ACCOUNT_PENDING_APPROVAL")
+    var serverCode: String? {
+        switch self {
+        case .serverError(_, let code):
+            return code
+        case .forbidden(_, let code):
+            return code
+        default:
+            return nil
+        }
     }
 }
 
-/// Paginated response wrapper
-struct PaginatedResponse<T: Decodable>: Decodable {
-    let items: T
-    let pagination: PaginationMeta
-}
-
-// MARK: - Specialized Response Types for Paginated Endpoints
-
-/// Response wrapper for clients endpoint: { data: { clients: [...], pagination: {...} } }
-struct ClientsListData: Decodable {
-    let clients: [Client]
-    let pagination: ClientsPagination?
-
-    struct ClientsPagination: Decodable {
-        let page: Int
-        let limit: Int
-        let total: Int
-        let totalPages: Int
-    }
-}
-
-/// Response wrapper for tickets endpoint: { data: { tickets: [...], page, limit, total, totalPages, ... } }
-struct TicketsListData: Decodable {
-    let tickets: [Ticket]
-    let page: Int?
-    let limit: Int?
-    let total: Int?
-    let totalPages: Int?
-    let statusCounts: [String: Int]?
-    let ticketTypeCounts: [String: Int]?
+/// Token refresh response from `/api/auth/refresh`
+struct TokenRefreshResponse: Decodable {
+    let token: String
+    let refreshToken: String
+    let expiresIn: Int
 }

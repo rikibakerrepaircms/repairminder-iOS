@@ -1,0 +1,213 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-02-04T10:30:00Z",
+
+  "deviceStatuses": {
+    "repair": [
+      {
+        "key": "device_received",
+        "label": "Received",
+        "customerLabel": "Device Received",
+        "color": "gray",
+        "isTerminal": false,
+        "sortOrder": 0
+      },
+      {
+        "key": "diagnosing",
+        "label": "Diagnosing",
+        "customerLabel": "Being Diagnosed",
+        "color": "blue",
+        "isTerminal": false,
+        "sortOrder": 1
+      },
+      {
+        "key": "awaiting_parts",
+        "label": "Awaiting Parts",
+        "customerLabel": "Waiting for Parts",
+        "color": "yellow",
+        "isTerminal": false,
+        "sortOrder": 2
+      },
+      {
+        "key": "in_repair",
+        "label": "In Repair",
+        "customerLabel": "Being Repaired",
+        "color": "blue",
+        "isTerminal": false,
+        "sortOrder": 3
+      },
+      {
+        "key": "quality_check",
+        "label": "Quality Check",
+        "customerLabel": "Quality Check",
+        "color": "purple",
+        "isTerminal": false,
+        "sortOrder": 4
+      },
+      {
+        "key": "repair_complete",
+        "label": "Complete",
+        "customerLabel": "Repair Complete",
+        "color": "green",
+        "isTerminal": true,
+        "sortOrder": 5
+      },
+      {
+        "key": "unrepairable",
+        "label": "Unrepairable",
+        "customerLabel": "Unable to Repair",
+        "color": "red",
+        "isTerminal": true,
+        "sortOrder": 6
+      }
+    ],
+    "buyback": [
+      {
+        "key": "device_received",
+        "label": "Received",
+        "customerLabel": "Device Received",
+        "color": "gray",
+        "isTerminal": false,
+        "sortOrder": 0
+      },
+      {
+        "key": "grading",
+        "label": "Grading",
+        "customerLabel": "Being Graded",
+        "color": "blue",
+        "isTerminal": false,
+        "sortOrder": 1
+      },
+      {
+        "key": "graded",
+        "label": "Graded",
+        "customerLabel": "Grading Complete",
+        "color": "green",
+        "isTerminal": false,
+        "sortOrder": 2
+      },
+      {
+        "key": "processing_payment",
+        "label": "Processing Payment",
+        "customerLabel": "Processing Payment",
+        "color": "purple",
+        "isTerminal": false,
+        "sortOrder": 3
+      },
+      {
+        "key": "buyback_complete",
+        "label": "Complete",
+        "customerLabel": "Complete",
+        "color": "green",
+        "isTerminal": true,
+        "sortOrder": 4
+      },
+      {
+        "key": "rejected",
+        "label": "Rejected",
+        "customerLabel": "Not Accepted",
+        "color": "red",
+        "isTerminal": true,
+        "sortOrder": 5
+      }
+    ]
+  },
+
+  "orderStatuses": [
+    { "key": "awaiting_device", "label": "Awaiting Device", "sortOrder": 0 },
+    { "key": "in_progress", "label": "In Progress", "sortOrder": 1 },
+    { "key": "service_complete", "label": "Service Complete", "sortOrder": 2 },
+    { "key": "awaiting_collection", "label": "Awaiting Collection/Despatch", "sortOrder": 3 },
+    { "key": "collected_despatched", "label": "Collected/Despatched", "sortOrder": 4 }
+  ],
+
+  "workflows": ["repair", "buyback"],
+
+  "paymentMethods": [
+    { "key": "cash", "label": "Cash" },
+    { "key": "card", "label": "Card" },
+    { "key": "bank_transfer", "label": "Bank Transfer" },
+    { "key": "paypal", "label": "PayPal" },
+    { "key": "invoice", "label": "Invoice" },
+    { "key": "other", "label": "Other" }
+  ],
+
+  "intakeMethods": [
+    { "key": "walk_in", "label": "Walk-In" },
+    { "key": "mail_in", "label": "Mail-In" },
+    { "key": "courier", "label": "Courier" },
+    { "key": "counter_sale", "label": "Counter Sale" },
+    { "key": "accessories_in_store", "label": "Accessories In-Store" }
+  ],
+
+  "carriers": [
+    { "key": "royal_mail", "label": "Royal Mail" },
+    { "key": "dpd", "label": "DPD" },
+    { "key": "dhl", "label": "DHL" },
+    { "key": "ups", "label": "UPS" },
+    { "key": "fedex", "label": "FedEx" },
+    { "key": "evri", "label": "Evri" },
+    { "key": "yodel", "label": "Yodel" },
+    { "key": "other", "label": "Other" }
+  ],
+
+  "priorities": [
+    { "key": "normal", "label": "Normal", "sortOrder": 0 },
+    { "key": "urgent", "label": "Urgent", "sortOrder": 1 },
+    { "key": "express", "label": "Express", "sortOrder": 2 }
+  ],
+
+  "conditionGrades": [
+    { "key": "A", "label": "Grade A - Excellent", "description": "Like new condition" },
+    { "key": "B", "label": "Grade B - Good", "description": "Minor wear" },
+    { "key": "C", "label": "Grade C - Fair", "description": "Visible wear" },
+    { "key": "D", "label": "Grade D - Poor", "description": "Significant wear" },
+    { "key": "F", "label": "Grade F - Faulty", "description": "Not functional" }
+  ],
+
+  "accessoryTypes": [
+    { "key": "charger", "label": "Charger" },
+    { "key": "cable", "label": "Cable" },
+    { "key": "case", "label": "Case" },
+    { "key": "sim_card", "label": "SIM Card" },
+    { "key": "stylus", "label": "Stylus" },
+    { "key": "box", "label": "Box" },
+    { "key": "sd_card", "label": "SD Card" },
+    { "key": "other", "label": "Other" }
+  ],
+
+  "passcodeTypes": [
+    { "key": "pin", "label": "PIN" },
+    { "key": "pattern", "label": "Pattern" },
+    { "key": "password", "label": "Password" },
+    { "key": "biometric", "label": "Biometric" },
+    { "key": "none", "label": "None" }
+  ],
+
+  "findMyStatuses": [
+    { "key": "disabled", "label": "Disabled" },
+    { "key": "enabled", "label": "Enabled" },
+    { "key": "unknown", "label": "Unknown" }
+  ],
+
+  "imageTypes": [
+    { "key": "pre_repair", "label": "Pre-Repair" },
+    { "key": "post_repair", "label": "Post-Repair" },
+    { "key": "damage", "label": "Damage" },
+    { "key": "diagnostic", "label": "Diagnostic" },
+    { "key": "part", "label": "Part" }
+  ],
+
+  "authorisationTypes": [
+    { "key": "pre_authorised", "label": "Pre-Authorised" },
+    { "key": "phone", "label": "Phone" },
+    { "key": "email", "label": "Email" },
+    { "key": "portal", "label": "Portal" }
+  ],
+
+  "ticketStatuses": [
+    { "key": "open", "label": "Open" },
+    { "key": "resolved", "label": "Resolved" },
+    { "key": "closed", "label": "Closed" }
+  ]
+}

@@ -3,7 +3,7 @@
 ## Feature Overview
 
 ### What
-Complete rebuild of the iOS app as a **single unified app target** supporting both **Staff** and **Customer** roles using an **API-first methodology**. Users select their role at login, and the app shows the appropriate interface:
+Complete rebuild of the iOS app as a **single unified app target** supporting both **Staff** and **Customer** roles. Users select their role at login, and the app shows the appropriate interface:
 - **Staff**: Dashboard, devices, orders, enquiries, settings
 - **Customer**: Order list, order detail with quote approval, messaging
 
@@ -21,481 +21,361 @@ Additionally, having separate Staff and Customer app targets created unnecessary
 - Simpler maintenance and deployment
 - Backend already supports both auth flows
 
-This rebuild documents all endpoints first, then builds Swift models and UI that match the backend exactly.
+---
+
+## Core Methodology: Web App as Source of Truth
+
+**CRITICAL**: The web app at `/Volumes/Riki Repos/repairminder` is the **single source of truth** for all API implementation.
+
+### The Rule
+> **Never duplicate API specs in documentation. Always read from the backend source files.**
+
+### For Each Feature Implementation:
+1. **Read the handler file** in `/Volumes/Riki Repos/repairminder/worker/` to understand the endpoint
+2. **Find the response shape** by reading what the handler returns
+3. **Build Swift models** that match the actual response structure
+4. **Test against the running backend** to verify
+
+### ⚠️ Mandatory Verification Step
+Each stage document includes a **Pre-Implementation Verification** section. Workers MUST:
+- Run the verification commands listed
+- Confirm response shapes match the documentation
+- Report any discrepancies before proceeding
+
+This catches backend changes that may have occurred since the plan was written.
+
+### Why This Matters
+- Documentation gets stale; source code is always current
+- The backend is actively maintained; any changes are immediately visible
+- No translation errors from "what we think the API does" vs "what it actually does"
 
 ---
 
-## Backend Reference (Source of Truth)
+## Backend File Reference (Actual Locations)
 
-All iOS implementation should match the backend at `/Volumes/Riki Repos/repairminder/worker/`
+All iOS implementation should read from: `/Volumes/Riki Repos/repairminder/worker/`
 
-### Backend Handlers by Feature
+### Handler Files by Feature
 
-| Feature | Backend Handler | Key Endpoints |
-|---------|-----------------|---------------|
-| **Dashboard** | `dashboard_handlers.js` | `GET /api/dashboard/stats`, `GET /api/dashboard/enquiry-stats` |
-| **My Queue** | `device_handlers.js` | `GET /api/devices/my-queue`, `GET /api/devices/my-active-work` |
-| **Devices** | `device_handlers.js` | `GET /api/devices`, `GET /api/devices/:id`, `PATCH /api/devices/:id` |
-| **Orders** | `order_handlers.js` | `GET /api/orders`, `GET /api/orders/:id`, `PATCH /api/orders/:id` |
-| **Clients** | `client_handlers.js` | `GET /api/clients`, `GET /api/clients/:id`, `GET /api/clients/search` |
-| **Enquiries** | `ticket_handlers.js`, `ticket_llm_handlers.js`, `macro_execution_handlers.js` | `GET/PATCH /api/tickets`, `POST .../reply`, `POST .../note`, `POST .../generate-response`, `POST .../macro` |
-| **Auth** | `auth_handlers.js` | `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/refresh` |
-| **Customer Auth** | `auth_handlers.js` | `POST /api/customer/auth/request-magic-link`, `POST /api/customer/auth/verify-code` |
-| **Customer Orders** | `order_handlers.js` | `GET /api/customer/orders`, `GET /api/customer/orders/:id` |
-| **Push Tokens** | `device_token_handlers.js` | `POST /api/user/device-token`, `DELETE /api/user/device-token` |
-| **Push Prefs** | `device_token_handlers.js` | `GET /api/user/push-preferences`, `PUT /api/user/push-preferences` |
+| Feature | Backend File | How to Find Response Shape |
+|---------|--------------|---------------------------|
+| **Staff Auth** | `src/auth.js` | Look for `login()`, `_issueTokenPair()` methods |
+| **Customer Auth** | `src/customer-auth.js` | Look for magic link request/verify functions |
+| **Auth Routes** | `index.js` (lines 1435+) | Search for `/api/auth` to see all auth endpoints |
+| **Dashboard** | `dashboard_handlers.js` | Search for `getStats`, `getEnquiryStats` |
+| **Devices** | `device_handlers.js` | Search for response objects returned |
+| **Device Workflows** | `src/device-workflows.js` | Contains all status definitions and transitions |
+| **Orders** | `order_handlers.js` | Search for `getOrder`, `getOrders` functions |
+| **Clients** | `client_handlers.js` | Search for response construction |
+| **Tickets/Enquiries** | `ticket_handlers.js` | Search for `getTicket`, message handling |
+| **Ticket AI** | `src/ticket_llm_handlers.js` | AI response generation |
+| **Macros/Workflows** | `macro_execution_handlers.js` | Workflow execution |
+| **Push Notifications** | `device_token_handlers.js` | Token registration, preferences |
+| **Authorization** | `authorization_handlers.js` | Quote approval endpoints |
+| **Customer Orders** | `order_handlers.js` | Search for `/api/customer/` routes in `index.js` |
 
-### Device Workflow (Source of Truth)
+### How to Read a Handler File
 
-From `worker/src/device-workflows.js`:
+Example for devices - in `device_handlers.js`, look for patterns like:
 
-**Repair Workflow (17 statuses):**
-```
-device_received → diagnosing → ready_to_quote → awaiting_authorisation →
-  → authorised_source_parts → authorised_awaiting_parts → ready_to_repair →
-  → repairing → repaired_qc → repaired_ready → collected/despatched
+```javascript
+// Find the list response shape
+return jsonResponse({
+  success: true,
+  data: devices,  // <-- This tells you the response structure
+  pagination: { ... }
+});
 
-Branch: awaiting_authorisation → rejected → rejection_qc → rejection_ready → collected
-Branch: diagnosing → company_rejected → rejection_qc → rejection_ready → collected
-Branch: repairing → awaiting_revised_quote → awaiting_authorisation
-```
-
-**Buyback Workflow (adds):** `ready_to_pay`, `payment_made`, `added_to_buyback`
-
-### Response Format
-
-All backend responses use:
-```json
-{
-  "success": true,
-  "data": { ... },
-  "pagination": { "page": 1, "limit": 50, "total": 100, "totalPages": 2 }
-}
+// Find the detail response shape
+return jsonResponse({
+  success: true,
+  data: device  // <-- Read what fields are in 'device'
+});
 ```
 
-### Key Business Logic
+### Finding Routes
 
-1. **Order status is AUTO-CALCULATED** from device statuses - iOS should NOT set order status directly
-2. **Device transitions** follow strict state machine - use `getNextStatuses()` from workflows
-3. **Push notifications** require `platform: "ios"`, `app_type: "staff"|"customer"`
-4. **All field names** are `snake_case` from backend
+All routes are defined in `index.js`. Search for the path pattern:
+```javascript
+case path === '/api/devices':
+case path.startsWith('/api/devices/'):
+case path === '/api/customer/orders':
+```
 
 ---
 
-## Detail View Responses (What to Display)
+## Key Business Logic (Read from Source)
 
-### Order Detail (`GET /api/orders/:id`)
+These rules come from the backend and must be respected:
 
-From `order_handlers.js` - includes everything needed for order view:
-
-| Section | Data |
-|---------|------|
-| **Header** | `order_number`, `status`, `payment_status`, `intake_method` |
-| **Client** | Nested `client` object: name, email, phone, address, `email_suppressed` |
-| **Location** | Nested `location` object: name, address |
-| **Assigned** | Nested `assigned_user`: id, name |
-| **Devices** | Array of devices with `status`, `workflow_type`, `authorization_status` |
-| **Line Items** | Array: description, quantity, unit_price, vat_rate, line_total_inc_vat |
-| **Payments** | Array: amount, payment_method, payment_date, is_deposit, refundable_amount |
-| **Totals** | Nested `totals`: subtotal, vat_total, grand_total, amount_paid, balance_due |
-| **Signatures** | Array: signature_type, typed_name, terms_agreed, captured_at |
-| **Messages** | Nested `ticket.messages`: type, from_name, body_text, created_at |
-| **Dates** | Nested `dates`: created_at, quote_sent_at, authorised_at, collected_at |
-
-### Device Detail (`GET /api/orders/:orderId/devices/:deviceId`)
-
-From `device_handlers.js` - comprehensive device data:
-
-| Section | Data |
-|---------|------|
-| **Header** | `display_name` (brand/model), `status`, `workflow_type`, `priority` |
-| **Specs** | serial_number, imei, colour, storage_capacity, passcode_type, find_my_status |
-| **Condition** | condition_grade, customer_reported_issues, technician_found_issues |
-| **Brand/Model** | Nested `brand` and `model` objects, or `custom_brand`/`custom_model` |
-| **Assignment** | Nested `assigned_engineer`: id, name |
-| **Location** | Nested `sub_location`: code, description, type |
-| **Notes** | diagnosis_notes, repair_notes, technician_notes, authorization_notes |
-| **Authorization** | Nested `authorization`: status, method, authorized_at, signature |
-| **Images** | Array: image_type, filename, caption, r2_key (for URL) |
-| **Accessories** | Array: accessory_type, description, returned_at |
-| **Parts** | Array: part_name, part_sku, part_cost, supplier, is_oem |
-| **Line Items** | Array: description, quantity, unit_price, line_total_inc_vat |
-| **Device Notes** | Array: body, created_at, created_by |
-| **Timestamps** | Nested `timestamps`: 12 date fields tracking full workflow |
-| **Checklist** | Nested `checklist`: items array with completion_percentage |
-
-### Ticket/Enquiry Detail (`GET /api/tickets/:id`)
-
-From `ticket_handlers.js` - full conversation thread:
-
-| Section | Data |
-|---------|------|
-| **Header** | `ticket_number`, `subject`, `status`, `ticket_type` |
-| **Client** | Nested `client`: email, name, phone, email_suppressed, is_generated_email |
-| **Assigned** | Nested `assigned_user`: first_name, last_name |
-| **Location** | Nested `location`: id, name; `requires_location` flag |
-| **Messages** | Array of full message objects (see below) |
-| **Custom Email** | Nested `received_custom_email`: email_address, display_name |
-
-**Message Object:**
-```
-type: outbound|inbound|internal_note|outbound_sms
-from_email, from_name, to_email, subject
-body_text, body_html
-device_id, device_name (if linked to device)
-created_by: {id, first_name, last_name}
-events: [{event_type, event_data, created_at}]  // delivery tracking
-attachments: [{filename, content_type, size_bytes, download_url}]
-```
-
-### Ticket Actions (Quick Reply Bar)
-
-The ticket detail view needs action buttons for:
-
-| Action | Endpoint | Request Body |
-|--------|----------|--------------|
-| **Send Public Reply** | `POST /api/tickets/:id/reply` | `{ html_body, text_body?, from_email_id? }` |
-| **Add Internal Note** | `POST /api/tickets/:id/note` | `{ body }` |
-| **Generate AI Reply** | `POST /api/tickets/:id/generate-response` | `{ location_id? }` - returns `{ response }` |
-| **Execute Workflow** | `POST /api/tickets/:id/macro` | `{ macro_id, variable_overrides? }` |
-
-**Workflow Modal** requires fetching available workflows:
-- `GET /api/macros` → Returns array of workflows with `id`, `name`, `description`, `is_active`
-- Each workflow has stages that execute sequentially (email, delay, follow-up)
-- `variable_overrides` allows customizing template variables before execution
+| Rule | Source File | What to Read |
+|------|-------------|--------------|
+| Device status transitions | `src/device-workflows.js` | `getNextStatuses()` function |
+| Order status calculation | `order_handlers.js` | Status is auto-calculated from devices |
+| Push notification format | `device_token_handlers.js` | Required fields: `platform`, `app_type` |
+| Response envelope | All handlers | `{ success, data, pagination?, error? }` |
+| Field naming | All handlers | Always `snake_case` from backend |
 
 ---
 
-## Step 0: Pre-Implementation Setup (DO THIS FIRST)
+## Step 0: Pre-Implementation Setup
 
-Before starting any stage, set up a clean unified app target.
+Before starting any stage:
 
-### Clean the iOS Project
-
-Remove existing broken code and start fresh with backend as source of truth:
+### 1. Verify Backend Access
 
 ```bash
-# Remove existing Core (will rebuild from backend specs)
-rm -rf "Repair Minder/Repair Minder/Core/Models/"
-rm -rf "Repair Minder/Repair Minder/Core/Networking/"
-rm -rf "Repair Minder/Repair Minder/Core/Auth/"
+# Ensure web app exists
+ls /Volumes/Riki\ Repos/repairminder/worker/
 
-# Remove existing Features (will rebuild matching backend)
-rm -rf "Repair Minder/Repair Minder/Features/"
-
-# Remove separate Customer target
-rm -rf "Repair Minder/Customer/"
-
-# Keep: App/, Shared/Components/, Resources/
+# Key files should exist:
+ls /Volumes/Riki\ Repos/repairminder/worker/src/auth.js
+ls /Volumes/Riki\ Repos/repairminder/worker/device_handlers.js
+ls /Volumes/Riki\ Repos/repairminder/worker/order_handlers.js
 ```
 
-### Already Removed (Offline/Sync)
-
-These files have already been deleted as part of removing offline mode:
-```
-Core/Storage/                          # CoreData, repositories, sync
-Resources/RepairMinder.xcdatamodeld/   # CoreData model
-```
-
-### Xcode Project Setup
-
-1. Open `Repair Minder.xcodeproj`
-2. Remove the "Customer" target if it exists
-3. Ensure only "Repair Minder" target remains
-4. Remove references to deleted files
-
-### Backend Verification
-
-Before coding, verify backend is running and test endpoints:
+### 2. Test Backend is Running
 
 ```bash
-# Test staff auth
+# Test staff auth (read src/auth.js for expected response)
 curl -X POST http://localhost:8787/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"test"}'
 
-# Test dashboard (with token)
+# Test with token (read dashboard_handlers.js for response shape)
 curl http://localhost:8787/api/dashboard/stats \
-  -H "Authorization: Bearer {token}"
-
-# Test devices
-curl http://localhost:8787/api/devices/my-queue \
   -H "Authorization: Bearer {token}"
 ```
 
----
+### 3. Clean iOS Project
 
-## Success Criteria
+```bash
+# Remove existing broken code (skip if already cleaned)
+rm -rf "Repair Minder/Repair Minder/Core/Models/"
+rm -rf "Repair Minder/Repair Minder/Core/Networking/"
+rm -rf "Repair Minder/Repair Minder/Core/Auth/"
+rm -rf "Repair Minder/Repair Minder/Features/"
+rm -rf "Repair Minder/Customer/"
+```
 
-| Criteria | Measurement |
-|----------|-------------|
-| Zero decode errors | No "keyNotFound", "typeMismatch", or "Failed to decode" in console |
-| Role selection works | User can choose Staff or Customer at login |
-| **Staff Features** | |
-| Dashboard loads | Stats display with correct values, period picker works |
-| My Queue functional | Shows user's assigned devices, updates on refresh |
-| Device actions work | Status transitions execute successfully via API |
-| Scanner works | Barcode/QR scan opens device detail |
-| Orders display | List and detail views show all data correctly |
-| Clients display | List and detail views show all data correctly |
-| Enquiries functional | Messages display, replies send successfully |
-| **Customer Features** | |
-| Customer orders load | Customer sees their orders only |
-| Quote approval works | Customer can approve/reject with signature |
-| Customer messaging | Customer can send messages on orders |
-| **Shared** | |
-| Push notifications | Token registers with correct appType, deep links work |
-| Build succeeds | Single target builds without errors |
+**After cleanup, your project should have:**
+- `Core/` - empty directory (ready for new networking/auth code)
+- `Resources/config.json` - bundled fallback configuration
+- `Assets.xcassets/` - app icons and images
+- `Repair_MinderApp.swift` - main app entry point
 
----
-
-## Dependencies & Prerequisites
-
-### Required Before Starting
-- [ ] Backend running (staging or local) at `/Volumes/Riki Repos/repairminder`
-- [ ] Test staff account with valid credentials
-- [ ] Xcode 15+ installed
-- [ ] iOS 17+ deployment target confirmed
-- [ ] Push notification certificates configured in Apple Developer Portal
-
-### Backend Reference
-All endpoint verification against: `/Volumes/Riki Repos/repairminder/worker/`
-
-| Feature | Backend Handler File |
-|---------|---------------------|
-| Authentication | `worker/index.js` (auth routes), `worker/auth_handlers.js` |
-| Dashboard | `worker/dashboard_handlers.js` |
-| Devices | `worker/device_handlers.js` |
-| Device Statuses | `worker/src/device-workflows.js` |
-| Orders | `worker/order_handlers.js` |
-| Tickets/Enquiries | `worker/ticket_handlers.js` |
-| Clients | `worker/client_handlers.js` |
-| Scanner | Uses device lookup endpoints in `worker/device_handlers.js` |
-| Push Notifications | `worker/device_token_handlers.js` |
-| Company Settings | `worker/company_handlers.js` |
-
----
-
-## Risk Assessment
-
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| Backend API changes during rebuild | Medium | High | Document endpoint versions, coordinate with backend team |
-| Missing device statuses | Medium | Medium | Use `device-workflows.js` as source of truth for all 18 statuses |
-| Push notification cert issues | Medium | Low | Test on physical device early, verify cert configuration |
-| Token refresh race conditions | Low | High | Implement proper token refresh queue, handle 401s gracefully |
-| Decode errors from new fields | Medium | Medium | Use optional types liberally, log unknown fields |
+**Verify cleanup:**
+```bash
+ls "Repair Minder/Repair Minder/"
+# Should show: Assets.xcassets, Configuration, Core, Resources, *.swift files
+```
 
 ---
 
 ## Stage Index
 
-| Stage | Name | Backend Source | Key Endpoints |
-|-------|------|----------------|---------------|
-| **01** | [API Verification](01-api-verification.md) | `worker/index.js` (routes) | Document all endpoints from backend |
-| **02** | [Foundation](02-foundation.md) | All handler files | Models matching backend response shapes |
-| **03** | [Authentication](03-authentication.md) | `auth_handlers.js` | `POST /api/auth/login`, `POST /api/customer/auth/*` |
-| **04** | [Dashboard & My Queue](04-dashboard-myqueue.md) | `dashboard_handlers.js`, `device_handlers.js` | `GET /api/dashboard/stats`, `GET /api/devices/my-queue` |
-| **05** | [Devices & Scanner](05-devices-scanner.md) | `device_handlers.js`, `device-workflows.js` | `GET/PATCH /api/devices`, status transitions |
-| **06** | [Orders & Clients](06-orders-clients.md) | `order_handlers.js`, `client_handlers.js` | `GET/PATCH /api/orders`, `GET /api/clients` |
-| **07** | [Enquiries](07-enquiries.md) | `ticket_handlers.js`, `ticket_llm_handlers.js`, `macro_execution_handlers.js` | List, detail, reply, internal note, AI generate, workflow execute |
-| **08** | [Settings & Push](08-settings-push.md) | `device_token_handlers.js` | `POST/DELETE /api/user/device-token`, preferences |
-| **09** | [Customer Screens](09-customer-screens.md) | `order_handlers.js` | `GET /api/customer/orders`, quote approval |
-| **10** | [Integration Testing](10-integration-testing.md) | All handlers | End-to-end against live backend |
+Each stage reads from specific backend files to build the iOS implementation.
+
+| Stage | Name | Read From | What to Build |
+|-------|------|-----------|---------------|
+| **01** ✅ | Foundation | `index.js`, all handlers | APIClient, APIResponse, base networking |
+| **02** ✅ | Authentication | `src/auth.js`, `src/customer-auth.js` | AuthManager, login flows for both roles |
+| **03** ✅ | Dashboard & My Queue | `dashboard_handlers.js`, `device_handlers.js` | Dashboard stats, my queue list |
+| **04** ✅ | Devices & Scanner | `device_handlers.js`, `src/device-workflows.js` | Device list/detail, status transitions |
+| **05** ✅ | Orders & Clients | `order_handlers.js`, `client_handlers.js` | Order/client list and detail views |
+| **06** ✅ | Enquiries | `ticket_handlers.js`, `src/ticket_llm_handlers.js` | Ticket list, messages, replies |
+| **07** ✅ | Settings & Push | `device_token_handlers.js`, `company_handlers.js` | Push registration, preferences |
+| **08** ✅ | Customer Screens | `order_handlers.js`, `authorization_handlers.js` | Customer orders, quote approval |
+| **09** ✅ | Integration Testing | All handlers | End-to-end verification |
 
 ### Stage Dependencies
 
 ```
-Stage 01 ──> Stage 02 ──> Stage 03 ──┬──> Stage 04 (Staff: Dashboard)
-                                     ├──> Stage 05 (Staff: Devices & Scanner)
-                                     ├──> Stage 06 (Staff: Orders & Clients)
-                                     ├──> Stage 07 (Staff: Enquiries)
-                                     ├──> Stage 08 (Both: Settings & Push)
-                                     └──> Stage 09 (Customer: Screens)
-                                                    │
-                                     All Stages ────┴──> Stage 10 (Integration Testing)
+Stage 01 ──> Stage 02 ──┬──> Stage 03 (Dashboard)
+                        ├──> Stage 04 (Devices)
+                        ├──> Stage 05 (Orders & Clients)
+                        ├──> Stage 06 (Enquiries)
+                        ├──> Stage 07 (Settings & Push)
+                        └──> Stage 08 (Customer Screens)
+                                       │
+                        All Stages ────┴──> Stage 09 (Integration)
 ```
 
-- Stages 04-09 can run in parallel after Stage 03 completes
-- Stage 08 (Settings) is shared by both roles
-- Stage 10 (Integration Testing) runs after all other stages are complete
-- Each stage is independently testable once its dependencies are met
+---
+
+## Implementation Pattern for Each Stage
+
+### Step 1: Read the Backend Handler
+
+```bash
+# Example: Building device feature
+# Read the handler to understand response shape
+cat /Volumes/Riki\ Repos/repairminder/worker/device_handlers.js | head -500
+```
+
+Look for:
+- What fields are returned in `data`
+- What nested objects exist
+- What enums/status values are used
+- What query parameters are accepted
+
+### Step 2: Read the Routes
+
+```bash
+# Find all device routes
+grep -n "device" /Volumes/Riki\ Repos/repairminder/worker/index.js | head -50
+```
+
+### Step 3: Build Swift Models
+
+Create models that **exactly match** what you read in the handler:
+- Use optional types for nullable fields
+- Match field names (Swift decoder converts snake_case)
+- Include all nested types
+
+### Step 4: Test Against Running Backend
+
+```bash
+# Hit the actual endpoint
+curl http://localhost:8787/api/devices \
+  -H "Authorization: Bearer {token}" | jq .
+```
+
+Compare the actual response to your Swift model.
+
+---
+
+## Success Criteria
+
+| Criteria | Verification |
+|----------|--------------|
+| Zero decode errors | No "keyNotFound", "typeMismatch" in console |
+| Models match backend | Compare Swift properties to handler response |
+| All endpoints work | Test each endpoint with curl first |
+| Role selection works | Staff and Customer can both login |
+| Push notifications | Token registers with correct `app_type` |
+
+---
+
+## iOS App Structure
+
+```
+Repair Minder/Repair Minder/
+├── App/
+│   ├── AppDelegate.swift
+│   ├── AppState.swift
+│   ├── UserRole.swift
+│   └── Repair_MinderApp.swift
+├── Core/
+│   ├── Auth/
+│   │   ├── AuthManager.swift       # Read: src/auth.js, src/customer-auth.js
+│   │   └── KeychainManager.swift
+│   ├── Models/                     # Read: Each handler's response shape
+│   │   ├── Device.swift            # Read: device_handlers.js
+│   │   ├── DeviceStatus.swift      # Read: src/device-workflows.js
+│   │   ├── Order.swift             # Read: order_handlers.js
+│   │   ├── Ticket.swift            # Read: ticket_handlers.js
+│   │   ├── Client.swift            # Read: client_handlers.js
+│   │   ├── DashboardStats.swift    # Read: dashboard_handlers.js
+│   │   └── User.swift              # Read: src/auth.js
+│   ├── Networking/
+│   │   ├── APIClient.swift         # snake_case decoder, auth interceptor
+│   │   ├── APIEndpoints.swift      # Read: index.js for all routes
+│   │   └── APIResponse.swift       # Standard {success, data, pagination}
+│   └── Notifications/
+│       └── PushNotificationManager.swift  # Read: device_token_handlers.js
+├── Features/
+│   ├── Auth/
+│   ├── Staff/
+│   │   ├── Dashboard/
+│   │   ├── Devices/
+│   │   ├── Scanner/
+│   │   ├── Orders/
+│   │   ├── Clients/
+│   │   └── Enquiries/
+│   ├── Customer/
+│   │   ├── OrderList/
+│   │   ├── OrderDetail/
+│   │   └── QuoteApproval/
+│   └── Settings/
+└── Shared/
+    └── Components/
+```
 
 ---
 
 ## Out of Scope
 
-This plan explicitly does NOT cover:
-
-| Item | Reason | Location |
-|------|--------|----------|
-| **Booking Feature** | Separate plan exists | `plans/new-booking-feature/` |
-| **Offline Mode / CoreData** | Already removed, staying online-only | N/A |
-| **Unit Tests** | Separate effort after rebuild | Future work |
-| **UI Polish / Animations** | Focus on functionality first | Future work |
-| **Accessories / Parts Management** | Not core staff workflow | Future work |
-| **Inventory / Stock** | Not core staff workflow | Future work |
-| **Payment Processing** | Web-only for now | N/A |
-| **Customer Enquiry Submission** | Done via website/public API | N/A |
+| Item | Reason |
+|------|--------|
+| Booking Feature | Separate plan in `plans/new-booking-feature/` |
+| Offline Mode | Removed, staying online-only |
+| Unit Tests | After rebuild |
+| UI Polish | Focus on functionality first |
+| Payment Processing | Web-only |
 
 ---
 
-## File Structure
+## 🔄 Dynamic Configuration (Future)
 
-### Plan Documents
-```
-plans/staff-app-rebuild/
-├── 00-master-plan.md           # This file
-├── 01-api-verification.md      # Endpoint documentation (staff + customer)
-├── 02-foundation.md            # Models + networking
-├── 03-authentication.md        # Role selection, dual auth flows
-├── 04-dashboard-myqueue.md     # Dashboard feature (Staff)
-├── 05-devices-scanner.md       # Devices and scanner features (Staff)
-├── 06-orders-clients.md        # Orders and clients features (Staff)
-├── 07-enquiries.md             # Enquiries/tickets feature (Staff)
-├── 08-settings-push.md         # Settings and push notifications (Both)
-├── 09-customer-screens.md      # Customer order list, quote approval (Customer)
-└── 10-integration-testing.md   # End-to-end testing (Both)
-```
+Some values are currently hardcoded in Swift but should eventually be fetched from a `/api/config` endpoint:
 
-### iOS App Structure (Rebuild)
+| Item | Current Location | Notes |
+|------|-----------------|-------|
+| Device statuses (labels, colors) | `DeviceStatus.swift` | Design code to support dynamic updates |
+| Status transitions | `DeviceStatus.swift` | Backend validates, but iOS shows available actions |
+| Customer progress stages | Customer screens | Maps internal statuses to customer-facing labels |
 
-Clean rebuild matching backend structure:
-
-```
-Repair Minder/Repair Minder/
-├── App/
-│   ├── AppDelegate.swift           # Push notification handling
-│   ├── AppState.swift              # Global state + UserRole
-│   ├── UserRole.swift              # Staff vs Customer enum
-│   └── Repair_MinderApp.swift      # Entry point with role-based navigation
-├── Core/
-│   ├── Auth/
-│   │   ├── AuthManager.swift       # Handles staff + customer auth flows
-│   │   └── KeychainManager.swift   # Secure token storage
-│   ├── Models/                     # Match backend response shapes exactly
-│   │   ├── Device.swift            # From device_handlers.js response
-│   │   ├── DeviceStatus.swift      # From device-workflows.js (20 statuses)
-│   │   ├── Order.swift             # From order_handlers.js response
-│   │   ├── OrderStatus.swift       # Auto-calculated statuses
-│   │   ├── Ticket.swift            # From ticket_handlers.js response
-│   │   ├── Client.swift            # From client_handlers.js response
-│   │   ├── DashboardStats.swift    # From dashboard_handlers.js response
-│   │   └── User.swift              # From auth_handlers.js response
-│   ├── Networking/
-│   │   ├── APIClient.swift         # snake_case decoder, auth interceptor
-│   │   ├── APIEndpoints.swift      # All endpoints from worker/index.js
-│   │   └── APIResponse.swift       # Standard {success, data, pagination}
-│   └── Notifications/
-│       ├── PushNotificationManager.swift  # device_token_handlers.js
-│       └── DeepLinkHandler.swift
-├── Features/
-│   ├── Auth/                       # Role selection + login screens
-│   ├── Staff/
-│   │   ├── Dashboard/              # dashboard_handlers.js
-│   │   ├── Devices/                # device_handlers.js
-│   │   ├── Scanner/                # Device lookup
-│   │   ├── Orders/                 # order_handlers.js
-│   │   ├── Clients/                # client_handlers.js
-│   │   └── Enquiries/              # ticket_handlers.js
-│   ├── Customer/
-│   │   ├── OrderList/              # GET /api/customer/orders
-│   │   ├── OrderDetail/            # GET /api/customer/orders/:id
-│   │   └── QuoteApproval/          # POST /api/customer/orders/:id/approve
-│   └── Settings/                   # Push preferences (both roles)
-└── Shared/
-    └── Components/                 # Reusable UI components
-```
+A separate task will add `GET /api/config` to the backend. Until then, hardcode initial values but structure code to accept dynamic configuration.
 
 ---
 
-## API Response Format
+## Quick Reference: Finding Things in Backend
 
-All backend responses use this envelope:
-
-```json
-{
-  "success": true,
-  "data": { ... },
-  "error": "Error message if success=false",
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 100,
-    "total_pages": 5
-  }
-}
+### Auth Endpoints
+```bash
+grep -n "/api/auth" /Volumes/Riki\ Repos/repairminder/worker/index.js
 ```
 
-**Critical**: All field names are `snake_case` from backend. Swift decoder converts to `camelCase`.
+### Customer Endpoints
+```bash
+grep -n "/api/customer" /Volumes/Riki\ Repos/repairminder/worker/index.js
+```
 
----
+### Device Statuses
+```bash
+cat /Volumes/Riki\ Repos/repairminder/worker/src/device-workflows.js | grep -A5 "statuses"
+```
 
-## Device Statuses (Source of Truth)
-
-From `[Ref: /Volumes/Riki Repos/repairminder/worker/src/device-workflows.js]`:
-
-### Repair Workflow (17 statuses)
-| Status | Display Name |
-|--------|--------------|
-| `device_received` | Device Received |
-| `diagnosing` | Diagnosing |
-| `ready_to_quote` | Ready to Quote |
-| `company_rejected` | Company Rejected |
-| `awaiting_authorisation` | Awaiting Authorisation |
-| `authorised_source_parts` | Authorised - Source Parts |
-| `authorised_awaiting_parts` | Awaiting Parts |
-| `ready_to_repair` | Ready to Repair |
-| `repairing` | Repairing |
-| `awaiting_revised_quote` | Awaiting Revised Quote |
-| `repaired_qc` | Repaired - QC |
-| `repaired_ready` | Repaired - Ready |
-| `rejected` | Rejected |
-| `rejection_qc` | Rejection - QC |
-| `rejection_ready` | Rejection - Ready |
-| `collected` | Collected |
-| `despatched` | Despatched |
-
-### Buyback Workflow (3 additional)
-| Status | Display Name |
-|--------|--------------|
-| `ready_to_pay` | Ready to Pay |
-| `payment_made` | Payment Made |
-| `added_to_buyback` | Added to Buyback |
+### Any Handler Response Shape
+```bash
+# Look for jsonResponse or return statements
+grep -n "jsonResponse\|return.*success" /Volumes/Riki\ Repos/repairminder/worker/{handler_name}.js
+```
 
 ---
 
 ## Verification Commands
 
-### Build Verification
+### Build
 ```bash
-# Build staff app for simulator
-xcodebuild -workspace "Repair Minder/Repair Minder.xcworkspace" \
+xcodebuild -project "Repair Minder/Repair Minder.xcodeproj" \
   -scheme "Repair Minder" \
   -destination "platform=iOS Simulator,name=iPhone 15 Pro" \
   build
-
-# Build for device (release)
-xcodebuild -workspace "Repair Minder/Repair Minder.xcworkspace" \
-  -scheme "Repair Minder" \
-  -destination "generic/platform=iOS" \
-  build
 ```
 
-### Runtime Verification
+### Runtime
 1. Launch app in Simulator
 2. Login with test credentials
 3. Monitor Xcode console for decode errors
 4. Navigate through all features
-5. Verify data displays correctly
+5. Compare displayed data to curl responses
 
 ---
 
-## Handoff Notes
+## Remember
 
-After all stages complete:
-1. Run full integration test on physical device
-2. Verify push notifications work end-to-end
-3. Test all deep link scenarios
-4. Performance check on list views with pagination
-5. Ready for TestFlight internal testing
+> **The web app is the source of truth. When in doubt, read the handler file.**
+
+Don't guess what an API returns. Don't copy from documentation. Open the handler file, read what it returns, and build your Swift model to match exactly.

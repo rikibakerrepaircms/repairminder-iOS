@@ -1,1766 +1,723 @@
-# Stage 01: API Verification & Documentation
+# Stage 01: Foundation & Networking
 
 ## Objective
 
-Document ALL backend endpoints needed by the unified app (Staff + Customer) with complete request/response examples BEFORE any code is written.
+Build the core networking infrastructure that all features depend on. This stage establishes the API client, response handling, and endpoint definitions.
 
-## Dependencies
+---
 
-- **Requires**: None (first stage)
-- **Backend Access**: `/Volumes/Riki Repos/repairminder/worker/`
+## ⚠️ Pre-Implementation Verification
 
-## Complexity
+**Before writing any code, verify the following against the backend source files:**
 
-**Medium** - Research and documentation, no code changes
+1. **Response envelope structure** - Read any handler in `/Volumes/Riki Repos/repairminder/worker/` and confirm the `{ success, data, pagination?, error? }` pattern
+2. **Pagination field names** - Verify `total_pages` vs `totalPages` in actual responses
+3. **Token refresh endpoint** - Confirm `/api/auth/refresh` request/response shape in `src/auth.js`
+4. **HTTP status codes** - Verify error handling matches `middleware/errorHandler.js`
 
-## Files to Modify
+```bash
+# Quick verification commands
+curl -s "https://api.repairminder.com/api/health" | jq  # Check API is live
+grep -n "jsonResponse" /Volumes/Riki\ Repos/repairminder/worker/device_handlers.js | head -5  # Verify response pattern
+```
 
-None (documentation only)
+**Do not proceed until you've verified the response shapes match this documentation.**
+
+---
+
+## API Response Envelope
+
+All backend endpoints return a standard response wrapper:
+
+```json
+{
+  "success": true | false,
+  "data": T,
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 100,
+    "total_pages": 5
+  },
+  "error": "Error message if success=false"
+}
+```
+
+**Notes:**
+- `pagination` is optional (only on list endpoints)
+- `error` is only present when `success: false`
+- Backend returns `total_pages` in snake_case
+
+---
+
+## Endpoint Reference
+
+### Auth Endpoints (`/api/auth/*`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/auth/login` | Initial login with email/password |
+| POST | `/api/auth/2fa/request` | Request 2FA code via email |
+| POST | `/api/auth/2fa/verify` | Verify 2FA code, get tokens |
+| POST | `/api/auth/magic-link/request` | Request magic link code |
+| POST | `/api/auth/magic-link/verify-code` | Verify 6-digit code |
+| POST | `/api/auth/refresh` | Refresh access token |
+| GET | `/api/auth/me` | Get current user + company |
+| POST | `/api/auth/logout` | Logout, invalidate session |
+| POST | `/api/auth/totp/setup` | Setup TOTP authenticator |
+| POST | `/api/auth/totp/verify-setup` | Verify TOTP setup |
+| POST | `/api/auth/totp/disable` | Disable TOTP |
+| GET | `/api/auth/totp/status` | Get TOTP status |
+
+### Customer Auth Endpoints (`/api/customer/auth/*`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/customer/auth/request-magic-link` | Request customer login code |
+| POST | `/api/customer/auth/verify-code` | Verify code, get customer token |
+| GET | `/api/customer/auth/me` | Get current customer session |
+| POST | `/api/customer/auth/logout` | Customer logout |
+
+### Dashboard Endpoints (`/api/dashboard/*`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/dashboard/stats` | Device counts, revenue, comparisons |
+| GET | `/api/dashboard/enquiry-stats` | Enquiry statistics |
+| GET | `/api/dashboard/lifecycle` | Lifecycle metrics |
+| GET | `/api/dashboard/category-breakdown` | Revenue by category |
+| GET | `/api/dashboard/activity-log` | Recent activity feed |
+| GET | `/api/dashboard/booking-heatmap` | Booking patterns |
+| GET | `/api/dashboard/buyback-stats` | Buyback statistics |
+| GET | `/api/dashboard/bookings-by-time` | Bookings over time |
+
+### Devices Endpoints (`/api/devices/*`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/devices` | List all devices (company-wide) |
+| GET | `/api/devices/my-queue` | Devices assigned to current user |
+| GET | `/api/devices/my-active-work` | Active work for current user |
+| GET | `/api/orders/:orderId/devices` | List devices for order |
+| POST | `/api/orders/:orderId/devices` | Add device to order |
+| GET | `/api/orders/:orderId/devices/:deviceId` | Get device detail |
+| PATCH | `/api/orders/:orderId/devices/:deviceId` | Update device |
+| DELETE | `/api/orders/:orderId/devices/:deviceId` | Delete device |
+| PATCH | `/api/orders/:orderId/devices/:deviceId/status` | Update device status |
+| GET | `/api/orders/:orderId/devices/:deviceId/actions` | Get available actions |
+| POST | `/api/orders/:orderId/devices/:deviceId/action` | Execute action |
+
+### Orders Endpoints (`/api/orders/*`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/orders` | List orders (paginated) |
+| POST | `/api/orders` | Create order |
+| GET | `/api/orders/:id` | Get order detail |
+| PATCH | `/api/orders/:id` | Update order |
+| GET | `/api/orders/:id/items` | List order items |
+| POST | `/api/orders/:id/items` | Add order item |
+| PATCH | `/api/orders/:id/items/:itemId` | Update order item |
+| DELETE | `/api/orders/:id/items/:itemId` | Delete order item |
+| GET | `/api/orders/:id/payments` | List payments |
+| POST | `/api/orders/:id/payments` | Add payment |
+| DELETE | `/api/orders/:id/payments/:paymentId` | Delete payment |
+| GET | `/api/orders/:id/signatures` | List signatures |
+| POST | `/api/orders/:id/signatures` | Capture signature |
+| POST | `/api/orders/:id/send-quote` | Send quote to customer |
+| POST | `/api/orders/:id/authorize` | Authorize order |
+| POST | `/api/orders/:id/despatch` | Mark as despatched |
+| POST | `/api/orders/:id/collect` | Mark as collected |
+
+### Clients Endpoints (`/api/clients/*`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/clients` | List clients (paginated) |
+| POST | `/api/clients` | Create client |
+| GET | `/api/clients/:id` | Get client detail |
+| PATCH | `/api/clients/:id` | Update client |
+| DELETE | `/api/clients/:id` | Soft delete client |
+| GET | `/api/clients/search` | Search clients |
+| GET | `/api/clients/export` | Export clients |
+| POST | `/api/clients/import` | Import clients |
+
+### Tickets/Enquiries Endpoints (`/api/tickets/*`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/tickets` | List tickets (paginated) |
+| POST | `/api/tickets` | Create ticket |
+| GET | `/api/tickets/:id` | Get ticket detail |
+| PATCH | `/api/tickets/:id` | Update ticket |
+| POST | `/api/tickets/:id/reply` | Send reply |
+| POST | `/api/tickets/:id/note` | Add internal note |
+| POST | `/api/tickets/:id/resolve` | Resolve ticket |
+| POST | `/api/tickets/:id/reassign` | Reassign ticket |
+| POST | `/api/tickets/enquiry` | Create enquiry (public) |
+
+### Push Notification Endpoints (`/api/user/*`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/user/device-token` | Register device token |
+| DELETE | `/api/user/device-token` | Unregister device token |
+| GET | `/api/user/device-tokens` | List user's tokens |
+| GET | `/api/user/push-preferences` | Get push preferences |
+| PUT | `/api/user/push-preferences` | Update push preferences |
+
+### Customer Portal Endpoints (`/api/customer/*`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/customer/orders` | List customer's orders |
+| GET | `/api/customer/orders/:orderId` | Get order detail |
+| POST | `/api/customer/orders/:orderId/approve` | Approve quote/device |
+| POST | `/api/customer/orders/:orderId/reply` | Send message to shop |
+| GET | `/api/customer/orders/:orderId/invoice` | Get invoice PDF |
+| GET | `/api/customer/devices/:deviceId/images/:imageId/file` | Get device image |
+
+### Configuration Endpoint (`/api/config`) - **FUTURE (Not Yet Implemented)**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/config` | Get app configuration (public, no auth required) |
+
+**⚠️ Important:** This endpoint does NOT exist in the backend yet. The iOS app MUST:
+1. **Bundle a fallback `config.json`** with hardcoded values (see shape below)
+2. Use the bundled fallback for all configuration data
+3. When the backend endpoint is implemented, fetch and cache it
+
+**Authentication:** Public endpoint - no auth required (when implemented).
+
+**Future Behavior (when implemented):** Response will include `Cache-Control: public, max-age=86400` (24 hours). Mobile apps should:
+1. Bundle a fallback `config.json` for offline use
+2. Fetch on launch, cache locally
+3. Compare `version` field to detect changes
+
+**Response Shape:**
+
+```json
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-02-04T10:30:00Z",
+
+  "deviceStatuses": {
+    "repair": [
+      {
+        "key": "device_received",
+        "label": "Received",
+        "customerLabel": "Device Received",
+        "color": "gray",
+        "isTerminal": false,
+        "sortOrder": 0
+      }
+    ],
+    "buyback": [
+      {
+        "key": "device_received",
+        "label": "Received",
+        "customerLabel": "Device Received",
+        "color": "gray",
+        "isTerminal": false,
+        "sortOrder": 0
+      }
+    ]
+  },
+
+  "orderStatuses": [
+    { "key": "awaiting_device", "label": "Awaiting Device", "sortOrder": 0 },
+    { "key": "in_progress", "label": "In Progress", "sortOrder": 1 },
+    { "key": "service_complete", "label": "Service Complete", "sortOrder": 2 },
+    { "key": "awaiting_collection", "label": "Awaiting Collection/Despatch", "sortOrder": 3 },
+    { "key": "collected_despatched", "label": "Collected/Despatched", "sortOrder": 4 }
+  ],
+
+  "workflows": ["repair", "buyback"],
+
+  "paymentMethods": [
+    { "key": "cash", "label": "Cash" },
+    { "key": "card", "label": "Card" },
+    { "key": "bank_transfer", "label": "Bank Transfer" },
+    { "key": "paypal", "label": "PayPal" },
+    { "key": "invoice", "label": "Invoice" },
+    { "key": "other", "label": "Other" }
+  ],
+
+  "intakeMethods": [
+    { "key": "walk_in", "label": "Walk-In" },
+    { "key": "mail_in", "label": "Mail-In" },
+    { "key": "courier", "label": "Courier" },
+    { "key": "counter_sale", "label": "Counter Sale" },
+    { "key": "accessories_in_store", "label": "Accessories In-Store" }
+  ],
+
+  "carriers": [
+    { "key": "royal_mail", "label": "Royal Mail" },
+    { "key": "dpd", "label": "DPD" },
+    { "key": "dhl", "label": "DHL" },
+    { "key": "ups", "label": "UPS" },
+    { "key": "fedex", "label": "FedEx" },
+    { "key": "evri", "label": "Evri" },
+    { "key": "yodel", "label": "Yodel" },
+    { "key": "other", "label": "Other" }
+  ],
+
+  "priorities": [
+    { "key": "normal", "label": "Normal", "sortOrder": 0 },
+    { "key": "urgent", "label": "Urgent", "sortOrder": 1 },
+    { "key": "express", "label": "Express", "sortOrder": 2 }
+  ],
+
+  "conditionGrades": [
+    { "key": "A", "label": "Grade A - Excellent", "description": "Like new condition" },
+    { "key": "B", "label": "Grade B - Good", "description": "Minor wear" },
+    { "key": "C", "label": "Grade C - Fair", "description": "Visible wear" },
+    { "key": "D", "label": "Grade D - Poor", "description": "Significant wear" },
+    { "key": "F", "label": "Grade F - Faulty", "description": "Not functional" }
+  ],
+
+  "accessoryTypes": [
+    { "key": "charger", "label": "Charger" },
+    { "key": "cable", "label": "Cable" },
+    { "key": "case", "label": "Case" },
+    { "key": "sim_card", "label": "SIM Card" },
+    { "key": "stylus", "label": "Stylus" },
+    { "key": "box", "label": "Box" },
+    { "key": "sd_card", "label": "SD Card" },
+    { "key": "other", "label": "Other" }
+  ],
+
+  "passcodeTypes": [
+    { "key": "pin", "label": "PIN" },
+    { "key": "pattern", "label": "Pattern" },
+    { "key": "password", "label": "Password" },
+    { "key": "biometric", "label": "Biometric" },
+    { "key": "none", "label": "None" }
+  ],
+
+  "findMyStatuses": [
+    { "key": "disabled", "label": "Disabled" },
+    { "key": "enabled", "label": "Enabled" },
+    { "key": "unknown", "label": "Unknown" }
+  ],
+
+  "imageTypes": [
+    { "key": "pre_repair", "label": "Pre-Repair" },
+    { "key": "post_repair", "label": "Post-Repair" },
+    { "key": "damage", "label": "Damage" },
+    { "key": "diagnostic", "label": "Diagnostic" },
+    { "key": "part", "label": "Part" }
+  ],
+
+  "authorisationTypes": [
+    { "key": "pre_authorised", "label": "Pre-Authorised" },
+    { "key": "phone", "label": "Phone" },
+    { "key": "email", "label": "Email" },
+    { "key": "portal", "label": "Portal" }
+  ],
+
+  "ticketStatuses": [
+    { "key": "open", "label": "Open" },
+    { "key": "resolved", "label": "Resolved" },
+    { "key": "closed", "label": "Closed" }
+  ]
+}
+```
+
+**Backend Source Files:**
+
+| Data | File | Lines |
+|------|------|-------|
+| Device statuses (repair) | `worker/src/device-workflows.js` | 35-53 |
+| Device statuses (buyback) | `worker/src/device-workflows.js` | 58-72 |
+| Status labels | `worker/src/device-workflows.js` | 128-149 |
+| Status colors | `worker/src/device-workflows.js` | 154-175 |
+| Terminal statuses | `worker/src/device-workflows.js` | 334 |
+| Order statuses | `worker/src/device-workflows.js` | 8-25 |
+| Payment methods | `worker/order_handlers.js` | 37 |
+| Intake methods | `worker/order_handlers.js` | 33 |
+| Authorisation types | `worker/order_handlers.js` | 35 |
+| Carriers | `worker/device_handlers.js` | 55 |
+| Priorities | `worker/device_handlers.js` | 43 |
+| Condition grades | `worker/device_handlers.js` | 53 |
+| Accessory types | `worker/device_handlers.js` | 47 |
+| Passcode types | `worker/device_handlers.js` | 49 |
+| Find My statuses | `worker/device_handlers.js` | 51 |
+| Image types | `worker/device_handlers.js` | 45 |
+
+---
+
+## Pagination Model
+
+Backend pagination response fields:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `page` | Int | Current page (1-indexed) |
+| `limit` | Int | Items per page |
+| `total` | Int | Total item count |
+| `total_pages` | Int | Total page count |
+
+**⚠️ Note:** Backend pagination field casing is inconsistent:
+- Some handlers return `total_pages` (snake_case): orders, devices, macros
+- Some handlers return `totalPages` (camelCase): clients, tickets, assets
+
+Swift's `keyDecodingStrategy = .convertFromSnakeCase` handles both correctly, so use `totalPages` in Swift models.
+
+---
+
+## APIClient Requirements
+
+### Base Configuration
+
+```swift
+let baseURL = URL(string: "https://api.repairminder.com")!
+```
+
+### Key Decoding Strategy
+
+All responses use `snake_case` keys. Configure decoder:
+
+```swift
+let decoder = JSONDecoder()
+decoder.keyDecodingStrategy = .convertFromSnakeCase
+```
+
+### Request Headers
+
+```http
+Authorization: Bearer <access_token>
+Content-Type: application/json
+User-Agent: RepairMinder-iOS/1.0 (iPhone; iOS 17.4)
+```
+
+**Important:** User-Agent must contain `Mobile`, `iPhone`, `iPad`, or similar to get 90-day refresh tokens (vs 7-day for web).
+
+### Token Refresh Flow
+
+On receiving HTTP 401:
+
+1. Call `POST /api/auth/refresh` with body:
+   ```json
+   { "refreshToken": "opaque_refresh_token" }
+   ```
+
+2. Response:
+   ```json
+   {
+     "token": "new_access_token",
+     "refreshToken": "new_refresh_token",
+     "expiresIn": 900
+   }
+   ```
+
+3. Store new tokens, retry original request
+
+4. If refresh fails, clear tokens and redirect to login
+
+### Token Expiry
+
+| Token | Web | Mobile |
+|-------|-----|--------|
+| Access Token | 15 min | 15 min |
+| Refresh Token | 7 days | 90 days |
+
+---
 
 ## Files to Create
 
 | File | Purpose |
 |------|---------|
-| This document | Complete endpoint reference |
+| `Core/Networking/APIResponse.swift` | Generic response wrapper + error type |
+| `Core/Networking/APIClient.swift` | HTTP client with auth & retry logic |
+| `Core/Networking/APIEndpoints.swift` | Endpoint enum definitions |
+| `Core/Models/Pagination.swift` | Pagination model |
 
 ---
 
 ## Implementation Details
 
-### Verification Process
+### APIResponse.swift
 
-For each endpoint:
-1. Find handler in backend `worker/*.js` files
-2. Document exact path, method, parameters
-3. Document request body structure (if POST/PATCH)
-4. Document response structure with exact field names
-5. Note any enum values (statuses, types)
+```swift
+/// Standard API response wrapper
+struct APIResponse<T: Decodable>: Decodable {
+    let success: Bool
+    let data: T?
+    let pagination: Pagination?
+    let error: String?
+}
 
----
+/// Empty response for endpoints that return no data
+struct EmptyResponse: Decodable {}
+```
 
-## Authentication Endpoints
+### Pagination.swift
 
-**Backend Reference**: `[Ref: /Volumes/Riki Repos/repairminder/worker/index.js]` (auth routes)
-
-### POST /api/auth/login
-
-**Purpose**: Login with email and password
-
-**Request Body**:
-```json
-{
-  "email": "user@example.com",
-  "password": "password123"
+```swift
+struct Pagination: Decodable {
+    let page: Int
+    let limit: Int
+    let total: Int
+    let totalPages: Int  // Decoded from total_pages
 }
 ```
 
-**Response (Success)**:
-```json
-{
-  "success": true,
-  "data": {
-    "token": "eyJhbGciOiJIUzI1NiIs...",
-    "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
-    "user": {
-      "id": "uuid",
-      "email": "user@example.com",
-      "first_name": "John",
-      "last_name": "Smith",
-      "role": "engineer",
-      "company_id": "uuid",
-      "company": {
-        "id": "uuid",
-        "name": "Repair Shop Ltd",
-        "currency_code": "GBP"
-      }
-    }
-  }
-}
-```
+### APIClient.swift
 
-**Response (2FA Required)**:
-```json
-{
-  "success": true,
-  "data": {
-    "requires_2fa": true,
-    "method": "totp",
-    "temp_token": "temp_uuid"
-  }
-}
-```
+Key responsibilities:
+1. Manage base URL and session configuration
+2. Inject `Authorization: Bearer` header from stored token
+3. Handle 401 by calling refresh endpoint
+4. Decode responses using snake_case strategy
+5. Throw typed errors for non-success responses
 
----
+### APIEndpoints.swift
 
-### POST /api/auth/magic-link/request
+Define as enum with associated values for parameters:
 
-**Purpose**: Request magic link code via email
+```swift
+enum APIEndpoint {
+    // Config (public, no auth)
+    case config
 
-**Request Body**:
-```json
-{
-  "email": "user@example.com"
-}
-```
+    // Auth
+    case login
+    case twoFactorRequest
+    case twoFactorVerify
+    case magicLinkRequest
+    case magicLinkVerifyCode
+    case refreshToken
+    case me
+    case logout
 
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "message": "Magic link sent to your email"
-  }
-}
-```
+    // Dashboard
+    case dashboardStats(scope: String?, period: String?)
+    case enquiryStats
+    case lifecycle
+    case categoryBreakdown
+    case activityLog
 
----
+    // Devices
+    case devices(page: Int, limit: Int, status: String?)
+    case myQueue
+    case myActiveWork
+    case orderDevices(orderId: String)
+    case orderDevice(orderId: String, deviceId: String)
+    case updateDeviceStatus(orderId: String, deviceId: String)
+    case deviceActions(orderId: String, deviceId: String)
+    case executeDeviceAction(orderId: String, deviceId: String)
 
-### POST /api/auth/magic-link/verify-code
+    // Orders
+    case orders(page: Int, limit: Int, status: String?)
+    case order(id: String)
+    case createOrder
+    case updateOrder(id: String)
+    case orderItems(orderId: String)
+    case orderPayments(orderId: String)
+    case orderSignatures(orderId: String)
 
-**Purpose**: Verify magic link code
+    // Clients
+    case clients(page: Int, limit: Int, search: String?)
+    case client(id: String)
+    case clientSearch(query: String)
+    case createClient
+    case updateClient(id: String)
 
-**Request Body**:
-```json
-{
-  "email": "user@example.com",
-  "code": "123456"
-}
-```
+    // Tickets
+    case tickets(page: Int, limit: Int, status: String?)
+    case ticket(id: String)
+    case ticketReply(id: String)
+    case ticketNote(id: String)
 
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "token": "eyJhbGciOiJIUzI1NiIs...",
-    "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
-    "user": { /* same as login response */ }
-  }
-}
-```
+    // Push
+    case registerDeviceToken
+    case unregisterDeviceToken
+    case pushPreferences
+    case updatePushPreferences
 
----
+    // Customer
+    case customerMagicLinkRequest
+    case customerVerifyCode
+    case customerMe
+    case customerLogout
+    case customerOrders
+    case customerOrder(orderId: String)
+    case customerApproveQuote(orderId: String)
+    case customerOrderReply(orderId: String)
 
-### POST /api/auth/refresh
-
-**Purpose**: Refresh access token using refresh token
-
-**Request Body**:
-```json
-{
-  "refresh_token": "eyJhbGciOiJIUzI1NiIs..."
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "token": "eyJhbGciOiJIUzI1NiIs...",
-    "refresh_token": "eyJhbGciOiJIUzI1NiIs..."
-  }
+    var path: String { /* return path string */ }
+    var method: HTTPMethod { /* return method */ }
 }
 ```
 
 ---
 
-### GET /api/auth/me
+## Endpoint Testing Reference
 
-**Purpose**: Get current user profile
+> **Authoritative Sources for Token Management & D1 Queries:**
+> - iOS Repo: [docs/REFERENCE-test-tokens/CLAUDE.md](../../docs/REFERENCE-test-tokens/CLAUDE.md)
+> - Backend Repo: `/Volumes/Riki Repos/repairminder/docs/REFERENCE-test-tokens/CLAUDE.md`
+>
+> These files contain current valid test tokens, detailed token generation steps, D1 database access patterns, and troubleshooting guides.
 
-**Headers**: `Authorization: Bearer {token}`
+### Quick Token Test
 
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "first_name": "John",
-    "last_name": "Smith",
-    "role": "engineer",
-    "company_id": "uuid",
-    "company": {
-      "id": "uuid",
-      "name": "Repair Shop Ltd",
-      "currency_code": "GBP",
-      "logo_url": "https://..."
-    },
-    "permissions": ["orders.view", "devices.edit", ...]
-  }
-}
+```bash
+curl -s "https://api.repairminder.com/api/dashboard/stats" \
+  -H "Authorization: Bearer <paste_token_directly>" | jq '.success'
+```
+
+**Important:** Paste tokens directly in curl commands. Shell variables truncate long JWT tokens.
+
+---
+
+## D1 Database Queries (via Wrangler)
+
+All D1 queries must be run from the backend repo directory (`/Volumes/Riki Repos/repairminder`) or any directory with wrangler configured.
+
+### Token Generation (Magic Link)
+
+1. Request magic link:
+   ```bash
+   curl -s -X POST "https://api.repairminder.com/api/auth/magic-link/request" \
+     -H "Content-Type: application/json" \
+     -d '{"email": "rikibaker+admin@gmail.com"}'
+   ```
+
+2. Get code from database:
+   ```bash
+   npx wrangler d1 execute repairminder_database --remote --json \
+     --command "SELECT magic_link_code FROM users WHERE email = 'rikibaker+admin@gmail.com'" \
+     2>/dev/null | jq -r '.[0].results[0].magic_link_code'
+   ```
+
+3. Exchange for token:
+   ```bash
+   curl -s -X POST "https://api.repairminder.com/api/auth/magic-link/verify-code" \
+     -H "Content-Type: application/json" \
+     -d '{"email": "rikibaker+admin@gmail.com", "code": "XXXXXX"}' | jq -r '.data.token'
+   ```
+
+### 2FA Code Retrieval (for testing 2FA flow)
+
+When testing the email-based 2FA login flow, retrieve the code from D1:
+
+```bash
+npx wrangler d1 execute repairminder_database --remote --json \
+  --command "SELECT two_factor_code, two_factor_expires_at FROM users WHERE email = 'rikibaker+admin@gmail.com'" \
+  2>/dev/null | jq -r '.[0].results[0]'
+```
+
+### Customer Portal Token Generation
+
+1. Request customer magic link:
+   ```bash
+   curl -s -X POST "https://api.repairminder.com/api/customer/auth/request-magic-link" \
+     -H "Content-Type: application/json" \
+     -d '{"email": "rikibaker+customer@gmail.com"}'
+   ```
+
+2. Get code from clients table:
+   ```bash
+   npx wrangler d1 execute repairminder_database --remote --json \
+     --command "SELECT magic_link_code FROM clients WHERE email = 'rikibaker+customer@gmail.com'" \
+     2>/dev/null | jq -r '.[0].results[0].magic_link_code'
+   ```
+
+3. Exchange for customer token:
+   ```bash
+   curl -s -X POST "https://api.repairminder.com/api/customer/auth/verify-code" \
+     -H "Content-Type: application/json" \
+     -d '{"email": "rikibaker+customer@gmail.com", "code": "XXXXXX"}' | jq -r '.data.token'
+   ```
+
+### Push Notification Debugging
+
+Verify device token registration:
+
+```bash
+npx wrangler d1 execute repairminder_database --remote --json \
+  --command "SELECT * FROM device_tokens WHERE user_id = '<USER_ID>' ORDER BY created_at DESC LIMIT 5" \
+  2>/dev/null | jq '.[0].results'
+```
+
+Check push notification delivery logs (no API endpoint for this):
+
+```bash
+npx wrangler d1 execute repairminder_database --remote --json \
+  --command "SELECT * FROM push_notification_log WHERE user_id = '<USER_ID>' ORDER BY created_at DESC LIMIT 10" \
+  2>/dev/null | jq '.[0].results'
+```
+
+Verify push preferences were saved:
+
+```bash
+npx wrangler d1 execute repairminder_database --remote --json \
+  --command "SELECT * FROM push_notification_preferences WHERE user_id = '<USER_ID>'" \
+  2>/dev/null | jq '.[0].results[0]'
+```
+
+### General D1 Query Pattern
+
+```bash
+# Basic query
+npx wrangler d1 execute repairminder_database --remote --command "YOUR_SQL"
+
+# JSON output (for parsing)
+npx wrangler d1 execute repairminder_database --remote --json --command "YOUR_SQL"
+
+# List all tables
+npx wrangler d1 execute repairminder_database --remote \
+  --command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
 ```
 
 ---
 
-### POST /api/auth/logout
+## Verification Checklist
 
-**Purpose**: Logout current session
-
-**Headers**: `Authorization: Bearer {token}`
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "message": "Logged out successfully"
-  }
-}
-```
+- [ ] Build succeeds with no errors
+- [ ] `APIResponse<T>` decodes standard envelope correctly
+- [ ] `Pagination` decodes with `totalPages` from `total_pages`
+- [ ] `APIClient` injects Authorization header
+- [ ] `APIClient` handles 401 with token refresh
+- [ ] `APIClient` retries request after successful refresh
+- [ ] `APIClient` clears tokens and throws on refresh failure
+- [ ] snake_case keys convert to camelCase properties
+- [ ] Test request to `/api/auth/me` returns user data
 
 ---
 
-## Dashboard Endpoints
-
-**Backend Reference**: `[Ref: /Volumes/Riki Repos/repairminder/worker/dashboard_handlers.js]`
-
-### GET /api/dashboard/stats
-
-**Purpose**: Get dashboard statistics
-
-**Query Parameters**:
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `scope` | String | No | `user` | `user` or `company` |
-| `period` | String | No | `this_month` | Period filter |
-| `compare_periods` | Int | No | 1 | Number of comparison periods |
-| `start_date` | Date | No | - | Override period start |
-| `end_date` | Date | No | - | Override period end |
-
-**Period Values**: `today`, `yesterday`, `this_week`, `last_week`, `this_month`, `last_month`, `this_quarter`, `this_year`
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "period": "this_month",
-    "devices": {
-      "current": { "count": 15 },
-      "comparisons": [
-        {
-          "period": "last_month",
-          "count": 12,
-          "change": 3,
-          "change_percent": 25.0
-        }
-      ]
-    },
-    "revenue": {
-      "current": { "total": 1250.50 },
-      "comparisons": [
-        {
-          "period": "last_month",
-          "total": 980.00,
-          "change": 270.50,
-          "change_percent": 27.6
-        }
-      ]
-    },
-    "clients": {
-      "current": { "count": 8 },
-      "comparisons": [...]
-    },
-    "new_clients": {
-      "current": { "count": 3 },
-      "comparisons": [...]
-    },
-    "returning_clients": {
-      "current": { "count": 5 },
-      "comparisons": [...]
-    },
-    "refunds": {
-      "current": { "total": 50.00, "count": 1 },
-      "comparisons": [...]
-    }
-  }
-}
-```
-
----
-
-## Device Endpoints
-
-**Backend Reference**: `[Ref: /Volumes/Riki Repos/repairminder/worker/device_handlers.js]`
-
-### GET /api/devices
-
-**Purpose**: List all devices across orders
-
-**Query Parameters**:
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `page` | Int | No | Page number (default: 1) |
-| `limit` | Int | No | Items per page (default: 20, max: 100) |
-| `status` | String | No | Filter by status (comma-separated) |
-| `device_type_id` | UUID | No | Filter by device type |
-| `assigned_user_id` | UUID | No | Filter by assigned engineer |
-| `workflow_type` | String | No | `repair`, `buyback`, `trade_in` |
-| `search` | String | No | Search serial/IMEI |
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "uuid",
-      "order_id": "uuid",
-      "order_number": 100001,
-      "display_name": "Apple iPhone 12 Pro",
-      "brand": {
-        "id": "uuid",
-        "name": "Apple"
-      },
-      "model": {
-        "id": "uuid",
-        "name": "iPhone 12 Pro"
-      },
-      "serial_number": "ABCD1234567890",
-      "imei": "123456789012345",
-      "status": "diagnosing",
-      "workflow_type": "repair",
-      "priority": "standard",
-      "assigned_engineer": {
-        "id": "uuid",
-        "name": "John Smith"
-      },
-      "device_type": {
-        "id": "uuid",
-        "name": "Phone",
-        "slug": "phone"
-      },
-      "client": {
-        "id": "uuid",
-        "name": "Jane Doe",
-        "email": "jane@example.com"
-      },
-      "created_at": "2024-02-04T10:30:00Z",
-      "updated_at": "2024-02-04T11:30:00Z"
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 150,
-    "total_pages": 8
-  }
-}
-```
-
----
-
-### GET /api/devices/my-queue
-
-**Purpose**: Get current user's assigned device queue
-
-**Query Parameters**:
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `page` | Int | No | Page number (default: 1) |
-| `limit` | Int | No | Items per page (default: 20) |
-
-**Response**: Same structure as `/api/devices` but filtered to current user's assignments
-
----
-
-### GET /api/devices/my-active-work
-
-**Purpose**: Get devices currently being worked on by user
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "uuid",
-      "display_name": "Apple iPhone 12 Pro",
-      "status": "repairing",
-      "started_at": "2024-02-04T10:30:00Z"
-    }
-  ]
-}
-```
-
----
-
-### GET /api/header/counts
-
-**Purpose**: Get badge counts for header/tabs
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "my_queue": 5,
-    "active_work": 1,
-    "open_enquiries": 3
-  }
-}
-```
-
----
-
-### GET /api/orders/:orderId/devices/:deviceId
-
-**Purpose**: Get full device detail
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "order_id": "uuid",
-    "brand": { "id": "uuid", "name": "Apple", "category": "Smartphone" },
-    "model": { "id": "uuid", "name": "iPhone 12 Pro" },
-    "custom_brand": null,
-    "custom_model": null,
-    "display_name": "Apple iPhone 12 Pro",
-    "serial_number": "ABCD1234567890",
-    "imei": "123456789012345",
-    "colour": "Space Gray",
-    "storage_capacity": "256GB",
-    "passcode": "123456",
-    "passcode_type": "numeric",
-    "find_my_status": "off",
-    "condition_grade": "Grade A",
-    "customer_reported_issues": "Screen cracked",
-    "technician_found_issues": "Screen cracked, battery degraded",
-    "status": "diagnosing",
-    "workflow_type": "repair",
-    "priority": "standard",
-    "due_date": "2024-02-10",
-    "assigned_engineer": {
-      "id": "uuid",
-      "name": "John Smith"
-    },
-    "sub_location": {
-      "id": "uuid",
-      "code": "SL001",
-      "description": "Shelf 1"
-    },
-    "device_type": {
-      "id": "uuid",
-      "name": "Phone",
-      "slug": "phone"
-    },
-    "diagnosis_notes": "Requires screen replacement",
-    "repair_notes": "",
-    "authorization": {
-      "status": "pending",
-      "method": null,
-      "authorized_at": null
-    },
-    "timestamps": {
-      "received_at": "2024-02-04T10:30:00Z",
-      "diagnosis_started_at": "2024-02-04T12:00:00Z",
-      "diagnosis_completed_at": null,
-      "repair_started_at": null,
-      "repair_completed_at": null,
-      "collected_at": null
-    },
-    "images": [
-      {
-        "id": "uuid",
-        "image_type": "pre_repair",
-        "filename": "image.jpg",
-        "caption": "Cracked screen",
-        "sort_order": 1
-      }
-    ],
-    "accessories": [
-      {
-        "id": "uuid",
-        "accessory_type": "charger",
-        "description": "Original USB-C cable",
-        "returned_at": null
-      }
-    ],
-    "line_items": [
-      {
-        "id": "uuid",
-        "description": "Screen replacement",
-        "quantity": 1,
-        "unit_price": 75.00,
-        "vat_rate": 20.0,
-        "line_total_inc_vat": 90.00
-      }
-    ],
-    "created_at": "2024-02-04T10:30:00Z",
-    "updated_at": "2024-02-04T15:30:00Z"
-  }
-}
-```
-
----
-
-### POST /api/devices/:deviceId/action
-
-**Purpose**: Execute a workflow action on device
-
-**Request Body**:
-```json
-{
-  "action": "start_diagnosis",
-  "notes": "Optional notes"
-}
-```
-
-**Available Actions** (from `device-workflows.js`):
-- `start_diagnosis` - Begin diagnosing
-- `complete_diagnosis` - Finish diagnosis
-- `send_quote` - Send quote to customer
-- `start_repair` - Begin repair work
-- `complete_repair` - Finish repair
-- `mark_ready` - Mark ready for collection
-- `collect` - Mark as collected
-- `despatch` - Mark as despatched
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "status": "ready_to_quote",
-    "message": "Device status updated"
-  }
-}
-```
-
----
-
-### PATCH /api/devices/:deviceId/engineer
-
-**Purpose**: Assign engineer to device
-
-**Request Body**:
-```json
-{
-  "engineer_id": "uuid"
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "assigned_engineer": {
-      "id": "uuid",
-      "name": "John Smith"
-    }
-  }
-}
-```
-
----
-
-### PATCH /api/devices/:deviceId/status
-
-**Purpose**: Directly update device status (admin override)
-
-**Request Body**:
-```json
-{
-  "status": "repairing",
-  "reason": "Override reason"
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "status": "repairing"
-  }
-}
-```
-
----
-
-## Order Endpoints
-
-**Backend Reference**: `[Ref: /Volumes/Riki Repos/repairminder/worker/order_handlers.js]`
-
-### GET /api/orders
-
-**Purpose**: List orders with pagination and filters
-
-**Query Parameters**:
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `page` | Int | Page number |
-| `limit` | Int | Items per page |
-| `status` | String | Order status filter (comma-separated) |
-| `payment_status` | String | `unpaid`, `partial`, `paid` |
-| `search` | String | Search order number, client name/email |
-| `location_id` | UUID | Filter by location |
-| `date_from` | Date | Start date |
-| `date_to` | Date | End date |
-| `sort` | String | `created_at`, `updated_at`, `order_number` |
-| `order` | String | `asc` or `desc` |
-
-**Order Status Values**: `awaiting_device`, `in_progress`, `service_complete`, `awaiting_collection`, `collected_despatched`
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "uuid",
-      "ticket_id": "uuid",
-      "order_number": 100001,
-      "client": {
-        "id": "uuid",
-        "email": "customer@example.com",
-        "first_name": "John",
-        "last_name": "Doe",
-        "phone": "+441234567890"
-      },
-      "location": {
-        "id": "uuid",
-        "name": "Main Shop"
-      },
-      "assigned_user": {
-        "id": "uuid",
-        "name": "Staff Member"
-      },
-      "intake_method": "walk_in",
-      "status": "in_progress",
-      "payment_status": "partial",
-      "order_total": 150.00,
-      "amount_paid": 100.00,
-      "balance_due": 50.00,
-      "device_count": 2,
-      "created_at": "2024-02-04T10:30:00Z",
-      "updated_at": "2024-02-04T11:30:00Z"
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 150,
-    "total_pages": 8
-  },
-  "filters": {
-    "locations": [{ "id": "uuid", "name": "Location Name" }],
-    "users": [{ "id": "uuid", "name": "User Name" }],
-    "statuses": ["awaiting_device", "in_progress", ...],
-    "payment_statuses": ["unpaid", "partial", "paid"]
-  }
-}
-```
-
----
-
-### GET /api/orders/:orderId
-
-**Purpose**: Get full order detail
-
-**Note**: Supports lookup by UUID or order_number
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "ticket_id": "uuid",
-    "order_number": 100001,
-    "client": {
-      "id": "uuid",
-      "email": "customer@example.com",
-      "first_name": "John",
-      "last_name": "Doe",
-      "phone": "+441234567890",
-      "address_line_1": "123 Main St",
-      "city": "London",
-      "postcode": "SW1A 1AA"
-    },
-    "location": {
-      "id": "uuid",
-      "name": "Main Shop",
-      "phone": "0207123456"
-    },
-    "intake_method": "walk_in",
-    "status": "in_progress",
-    "devices": [
-      {
-        "id": "uuid",
-        "display_name": "Apple iPhone 12 Pro",
-        "status": "diagnosing",
-        "workflow_type": "repair"
-      }
-    ],
-    "items": [
-      {
-        "id": "uuid",
-        "description": "Screen repair",
-        "quantity": 1,
-        "unit_price": 75.00,
-        "vat_rate": 20.0,
-        "line_total": 75.00,
-        "line_total_inc_vat": 90.00
-      }
-    ],
-    "payments": [
-      {
-        "id": "uuid",
-        "amount": 50.00,
-        "payment_method": "card",
-        "payment_date": "2024-02-04",
-        "is_deposit": 1
-      }
-    ],
-    "totals": {
-      "subtotal": 150.00,
-      "vat_total": 30.00,
-      "grand_total": 180.00,
-      "amount_paid": 50.00,
-      "balance_due": 130.00
-    },
-    "payment_status": "partial",
-    "dates": {
-      "created_at": "2024-02-04T10:30:00Z",
-      "updated_at": "2024-02-04T11:30:00Z",
-      "quote_sent_at": null,
-      "collected_at": null,
-      "ready_by_date": "2024-02-10T17:00:00Z"
-    },
-    "notes": [
-      {
-        "body": "Note text",
-        "created_at": "2024-02-04T10:30:00Z",
-        "created_by": "Staff Name"
-      }
-    ]
-  }
-}
-```
-
----
-
-## Ticket/Enquiry Endpoints
-
-**Backend Reference**: `[Ref: /Volumes/Riki Repos/repairminder/worker/ticket_handlers.js]`
-
-### GET /api/tickets
-
-**Purpose**: List tickets/enquiries
-
-**Query Parameters**:
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `page` | Int | Page number |
-| `limit` | Int | Items per page |
-| `status` | String | `open`, `pending`, `resolved`, `closed` |
-| `ticket_type` | String | `lead` or `order` |
-| `assigned_user_id` | UUID | Filter by assignee |
-| `sort_by` | String | `updated_at`, `created_at`, `last_client_update` |
-| `sort_order` | String | `asc` or `desc` |
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "tickets": [
-      {
-        "id": "uuid",
-        "ticket_number": 100001,
-        "subject": "iPhone repair request",
-        "status": "open",
-        "ticket_type": "order",
-        "assigned_user": {
-          "first_name": "John",
-          "last_name": "Smith"
-        },
-        "client": {
-          "id": "uuid",
-          "email": "customer@example.com",
-          "name": "John Doe"
-        },
-        "location": {
-          "id": "uuid",
-          "name": "Main Shop"
-        },
-        "order": {
-          "id": "uuid",
-          "status": "in_progress",
-          "device_count": 1
-        },
-        "created_at": "2024-02-04T10:30:00Z",
-        "updated_at": "2024-02-04T11:30:00Z",
-        "last_client_update": "2024-02-04T10:45:00Z"
-      }
-    ],
-    "statusCounts": {
-      "open": 5,
-      "pending": 3,
-      "resolved": 10,
-      "closed": 2
-    },
-    "total": 20,
-    "page": 1,
-    "limit": 20,
-    "totalPages": 1
-  }
-}
-```
-
----
-
-### GET /api/tickets/:ticketId
-
-**Purpose**: Get ticket detail with messages
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "ticket_number": 100001,
-    "subject": "iPhone repair request",
-    "status": "open",
-    "ticket_type": "order",
-    "assigned_user": {
-      "first_name": "John",
-      "last_name": "Smith"
-    },
-    "client": {
-      "id": "uuid",
-      "email": "customer@example.com",
-      "name": "John Doe",
-      "phone": "+441234567890"
-    },
-    "order": {
-      "id": "uuid",
-      "order_number": 100001,
-      "status": "in_progress"
-    },
-    "messages": [
-      {
-        "id": "uuid",
-        "type": "inbound",
-        "from_email": "customer@example.com",
-        "from_name": "John Doe",
-        "subject": "iPhone repair request",
-        "body_text": "Hi, I need my iPhone screen repaired.",
-        "created_at": "2024-02-04T10:30:00Z",
-        "attachments": [
-          {
-            "id": "uuid",
-            "filename": "photo.jpg",
-            "content_type": "image/jpeg",
-            "size_bytes": 245000
-          }
-        ]
-      },
-      {
-        "id": "uuid",
-        "type": "outbound",
-        "from_name": "Repair Shop",
-        "body_text": "Hi John, we can help with that...",
-        "created_at": "2024-02-04T11:00:00Z",
-        "created_by": {
-          "id": "uuid",
-          "first_name": "Staff",
-          "last_name": "Member"
-        }
-      },
-      {
-        "id": "uuid",
-        "type": "note",
-        "body_text": "Internal note for team",
-        "created_at": "2024-02-04T11:30:00Z",
-        "created_by": {
-          "id": "uuid",
-          "first_name": "Staff",
-          "last_name": "Member"
-        }
-      }
-    ],
-    "created_at": "2024-02-04T10:30:00Z",
-    "updated_at": "2024-02-04T11:30:00Z"
-  }
-}
-```
-
----
-
-### POST /api/tickets/:ticketId/reply
-
-**Purpose**: Send reply to customer
-
-**Request Body**:
-```json
-{
-  "body": "Thank you for contacting us...",
-  "subject": "Re: iPhone repair request"
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "type": "outbound",
-    "body_text": "Thank you for contacting us...",
-    "created_at": "2024-02-04T12:00:00Z"
-  }
-}
-```
-
----
-
-### POST /api/tickets/:ticketId/note
-
-**Purpose**: Add internal note (not sent to customer)
-
-**Request Body**:
-```json
-{
-  "body": "Internal team note..."
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "type": "note",
-    "body_text": "Internal team note...",
-    "created_at": "2024-02-04T12:00:00Z"
-  }
-}
-```
-
----
-
-### POST /api/tickets/:ticketId/resolve
-
-**Purpose**: Mark ticket as resolved
-
-**Request Body**:
-```json
-{
-  "resolution_notes": "Issue resolved - device repaired"
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "status": "resolved"
-  }
-}
-```
-
----
-
-## Push Notification Endpoints
-
-**Backend Reference**: `[Ref: /Volumes/Riki Repos/repairminder/worker/device_token_handlers.js]`
-
-### POST /api/user/device-token
-
-**Purpose**: Register device token for push notifications
-
-**Request Body**:
-```json
-{
-  "token": "device_token_string_from_apns",
-  "platform": "ios",
-  "app_type": "staff"
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "registered": true
-  }
-}
-```
-
----
-
-### DELETE /api/user/device-token
-
-**Purpose**: Unregister device token (on logout)
-
-**Request Body**:
-```json
-{
-  "token": "device_token_string_from_apns"
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "unregistered": true
-  }
-}
-```
-
----
-
-### GET /api/user/push-preferences
-
-**Purpose**: Get push notification preferences
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "enabled": true,
-    "order_created": true,
-    "order_status_changed": true,
-    "order_collected": true,
-    "device_status_changed": true,
-    "quote_approved": true,
-    "quote_rejected": true,
-    "payment_received": true,
-    "new_enquiry": true,
-    "enquiry_reply": true,
-    "device_assigned": true
-  }
-}
-```
-
----
-
-### PUT /api/user/push-preferences
-
-**Purpose**: Update push notification preferences
-
-**Request Body**:
-```json
-{
-  "enabled": true,
-  "order_created": true,
-  "order_status_changed": false,
-  "device_assigned": true
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "enabled": true,
-    "order_created": true,
-    "order_status_changed": false,
-    "device_assigned": true
-  }
-}
-```
-
----
-
-## Client Endpoints
-
-**Backend Reference**: `[Ref: /Volumes/Riki Repos/repairminder/worker/client_handlers.js]`
-
-### GET /api/clients
-
-**Purpose**: List clients
-
-**Query Parameters**:
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `page` | Int | Page number |
-| `limit` | Int | Items per page |
-| `search` | String | Search email, name, phone |
-| `sort` | String | `created_at`, `name`, `email` |
-| `order` | String | `asc` or `desc` |
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "clients": [
-      {
-        "id": "uuid",
-        "email": "customer@example.com",
-        "first_name": "John",
-        "last_name": "Doe",
-        "phone": "+441234567890",
-        "order_count": 5,
-        "device_count": 7,
-        "total_spend": 450.50,
-        "created_at": "2024-01-15T14:20:00Z"
-      }
-    ],
-    "pagination": {
-      "page": 1,
-      "limit": 50,
-      "total": 150,
-      "totalPages": 3
-    }
-  }
-}
-```
-
----
-
-### GET /api/clients/:clientId
-
-**Purpose**: Get client detail
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "email": "customer@example.com",
-    "first_name": "John",
-    "last_name": "Doe",
-    "phone": "+441234567890",
-    "notes": "Preferred customer",
-    "address_line_1": "123 Main St",
-    "address_line_2": "Apt 4",
-    "city": "London",
-    "county": "Greater London",
-    "postcode": "SW1A 1AA",
-    "country": "GB",
-    "marketing_consent": true,
-    "order_count": 5,
-    "total_spend": 450.50,
-    "created_at": "2024-01-15T14:20:00Z",
-    "updated_at": "2024-02-04T10:30:00Z"
-  }
-}
-```
-
----
-
-## Error Response Format
-
-All error responses follow this structure:
+## Error Handling
+
+### HTTP Status Codes
+
+| Code | Meaning |
+|------|---------|
+| 200 | Success |
+| 201 | Created |
+| 400 | Bad Request (validation error) |
+| 401 | Unauthorized (invalid/expired token) |
+| 403 | Forbidden (insufficient permissions) |
+| 404 | Not Found |
+| 429 | Rate Limited |
+| 500 | Server Error |
+
+### Quarantine Mode
+
+Users from companies with `status='pending_approval'` or `status='suspended'` get a 403 with:
 
 ```json
 {
   "success": false,
-  "error": "Error message describing what went wrong",
-  "errors": [
-    {
-      "field": "email",
-      "message": "Invalid email format"
-    }
-  ]
-}
-```
-
-**Common HTTP Status Codes**:
-- `400` - Bad Request (validation errors)
-- `401` - Unauthorized (invalid/expired token)
-- `403` - Forbidden (insufficient permissions)
-- `404` - Not Found
-- `500` - Internal Server Error
-
----
-
----
-
-# CUSTOMER PORTAL ENDPOINTS
-
-**All customer endpoints use a separate authentication flow from staff.**
-
----
-
-## Customer Authentication Endpoints
-
-**Backend Reference**: `[Ref: /Volumes/Riki Repos/repairminder/worker/src/customer-auth.js]`
-
-### POST /api/customer/auth/request-magic-link
-
-**Purpose**: Request magic link code for customer portal login (customers use magic link only, no password)
-
-**Request Body**:
-```json
-{
-  "email": "customer@example.com"
-}
-```
-
-**Response (Success)**:
-```json
-{
-  "success": true,
-  "data": {
-    "message": "If an account exists, a login code has been sent"
-  }
-}
-```
-
-**Notes**: Always returns success to prevent user enumeration. Email contains 6-digit code.
-
----
-
-### POST /api/customer/auth/verify-code
-
-**Purpose**: Verify magic code and return JWT
-
-**Request Body (Step 1 - without company selection)**:
-```json
-{
-  "email": "customer@example.com",
-  "code": "123456"
-}
-```
-
-**Response (Single Company - Direct Login)**:
-```json
-{
-  "success": true,
-  "data": {
-    "token": "eyJhbGciOiJIUzI1NiIs...",
-    "client": {
-      "id": "uuid",
-      "firstName": "John",
-      "lastName": "Doe",
-      "email": "customer@example.com",
-      "name": "John Doe"
-    },
-    "company": {
-      "id": "uuid",
-      "name": "Repair Shop Ltd",
-      "logoUrl": "https://api.repairminder.com/api/branding/uuid/logo"
-    }
-  }
-}
-```
-
-**Response (Multiple Companies - Requires Selection)**:
-```json
-{
-  "success": true,
-  "data": {
-    "requiresCompanySelection": true,
-    "companies": [
-      {
-        "id": "uuid",
-        "name": "Repair Shop 1",
-        "logoUrl": "https://api.repairminder.com/api/branding/uuid/logo"
-      },
-      {
-        "id": "uuid2",
-        "name": "Repair Shop 2",
-        "logoUrl": null
-      }
-    ],
-    "email": "customer@example.com",
-    "code": "123456"
-  }
-}
-```
-
-**Request Body (Step 2 - with company selection)**:
-```json
-{
-  "email": "customer@example.com",
-  "code": "123456",
-  "companyId": "uuid"
+  "error": "Your account is pending approval...",
+  "code": "ACCOUNT_PENDING_APPROVAL"
 }
 ```
 
 ---
 
-### GET /api/customer/auth/me
+## Next Stage
 
-**Purpose**: Get current customer session info
-
-**Headers**: `Authorization: Bearer {token}`
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "client": {
-      "id": "uuid",
-      "firstName": "John",
-      "lastName": "Doe",
-      "email": "customer@example.com",
-      "name": "John Doe"
-    },
-    "company": {
-      "id": "uuid",
-      "name": "Repair Shop Ltd",
-      "logoUrl": "https://api.repairminder.com/api/branding/uuid/logo"
-    }
-  }
-}
-```
-
----
-
-### POST /api/customer/auth/logout
-
-**Purpose**: Invalidate current customer session
-
-**Headers**: `Authorization: Bearer {token}`
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "message": "Logged out successfully"
-  }
-}
-```
-
----
-
-## Customer Order Endpoints
-
-**Backend Reference**: `[Ref: /Volumes/Riki Repos/repairminder/worker/index.js]` (handleCustomerListOrders, handleCustomerGetOrder)
-
-### GET /api/customer/orders
-
-**Purpose**: List all orders for authenticated customer
-
-**Headers**: `Authorization: Bearer {token}`
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "uuid",
-      "ticket_number": 100001,
-      "status": "in_progress",
-      "created_at": "2024-02-04T10:30:00Z",
-      "quote_sent_at": "2024-02-04T11:00:00Z",
-      "quote_approved_at": null,
-      "rejected_at": null,
-      "updated_at": "2024-02-04T12:00:00Z",
-      "devices": [
-        {
-          "id": "uuid",
-          "status": "diagnosing",
-          "display_name": "Apple iPhone 12 Pro"
-        }
-      ],
-      "totals": {
-        "subtotal": 75.00,
-        "vat_total": 15.00,
-        "grand_total": 90.00
-      }
-    }
-  ],
-  "currency_code": "GBP"
-}
-```
-
----
-
-### GET /api/customer/orders/:orderId
-
-**Purpose**: Get full order detail for customer
-
-**Headers**: `Authorization: Bearer {token}`
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "ticket_number": 100001,
-    "status": "in_progress",
-    "created_at": "2024-02-04T10:30:00Z",
-    "collected_at": null,
-    "quote_sent_at": "2024-02-04T11:00:00Z",
-    "quote_approved_at": null,
-    "quote_approved_method": null,
-    "rejected_at": null,
-    "pre_authorization": {
-      "amount": 100.00,
-      "notes": "Pre-authorized for screen replacement",
-      "authorised_at": "2024-02-04T10:30:00Z",
-      "authorised_by": {
-        "first_name": "Staff",
-        "last_name": "Member"
-      },
-      "signature": {
-        "id": "uuid",
-        "type": "drawn",
-        "data": "base64_signature_data",
-        "typed_name": null,
-        "captured_at": "2024-02-04T10:30:00Z"
-      }
-    },
-    "review_links": {
-      "google": "https://search.google.com/local/writereview?placeid=...",
-      "facebook": "https://facebook.com/repairshop/reviews",
-      "trustpilot": "https://trustpilot.com/...",
-      "yelp": null,
-      "apple": null
-    },
-    "devices": [
-      {
-        "id": "uuid",
-        "display_name": "Apple iPhone 12 Pro",
-        "status": "awaiting_authorisation",
-        "workflow_type": "repair",
-        "customer_reported_issues": "Screen cracked",
-        "diagnosis_notes": "Requires screen replacement",
-        "serial_number": "ABC123",
-        "imei": "123456789012345",
-        "authorization_status": "pending",
-        "authorization_method": null,
-        "authorized_at": null,
-        "authorization_notes": null,
-        "collection_location": {
-          "id": "uuid",
-          "name": "Main Shop",
-          "address": "123 Main St, London, SW1A 1AA",
-          "phone": "020 7123 4567",
-          "email": "shop@example.com",
-          "google_maps_url": "https://www.google.com/maps/place/?q=place_id:...",
-          "opening_hours": { "monday": "09:00-18:00" }
-        },
-        "deposit_paid": 50.00,
-        "images": [
-          {
-            "id": "uuid",
-            "image_type": "pre_repair",
-            "url": "https://api.repairminder.com/api/customer/devices/uuid/images/uuid/file",
-            "filename": "screen_damage.jpg",
-            "caption": "Cracked screen",
-            "uploaded_at": "2024-02-04T10:30:00Z"
-          }
-        ],
-        "pre_repair_checklist": {
-          "id": "uuid",
-          "template_name": "iPhone Pre-Repair",
-          "results": [
-            { "name": "Screen Check", "result": "fail", "notes": "Cracked" }
-          ],
-          "completed_at": "2024-02-04T10:30:00Z",
-          "completed_by_name": "Staff Member"
-        }
-      }
-    ],
-    "items": [
-      {
-        "id": "uuid",
-        "description": "Screen replacement",
-        "quantity": 1,
-        "unit_price": 75.00,
-        "vat_rate": 0.20,
-        "line_total": 75.00,
-        "vat_amount": 15.00,
-        "line_total_inc_vat": 90.00,
-        "device_id": "uuid",
-        "authorization_status": "pending",
-        "signature_id": null,
-        "authorized_price": null
-      }
-    ],
-    "totals": {
-      "subtotal": 75.00,
-      "vat_total": 15.00,
-      "grand_total": 90.00,
-      "deposits_paid": 50.00,
-      "final_payments_paid": 0.00,
-      "amount_paid": 50.00,
-      "balance_due": 40.00
-    },
-    "messages": [
-      {
-        "id": "uuid",
-        "type": "inbound",
-        "subject": "iPhone repair request",
-        "body_text": "Hi, I need my screen repaired.",
-        "created_at": "2024-02-04T10:30:00Z"
-      }
-    ],
-    "company": {
-      "name": "Repair Shop Ltd",
-      "phone": "020 7123 4567",
-      "email": "support@repairshop.com",
-      "logo_url": "https://api.repairminder.com/api/branding/uuid/logo",
-      "currency_code": "GBP",
-      "terms_conditions": "All repairs carry 90 day warranty...",
-      "collection_storage_fee_enabled": true,
-      "collection_recycling_enabled": true,
-      "collection_storage_fee_daily": 5,
-      "collection_storage_fee_cap": 150
-    }
-  }
-}
-```
-
----
-
-### POST /api/customer/orders/:orderId/approve
-
-**Purpose**: Approve or reject quote from customer portal with signature
-
-**Headers**: `Authorization: Bearer {token}`
-
-**Request Body (Approve)**:
-```json
-{
-  "action": "approve",
-  "signature_type": "drawn",
-  "signature_data": "base64_encoded_signature_image",
-  "amount_acknowledged": 90.00
-}
-```
-
-**Request Body (Reject)**:
-```json
-{
-  "action": "reject",
-  "signature_type": "typed",
-  "signature_data": "John Doe",
-  "rejection_reason": "Too expensive"
-}
-```
-
-**Response (Success)**:
-```json
-{
-  "success": true,
-  "data": {
-    "message": "Quote approved successfully",
-    "approved_at": "2024-02-04T15:00:00Z",
-    "signature_id": "uuid"
-  }
-}
-```
-
-**Signature Types**: `typed` (name text) or `drawn` (base64 image)
-
----
-
-### POST /api/customer/devices/:deviceId/authorize
-
-**Purpose**: Per-device authorization for quotes (used when order has multiple devices)
-
-**Headers**: `Authorization: Bearer {token}`
-
-**Request Body (Approve)**:
-```json
-{
-  "action": "approve",
-  "signature_type": "drawn",
-  "signature_data": "base64_encoded_signature"
-}
-```
-
-**Request Body (Reject)**:
-```json
-{
-  "action": "reject"
-}
-```
-
-**Request Body (Proceed with Original - for revised quotes)**:
-```json
-{
-  "action": "proceed_original"
-}
-```
-
-**Note**: For buyback workflow devices, bank details are required:
-```json
-{
-  "action": "approve",
-  "signature_type": "drawn",
-  "signature_data": "base64_encoded_signature",
-  "bank_details": {
-    "account_name": "John Doe",
-    "sort_code": "12-34-56",
-    "account_number": "12345678"
-  }
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "message": "Device approved successfully",
-    "new_status": "authorised_source_parts",
-    "signature_id": "uuid"
-  }
-}
-```
-
----
-
-### POST /api/customer/orders/:orderId/reply
-
-**Purpose**: Submit a message from customer portal (creates ticket message)
-
-**Headers**: `Authorization: Bearer {token}`
-
-**Request Body**:
-```json
-{
-  "message": "I have a question about my repair...",
-  "device_id": "uuid"
-}
-```
-
-**Note**: `device_id` is optional. If provided, subject includes device name.
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "message_id": "uuid",
-    "created_at": "2024-02-04T15:30:00Z"
-  }
-}
-```
-
----
-
-### GET /api/customer/orders/:orderId/invoice
-
-**Purpose**: Download invoice HTML for customer
-
-**Headers**: `Authorization: Bearer {token}`
-
-**Response**: HTML document with `Content-Disposition: attachment; filename="Invoice-100001.html"`
-
----
-
-### GET /api/customer/devices/:deviceId/images/:imageId/file
-
-**Purpose**: Serve device image file for customer portal
-
-**Headers**: `Authorization: Bearer {token}`
-
-**Response**: Binary image data with appropriate `Content-Type`
-
----
-
-## Customer Push Notification Registration
-
-Customers use the same push notification endpoints as staff, but with `app_type: "customer"`:
-
-### POST /api/user/device-token (Customer Context)
-
-**Purpose**: Register device token for customer push notifications
-
-**Headers**: `Authorization: Bearer {token}` (customer token)
-
-**Request Body**:
-```json
-{
-  "token": "device_token_string_from_apns",
-  "platform": "ios",
-  "app_type": "customer"
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "registered": true
-  }
-}
-```
-
----
-
-## Database Changes
-
-None (documentation stage)
-
-## Test Cases
-
-| Test | Expected |
-|------|----------|
-| **Staff Endpoints** | |
-| Verify auth endpoints match | All fields documented exist in backend |
-| Verify dashboard stats response | Field names match exactly |
-| Verify device status enum | All 18 statuses documented |
-| Verify order status enum | All 5 order statuses documented |
-| Verify ticket status enum | All 4 ticket statuses documented |
-| Verify pagination format | page, limit, total, total_pages present |
-| **Customer Endpoints** | |
-| Verify customer auth endpoints | Magic link flow works end-to-end |
-| Verify customer orders list | Returns orders for authenticated customer only |
-| Verify customer order detail | Returns full order with devices, items, totals |
-| Verify quote approval flow | Signature captured, status updated |
-| Verify customer reply | Creates ticket message as inbound type |
-
-## Acceptance Checklist
-
-### Staff Endpoints
-- [ ] All authentication endpoints documented
-- [ ] Dashboard stats endpoint documented with all periods
-- [ ] Device endpoints documented with status enum
-- [ ] Order endpoints documented with filters
-- [ ] Ticket endpoints documented with message types
-- [ ] Push notification endpoints documented
-- [ ] Client endpoints documented
-- [ ] Error response format documented
-- [ ] All field names verified against backend handler code
-
-### Customer Endpoints
-- [ ] Customer magic link auth flow documented
-- [ ] Customer verify code response documented (single & multi-company)
-- [ ] Customer orders list endpoint documented
-- [ ] Customer order detail endpoint documented (full response structure)
-- [ ] Quote approval endpoint documented (approve/reject actions)
-- [ ] Per-device authorization endpoint documented
-- [ ] Customer reply endpoint documented
-- [ ] Customer push notification registration documented (app_type: customer)
-
-## Deployment
-
-N/A (documentation stage)
-
-## Handoff Notes
-
-- All endpoints use `snake_case` field names
-- Swift decoder must use `.convertFromSnakeCase` strategy
-- Device has 18 possible statuses (17 repair + buyback)
-- Pagination uses `total_pages` not `totalPages`
-- All timestamps are ISO8601 format in UTC
-- [See: Stage 02] for model implementation using this documentation
+Once networking is verified, proceed to **Stage 02: Authentication** to implement the full login flow.

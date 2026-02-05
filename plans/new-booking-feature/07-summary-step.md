@@ -19,7 +19,7 @@ Create the review step displaying all entered information with ready-by date sel
 
 | File | Purpose |
 |------|---------|
-| `Features/Booking/Steps/SummaryStepView.swift` | Summary/review step |
+| `Features/Staff/Booking/Steps/SummaryStepView.swift` | Summary/review step |
 
 ---
 

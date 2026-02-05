@@ -27,7 +27,7 @@ Implement a full booking wizard in the iOS app that mirrors the web app's `Booki
 | Order creation successful | API creates order and devices, returns order number |
 | Confirmation displays | Shows order number and success state |
 | Build passes | `xcodebuild` completes without errors |
-| Feature accessible | "New Booking" button on dashboard launches the wizard |
+| Feature accessible | Blue plus icon in toolbar (top right) launches the wizard |
 
 ---
 
@@ -36,7 +36,7 @@ Implement a full booking wizard in the iOS app that mirrors the web app's `Booki
 ### Required Before Starting
 1. ✅ iOS app builds successfully
 2. ✅ Authentication working (can make authenticated API calls)
-3. ✅ AppRouter navigation system in place
+3. ✅ TabView + NavigationStack navigation in place (StaffMainView)
 4. ✅ APIClient and APIEndpoint patterns established
 5. ✅ Existing models: Client, Device, Order
 
@@ -62,7 +62,7 @@ Implement a full booking wizard in the iOS app that mirrors the web app's `Booki
 
 | Stage | Name | Description | Complexity |
 |-------|------|-------------|------------|
-| 01 | Models | Create booking models (Location, Brand, DeviceModel, DeviceType) | Low |
+| 01 | Models & Endpoints | Create booking models + add APIEndpoint cases | Low |
 | 02 | Booking View Model | Create central state management for the wizard | Medium |
 | 03 | Service Type Selection | BookingView with 4 service type cards | Low |
 | 04 | Wizard Container | BookingWizardView with step navigation and progress | Medium |
@@ -71,7 +71,7 @@ Implement a full booking wizard in the iOS app that mirrors the web app's `Booki
 | 07 | Summary Step | Review all data, set ready-by date | Low |
 | 08 | Signature Step | Terms agreement and signature capture | Medium |
 | 09 | Confirmation Step | Success view with order details | Low |
-| 10 | Dashboard Integration | Wire up "New Booking" button, navigation routes | Low |
+| 10 | Toolbar Integration | Add blue plus icon to StaffMainView toolbar | Low |
 
 ---
 
@@ -97,79 +97,134 @@ The following are explicitly **NOT** included in this implementation:
 ```
 Repair Minder/
 ├── Features/
-│   └── Booking/
-│       ├── BookingView.swift                 # Stage 03
-│       ├── BookingWizardView.swift           # Stage 04
-│       ├── BookingViewModel.swift            # Stage 02
-│       ├── Steps/
-│       │   ├── ClientStepView.swift          # Stage 05
-│       │   ├── DevicesStepView.swift         # Stage 06
-│       │   ├── SummaryStepView.swift         # Stage 07
-│       │   ├── SignatureStepView.swift       # Stage 08
-│       │   └── ConfirmationStepView.swift    # Stage 09
-│       └── Components/
-│           ├── ClientSearchView.swift        # Stage 05
-│           ├── DeviceEntryFormView.swift     # Stage 06
-│           ├── BrandModelPicker.swift        # Stage 06
-│           └── SignaturePadView.swift        # Stage 08
+│   └── Staff/
+│       └── Booking/                          # New feature folder
+│           ├── BookingView.swift             # Stage 03 - Service type selection
+│           ├── BookingWizardView.swift       # Stage 04 - Wizard container
+│           ├── BookingViewModel.swift        # Stage 02 - Central state
+│           ├── Steps/
+│           │   ├── ClientStepView.swift      # Stage 05
+│           │   ├── DevicesStepView.swift     # Stage 06
+│           │   ├── SummaryStepView.swift     # Stage 07
+│           │   ├── SignatureStepView.swift   # Stage 08
+│           │   └── ConfirmationStepView.swift # Stage 09
+│           └── Components/
+│               ├── ClientSearchView.swift    # Stage 05
+│               ├── DeviceEntryFormView.swift # Stage 06
+│               ├── BrandModelPicker.swift    # Stage 06
+│               └── SignaturePadView.swift    # Stage 08
 ├── Core/
-│   └── Models/
-│       ├── Location.swift                    # Stage 01
-│       ├── Brand.swift                       # Stage 01
-│       ├── DeviceModel.swift                 # Stage 01
-│       ├── DeviceType.swift                  # Stage 01
-│       └── BookingFormData.swift             # Stage 02
-└── Features/
-    └── Dashboard/
-        └── Components/
-            └── QuickActionsView.swift        # Stage 10 (modify)
+│   ├── Models/
+│   │   ├── Location.swift                    # Stage 01
+│   │   ├── Brand.swift                       # Stage 01
+│   │   ├── DeviceModel.swift                 # Stage 01
+│   │   ├── DeviceType.swift                  # Stage 01
+│   │   └── BookingFormData.swift             # Stage 02
+│   └── Networking/
+│       └── APIEndpoints.swift                # Stage 01 (modify - add new cases)
+└── Repair_MinderApp.swift                    # Stage 10 (modify StaffMainView)
 ```
+
+**Notes:**
+- Booking goes inside `Features/Staff/` to match the existing pattern where staff features are organized under that folder (Dashboard, Orders, Devices, etc.).
+- `APIEndpoints.swift` is an existing file that needs new enum cases added for booking-related endpoints.
 
 ---
 
 ## API Endpoints Required
 
-All backend endpoints already exist. Use `APIEndpoint(path:)` directly - **no new Swift definitions needed**.
+All backend endpoints already exist. Some already have `APIEndpoint` enum cases; others need new cases added.
 
-| Endpoint | Method | Purpose | Usage |
-|----------|--------|---------|-------|
-| `/api/clients?search=` | GET | Search clients | `clients(search:)` exists |
-| `/api/clients/:id` | GET | Get client details | `client(id:)` exists |
-| `/api/orders` | POST | Create order | `createOrder(body:)` exists |
-| `/api/locations` | GET | Get locations list | `APIEndpoint(path: "/api/locations")` |
-| `/api/brands` | GET | Get brands list | `APIEndpoint(path: "/api/brands")` |
-| `/api/brands/:id/models` | GET | Get models for brand | `APIEndpoint(path: "/api/brands/\(brandId)/models")` |
-| `/api/device-types` | GET | Get device types | `APIEndpoint(path: "/api/device-types")` |
-| `/api/orders/:id/devices` | POST | Add device to order | `APIEndpoint(path: "/api/orders/\(orderId)/devices", method: .post, body: ...)` |
+| Endpoint | Method | Purpose | APIEndpoint Case |
+|----------|--------|---------|------------------|
+| `/api/clients/search?q=` | GET | Search clients | `.clientSearch(query:)` ✅ exists |
+| `/api/clients/:id` | GET | Get client details | `.client(id:)` ✅ exists |
+| `/api/clients` | POST | Create new client | `.createClient` ✅ exists |
+| `/api/orders` | POST | Create order | `.createOrder` ✅ exists |
+| `/api/orders/:id/devices` | POST | Add device to order | `.createOrderDevice(orderId:)` ✅ exists |
+| `/api/orders/:id/signatures` | POST | Add signature | `.createOrderSignature(orderId:)` ✅ exists |
+| `/api/locations` | GET | Get locations list | `.locations` ⚠️ **add in Stage 01** |
+| `/api/brands` | GET | Get brands list | `.brands` ⚠️ **add in Stage 01** |
+| `/api/brands/:id/models` | GET | Get models for brand | `.brandModels(brandId:)` ⚠️ **add in Stage 01** |
+| `/api/device-types` | GET | Get device types | `.deviceTypes` ⚠️ **add in Stage 01** |
 
-**Note:** No changes to `APIEndpoints.swift` required. Just use inline `APIEndpoint(path:)` for endpoints without existing definitions.
+**Note:** Stage 01 must add new cases to `APIEndpoints.swift` for locations, brands, brandModels, and deviceTypes.
 
 ### API Client Usage Patterns
 
-Use `APIEndpoint(path:)` directly - no new definitions needed:
+Use the `APIEndpoint` enum cases with type-inferred responses:
 
 ```swift
-// GET request - use APIEndpoint(path:) directly
-let locations = try await APIClient.shared.request(
-    APIEndpoint(path: "/api/locations"),
-    responseType: [Location].self
+// GET request - response type is inferred from the variable type
+let locations: [Location] = try await APIClient.shared.request(.locations)
+
+// GET with parameters
+let brands: [Brand] = try await APIClient.shared.request(.brands)
+let models: [DeviceModel] = try await APIClient.shared.request(.brandModels(brandId: "123"))
+
+// Search clients
+let searchResults: ClientSearchResponse = try await APIClient.shared.request(
+    .clientSearch(query: "john")
 )
 
-// POST request with body
-try await APIClient.shared.requestVoid(
-    APIEndpoint(path: "/api/orders/\(orderId)/devices", method: .post, body: deviceRequest)
-)
+// POST request with body - pass body as second parameter
+let order: Order = try await APIClient.shared.request(.createOrder, body: createOrderRequest)
 
-// Use existing definitions where available
-let response = try await APIClient.shared.request(
-    .clients(search: query),
-    responseType: ClientsListData.self
+// POST device to order
+let device: OrderDevice = try await APIClient.shared.request(
+    .createOrderDevice(orderId: orderId),
+    body: deviceRequest
 )
-let clients = response.clients  // Access nested array
 ```
 
-- Encoder auto-converts camelCase to snake_case for request bodies
-- Decoder auto-converts snake_case to camelCase for responses
+**Key patterns:**
+- Response type is inferred from the return type (no `responseType:` parameter)
+- Encoder auto-converts camelCase → snake_case for request bodies
+- Decoder auto-converts snake_case → camelCase for responses
+- Use `.convertFromSnakeCase` - don't add explicit raw values in CodingKeys
+
+---
+
+## ViewModel Pattern
+
+Use `@Observable` macro (iOS 17+) for all new ViewModels to match the modern pattern:
+
+```swift
+import SwiftUI
+
+@Observable
+@MainActor
+final class BookingViewModel {
+    // State properties (no @Published needed with @Observable)
+    private(set) var isLoading = false
+    private(set) var error: String?
+    var currentStep: BookingStep = .client
+
+    // Form data
+    var selectedClient: Client?
+    var devices: [BookingDevice] = []
+
+    // Methods
+    func loadLocations() async { ... }
+    func submitBooking() async throws { ... }
+}
+```
+
+**View usage:**
+```swift
+struct BookingWizardView: View {
+    @State private var viewModel = BookingViewModel()
+
+    var body: some View {
+        // Access viewModel properties directly
+    }
+}
+```
+
+**Key differences from `@ObservableObject`:**
+- No `@Published` property wrappers needed
+- Use `@State private var` in views (not `@StateObject`)
+- Cleaner, less boilerplate code
 
 ---
 

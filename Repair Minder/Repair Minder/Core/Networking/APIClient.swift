@@ -2,299 +2,405 @@
 //  APIClient.swift
 //  Repair Minder
 //
-//  Created by Claude on 03/02/2026.
+//  Created on 04/02/2026.
 //
 
 import Foundation
-import os.log
 
-actor APIClient {
+// MARK: - Token Provider Protocol
+
+/// Protocol for providing authentication tokens
+/// Implemented by AuthManager in Stage 02
+@MainActor
+protocol TokenProvider: AnyObject {
+    var accessToken: String? { get }
+    var refreshToken: String? { get }
+    func updateTokens(accessToken: String, refreshToken: String)
+    func clearTokens()
+}
+
+// MARK: - API Client
+
+/// Main HTTP client for all API requests
+/// Handles authentication, token refresh, and response decoding
+@MainActor
+final class APIClient {
+
+    // MARK: - Shared Instance
+
     static let shared = APIClient()
 
+    // MARK: - Configuration
+
+    private let baseURL = URL(string: "https://api.repairminder.com")!
     private let session: URLSession
-    private let baseURL: URL
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
-    private let logger = Logger(subsystem: "com.mendmyi.Repair-Minder", category: "APIClient")
 
-    private var interceptors: [RequestInterceptor] = []
+    /// Token provider for authentication - set by AuthManager
+    weak var tokenProvider: TokenProvider?
 
-    init(
-        baseURL: URL = AppEnvironment.current.apiBaseURL,
-        session: URLSession = .shared
-    ) {
-        self.baseURL = baseURL
-        self.session = session
+    /// Flag to prevent multiple simultaneous token refresh attempts
+    private var isRefreshingToken = false
+
+    /// Pending requests waiting for token refresh
+    private var pendingRequests: [CheckedContinuation<Void, Error>] = []
+
+    // MARK: - Initialization
+
+    init() {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 30
+        configuration.timeoutIntervalForResource = 60
+        self.session = URLSession(configuration: configuration)
 
         self.decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        decoder.dateDecodingStrategy = .iso8601
+        self.decoder.keyDecodingStrategy = .convertFromSnakeCase
+        self.decoder.dateDecodingStrategy = .iso8601
 
         self.encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        encoder.dateEncodingStrategy = .iso8601
-
-        // Add default interceptors
-        interceptors.append(CommonHeadersInterceptor())
-        interceptors.append(LoggingInterceptor())
+        self.encoder.keyEncodingStrategy = .convertToSnakeCase
     }
 
-    func addInterceptor(_ interceptor: RequestInterceptor) {
-        interceptors.append(interceptor)
-    }
+    // MARK: - Public API
 
-    func setAuthTokenProvider(_ provider: @escaping () -> String?) {
-        interceptors.insert(AuthInterceptor(tokenProvider: provider), at: 0)
-    }
-
-    // MARK: - Request Methods
-
-    /// Perform a request expecting a typed response
+    /// Perform a request that expects a typed response
+    /// - Parameters:
+    ///   - endpoint: The API endpoint to call
+    ///   - body: Optional request body (will be JSON encoded)
+    /// - Returns: The decoded response data
     func request<T: Decodable>(
         _ endpoint: APIEndpoint,
-        responseType: T.Type
+        body: Encodable? = nil
     ) async throws -> T {
-        let response: APIResponse<T> = try await performRequest(endpoint)
+        let response: APIResponse<T> = try await performRequest(endpoint, body: body)
 
         guard response.success, let data = response.data else {
-            throw APIError.httpError(
-                statusCode: 400,
-                message: response.error ?? response.message ?? "Request failed"
+            throw APIError.serverError(
+                message: response.error ?? "Unknown error",
+                code: response.code
             )
         }
 
         return data
     }
 
-    /// Perform a request expecting the raw APIResponse wrapper
-    func requestRaw<T: Decodable>(
-        _ endpoint: APIEndpoint
-    ) async throws -> APIResponse<T> {
-        return try await performRequest(endpoint)
+    /// Perform a request that returns a response with pagination
+    /// - Parameters:
+    ///   - endpoint: The API endpoint to call
+    ///   - body: Optional request body (will be JSON encoded)
+    /// - Returns: Tuple containing the decoded data and pagination info
+    func requestWithPagination<T: Decodable>(
+        _ endpoint: APIEndpoint,
+        body: Encodable? = nil
+    ) async throws -> (data: T, pagination: Pagination?) {
+        let response: APIResponse<T> = try await performRequest(endpoint, body: body)
+
+        guard response.success, let data = response.data else {
+            throw APIError.serverError(
+                message: response.error ?? "Unknown error",
+                code: response.code
+            )
+        }
+
+        return (data, response.pagination)
     }
 
-    /// Perform a request expecting a custom response type (not wrapped in APIResponse)
-    func requestDirect<T: Decodable>(
-        _ endpoint: APIEndpoint
-    ) async throws -> T {
-        return try await performRequest(endpoint)
+    /// Perform a request that returns a response with pagination and filters
+    /// Used by list endpoints like devices and my-queue that include filter options
+    /// - Parameters:
+    ///   - endpoint: The API endpoint to call
+    ///   - body: Optional request body (will be JSON encoded)
+    /// - Returns: Tuple containing the decoded data, pagination, and filters
+    func requestWithFilters<T: Decodable, F: Decodable>(
+        _ endpoint: APIEndpoint,
+        body: Encodable? = nil
+    ) async throws -> (data: T, pagination: Pagination?, filters: F?) {
+        let response: APIResponseWithFilters<T, F> = try await performRequestWithFilters(endpoint, body: body)
+
+        guard response.success, let data = response.data else {
+            throw APIError.serverError(
+                message: response.error ?? "Unknown error",
+                code: response.code
+            )
+        }
+
+        return (data, response.pagination, response.filters)
     }
 
-    /// Perform a request with no expected response data
-    func requestVoid(_ endpoint: APIEndpoint) async throws {
-        let _: APIResponse<EmptyResponse> = try await performRequest(endpoint)
+    /// Perform a request that expects no response data
+    /// - Parameters:
+    ///   - endpoint: The API endpoint to call
+    ///   - body: Optional request body (will be JSON encoded)
+    func requestVoid(
+        _ endpoint: APIEndpoint,
+        body: Encodable? = nil
+    ) async throws {
+        let response: APIResponse<EmptyResponse> = try await performRequest(endpoint, body: body)
+
+        guard response.success else {
+            throw APIError.serverError(
+                message: response.error ?? "Unknown error",
+                code: response.code
+            )
+        }
     }
 
-    // MARK: - Private
+    /// Perform the raw token refresh request
+    /// This is used by AuthManager and should not be called directly
+    func refreshAccessToken() async throws -> TokenRefreshResponse {
+        guard let refreshToken = tokenProvider?.refreshToken else {
+            throw APIError.unauthorized
+        }
+
+        let body = ["refreshToken": refreshToken]
+        let response: APIResponse<TokenRefreshResponse> = try await performRequest(
+            .refreshToken,
+            body: body,
+            skipAuthRefresh: true
+        )
+
+        guard response.success, let data = response.data else {
+            throw APIError.serverError(
+                message: response.error ?? "Token refresh failed",
+                code: response.code
+            )
+        }
+
+        return data
+    }
+
+    // MARK: - Private Implementation
 
     private func performRequest<T: Decodable>(
-        _ endpoint: APIEndpoint
-    ) async throws -> T {
-        // Check network connectivity
-        let isConnected = await NetworkMonitor.shared.isConnected
-        guard isConnected else {
-            throw APIError.offline
-        }
+        _ endpoint: APIEndpoint,
+        body: Encodable? = nil,
+        skipAuthRefresh: Bool = false
+    ) async throws -> APIResponse<T> {
+        let request = try buildRequest(endpoint, body: body)
 
-        // Build URL
-        guard let url = URL(string: endpoint.path, relativeTo: baseURL) else {
-            throw APIError.invalidURL
-        }
+        do {
+            let (data, response) = try await session.data(for: request)
 
-        var urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: true)
-
-        // Add query parameters
-        if let queryParams = endpoint.queryParameters, !queryParams.isEmpty {
-            urlComponents?.queryItems = queryParams.map {
-                URLQueryItem(name: $0.key, value: $0.value)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.networkError(URLError(.badServerResponse))
             }
+
+            // Handle HTTP status codes
+            switch httpResponse.statusCode {
+            case 200...299:
+                // Debug: print first 1000 chars of response for dashboard stats
+                if endpoint.path.contains("dashboard") {
+                    let responseString = String(data: data, encoding: .utf8) ?? "N/A"
+                    print("🔍 [API] Response preview: \(responseString.prefix(1000))")
+                }
+                return try decodeResponse(data)
+
+            case 401:
+                // Unauthorized - try to refresh token if not already refreshing
+                if !skipAuthRefresh && endpoint.requiresAuth {
+                    try await handleTokenRefresh()
+                    // Retry the original request
+                    return try await performRequest(endpoint, body: body, skipAuthRefresh: true)
+                }
+                throw APIError.unauthorized
+
+            case 403:
+                let errorResponse = try? decodeResponse(data) as APIResponse<EmptyResponse>
+                throw APIError.forbidden(
+                    message: errorResponse?.error,
+                    code: errorResponse?.code
+                )
+
+            case 404:
+                throw APIError.notFound
+
+            case 429:
+                throw APIError.rateLimited
+
+            default:
+                let errorResponse = try? decodeResponse(data) as APIResponse<EmptyResponse>
+                throw APIError.httpError(
+                    statusCode: httpResponse.statusCode,
+                    message: errorResponse?.error
+                )
+            }
+        } catch let error as APIError {
+            throw error
+        } catch let error as URLError where error.code == .cancelled {
+            throw APIError.cancelled
+        } catch let error as DecodingError {
+            throw APIError.decodingError(error)
+        } catch {
+            throw APIError.networkError(error)
+        }
+    }
+
+    private func buildRequest(_ endpoint: APIEndpoint, body: Encodable? = nil) throws -> URLRequest {
+        var components = URLComponents(url: baseURL.appendingPathComponent(endpoint.path), resolvingAgainstBaseURL: true)!
+        components.queryItems = endpoint.queryItems
+
+        guard let url = components.url else {
+            throw APIError.invalidRequest("Invalid URL")
         }
 
-        guard let finalURL = urlComponents?.url else {
-            throw APIError.invalidURL
-        }
+        print("🌐 [API] \(endpoint.method.rawValue) \(url.absoluteString)")
 
-        // Build request
-        var request = URLRequest(url: finalURL)
+        var request = URLRequest(url: url)
         request.httpMethod = endpoint.method.rawValue
-        request.timeoutInterval = 30
 
-        // Add body if present
-        if let body = endpoint.body {
-            do {
-                request.httpBody = try encoder.encode(body)
-            } catch {
-                throw APIError.encodingError(error)
-            }
+        // Add headers
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+
+        // Add authorization header if required
+        if endpoint.requiresAuth, let token = tokenProvider?.accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
 
-        // Apply interceptors
-        for interceptor in interceptors {
-            try await interceptor.intercept(&request)
+        // Add body if provided
+        if let body = body {
+            request.httpBody = try encoder.encode(AnyEncodable(body))
         }
 
-        // Perform request
-        let data: Data
-        let response: URLResponse
+        return request
+    }
 
+    private func decodeResponse<T: Decodable>(_ data: Data) throws -> APIResponse<T> {
         do {
-            (data, response) = try await session.data(for: request)
-        } catch let error as URLError {
-            logger.error("Network error: \(error.localizedDescription)")
-            throw APIError.networkError(error)
+            return try decoder.decode(APIResponse<T>.self, from: data)
         } catch {
-            logger.error("Unknown error: \(error.localizedDescription)")
-            throw APIError.networkError(error)
-        }
-
-        // Validate response
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-
-        #if DEBUG
-        logger.debug("Response [\(httpResponse.statusCode)]: \(String(data: data, encoding: .utf8) ?? "nil")")
-        #endif
-
-        // Handle HTTP status codes
-        switch httpResponse.statusCode {
-        case 200...299:
-            break // Success
-        case 401:
-            throw APIError.unauthorized
-        case 403:
-            throw APIError.forbidden
-        case 404:
-            throw APIError.notFound
-        case 429:
-            let retryAfter = httpResponse.value(forHTTPHeaderField: "Retry-After")
-                .flatMap { Int($0) }
-            throw APIError.rateLimited(retryAfter: retryAfter)
-        case 500...599:
-            let errorMessage = try? decoder.decode(APIResponse<EmptyResponse>.self, from: data).error
-            throw APIError.serverError(errorMessage)
-        default:
-            let errorMessage = try? decoder.decode(APIResponse<EmptyResponse>.self, from: data).error
-            throw APIError.httpError(statusCode: httpResponse.statusCode, message: errorMessage)
-        }
-
-        // Decode response
-        do {
-            return try decoder.decode(T.self, from: data)
-        } catch let DecodingError.keyNotFound(key, context) {
-            logger.error("Missing key '\(key.stringValue)' at path: \(context.codingPath.map(\.stringValue).joined(separator: "."))")
-            throw APIError.decodingError(DecodingError.keyNotFound(key, context))
-        } catch let DecodingError.typeMismatch(type, context) {
-            logger.error("Type mismatch: expected \(type) at path: \(context.codingPath.map(\.stringValue).joined(separator: "."))")
-            throw APIError.decodingError(DecodingError.typeMismatch(type, context))
-        } catch let DecodingError.valueNotFound(type, context) {
-            logger.error("Value not found: expected \(type) at path: \(context.codingPath.map(\.stringValue).joined(separator: "."))")
-            throw APIError.decodingError(DecodingError.valueNotFound(type, context))
-        } catch let DecodingError.dataCorrupted(context) {
-            logger.error("Data corrupted at path: \(context.codingPath.map(\.stringValue).joined(separator: "."))")
-            throw APIError.decodingError(DecodingError.dataCorrupted(context))
-        } catch {
-            logger.error("Decoding error: \(error)")
             throw APIError.decodingError(error)
         }
     }
 
-    /// Perform a request expecting a custom response type (not wrapped in APIResponse)
-    private func performRequestDirect<T: Decodable>(
-        _ endpoint: APIEndpoint
-    ) async throws -> T {
-        // Check network connectivity
-        let isConnected = await NetworkMonitor.shared.isConnected
-        guard isConnected else {
-            throw APIError.offline
-        }
-
-        // Build URL
-        guard let url = URL(string: endpoint.path, relativeTo: baseURL) else {
-            throw APIError.invalidURL
-        }
-
-        var urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: true)
-
-        // Add query parameters
-        if let queryParams = endpoint.queryParameters, !queryParams.isEmpty {
-            urlComponents?.queryItems = queryParams.map {
-                URLQueryItem(name: $0.key, value: $0.value)
-            }
-        }
-
-        guard let finalURL = urlComponents?.url else {
-            throw APIError.invalidURL
-        }
-
-        // Build request
-        var request = URLRequest(url: finalURL)
-        request.httpMethod = endpoint.method.rawValue
-        request.timeoutInterval = 30
-
-        // Add body if present
-        if let body = endpoint.body {
-            do {
-                request.httpBody = try encoder.encode(body)
-            } catch {
-                throw APIError.encodingError(error)
-            }
-        }
-
-        // Apply interceptors
-        for interceptor in interceptors {
-            try await interceptor.intercept(&request)
-        }
-
-        // Perform request
-        let data: Data
-        let response: URLResponse
+    private func performRequestWithFilters<T: Decodable, F: Decodable>(
+        _ endpoint: APIEndpoint,
+        body: Encodable? = nil,
+        skipAuthRefresh: Bool = false
+    ) async throws -> APIResponseWithFilters<T, F> {
+        let request = try buildRequest(endpoint, body: body)
 
         do {
-            (data, response) = try await session.data(for: request)
-        } catch let error as URLError {
-            logger.error("Network error: \(error.localizedDescription)")
-            throw APIError.networkError(error)
-        } catch {
-            logger.error("Unknown error: \(error.localizedDescription)")
-            throw APIError.networkError(error)
-        }
+            let (data, response) = try await session.data(for: request)
 
-        // Validate response
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.networkError(URLError(.badServerResponse))
+            }
 
-        #if DEBUG
-        logger.debug("Response [\(httpResponse.statusCode)]: \(String(data: data, encoding: .utf8) ?? "nil")")
-        #endif
+            switch httpResponse.statusCode {
+            case 200...299:
+                // Debug logging for my-queue
+                if endpoint.path.contains("my-queue") {
+                    let responseString = String(data: data, encoding: .utf8) ?? "N/A"
+                    print("🔍 [API] my-queue response: \(responseString.prefix(2000))")
+                }
+                do {
+                    return try decoder.decode(APIResponseWithFilters<T, F>.self, from: data)
+                } catch {
+                    print("❌ [API] Decoding error for \(endpoint.path): \(error)")
+                    throw error
+                }
 
-        // Handle HTTP status codes
-        switch httpResponse.statusCode {
-        case 200...299:
-            break // Success
-        case 401:
-            throw APIError.unauthorized
-        case 403:
-            throw APIError.forbidden
-        case 404:
-            throw APIError.notFound
-        case 429:
-            let retryAfter = httpResponse.value(forHTTPHeaderField: "Retry-After")
-                .flatMap { Int($0) }
-            throw APIError.rateLimited(retryAfter: retryAfter)
-        case 500...599:
-            throw APIError.serverError(nil)
-        default:
-            throw APIError.httpError(statusCode: httpResponse.statusCode, message: nil)
-        }
+            case 401:
+                if !skipAuthRefresh && endpoint.requiresAuth {
+                    try await handleTokenRefresh()
+                    return try await performRequestWithFilters(endpoint, body: body, skipAuthRefresh: true)
+                }
+                throw APIError.unauthorized
 
-        // Decode response directly (no APIResponse wrapper)
-        do {
-            return try decoder.decode(T.self, from: data)
-        } catch {
-            logger.error("Decoding error: \(error)")
+            case 403:
+                let errorResponse = try? decodeResponse(data) as APIResponse<EmptyResponse>
+                throw APIError.forbidden(
+                    message: errorResponse?.error,
+                    code: errorResponse?.code
+                )
+
+            case 404:
+                throw APIError.notFound
+
+            case 429:
+                throw APIError.rateLimited
+
+            default:
+                let errorResponse = try? decodeResponse(data) as APIResponse<EmptyResponse>
+                throw APIError.httpError(
+                    statusCode: httpResponse.statusCode,
+                    message: errorResponse?.error
+                )
+            }
+        } catch let error as APIError {
+            throw error
+        } catch let error as URLError where error.code == .cancelled {
+            throw APIError.cancelled
+        } catch let error as DecodingError {
             throw APIError.decodingError(error)
+        } catch {
+            throw APIError.networkError(error)
         }
+    }
+
+    private func handleTokenRefresh() async throws {
+        // If already refreshing, wait for it to complete
+        if isRefreshingToken {
+            try await withCheckedThrowingContinuation { continuation in
+                pendingRequests.append(continuation)
+            }
+            return
+        }
+
+        isRefreshingToken = true
+
+        do {
+            let response = try await refreshAccessToken()
+            tokenProvider?.updateTokens(
+                accessToken: response.token,
+                refreshToken: response.refreshToken
+            )
+
+            // Resume pending requests
+            for continuation in pendingRequests {
+                continuation.resume()
+            }
+            pendingRequests.removeAll()
+            isRefreshingToken = false
+
+        } catch {
+            // Clear tokens on refresh failure
+            tokenProvider?.clearTokens()
+
+            // Fail pending requests
+            for continuation in pendingRequests {
+                continuation.resume(throwing: APIError.unauthorized)
+            }
+            pendingRequests.removeAll()
+            isRefreshingToken = false
+
+            throw APIError.unauthorized
+        }
+    }
+
+    /// User-Agent string that identifies the app as mobile for 90-day refresh tokens
+    private var userAgent: String {
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
+
+        return "RepairMinder-iOS/\(appVersion).\(buildNumber) (iPhone; iOS \(osVersion))"
+    }
+}
+
+// MARK: - AnyEncodable Helper
+
+/// Type-erased Encodable wrapper for encoding request bodies
+private struct AnyEncodable: Encodable {
+    private let _encode: (Encoder) throws -> Void
+
+    init<T: Encodable>(_ value: T) {
+        _encode = value.encode
+    }
+
+    func encode(to encoder: Encoder) throws {
+        try _encode(encoder)
     }
 }

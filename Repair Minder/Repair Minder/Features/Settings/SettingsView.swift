@@ -2,137 +2,184 @@
 //  SettingsView.swift
 //  Repair Minder
 //
-//  Created by Claude on 04/02/2026.
+//  Created on 04/02/2026.
 //
 
 import SwiftUI
 
+// MARK: - Settings View
+
+/// Staff settings screen with profile, notifications, and logout
 struct SettingsView: View {
-    @Environment(AppState.self) private var appState
-    @State private var viewModel: SettingsViewModel?
-    @State private var showLogoutConfirmation = false
+    @StateObject private var viewModel = SettingsViewModel()
+    @ObservedObject private var authManager = AuthManager.shared
+    @ObservedObject private var appState = AppState.shared
 
     var body: some View {
         NavigationStack {
-            Group {
-                if let vm = viewModel {
-                    settingsContent(vm)
-                } else {
-                    ProgressView()
-                }
+            List {
+                // User profile section
+                profileSection
+
+                // Navigation section
+                navigationSection
+
+                // Notifications section
+                notificationsSection
+
+                // About section
+                aboutSection
+
+                // Account actions section
+                accountActionsSection
             }
-            .navigationTitle("Settings")
-            .task {
-                if viewModel == nil {
-                    viewModel = SettingsViewModel(appState: appState)
+            .navigationTitle("More")
+            .alert("Logout", isPresented: $viewModel.showLogoutConfirmation) {
+                Button("Cancel", role: .cancel) {}
+                Button("Logout", role: .destructive) {
+                    Task {
+                        await viewModel.logout()
+                        appState.onStaffLogout()
+                    }
+                }
+            } message: {
+                Text("Are you sure you want to logout?")
+            }
+        }
+    }
+
+    // MARK: - Profile Section
+
+    private var profileSection: some View {
+        Section {
+            if let user = authManager.currentUser {
+                HStack(spacing: 12) {
+                    // Avatar
+                    ZStack {
+                        Circle()
+                            .fill(Color.blue.opacity(0.2))
+                            .frame(width: 56, height: 56)
+
+                        Text(user.initials)
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.blue)
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(user.displayName)
+                            .font(.headline)
+
+                        Text(user.email)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        HStack(spacing: 4) {
+                            Image(systemName: roleIcon(for: user.role))
+                                .font(.caption2)
+                            Text(user.role.displayName)
+                                .font(.caption)
+                        }
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+
+            if let company = authManager.currentCompany {
+                HStack {
+                    Label("Company", systemImage: "building.2")
+                    Spacer()
+                    Text(company.name)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
     }
 
-    @ViewBuilder
-    private func settingsContent(_ vm: SettingsViewModel) -> some View {
-        List {
-            // User Profile Section
-            if let user = vm.currentUser {
-                Section {
-                    UserProfileHeader(user: user, company: vm.currentCompany)
-                }
+    // MARK: - Navigation Section
+
+    private var navigationSection: some View {
+        Section {
+            NavigationLink {
+                ClientListView()
+            } label: {
+                Label("Clients", systemImage: "person.2.fill")
+            }
+        }
+    }
+
+    // MARK: - Notifications Section
+
+    private var notificationsSection: some View {
+        Section("Notifications") {
+            NavigationLink {
+                NotificationSettingsView()
+            } label: {
+                Label("Push Notifications", systemImage: "bell.badge")
+            }
+        }
+    }
+
+    // MARK: - About Section
+
+    private var aboutSection: some View {
+        Section("About") {
+            HStack {
+                Label("Version", systemImage: "info.circle")
+                Spacer()
+                Text(viewModel.appVersion)
+                    .foregroundStyle(.secondary)
             }
 
-            // Preferences Section
-            Section("Preferences") {
-                NavigationLink {
-                    StaffNotificationSettingsView()
-                } label: {
-                    Label("Notifications", systemImage: "bell.fill")
-                }
-
-                NavigationLink {
-                    AppearanceSettingsView()
-                } label: {
-                    Label("Appearance", systemImage: "paintbrush.fill")
-                }
+            HStack {
+                Label("Build", systemImage: "hammer")
+                Spacer()
+                Text(viewModel.buildNumber)
+                    .foregroundStyle(.secondary)
             }
 
-            // Support Section
-            Section("Support") {
-                Button {
-                    vm.openHelpCenter()
-                } label: {
-                    HStack {
-                        Label("Help Center", systemImage: "questionmark.circle.fill")
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        Image(systemName: "arrow.up.forward")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Button {
-                    vm.openContactSupport()
-                } label: {
-                    HStack {
-                        Label("Contact Support", systemImage: "envelope.fill")
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        Image(systemName: "arrow.up.forward")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-
-            // About Section
-            Section("About") {
-                NavigationLink {
-                    AboutView()
-                } label: {
-                    Label("About Repair Minder", systemImage: "info.circle.fill")
-                }
-
-                #if DEBUG
-                NavigationLink {
-                    DebugView()
-                } label: {
-                    Label("Debug Info", systemImage: "ant.fill")
-                        .foregroundStyle(.orange)
-                }
-                #endif
-            }
-
-            // Sign Out Section
-            Section {
-                Button(role: .destructive) {
-                    showLogoutConfirmation = true
-                } label: {
-                    HStack {
-                        Spacer()
-                        Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
-                        Spacer()
-                    }
+            if let company = authManager.currentCompany {
+                HStack {
+                    Label("Currency", systemImage: "dollarsign.circle")
+                    Spacer()
+                    Text(company.currencyCode ?? "GBP")
+                        .foregroundStyle(.secondary)
                 }
             }
         }
-        .confirmationDialog(
-            "Sign Out",
-            isPresented: $showLogoutConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Sign Out", role: .destructive) {
-                Task {
-                    await vm.logout()
-                }
+    }
+
+    // MARK: - Account Actions Section
+
+    private var accountActionsSection: some View {
+        Section {
+            Button(role: .destructive) {
+                viewModel.showLogoutConfirmation = true
+            } label: {
+                Label("Logout", systemImage: "rectangle.portrait.and.arrow.right")
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Are you sure you want to logout?")
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func roleIcon(for role: UserRole) -> String {
+        switch role {
+        case .masterAdmin, .admin:
+            return "shield.fill"
+        case .seniorEngineer:
+            return "wrench.and.screwdriver.fill"
+        case .engineer:
+            return "wrench.fill"
+        case .office:
+            return "desktopcomputer"
         }
     }
 }
 
+// MARK: - Preview
+
 #Preview {
     SettingsView()
-        .environment(AppState())
 }

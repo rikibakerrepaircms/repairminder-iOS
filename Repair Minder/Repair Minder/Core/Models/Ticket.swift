@@ -2,218 +2,250 @@
 //  Ticket.swift
 //  Repair Minder
 //
-//  Created by Claude on 04/02/2026.
+//  Created on 04/02/2026.
 //
 
 import Foundation
 
-struct Ticket: Identifiable, Equatable, Sendable {
+// MARK: - Ticket
+
+/// Support ticket/enquiry model
+struct Ticket: Codable, Identifiable, Sendable, Equatable, Hashable {
     let id: String
     let ticketNumber: Int
     let subject: String
     let status: TicketStatus
-    let ticketType: String?
-    let clientId: String?
-    let clientEmail: String?
-    let clientName: String?
+    let ticketType: TicketType
     let assignedUserId: String?
-    let assignedFirstName: String?
-    let assignedLastName: String?
+    let assignedUser: AssignedUser?
+    let mergedIntoTicketId: String?
     let locationId: String?
-    let locId: String?
-    let locName: String?
-    let orderId: String?
-    let orderStatus: String?
-    let deviceCount: Int
-    let lastClientUpdate: Date?
-    let createdAt: Date
-    let updatedAt: Date
+    let location: TicketLocation?
+    let requiresLocation: Bool?
+    let receivedCustomEmail: CustomEmail?
+    let lastReplyFromCustomEmailId: String?
+    let createdAt: String
+    let updatedAt: String
+    let lastClientUpdate: String?
+    let client: TicketClient
+    let messages: [TicketMessage]?
+    let order: TicketOrder?
+    let notes: [TicketNote]?
 
-    var displayRef: String {
+    // MARK: - Computed Properties
+
+    /// Display name for ticket (e.g., "#100000001")
+    var displayNumber: String {
         "#\(ticketNumber)"
     }
 
-    // Computed property for backwards compatibility
-    var assignedUserName: String? {
-        [assignedFirstName, assignedLastName]
-            .compactMap { $0?.isEmpty == false ? $0 : nil }
-            .joined(separator: " ")
-            .isEmpty ? nil : [assignedFirstName, assignedLastName]
-            .compactMap { $0?.isEmpty == false ? $0 : nil }
-            .joined(separator: " ")
+    /// Whether the ticket can receive replies
+    var canReply: Bool {
+        status != .closed && mergedIntoTicketId == nil
+    }
+
+    /// Whether the ticket can receive notes
+    var canAddNote: Bool {
+        status != .closed && mergedIntoTicketId == nil
+    }
+
+    /// Whether this ticket has been merged into another
+    var isMerged: Bool {
+        mergedIntoTicketId != nil
+    }
+
+    /// Time since last update
+    var lastUpdatedDate: Date? {
+        ISO8601DateFormatter().date(from: updatedAt)
+    }
+
+    /// Time since last client message
+    var lastClientUpdateDate: Date? {
+        guard let lastClientUpdate else { return nil }
+        return ISO8601DateFormatter().date(from: lastClientUpdate)
+    }
+
+    /// Formatted last update time
+    var formattedLastUpdate: String {
+        guard let date = lastUpdatedDate else { return updatedAt }
+        return date.relativeFormatted()
+    }
+
+    // MARK: - Hashable
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }
 
-enum TicketStatus: String, Codable, CaseIterable, Sendable {
-    case open
-    case pending
-    case closed
-    case awaitingReply = "awaiting_reply"
-    case inProgress = "in_progress"
+// MARK: - Assigned User
 
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        let rawValue = try container.decode(String.self)
-        // Handle any unknown status gracefully
-        self = TicketStatus(rawValue: rawValue) ?? .open
+/// Staff member assigned to the ticket
+struct AssignedUser: Codable, Equatable, Sendable {
+    let firstName: String?
+    let lastName: String?
+
+    var fullName: String {
+        [firstName, lastName]
+            .compactMap { $0 }
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespaces)
     }
 
+    var initials: String {
+        let first = firstName?.first.map(String.init) ?? ""
+        let last = lastName?.first.map(String.init) ?? ""
+        return "\(first)\(last)".uppercased()
+    }
+}
+
+// MARK: - Ticket Location
+
+/// Location associated with the ticket
+struct TicketLocation: Codable, Identifiable, Equatable, Sendable {
+    let id: String
+    let name: String
+}
+
+// MARK: - Custom Email
+
+/// Custom email address for sending/receiving
+struct CustomEmail: Codable, Identifiable, Equatable, Sendable {
+    let id: String
+    let emailAddress: String
+    let displayName: String?
+}
+
+// MARK: - Ticket Client
+
+/// Customer/client associated with the ticket
+struct TicketClient: Codable, Identifiable, Equatable, Sendable {
+    let id: String
+    let email: String
+    let name: String?
+    let phone: String?
+    let emailSuppressed: Int?
+    let emailSuppressedAt: String?
+    let isGeneratedEmail: Int?
+    let suppressionStatus: String?
+    let suppressionError: String?
+
+    /// Display name or email if name is missing
     var displayName: String {
-        switch self {
-        case .open: return "Open"
-        case .pending: return "Pending"
-        case .closed: return "Closed"
-        case .awaitingReply: return "Awaiting Reply"
-        case .inProgress: return "In Progress"
-        }
+        name?.trimmingCharacters(in: .whitespaces).isEmpty == false
+            ? name!
+            : email
     }
 
-    var colorName: String {
-        switch self {
-        case .open: return "green"
-        case .pending: return "orange"
-        case .closed: return "gray"
-        case .awaitingReply: return "yellow"
-        case .inProgress: return "blue"
-        }
-    }
-}
-
-// MARK: - Decodable
-extension Ticket: Decodable {
-    enum CodingKeys: String, CodingKey {
-        case id, subject, status
-        case ticketNumber, ticketType
-        case client, location, order
-        case assignedUserId, assignedUser
-        case locationId
-        case lastClientUpdate
-        case createdAt, updatedAt
+    /// First name extracted from full name
+    var firstName: String {
+        name?.components(separatedBy: " ").first ?? email.components(separatedBy: "@").first ?? "Customer"
     }
 
-    // Nested types for backend response
-    struct TicketClient: Decodable {
-        let id: String
-        let email: String?
-        let name: String?
+    /// Whether email is suppressed (bounced/blocked)
+    var isEmailSuppressed: Bool {
+        (emailSuppressed ?? 0) == 1
     }
 
-    struct TicketLocation: Decodable {
-        let id: String
-        let name: String?
-    }
-
-    struct TicketOrder: Decodable {
-        let id: String
-        let status: String?
-        let deviceCount: Int?
-    }
-
-    struct TicketAssignedUser: Decodable {
-        let id: String
-        let name: String?
-    }
-
-    // Date formatters for various backend formats
-    private static let sqliteDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter
-    }()
-
-    private static let iso8601Formatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-
-    private static let iso8601FormatterNoFraction: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter
-    }()
-
-    private static func parseDate(from string: String) -> Date? {
-        if let date = iso8601Formatter.date(from: string) {
-            return date
-        }
-        if let date = iso8601FormatterNoFraction.date(from: string) {
-            return date
-        }
-        if let date = sqliteDateFormatter.date(from: string) {
-            return date
-        }
-        return nil
-    }
-
-    private static func decodeOptionalDate(from container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys) -> Date? {
-        if let date = try? container.decode(Date.self, forKey: key) {
-            return date
-        }
-        if let dateString = try? container.decode(String.self, forKey: key) {
-            return parseDate(from: dateString)
-        }
-        return nil
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-
-        id = try container.decode(String.self, forKey: .id)
-        ticketNumber = try container.decode(Int.self, forKey: .ticketNumber)
-        subject = try container.decodeIfPresent(String.self, forKey: .subject) ?? ""
-        status = try container.decodeIfPresent(TicketStatus.self, forKey: .status) ?? .open
-        ticketType = try container.decodeIfPresent(String.self, forKey: .ticketType)
-
-        // Decode nested client object
-        if let client = try container.decodeIfPresent(TicketClient.self, forKey: .client) {
-            clientId = client.id
-            clientEmail = client.email
-            clientName = client.name
-        } else {
-            clientId = nil
-            clientEmail = nil
-            clientName = nil
-        }
-
-        // Decode nested assigned_user object or direct assigned_user_id
-        if let assignedUser = try container.decodeIfPresent(TicketAssignedUser.self, forKey: .assignedUser) {
-            assignedUserId = assignedUser.id
-            // Parse name into first/last if possible
-            let nameParts = assignedUser.name?.components(separatedBy: " ") ?? []
-            assignedFirstName = nameParts.first
-            assignedLastName = nameParts.count > 1 ? nameParts.dropFirst().joined(separator: " ") : nil
-        } else {
-            assignedUserId = try container.decodeIfPresent(String.self, forKey: .assignedUserId)
-            assignedFirstName = nil
-            assignedLastName = nil
-        }
-
-        // Decode nested location object
-        locationId = try container.decodeIfPresent(String.self, forKey: .locationId)
-        if let location = try container.decodeIfPresent(TicketLocation.self, forKey: .location) {
-            locId = location.id
-            locName = location.name
-        } else {
-            locId = nil
-            locName = nil
-        }
-
-        // Decode nested order object
-        if let order = try container.decodeIfPresent(TicketOrder.self, forKey: .order) {
-            orderId = order.id
-            orderStatus = order.status
-            deviceCount = order.deviceCount ?? 0
-        } else {
-            orderId = nil
-            orderStatus = nil
-            deviceCount = 0
-        }
-
-        lastClientUpdate = Ticket.decodeOptionalDate(from: container, forKey: .lastClientUpdate)
-        createdAt = Ticket.decodeOptionalDate(from: container, forKey: .createdAt) ?? Date()
-        updatedAt = Ticket.decodeOptionalDate(from: container, forKey: .updatedAt) ?? Date()
+    /// Whether this is a system-generated placeholder email
+    var hasGeneratedEmail: Bool {
+        (isGeneratedEmail ?? 0) == 1
     }
 }
 
+// MARK: - Ticket Order
+
+/// Order linked to this ticket (if ticket_type = "order")
+struct TicketOrder: Codable, Identifiable, Equatable, Sendable {
+    let id: String
+    let status: String
+    let deviceCount: Int
+    let devices: [TicketOrderDevice]?
+}
+
+// MARK: - Ticket Order Device
+
+/// Device on the order linked to this ticket
+struct TicketOrderDevice: Codable, Identifiable, Equatable, Sendable {
+    let id: String
+    let displayName: String
+    let status: String
+}
+
+// MARK: - Ticket Note
+
+/// Internal note shown in ticket list (summary view)
+struct TicketNote: Codable, Equatable, Sendable {
+    let body: String
+    let createdAt: String
+    let createdBy: String?
+    let deviceId: String?
+    let deviceName: String?
+
+    var formattedDate: String {
+        guard let date = ISO8601DateFormatter().date(from: createdAt) else {
+            return createdAt
+        }
+        return date.relativeFormatted()
+    }
+}
+
+// MARK: - Ticket List Response
+
+/// Response from GET /api/tickets
+struct TicketListResponse: Decodable, Sendable {
+    let tickets: [Ticket]
+    let companyLocations: [CompanyLocation]?
+    let statusCounts: StatusCounts
+    let ticketTypeCounts: TicketTypeCounts
+    let total: Int
+    let page: Int
+    let limit: Int
+    let totalPages: Int
+}
+
+// MARK: - Status Counts
+
+/// Count of tickets by status
+struct StatusCounts: Decodable, Equatable, Sendable {
+    let open: Int
+    let pending: Int
+    let resolved: Int
+    let closed: Int
+
+    /// Total active tickets (not closed)
+    var totalActive: Int {
+        open + pending + resolved
+    }
+}
+
+// MARK: - Ticket Type Counts
+
+/// Count of tickets by type
+struct TicketTypeCounts: Decodable, Equatable, Sendable {
+    let lead: Int
+    let order: Int
+
+    var total: Int {
+        lead + order
+    }
+}
+
+// MARK: - Company Location
+
+/// Location for filtering
+struct CompanyLocation: Codable, Identifiable, Equatable, Sendable {
+    let id: String
+    let name: String
+    let isPrimary: Bool?
+}
+
+// MARK: - Date Extension
+
+private extension Date {
+    func relativeFormatted() -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: self, relativeTo: Date())
+    }
+}

@@ -1,1409 +1,838 @@
-# Stage 05: Devices & Orders
+# Stage 05: Orders & Clients
 
 ## Objective
 
-Implement device list, device detail with actions, order list, and order detail views.
+Implement order list, order detail, client list, and client detail views with full API alignment.
 
-## Dependencies
+---
 
-- **Requires**: Stage 03 complete (Authentication)
-- **Requires**: Stage 04 complete (DeviceStatusBadge component)
-- **Backend Reference**: `[Ref: /Volumes/Riki Repos/repairminder/worker/device_handlers.js]`
-- **Backend Reference**: `[Ref: /Volumes/Riki Repos/repairminder/worker/order_handlers.js]`
+## ⚠️ Pre-Implementation Verification
 
-## Complexity
+**Before writing any code, verify the following against the backend source files:**
 
-**High** - Multiple views, device actions, status transitions
+1. **Order list response** - Read `/Volumes/Riki Repos/repairminder/worker/order_handlers.js` and verify:
+   - `getOrders()` function return shape
+   - Filter options returned in response
+   - Nested client, location, assigned_user objects
 
-## Files to Modify
+2. **Order detail response** - Verify the full order object structure including:
+   - Items, payments, signatures, refunds arrays
+   - Totals calculation fields
+   - Dates object structure
 
-| File | Changes |
-|------|---------|
-| `Features/Devices/DeviceListView.swift` | Complete rewrite |
-| `Features/Devices/DeviceDetailView.swift` | Complete rewrite |
-| `Features/Orders/OrderListView.swift` | Complete rewrite |
-| `Features/Orders/OrderDetailView.swift` | Complete rewrite |
+3. **Order status** - Confirm status is auto-calculated from device statuses (read-only in iOS)
+
+4. **Client responses** - Read `/Volumes/Riki Repos/repairminder/worker/client_handlers.js` and verify:
+   - List vs detail response differences
+   - Stats object structure
+   - Nested tickets, orders, devices arrays
+
+```bash
+# Quick verification commands
+grep -n "getOrders\|getOrder" /Volumes/Riki\ Repos/repairminder/worker/order_handlers.js | head -10
+grep -n "getClients\|getClient" /Volumes/Riki\ Repos/repairminder/worker/client_handlers.js | head -10
+```
+
+**Do not proceed until you've verified the response shapes match this documentation.**
+
+---
+
+## API Endpoints
+
+### GET /api/orders
+
+List orders with pagination and filtering.
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `page` | Int | Page number (default: 1) |
+| `limit` | Int | Items per page (default: 20, max: 100) |
+| `status` | String | Comma-separated order statuses |
+| `payment_status` | String | Comma-separated: `unpaid`, `partial`, `paid` |
+| `location_id` | String | Location UUID or `unset` or `all` |
+| `assigned_user_id` | String | User UUID or `unassigned` |
+| `device_type_id` | String | Device type UUID or `unassigned` |
+| `search` | String | Search order number, client name, email |
+| `date_from` | String | Start date (YYYY-MM-DD) |
+| `date_to` | String | End date (YYYY-MM-DD) |
+| `sort` | String | `created_at`, `updated_at`, `status`, `order_number` |
+| `order` | String | `asc` or `desc` (default: desc) |
+| `category` | String | `repair`, `device_sale`, `accessory`, `device_purchase` |
+| `period` | String | `today`, `yesterday`, `this_week`, `this_month`, `last_month` |
+| `date_filter` | String | `created` or `collected` (default: created) |
+| `has_refund` | String | `true` to show only orders with refunds |
+| `unpaid` | String | `true` to show only orders with balance due |
+| `collection_status` | String | `awaiting` for complete orders awaiting collection |
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "uuid",
+      "ticket_id": "uuid",
+      "order_number": 12345,
+      "client": {
+        "id": "uuid",
+        "email": "client@example.com",
+        "first_name": "John",
+        "last_name": "Doe",
+        "phone": "+44..."
+      },
+      "location": {
+        "id": "uuid",
+        "name": "Main Store"
+      },
+      "assigned_user": {
+        "id": "uuid",
+        "name": "Tech Name"
+      },
+      "intake_method": "walk_in",
+      "status": "in_progress",
+      "payment_status": "unpaid",
+      "order_total": 150.00,
+      "amount_paid": 0.00,
+      "balance_due": 150.00,
+      "created_at": "2024-01-15T10:30:00Z",
+      "updated_at": "2024-01-15T14:22:00Z",
+      "notes": [
+        {
+          "body": "Note text",
+          "created_at": "...",
+          "created_by": "Staff Name",
+          "device_id": "uuid or null",
+          "device_name": "iPhone 14 or null"
+        }
+      ]
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 156,
+    "total_pages": 8
+  },
+  "filters": {
+    "locations": [{ "id": "uuid", "name": "Location Name" }],
+    "users": [{ "id": "uuid", "name": "User Name" }],
+    "statuses": ["awaiting_device", "in_progress", "service_complete", "awaiting_collection", "collected_despatched"],
+    "payment_statuses": ["unpaid", "partial", "paid"],
+    "device_types": [{ "id": "uuid", "name": "iPhone", "slug": "iphone" }]
+  }
+}
+```
+
+---
+
+### GET /api/orders/:id
+
+Get single order with all related data. Supports lookup by UUID or order_number.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "ticket_id": "uuid",
+    "order_number": 12345,
+    "company_id": "uuid",
+    "client": {
+      "id": "uuid",
+      "email": "client@example.com",
+      "first_name": "John",
+      "last_name": "Doe",
+      "phone": "+44...",
+      "notes": "Client notes",
+      "address_line_1": "123 Street",
+      "address_line_2": null,
+      "city": "London",
+      "county": "Greater London",
+      "postcode": "SW1A 1AA",
+      "country": "United Kingdom",
+      "email_suppressed": false,
+      "email_suppressed_at": null,
+      "suppression_status": null,
+      "suppression_error": null
+    },
+    "location": {
+      "id": "uuid",
+      "name": "Main Store",
+      "address_line_1": "456 High Street",
+      "address_line_2": null,
+      "city": "London",
+      "postcode": "E1 6AN",
+      "phone": "+44..."
+    },
+    "assigned_user": {
+      "id": "uuid",
+      "name": "Tech Name"
+    },
+    "intake_method": "walk_in",
+    "status": "in_progress",
+    "stored_status": "in_progress",
+    "authorisation_type": "email",
+    "authorisation_amount": 150.00,
+    "authorisation_notes": "Notes about auth",
+    "tracking_number": "RM123456789GB",
+    "carrier": "Royal Mail",
+    "terms_conditions_snapshot": "...",
+    "items": [
+      {
+        "id": "uuid",
+        "item_type": "repair",
+        "description": "Screen Replacement",
+        "quantity": 1,
+        "unit_price": 79.99,
+        "vat_rate": 20.0,
+        "line_total": 79.99,
+        "vat_amount": 16.00,
+        "line_total_inc_vat": 95.99,
+        "device_id": "uuid or null",
+        "created_at": "...",
+        "authorization_status": "authorized",
+        "authorization_round": 1
+      }
+    ],
+    "payments": [
+      {
+        "id": "uuid",
+        "amount": 50.00,
+        "payment_method": "card",
+        "payment_date": "2024-01-15",
+        "notes": "Deposit",
+        "recorded_by_name": "Staff Name",
+        "created_at": "...",
+        "is_deposit": 1,
+        "device_id": null,
+        "pos_transaction_id": "uuid or null",
+        "pos_transaction_status": "completed",
+        "card_brand": "visa",
+        "card_last_four": "4242",
+        "auth_code": "ABC123",
+        "is_refundable": true,
+        "total_refunded": 0,
+        "refundable_amount": 50.00
+      }
+    ],
+    "signatures": [
+      {
+        "id": "uuid",
+        "signature_type": "drop_off",
+        "has_signature": true,
+        "typed_name": "John Doe",
+        "terms_agreed": true,
+        "captured_at": "..."
+      }
+    ],
+    "device_signatures": [
+      {
+        "id": "uuid",
+        "device_id": "uuid",
+        "device_name": "iPhone 14 Pro",
+        "signature_type": "authorization",
+        "signature_data": "base64...",
+        "action": "authorize",
+        "ip_address": "...",
+        "user_agent": "...",
+        "created_at": "..."
+      }
+    ],
+    "refunds": [
+      {
+        "id": "uuid",
+        "order_payment_id": "uuid",
+        "amount": 10.00,
+        "refund_date": "2024-01-20",
+        "reason": "Partial refund",
+        "recorded_by_name": "Staff Name",
+        "created_at": "..."
+      }
+    ],
+    "devices": [
+      {
+        "id": "uuid",
+        "status": "repairing",
+        "workflow_type": "repair",
+        "ready_for_collection_at": null,
+        "authorization_status": "authorized",
+        "authorization_method": "email",
+        "authorized_at": "...",
+        "deposits": 50.00,
+        "final_paid": 0.00
+      }
+    ],
+    "totals": {
+      "subtotal": 79.99,
+      "vat_total": 16.00,
+      "grand_total": 95.99,
+      "deposits_paid": 50.00,
+      "final_payments_paid": 0.00,
+      "amount_paid": 50.00,
+      "total_refunded": 0.00,
+      "net_paid": 50.00,
+      "balance_due": 45.99
+    },
+    "payment_status": "partial",
+    "dates": {
+      "created_at": "...",
+      "updated_at": "...",
+      "quote_sent_at": "...",
+      "authorised_at": "...",
+      "rejected_at": null,
+      "service_completed_at": null,
+      "collected_at": null,
+      "despatched_at": null,
+      "ready_by_date": null
+    },
+    "portal_access_disabled": 0,
+    "portal_access_expires_at": null,
+    "ticket": {
+      "id": "uuid",
+      "subject": "iPhone 14 Pro - Screen Repair",
+      "status": "open",
+      "messages": [...],
+      "messages_count": 5
+    },
+    "company": {
+      "name": "Repair Shop Ltd",
+      "vat_number": "GB123456789",
+      "terms_conditions": "...",
+      "logo_url": "https://...",
+      "vat_rate_repair": 20,
+      "vat_rate_device_sale": 0,
+      "vat_rate_accessory": 20,
+      "vat_rate_device_purchase": 0,
+      "portal_access_days_after_collection": 14,
+      "deposits_enabled": 1
+    }
+  }
+}
+```
+
+---
+
+### PATCH /api/orders/:id
+
+Update order fields. **Note: Status is auto-calculated from device statuses - cannot be set manually.**
+
+**Request Body (all optional):**
+```json
+{
+  "location_id": "uuid",
+  "assigned_user_id": "uuid",
+  "intake_method": "walk_in|mail_in|courier|counter_sale|accessories_in_store",
+  "authorisation_type": "pre_authorised|phone|email|portal",
+  "authorisation_amount": 150.00,
+  "authorisation_notes": "string",
+  "tracking_number": "string",
+  "carrier": "Royal Mail|DPD|DHL|UPS|FedEx|Hermes|Yodel|Other",
+  "ready_by_date": "2024-01-20",
+  "portal_access_expires_at": "2024-02-01T23:59:59Z",
+  "portal_access_disabled": true
+}
+```
+
+---
+
+### GET /api/clients
+
+List clients with pagination and filtering.
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `page` | Int | Page number (default: 1) |
+| `limit` | Int | Items per page (default: 50, max: 100) |
+| `search` | String | Search email, name, phone, group name |
+| `group_id` | String | Filter by client group UUID |
+| `sort` | String | `created_at`, `updated_at`, `email`, `name`, `first_name`, `last_name` |
+| `order` | String | `asc` or `desc` (default: desc) |
+| `period` | String | `today`, `yesterday`, `this_week`, `this_month`, `last_month` |
+| `new` | String | `true` - clients whose first order is in period |
+| `returning` | String | `true` - clients with orders in period who had prior orders |
+| `had_orders_in_period` | String | `true` - clients with any order in period |
+| `blocked` | String | `true` - show only suppressed/bounced clients |
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "clients": [
+      {
+        "id": "uuid",
+        "email": "client@example.com",
+        "first_name": "John",
+        "last_name": "Doe",
+        "phone": "+44...",
+        "country_code": "GB",
+        "client_group_id": "uuid or null",
+        "client_group_name": "VIP Customers",
+        "groups": [
+          { "id": "uuid", "name": "VIP", "group_type": "manual" }
+        ],
+        "email_suppressed": false,
+        "email_suppressed_at": null,
+        "is_generated_email": false,
+        "marketing_consent": true,
+        "suppression_status": null,
+        "suppression_error": null,
+        "ticket_count": 3,
+        "order_count": 5,
+        "device_count": 8,
+        "total_spend": 450.00,
+        "average_spend": 90.00,
+        "last_contact_received": "...",
+        "last_contact_sent": "...",
+        "created_at": "..."
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 50,
+      "total": 234,
+      "totalPages": 5
+    }
+  }
+}
+```
+
+---
+
+### GET /api/clients/:id
+
+Get single client with full details.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "email": "client@example.com",
+    "first_name": "John",
+    "last_name": "Doe",
+    "name": "John Doe",
+    "phone": "+44...",
+    "notes": "VIP customer, prefers morning appointments",
+    "address_line_1": "123 Street",
+    "address_line_2": null,
+    "city": "London",
+    "county": "Greater London",
+    "postcode": "SW1A 1AA",
+    "country": "United Kingdom",
+    "country_code": "GB",
+    "social_facebook": "https://facebook.com/...",
+    "social_instagram": "https://instagram.com/...",
+    "social_twitter": "https://twitter.com/...",
+    "social_linkedin": null,
+    "social_tiktok": null,
+    "social_youtube": null,
+    "social_pinterest": null,
+    "social_whatsapp": "+44...",
+    "social_snapchat": null,
+    "social_threads": null,
+    "client_group_id": "uuid",
+    "client_group": {
+      "id": "uuid",
+      "name": "VIP Customers"
+    },
+    "groups": [
+      {
+        "id": "uuid",
+        "name": "VIP",
+        "group_type": "manual",
+        "location_id": null,
+        "added_at": "...",
+        "added_source": "manual"
+      }
+    ],
+    "email_suppressed": false,
+    "email_suppressed_at": null,
+    "marketing_consent": true,
+    "marketing_consent_at": "...",
+    "marketing_consent_source": "signup",
+    "suppression_status": null,
+    "suppression_error": null,
+    "created_at": "...",
+    "updated_at": "...",
+    "deleted_at": null,
+    "tickets": [
+      {
+        "id": "uuid",
+        "ticket_number": 12345,
+        "subject": "iPhone repair",
+        "status": "open",
+        "created_at": "..."
+      }
+    ],
+    "orders": [
+      {
+        "id": "uuid",
+        "order_number": 12345,
+        "status": "in_progress",
+        "total": 150.00,
+        "created_at": "..."
+      }
+    ],
+    "devices": [
+      {
+        "id": "uuid",
+        "order_id": "uuid",
+        "order_number": 12345,
+        "brand_name": "Apple",
+        "model_name": "iPhone 14 Pro",
+        "custom_brand": null,
+        "custom_model": null,
+        "serial_number": "ABCD1234",
+        "status": "repairing"
+      }
+    ],
+    "stats": {
+      "ticket_count": 3,
+      "order_count": 5,
+      "device_count": 8,
+      "total_spend": 450.00,
+      "average_spend": 90.00,
+      "spend_breakdown": {
+        "repair": { "count": 6, "total": 380.00, "average": 63.33 },
+        "buyback": { "count": 1, "total": -50.00, "average": -50.00 },
+        "accessory": { "count": 3, "total": 45.00, "average": 15.00 },
+        "device_sale": { "count": 1, "total": 75.00, "average": 75.00 }
+      },
+      "last_contact_received": "...",
+      "last_contact_sent": "...",
+      "avg_authorization_hours": 2.5,
+      "authorization_count": 4,
+      "avg_rejection_hours": null,
+      "rejection_count": 0,
+      "avg_collection_hours": 24.3,
+      "collection_count": 4
+    }
+  }
+}
+```
+
+---
+
+## Constants
+
+### Order Statuses (Auto-calculated from devices)
+
+```swift
+enum OrderStatus: String, Codable, CaseIterable {
+    case awaitingDevice = "awaiting_device"
+    case inProgress = "in_progress"
+    case serviceComplete = "service_complete"
+    case awaitingCollection = "awaiting_collection"
+    case collectedDespatched = "collected_despatched"
+
+    var label: String {
+        switch self {
+        case .awaitingDevice: return "Awaiting Device"
+        case .inProgress: return "In Progress"
+        case .serviceComplete: return "Service Complete"
+        case .awaitingCollection: return "Awaiting Collection/Despatch"
+        case .collectedDespatched: return "Collected/Despatched"
+        }
+    }
+}
+```
+
+**Important:** Order status is auto-calculated from device statuses. iOS should NOT set this directly.
+
+### Payment Statuses
+
+```swift
+enum PaymentStatus: String, Codable, CaseIterable {
+    case unpaid
+    case partial
+    case paid
+    case refunded
+}
+```
+
+### Intake Methods
+
+```swift
+enum IntakeMethod: String, Codable, CaseIterable {
+    case walkIn = "walk_in"
+    case mailIn = "mail_in"
+    case courier
+    case counterSale = "counter_sale"
+    case accessoriesInStore = "accessories_in_store"
+}
+```
+
+### Authorisation Types
+
+```swift
+enum AuthorisationType: String, Codable, CaseIterable {
+    case preAuthorised = "pre_authorised"
+    case phone
+    case email
+    case portal
+}
+```
+
+### Payment Methods
+
+```swift
+enum PaymentMethod: String, Codable, CaseIterable {
+    case cash
+    case card
+    case bankTransfer = "bank_transfer"
+    case paypal
+    case invoice
+    case other
+}
+```
+
+### Signature Types
+
+```swift
+enum SignatureType: String, Codable, CaseIterable {
+    case dropOff = "drop_off"
+    case collection
+    case authorization
+}
+```
+
+### Item Types
+
+```swift
+enum OrderItemType: String, Codable, CaseIterable {
+    case repair
+    case deviceSale = "device_sale"
+    case accessory
+    case devicePurchase = "device_purchase"
+}
+```
+
+### Carriers
+
+```swift
+enum Carrier: String, Codable, CaseIterable {
+    case royalMail = "Royal Mail"
+    case dpd = "DPD"
+    case dhl = "DHL"
+    case ups = "UPS"
+    case fedEx = "FedEx"
+    case hermes = "Hermes"
+    case yodel = "Yodel"
+    case other = "Other"
+}
+```
+
+---
+
+## Swift Models
+
+### Order.swift
+
+```swift
+struct Order: Codable, Identifiable {
+    let id: String
+    let ticketId: String
+    let orderNumber: Int
+    let companyId: String?
+
+    // Nested objects
+    let client: OrderClient?
+    let location: OrderLocation?
+    let assignedUser: AssignedUser?
+
+    // Order settings
+    let intakeMethod: IntakeMethod?
+    let status: OrderStatus
+    let storedStatus: OrderStatus?
+    let authorisationType: AuthorisationType?
+    let authorisationAmount: Double?
+    let authorisationNotes: String?
+    let trackingNumber: String?
+    let carrier: Carrier?
+    let termsConditionsSnapshot: String?
+
+    // Line items, payments, etc.
+    let items: [OrderItem]?
+    let payments: [OrderPayment]?
+    let signatures: [OrderSignature]?
+    let deviceSignatures: [DeviceSignature]?
+    let refunds: [OrderRefund]?
+    let devices: [OrderDeviceSummary]?
+
+    // Totals
+    let totals: OrderTotals?
+    let paymentStatus: PaymentStatus?
+
+    // Dates
+    let dates: OrderDates?
+
+    // Portal access
+    let portalAccessDisabled: Int?
+    let portalAccessExpiresAt: String?
+
+    // Related data
+    let ticket: OrderTicket?
+    let company: OrderCompany?
+
+    // List view properties (denormalized)
+    let orderTotal: Double?
+    let amountPaid: Double?
+    let balanceDue: Double?
+    let createdAt: String?
+    let updatedAt: String?
+    let notes: [OrderNote]?
+}
+```
+
+### Client.swift
+
+```swift
+struct Client: Codable, Identifiable {
+    let id: String
+    let email: String
+    let firstName: String?
+    let lastName: String?
+    let name: String?
+    let phone: String?
+    let notes: String?
+    let countryCode: String?
+
+    // Address
+    let addressLine1: String?
+    let addressLine2: String?
+    let city: String?
+    let county: String?
+    let postcode: String?
+    let country: String?
+
+    // Social media
+    let socialFacebook: String?
+    let socialInstagram: String?
+    let socialTwitter: String?
+    let socialLinkedin: String?
+    let socialTiktok: String?
+    let socialYoutube: String?
+    let socialPinterest: String?
+    let socialWhatsapp: String?
+    let socialSnapchat: String?
+    let socialThreads: String?
+
+    // Groups
+    let clientGroupId: String?
+    let clientGroup: ClientGroup?
+    let groups: [ClientGroupMembership]?
+
+    // Email status
+    let emailSuppressed: Bool?
+    let emailSuppressedAt: String?
+    let isGeneratedEmail: Bool?
+    let marketingConsent: Bool?
+    let marketingConsentAt: String?
+    let marketingConsentSource: String?
+    let suppressionStatus: String?
+    let suppressionError: String?
+
+    // Timestamps
+    let createdAt: String?
+    let updatedAt: String?
+    let deletedAt: String?
+
+    // Detail view arrays
+    let tickets: [ClientTicket]?
+    let orders: [ClientOrder]?
+    let devices: [ClientDevice]?
+
+    // Stats
+    let stats: ClientStats?
+
+    // List view stats (denormalized)
+    let ticketCount: Int?
+    let orderCount: Int?
+    let deviceCount: Int?
+    let totalSpend: Double?
+    let averageSpend: Double?
+    let lastContactReceived: String?
+    let lastContactSent: String?
+}
+```
+
+---
 
 ## Files to Create
 
 | File | Purpose |
 |------|---------|
-| `Features/Devices/DeviceListViewModel.swift` | Device list logic |
-| `Features/Devices/DeviceDetailViewModel.swift` | Device detail and actions |
-| `Features/Devices/Components/DeviceListRow.swift` | Device row component |
-| `Features/Devices/Components/DeviceHeaderCard.swift` | Device header info |
-| `Features/Devices/Components/DeviceActionsSheet.swift` | Status actions |
-| `Features/Orders/OrderListViewModel.swift` | Order list logic |
-| `Features/Orders/OrderDetailViewModel.swift` | Order detail logic |
-| `Features/Orders/Components/OrderListRow.swift` | Order row component |
-| `Features/Orders/Components/OrderDevicesSection.swift` | Devices in order |
+| `Core/Models/Order.swift` | Order model with all nested types |
+| `Core/Models/OrderStatus.swift` | Order status enum with labels |
+| `Core/Models/Client.swift` | Client model with nested types |
+| `Core/Models/OrderEnums.swift` | Shared enums (IntakeMethod, PaymentStatus, etc.) |
+| `Core/Services/OrderService.swift` | Order API service |
+| `Core/Services/ClientService.swift` | Client API service |
+| `Features/Staff/Orders/OrderListView.swift` | Order list UI |
+| `Features/Staff/Orders/OrderListViewModel.swift` | Order list logic |
+| `Features/Staff/Orders/OrderDetailView.swift` | Order detail UI |
+| `Features/Staff/Orders/OrderDetailViewModel.swift` | Order detail logic |
+| `Features/Staff/Clients/ClientListView.swift` | Client list UI |
+| `Features/Staff/Clients/ClientListViewModel.swift` | Client list logic |
+| `Features/Staff/Clients/ClientDetailView.swift` | Client detail UI |
+| `Features/Staff/Clients/ClientDetailViewModel.swift` | Client detail logic |
 
 ---
 
-## Implementation Details
+## Testing
 
-### DeviceListViewModel.swift
+**Query orders with Wrangler:**
+```bash
+npx wrangler d1 execute repairminder_database --remote --json --command "SELECT id, order_number, status FROM orders WHERE company_id = '4b63c1e6ade1885e73171e10221cac53' LIMIT 5"
+```
 
-```swift
-// Features/Devices/DeviceListViewModel.swift
+**Test with curl:**
+```bash
+# List orders
+curl "https://api.repairminder.co.uk/api/orders?page=1&limit=20" \
+  -H "Authorization: Bearer {token}" | jq .
 
-import Foundation
-import os.log
+# Get order by ID
+curl "https://api.repairminder.co.uk/api/orders/{order_id}" \
+  -H "Authorization: Bearer {token}" | jq .
 
-@MainActor
-@Observable
-final class DeviceListViewModel {
-    private(set) var devices: [Device] = []
-    private(set) var isLoading = false
-    private(set) var isLoadingMore = false
-    private(set) var hasMorePages = true
-    var error: String?
+# Get order by number
+curl "https://api.repairminder.co.uk/api/orders/12345" \
+  -H "Authorization: Bearer {token}" | jq .
 
-    var selectedStatus: DeviceStatus?
-    var searchText = ""
-    var filterToMyQueue = false
+# Update order
+curl -X PATCH "https://api.repairminder.co.uk/api/orders/{order_id}" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{"assigned_user_id": "uuid"}' | jq .
 
-    private var currentPage = 1
-    private let pageSize = 20
-    private let logger = Logger(subsystem: "com.mendmyi.Repair-Minder", category: "Devices")
+# List clients
+curl "https://api.repairminder.co.uk/api/clients?page=1&limit=50&search=john" \
+  -H "Authorization: Bearer {token}" | jq .
 
-    // MARK: - Load Devices
-
-    func loadDevices(refresh: Bool = false) async {
-        if refresh {
-            currentPage = 1
-            hasMorePages = true
-        }
-
-        guard !isLoading else { return }
-        isLoading = true
-        error = nil
-
-        do {
-            let endpoint: APIEndpoint
-            if filterToMyQueue {
-                endpoint = .myQueue(page: currentPage, limit: pageSize)
-            } else {
-                endpoint = .devices(
-                    page: currentPage,
-                    limit: pageSize,
-                    status: selectedStatus?.rawValue
-                )
-            }
-
-            let newDevices = try await APIClient.shared.request(
-                endpoint,
-                responseType: [Device].self
-            )
-
-            if refresh {
-                devices = newDevices
-            } else {
-                devices.append(contentsOf: newDevices)
-            }
-
-            hasMorePages = newDevices.count == pageSize
-            currentPage += 1
-
-            logger.debug("Loaded \(newDevices.count) devices, total: \(self.devices.count)")
-        } catch {
-            self.error = "Failed to load devices"
-            logger.error("Load error: \(error.localizedDescription)")
-        }
-
-        isLoading = false
-    }
-
-    func loadMore() async {
-        guard !isLoadingMore && hasMorePages else { return }
-        isLoadingMore = true
-        await loadDevices()
-        isLoadingMore = false
-    }
-
-    func refresh() async {
-        await loadDevices(refresh: true)
-    }
-
-    func applyStatusFilter(_ status: DeviceStatus?) async {
-        selectedStatus = status
-        await loadDevices(refresh: true)
-    }
-
-    func search(_ text: String) async {
-        searchText = text
-        // For now, filter locally
-        // TODO: Implement server-side search
-    }
-}
+# Get client detail
+curl "https://api.repairminder.co.uk/api/clients/{client_id}" \
+  -H "Authorization: Bearer {token}" | jq .
 ```
 
 ---
 
-### DeviceListView.swift
+## Verification Checklist
 
-```swift
-// Features/Devices/DeviceListView.swift
-
-import SwiftUI
-
-struct DeviceListView: View {
-    var filterToMyQueue: Bool = false
-
-    @State private var viewModel = DeviceListViewModel()
-    @State private var showStatusFilter = false
-
-    var body: some View {
-        NavigationStack {
-            List {
-                // Status Filter Chips
-                if !filterToMyQueue {
-                    StatusFilterChips(
-                        selectedStatus: viewModel.selectedStatus,
-                        onSelect: { status in
-                            Task {
-                                await viewModel.applyStatusFilter(status)
-                            }
-                        }
-                    )
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-                }
-
-                // Device List
-                ForEach(viewModel.devices) { device in
-                    NavigationLink {
-                        DeviceDetailView(
-                            orderId: device.orderId,
-                            deviceId: device.id
-                        )
-                    } label: {
-                        DeviceListRow(device: device)
-                    }
-                    .onAppear {
-                        // Load more when reaching end
-                        if device == viewModel.devices.last {
-                            Task { await viewModel.loadMore() }
-                        }
-                    }
-                }
-
-                // Loading indicator
-                if viewModel.isLoadingMore {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .listRowBackground(Color.clear)
-                }
-            }
-            .listStyle(.plain)
-            .navigationTitle(filterToMyQueue ? "My Queue" : "Devices")
-            .searchable(text: $viewModel.searchText, prompt: "Search devices...")
-            .refreshable {
-                await viewModel.refresh()
-            }
-            .overlay {
-                if viewModel.isLoading && viewModel.devices.isEmpty {
-                    ProgressView()
-                } else if viewModel.devices.isEmpty {
-                    ContentUnavailableView(
-                        "No Devices",
-                        systemImage: "iphone.slash",
-                        description: Text(filterToMyQueue ? "No devices assigned to you" : "No devices found")
-                    )
-                }
-            }
-            .task {
-                viewModel.filterToMyQueue = filterToMyQueue
-                await viewModel.loadDevices(refresh: true)
-            }
-        }
-    }
-}
-
-// MARK: - Status Filter Chips
-
-struct StatusFilterChips: View {
-    let selectedStatus: DeviceStatus?
-    let onSelect: (DeviceStatus?) -> Void
-
-    private let statuses: [DeviceStatus] = [
-        .diagnosing, .awaitingAuthorisation, .repairing,
-        .repairedReady, .awaitingCollection
-    ]
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                FilterChip(
-                    title: "All",
-                    isSelected: selectedStatus == nil,
-                    action: { onSelect(nil) }
-                )
-
-                ForEach(statuses, id: \.self) { status in
-                    FilterChip(
-                        title: status.displayName,
-                        isSelected: selectedStatus == status,
-                        action: { onSelect(status) }
-                    )
-                }
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-        }
-    }
-}
-
-struct FilterChip: View {
-    let title: String
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.caption)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(isSelected ? Color.accentColor : Color(.systemGray5))
-                .foregroundStyle(isSelected ? .white : .primary)
-                .cornerRadius(16)
-        }
-    }
-}
-```
-
----
-
-### DeviceListRow.swift
-
-```swift
-// Features/Devices/Components/DeviceListRow.swift
-
-import SwiftUI
-
-struct DeviceListRow: View {
-    let device: Device
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(device.displayName)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-
-                Spacer()
-
-                DeviceStatusBadge(status: device.status)
-            }
-
-            HStack {
-                if let orderNumber = device.orderNumber {
-                    Text("#\(orderNumber)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                if let client = device.client {
-                    Text(client.name ?? client.email ?? "")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                if let engineer = device.assignedEngineer {
-                    Label(engineer.name, systemImage: "person.circle")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .padding(.vertical, 4)
-    }
-}
-```
-
----
-
-### DeviceDetailViewModel.swift
-
-```swift
-// Features/Devices/DeviceDetailViewModel.swift
-
-import Foundation
-import os.log
-
-@MainActor
-@Observable
-final class DeviceDetailViewModel {
-    let orderId: String
-    let deviceId: String
-
-    private(set) var device: Device?
-    private(set) var isLoading = false
-    private(set) var isExecutingAction = false
-    var error: String?
-    var successMessage: String?
-
-    private let logger = Logger(subsystem: "com.mendmyi.Repair-Minder", category: "DeviceDetail")
-
-    init(orderId: String, deviceId: String) {
-        self.orderId = orderId
-        self.deviceId = deviceId
-    }
-
-    // MARK: - Load
-
-    func loadDevice() async {
-        isLoading = true
-        error = nil
-
-        do {
-            device = try await APIClient.shared.request(
-                .device(orderId: orderId, deviceId: deviceId),
-                responseType: Device.self
-            )
-            logger.debug("Device loaded: \(self.device?.displayName ?? "unknown")")
-        } catch {
-            self.error = "Failed to load device"
-            logger.error("Load error: \(error.localizedDescription)")
-        }
-
-        isLoading = false
-    }
-
-    // MARK: - Actions
-
-    func executeAction(_ action: String, notes: String? = nil) async {
-        isExecutingAction = true
-        error = nil
-        successMessage = nil
-
-        do {
-            try await APIClient.shared.requestVoid(
-                .deviceAction(deviceId: deviceId, action: action, notes: notes)
-            )
-            successMessage = "Action completed"
-            await loadDevice() // Reload to get new status
-        } catch {
-            self.error = "Failed to execute action"
-            logger.error("Action error: \(error.localizedDescription)")
-        }
-
-        isExecutingAction = false
-    }
-
-    func assignEngineer(_ engineerId: String) async {
-        isExecutingAction = true
-        error = nil
-
-        do {
-            try await APIClient.shared.requestVoid(
-                .assignEngineer(deviceId: deviceId, engineerId: engineerId)
-            )
-            successMessage = "Engineer assigned"
-            await loadDevice()
-        } catch {
-            self.error = "Failed to assign engineer"
-        }
-
-        isExecutingAction = false
-    }
-
-    // MARK: - Available Actions
-
-    var availableActions: [DeviceAction] {
-        guard let device = device else { return [] }
-
-        // Based on current status, return available actions
-        switch device.status {
-        case .deviceReceived:
-            return [.startDiagnosis]
-        case .diagnosing:
-            return [.completeDiagnosis]
-        case .readyToQuote:
-            return [.sendQuote]
-        case .awaitingAuthorisation:
-            return [] // Customer action
-        case .authorisedSourceParts, .authorisedAwaitingParts:
-            return [.startRepair]
-        case .readyToRepair:
-            return [.startRepair]
-        case .repairing:
-            return [.completeRepair]
-        case .repairedQc:
-            return [.passQc, .failQc]
-        case .repairedReady, .rejectionReady:
-            return [.markReady]
-        default:
-            return []
-        }
-    }
-}
-
-// MARK: - Device Actions
-
-enum DeviceAction: String, CaseIterable {
-    case startDiagnosis = "start_diagnosis"
-    case completeDiagnosis = "complete_diagnosis"
-    case sendQuote = "send_quote"
-    case startRepair = "start_repair"
-    case completeRepair = "complete_repair"
-    case passQc = "pass_qc"
-    case failQc = "fail_qc"
-    case markReady = "mark_ready"
-    case collect = "collect"
-    case despatch = "despatch"
-
-    var displayName: String {
-        switch self {
-        case .startDiagnosis: return "Start Diagnosis"
-        case .completeDiagnosis: return "Complete Diagnosis"
-        case .sendQuote: return "Send Quote"
-        case .startRepair: return "Start Repair"
-        case .completeRepair: return "Complete Repair"
-        case .passQc: return "Pass QC"
-        case .failQc: return "Fail QC"
-        case .markReady: return "Mark Ready"
-        case .collect: return "Mark Collected"
-        case .despatch: return "Mark Despatched"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .startDiagnosis: return "magnifyingglass"
-        case .completeDiagnosis: return "checkmark.circle"
-        case .sendQuote: return "paperplane"
-        case .startRepair: return "wrench.and.screwdriver"
-        case .completeRepair: return "checkmark.circle"
-        case .passQc: return "checkmark.seal"
-        case .failQc: return "xmark.seal"
-        case .markReady: return "bell"
-        case .collect: return "hand.raised"
-        case .despatch: return "shippingbox"
-        }
-    }
-}
-```
-
----
-
-### DeviceDetailView.swift
-
-```swift
-// Features/Devices/DeviceDetailView.swift
-
-import SwiftUI
-
-struct DeviceDetailView: View {
-    let orderId: String
-    let deviceId: String
-
-    @State private var viewModel: DeviceDetailViewModel
-    @State private var showActionsSheet = false
-
-    init(orderId: String, deviceId: String) {
-        self.orderId = orderId
-        self.deviceId = deviceId
-        _viewModel = State(initialValue: DeviceDetailViewModel(orderId: orderId, deviceId: deviceId))
-    }
-
-    var body: some View {
-        ScrollView {
-            if let device = viewModel.device {
-                VStack(spacing: 16) {
-                    DeviceHeaderCard(device: device)
-
-                    DeviceInfoSection(device: device)
-
-                    if let notes = device.customerReportedIssues, !notes.isEmpty {
-                        NotesCard(title: "Customer Reported Issues", notes: notes)
-                    }
-
-                    if let notes = device.diagnosisNotes, !notes.isEmpty {
-                        NotesCard(title: "Diagnosis Notes", notes: notes)
-                    }
-
-                    if let notes = device.repairNotes, !notes.isEmpty {
-                        NotesCard(title: "Repair Notes", notes: notes)
-                    }
-
-                    // Actions
-                    if !viewModel.availableActions.isEmpty {
-                        ActionsSection(
-                            actions: viewModel.availableActions,
-                            isExecuting: viewModel.isExecutingAction,
-                            onAction: { action in
-                                Task {
-                                    await viewModel.executeAction(action.rawValue)
-                                }
-                            }
-                        )
-                    }
-                }
-                .padding()
-            }
-        }
-        .navigationTitle(viewModel.device?.displayName ?? "Device")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    Button {
-                        // Navigate to order
-                    } label: {
-                        Label("View Order", systemImage: "doc.text")
-                    }
-
-                    Button {
-                        // Assign engineer
-                    } label: {
-                        Label("Assign Engineer", systemImage: "person.badge.plus")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-            }
-        }
-        .overlay {
-            if viewModel.isLoading && viewModel.device == nil {
-                ProgressView()
-            }
-        }
-        .alert("Error", isPresented: .constant(viewModel.error != nil)) {
-            Button("OK") { viewModel.error = nil }
-        } message: {
-            Text(viewModel.error ?? "")
-        }
-        .task {
-            await viewModel.loadDevice()
-        }
-    }
-}
-
-// MARK: - Device Header Card
-
-struct DeviceHeaderCard: View {
-    let device: Device
-
-    var body: some View {
-        VStack(spacing: 12) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(device.displayName)
-                        .font(.title2)
-                        .fontWeight(.bold)
-
-                    if let serial = device.serialNumber {
-                        Text("S/N: \(serial)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if let imei = device.imei {
-                        Text("IMEI: \(imei)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Spacer()
-
-                DeviceStatusBadge(status: device.status)
-            }
-
-            Divider()
-
-            HStack {
-                if let engineer = device.assignedEngineer {
-                    Label(engineer.name, systemImage: "person.circle")
-                        .font(.caption)
-                } else {
-                    Label("Unassigned", systemImage: "person.circle")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                if let workflow = device.workflowType {
-                    Text(workflow.rawValue.capitalized)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
-    }
-}
-
-// MARK: - Device Info Section
-
-struct DeviceInfoSection: View {
-    let device: Device
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Device Info")
-                .font(.headline)
-
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 12) {
-                InfoItem(label: "Colour", value: device.colour)
-                InfoItem(label: "Storage", value: device.storageCapacity)
-                InfoItem(label: "Condition", value: device.conditionGrade)
-                InfoItem(label: "Find My", value: device.findMyStatus)
-            }
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-    }
-}
-
-struct InfoItem: View {
-    let label: String
-    let value: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text(value ?? "—")
-                .font(.subheadline)
-        }
-    }
-}
-
-// MARK: - Notes Card
-
-struct NotesCard: View {
-    let title: String
-    let notes: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-            Text(notes)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-    }
-}
-
-// MARK: - Actions Section
-
-struct ActionsSection: View {
-    let actions: [DeviceAction]
-    let isExecuting: Bool
-    let onAction: (DeviceAction) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Actions")
-                .font(.headline)
-
-            ForEach(actions, id: \.self) { action in
-                Button {
-                    onAction(action)
-                } label: {
-                    HStack {
-                        Image(systemName: action.icon)
-                        Text(action.displayName)
-                        Spacer()
-                        if isExecuting {
-                            ProgressView()
-                        }
-                    }
-                    .padding()
-                    .background(Color.accentColor.opacity(0.1))
-                    .cornerRadius(8)
-                }
-                .disabled(isExecuting)
-            }
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-    }
-}
-```
-
----
-
-### OrderListViewModel.swift
-
-```swift
-// Features/Orders/OrderListViewModel.swift
-
-import Foundation
-
-@MainActor
-@Observable
-final class OrderListViewModel {
-    private(set) var orders: [Order] = []
-    private(set) var isLoading = false
-    private(set) var isLoadingMore = false
-    private(set) var hasMorePages = true
-    var error: String?
-
-    var selectedStatus: OrderStatus?
-    var searchText = ""
-
-    private var currentPage = 1
-    private let pageSize = 20
-
-    func loadOrders(refresh: Bool = false) async {
-        if refresh {
-            currentPage = 1
-            hasMorePages = true
-        }
-
-        guard !isLoading else { return }
-        isLoading = true
-        error = nil
-
-        do {
-            let newOrders = try await APIClient.shared.request(
-                .orders(
-                    page: currentPage,
-                    limit: pageSize,
-                    status: selectedStatus?.rawValue,
-                    search: searchText.isEmpty ? nil : searchText
-                ),
-                responseType: [Order].self
-            )
-
-            if refresh {
-                orders = newOrders
-            } else {
-                orders.append(contentsOf: newOrders)
-            }
-
-            hasMorePages = newOrders.count == pageSize
-            currentPage += 1
-        } catch {
-            self.error = "Failed to load orders"
-        }
-
-        isLoading = false
-    }
-
-    func loadMore() async {
-        guard !isLoadingMore && hasMorePages else { return }
-        isLoadingMore = true
-        await loadOrders()
-        isLoadingMore = false
-    }
-
-    func refresh() async {
-        await loadOrders(refresh: true)
-    }
-
-    func applyStatusFilter(_ status: OrderStatus?) async {
-        selectedStatus = status
-        await loadOrders(refresh: true)
-    }
-}
-```
-
----
-
-### OrderListView.swift
-
-```swift
-// Features/Orders/OrderListView.swift
-
-import SwiftUI
-
-struct OrderListView: View {
-    @State private var viewModel = OrderListViewModel()
-
-    var body: some View {
-        NavigationStack {
-            List {
-                // Status Filter
-                OrderStatusFilter(
-                    selectedStatus: viewModel.selectedStatus,
-                    onSelect: { status in
-                        Task {
-                            await viewModel.applyStatusFilter(status)
-                        }
-                    }
-                )
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
-
-                // Orders
-                ForEach(viewModel.orders) { order in
-                    NavigationLink {
-                        OrderDetailView(orderId: order.id)
-                    } label: {
-                        OrderListRow(order: order)
-                    }
-                    .onAppear {
-                        if order == viewModel.orders.last {
-                            Task { await viewModel.loadMore() }
-                        }
-                    }
-                }
-
-                if viewModel.isLoadingMore {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .listStyle(.plain)
-            .navigationTitle("Orders")
-            .searchable(text: $viewModel.searchText, prompt: "Search orders...")
-            .onSubmit(of: .search) {
-                Task { await viewModel.loadOrders(refresh: true) }
-            }
-            .refreshable {
-                await viewModel.refresh()
-            }
-            .overlay {
-                if viewModel.isLoading && viewModel.orders.isEmpty {
-                    ProgressView()
-                }
-            }
-            .task {
-                await viewModel.loadOrders(refresh: true)
-            }
-        }
-    }
-}
-
-struct OrderStatusFilter: View {
-    let selectedStatus: OrderStatus?
-    let onSelect: (OrderStatus?) -> Void
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                FilterChip(title: "All", isSelected: selectedStatus == nil) {
-                    onSelect(nil)
-                }
-
-                ForEach(OrderStatus.allCases.filter { $0 != .unknown }, id: \.self) { status in
-                    FilterChip(title: status.displayName, isSelected: selectedStatus == status) {
-                        onSelect(status)
-                    }
-                }
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-        }
-    }
-}
-```
-
----
-
-### OrderListRow.swift
-
-```swift
-// Features/Orders/Components/OrderListRow.swift
-
-import SwiftUI
-
-struct OrderListRow: View {
-    let order: Order
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(order.displayRef)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-
-                Spacer()
-
-                OrderStatusBadge(status: order.status)
-            }
-
-            HStack {
-                Text(order.client.fullName)
-                    .font(.subheadline)
-
-                Spacer()
-
-                if let total = order.orderTotal {
-                    Text(formatCurrency(total))
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                }
-            }
-
-            HStack {
-                if let deviceCount = order.deviceCount {
-                    Label("\(deviceCount) device\(deviceCount == 1 ? "" : "s")", systemImage: "iphone")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Text(order.createdAt, style: .date)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.vertical, 4)
-    }
-
-    private func formatCurrency(_ value: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "GBP"
-        return formatter.string(from: NSNumber(value: value)) ?? "£0.00"
-    }
-}
-
-struct OrderStatusBadge: View {
-    let status: OrderStatus
-
-    var body: some View {
-        Text(status.displayName)
-            .font(.caption2)
-            .fontWeight(.medium)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(backgroundColor)
-            .foregroundStyle(foregroundColor)
-            .cornerRadius(4)
-    }
-
-    private var backgroundColor: Color {
-        switch status {
-        case .awaitingDevice: return .orange.opacity(0.2)
-        case .inProgress: return .blue.opacity(0.2)
-        case .serviceComplete: return .purple.opacity(0.2)
-        case .awaitingCollection: return .green.opacity(0.2)
-        case .collectedDespatched: return .gray.opacity(0.2)
-        case .unknown: return .gray.opacity(0.2)
-        }
-    }
-
-    private var foregroundColor: Color {
-        switch status {
-        case .awaitingDevice: return .orange
-        case .inProgress: return .blue
-        case .serviceComplete: return .purple
-        case .awaitingCollection: return .green
-        case .collectedDespatched: return .gray
-        case .unknown: return .gray
-        }
-    }
-}
-```
-
----
-
-### OrderDetailView.swift
-
-```swift
-// Features/Orders/OrderDetailView.swift
-
-import SwiftUI
-
-struct OrderDetailView: View {
-    let orderId: String
-    @State private var viewModel: OrderDetailViewModel
-
-    init(orderId: String) {
-        self.orderId = orderId
-        _viewModel = State(initialValue: OrderDetailViewModel(orderId: orderId))
-    }
-
-    var body: some View {
-        ScrollView {
-            if let order = viewModel.order {
-                VStack(spacing: 16) {
-                    // Header
-                    OrderHeaderCard(order: order)
-
-                    // Client Info
-                    ClientInfoCard(client: order.client)
-
-                    // Devices
-                    if let devices = order.devices, !devices.isEmpty {
-                        OrderDevicesSection(devices: devices, orderId: orderId)
-                    }
-
-                    // Totals
-                    if let totals = order.totals {
-                        OrderTotalsCard(totals: totals, paymentStatus: order.paymentStatus)
-                    }
-
-                    // Notes
-                    if let notes = order.notes, !notes.isEmpty {
-                        OrderNotesSection(notes: notes)
-                    }
-                }
-                .padding()
-            }
-        }
-        .navigationTitle(viewModel.order?.displayRef ?? "Order")
-        .navigationBarTitleDisplayMode(.inline)
-        .overlay {
-            if viewModel.isLoading && viewModel.order == nil {
-                ProgressView()
-            }
-        }
-        .refreshable {
-            await viewModel.loadOrder()
-        }
-        .task {
-            await viewModel.loadOrder()
-        }
-    }
-}
-
-// MARK: - Order Header Card
-
-struct OrderHeaderCard: View {
-    let order: Order
-
-    var body: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Text(order.displayRef)
-                    .font(.title2)
-                    .fontWeight(.bold)
-
-                Spacer()
-
-                OrderStatusBadge(status: order.status)
-            }
-
-            HStack {
-                if let location = order.location {
-                    Label(location.name, systemImage: "mappin")
-                        .font(.caption)
-                }
-
-                Spacer()
-
-                Text(order.createdAt, style: .date)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-    }
-}
-
-// MARK: - Client Info Card
-
-struct ClientInfoCard: View {
-    let client: OrderClient
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Client")
-                .font(.headline)
-
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(client.fullName)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-
-                    if let email = client.email {
-                        Text(email)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if let phone = client.phone {
-                        Text(phone)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Spacer()
-
-                // Contact actions
-                HStack(spacing: 12) {
-                    if let phone = client.phone {
-                        Button {
-                            if let url = URL(string: "tel:\(phone)") {
-                                UIApplication.shared.open(url)
-                            }
-                        } label: {
-                            Image(systemName: "phone.circle.fill")
-                                .font(.title2)
-                        }
-                    }
-
-                    if let email = client.email {
-                        Button {
-                            if let url = URL(string: "mailto:\(email)") {
-                                UIApplication.shared.open(url)
-                            }
-                        } label: {
-                            Image(systemName: "envelope.circle.fill")
-                                .font(.title2)
-                        }
-                    }
-                }
-            }
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-    }
-}
-
-// MARK: - Order Devices Section
-
-struct OrderDevicesSection: View {
-    let devices: [OrderDevice]
-    let orderId: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Devices")
-                .font(.headline)
-
-            ForEach(devices) { device in
-                NavigationLink {
-                    DeviceDetailView(orderId: orderId, deviceId: device.id)
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(device.displayName ?? "Unknown Device")
-                                .font(.subheadline)
-                        }
-
-                        Spacer()
-
-                        if let status = device.status {
-                            DeviceStatusBadge(status: status)
-                        }
-
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 8)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-    }
-}
-
-// MARK: - Order Totals Card
-
-struct OrderTotalsCard: View {
-    let totals: OrderTotals
-    let paymentStatus: PaymentStatus?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Payment")
-                    .font(.headline)
-
-                Spacer()
-
-                if let status = paymentStatus {
-                    PaymentStatusBadge(status: status)
-                }
-            }
-
-            VStack(spacing: 8) {
-                TotalRow(label: "Subtotal", value: totals.subtotal)
-                TotalRow(label: "VAT", value: totals.vatTotal)
-                Divider()
-                TotalRow(label: "Total", value: totals.grandTotal, bold: true)
-
-                if let paid = totals.amountPaid, paid > 0 {
-                    TotalRow(label: "Paid", value: paid, color: .green)
-                }
-
-                if let due = totals.balanceDue, due > 0 {
-                    TotalRow(label: "Balance Due", value: due, bold: true, color: .orange)
-                }
-            }
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-    }
-}
-
-struct TotalRow: View {
-    let label: String
-    let value: Double
-    var bold: Bool = false
-    var color: Color = .primary
-
-    var body: some View {
-        HStack {
-            Text(label)
-                .font(bold ? .subheadline.bold() : .subheadline)
-            Spacer()
-            Text(formatCurrency(value))
-                .font(bold ? .subheadline.bold() : .subheadline)
-                .foregroundStyle(color)
-        }
-    }
-
-    private func formatCurrency(_ value: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "GBP"
-        return formatter.string(from: NSNumber(value: value)) ?? "£0.00"
-    }
-}
-
-struct PaymentStatusBadge: View {
-    let status: PaymentStatus
-
-    var body: some View {
-        Text(status.rawValue.capitalized)
-            .font(.caption2)
-            .fontWeight(.medium)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(backgroundColor)
-            .foregroundStyle(foregroundColor)
-            .cornerRadius(4)
-    }
-
-    private var backgroundColor: Color {
-        switch status {
-        case .unpaid: return .red.opacity(0.2)
-        case .partial: return .orange.opacity(0.2)
-        case .paid: return .green.opacity(0.2)
-        case .unknown: return .gray.opacity(0.2)
-        }
-    }
-
-    private var foregroundColor: Color {
-        switch status {
-        case .unpaid: return .red
-        case .partial: return .orange
-        case .paid: return .green
-        case .unknown: return .gray
-        }
-    }
-}
-```
-
----
-
-### OrderDetailViewModel.swift
-
-```swift
-// Features/Orders/OrderDetailViewModel.swift
-
-import Foundation
-
-@MainActor
-@Observable
-final class OrderDetailViewModel {
-    let orderId: String
-
-    private(set) var order: Order?
-    private(set) var isLoading = false
-    var error: String?
-
-    init(orderId: String) {
-        self.orderId = orderId
-    }
-
-    func loadOrder() async {
-        isLoading = true
-        error = nil
-
-        do {
-            order = try await APIClient.shared.request(
-                .order(id: orderId),
-                responseType: Order.self
-            )
-        } catch {
-            self.error = "Failed to load order"
-        }
-
-        isLoading = false
-    }
-}
-```
-
----
-
-## Database Changes
-
-None (iOS only)
-
-## Test Cases
-
-| Test | Steps | Expected |
-|------|-------|----------|
-| Device list loads | Navigate to Devices tab | List displays |
-| Device pagination | Scroll to bottom | More devices load |
-| Device status filter | Tap status chip | List filters |
-| Device detail loads | Tap device | Detail view shows |
-| Device action works | Tap action button | Status updates |
-| Order list loads | Navigate to Orders tab | List displays |
-| Order pagination | Scroll to bottom | More orders load |
-| Order search | Enter search term | Results filter |
-| Order detail loads | Tap order | Detail view shows |
-| Order devices navigate | Tap device in order | Device detail opens |
-
-## Acceptance Checklist
-
-- [ ] Device list loads with pagination
-- [ ] Device status filter works
-- [ ] Device search works
-- [ ] Device detail shows all info
-- [ ] Device actions execute correctly
-- [ ] All 18 device statuses display correctly
 - [ ] Order list loads with pagination
-- [ ] Order status filter works
-- [ ] Order search works
-- [ ] Order detail shows client, devices, totals
-- [ ] Navigation between orders and devices works
-- [ ] No decode errors in console
-
-## Deployment
-
-1. Build and run
-2. Navigate to Devices tab, verify list loads
-3. Test status filter
-4. Tap device, verify detail loads
-5. Test action buttons
-6. Navigate to Orders tab, verify list loads
-7. Tap order, verify detail with devices
-8. Navigate from order device to device detail
-
-## Handoff Notes
-
-- DeviceStatusBadge from [See: Stage 04] is reused
-- Device actions based on status from `device-workflows.js`
-- Order detail includes nested devices array
-- My Queue filter available via `filterToMyQueue` parameter
-- [See: Stage 06] for ticket navigation from orders
+- [ ] Order list filters work (status, payment_status, location, assigned_user)
+- [ ] Order list search works (order number, client name/email)
+- [ ] Order detail shows all sections (client, devices, payments, signatures, totals)
+- [ ] Order totals calculate correctly (subtotal, VAT, grand_total, balance_due)
+- [ ] Order dates display correctly (quote_sent_at, authorised_at, etc.)
+- [ ] Order update works for allowed fields
+- [ ] Client list loads with pagination
+- [ ] Client list search works
+- [ ] Client detail shows orders, tickets, devices
+- [ ] Client stats display correctly (spend breakdown, timing metrics)
+- [ ] No decode errors for any response

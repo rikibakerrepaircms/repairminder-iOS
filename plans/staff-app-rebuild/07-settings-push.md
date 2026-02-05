@@ -2,822 +2,508 @@
 
 ## Objective
 
-Implement settings screen with push notification preferences, appearance settings, and comprehensive notification handling with deep linking.
+Implement settings screen and push notification registration/preferences for staff users.
 
-## Dependencies
+---
 
-- **Requires**: Stage 03 complete (PushNotificationManager)
-- **Backend Reference**: `[Ref: /Volumes/Riki Repos/repairminder/worker/device_token_handlers.js]`
+## ⚠️ Pre-Implementation Verification
 
-## Complexity
+**Before writing any code, verify the following against the backend source files:**
 
-**Medium** - Settings UI, preferences API, deep linking
+1. **Device token endpoints** - Read `/Volumes/Riki Repos/repairminder/worker/device_token_handlers.js` and verify:
+   - Register token request/response shape
+   - Required fields (deviceToken, platform, appType)
+   - Optional metadata fields
 
-## Files to Modify
+2. **Push preferences** - Verify preference field names match the backend:
+   - All toggle keys (orderStatusChanged, deviceStatusChanged, etc.)
+   - Master toggle field name (notificationsEnabled)
 
-| File | Changes |
+3. **Push triggers** - Read `/Volumes/Riki Repos/repairminder/worker/src/order-push-triggers.js` to understand:
+   - What events trigger notifications
+   - Payload structure for deep linking
+
+```bash
+# Quick verification commands
+grep -n "registerDeviceToken\|getPreferences" /Volumes/Riki\ Repos/repairminder/worker/device_token_handlers.js
+grep -n "triggerOrderStatusPush\|triggerDeviceStatusPush" /Volumes/Riki\ Repos/repairminder/worker/src/order-push-triggers.js
+```
+
+**Do not proceed until you've verified the response shapes match this documentation.**
+
+---
+
+## Backend Implementation Status ✅
+
+> **The backend push notification system is fully implemented and production-ready.**
+
+### D1 Tables (Migrations 0265, 0266)
+
+| Table | Purpose |
+|-------|---------|
+| `device_tokens` | Stores APNS tokens with `user_id`, `company_id`, `platform`, `app_type`, `device_name`, `is_active` |
+| `push_notification_preferences` | Per-user toggles for each notification type |
+| `push_notification_log` | Audit trail with delivery status, `apns_id`, error tracking |
+
+### Backend Files
+
+| File | Purpose |
 |------|---------|
-| `Features/Settings/SettingsView.swift` | Complete rewrite |
-| `Core/Notifications/PushNotificationManager.swift` | Add preferences management |
+| `device_token_handlers.js` | API endpoint handlers |
+| `src/apns.js` | APNs JWT auth + HTTP/2 sending |
+| `src/order-push-triggers.js` | 8 trigger functions called from order handlers |
+
+### Trigger Functions (All Implemented)
+
+- `triggerOrderStatusPush` - Staff notified of order status changes
+- `triggerCustomerOrderStatusPush` - Customer app order updates
+- `triggerDeviceStatusPush` - Device status changes (prioritizes assigned engineer)
+- `triggerNewEnquiryPush` - New customer enquiry
+- `triggerEnquiryReplyPush` - Customer reply on ticket
+- `triggerQuoteApprovedPush` - Quote approved by customer
+- `triggerQuoteRejectedPush` - Quote rejected
+- `triggerPaymentReceivedPush` - Payment received
+
+---
+
+## API Endpoints
+
+### POST /api/user/device-token
+
+Register device token for push notifications.
+
+**Request:**
+```json
+{
+  "deviceToken": "apns_token_string",
+  "platform": "ios",
+  "appType": "staff",
+  "deviceName": "iPhone 15 Pro",
+  "osVersion": "17.4",
+  "appVersion": "1.0.0"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Device token registered successfully"
+}
+```
+
+**Notes:**
+- `platform`: Must be `"ios"` or `"android"`
+- `appType`: Must be `"staff"` or `"customer"` - determines which notifications are sent
+- `deviceName`, `osVersion`, `appVersion` are optional but recommended
+- Uses upsert - updates existing token if already registered
+
+---
+
+### DELETE /api/user/device-token
+
+Unregister device token on logout.
+
+**Request:**
+```json
+{
+  "deviceToken": "apns_token_string"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Device token unregistered successfully"
+}
+```
+
+**Notes:**
+- Marks token as inactive (soft delete for audit trail)
+- Call this on logout to stop receiving notifications
+
+---
+
+### GET /api/user/device-tokens
+
+List user's registered device tokens.
+
+**Response:**
+```json
+{
+  "success": true,
+  "tokens": [
+    {
+      "id": "uuid",
+      "platform": "ios",
+      "app_type": "staff",
+      "device_name": "iPhone 15 Pro",
+      "os_version": "17.4",
+      "app_version": "1.0.0",
+      "last_used_at": "2024-01-15T10:30:00Z",
+      "created_at": "2024-01-01T09:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+### GET /api/user/push-preferences
+
+Get push notification preferences.
+
+**Response:**
+```json
+{
+  "success": true,
+  "preferences": {
+    "notificationsEnabled": true,
+    "orderStatusChanged": true,
+    "orderCreated": true,
+    "orderCollected": true,
+    "deviceStatusChanged": true,
+    "quoteApproved": true,
+    "quoteRejected": true,
+    "paymentReceived": true,
+    "newEnquiry": true,
+    "enquiryReply": true
+  }
+}
+```
+
+**Notes:**
+- Returns defaults (all enabled) if no preferences saved
+- `notificationsEnabled` is the master toggle
+
+---
+
+### PUT /api/user/push-preferences
+
+Update push notification preferences.
+
+**Request (partial update supported):**
+```json
+{
+  "notificationsEnabled": true,
+  "orderStatusChanged": false,
+  "newEnquiry": true
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Push preferences updated successfully"
+}
+```
+
+**Notes:**
+- Only send fields you want to update
+- Creates preferences record if none exists
+
+---
+
+## Push Notification Payload Structure
+
+Push notifications include custom data for deep linking:
+
+```json
+{
+  "aps": {
+    "alert": {
+      "title": "Order #1234 Updated",
+      "body": "Status changed to Ready for Collection"
+    },
+    "sound": "default",
+    "badge": 1
+  },
+  "type": "order_status_changed",
+  "entity_type": "order",
+  "entity_id": "order-uuid"
+}
+```
+
+### Notification Types
+
+| Type | Entity Type | Description |
+|------|-------------|-------------|
+| `order_created` | `order` | New order created |
+| `order_status_changed` | `order` | Order status updated |
+| `device_assigned` | `device` | Device assigned to technician |
+| `device_status_changed` | `device` | Device status updated |
+| `quote_approved` | `order` | Customer approved quote |
+| `quote_rejected` | `order` | Customer rejected quote |
+| `payment_received` | `order` | Payment received |
+| `enquiry_received` | `enquiry` | New enquiry from customer |
+| `enquiry_reply` | `enquiry` | Reply to enquiry |
+| `ticket_message` | `ticket` | New support ticket message |
+
+---
+
+## Swift Models
+
+### DeviceTokenRegistration.swift
+
+```swift
+struct DeviceTokenRegistration: Codable {
+    let deviceToken: String
+    let platform: String
+    let appType: String
+    let deviceName: String?
+    let osVersion: String?
+    let appVersion: String?
+
+    static func forStaff(
+        token: String,
+        deviceName: String? = nil,
+        osVersion: String? = nil,
+        appVersion: String? = nil
+    ) -> DeviceTokenRegistration {
+        DeviceTokenRegistration(
+            deviceToken: token,
+            platform: "ios",
+            appType: "staff",
+            deviceName: deviceName,
+            osVersion: osVersion,
+            appVersion: appVersion
+        )
+    }
+}
+```
+
+### PushPreferences.swift
+
+```swift
+struct PushPreferences: Codable {
+    var notificationsEnabled: Bool
+    var orderStatusChanged: Bool
+    var orderCreated: Bool
+    var orderCollected: Bool
+    var deviceStatusChanged: Bool
+    var quoteApproved: Bool
+    var quoteRejected: Bool
+    var paymentReceived: Bool
+    var newEnquiry: Bool
+    var enquiryReply: Bool
+
+    static let allEnabled = PushPreferences(
+        notificationsEnabled: true,
+        orderStatusChanged: true,
+        orderCreated: true,
+        orderCollected: true,
+        deviceStatusChanged: true,
+        quoteApproved: true,
+        quoteRejected: true,
+        paymentReceived: true,
+        newEnquiry: true,
+        enquiryReply: true
+    )
+}
+
+struct PushPreferencesResponse: Codable {
+    let success: Bool
+    let preferences: PushPreferences
+}
+```
+
+### NotificationPayload.swift
+
+```swift
+enum NotificationType: String, Codable {
+    case orderCreated = "order_created"
+    case orderStatusChanged = "order_status_changed"
+    case deviceAssigned = "device_assigned"
+    case deviceStatusChanged = "device_status_changed"
+    case quoteApproved = "quote_approved"
+    case quoteRejected = "quote_rejected"
+    case paymentReceived = "payment_received"
+    case enquiryReceived = "enquiry_received"
+    case enquiryReply = "enquiry_reply"
+    case ticketMessage = "ticket_message"
+}
+
+struct NotificationPayload {
+    let type: NotificationType?
+    let entityType: String?
+    let entityId: String?
+
+    init(userInfo: [AnyHashable: Any]) {
+        self.type = (userInfo["type"] as? String).flatMap(NotificationType.init)
+        self.entityType = userInfo["entity_type"] as? String
+        self.entityId = userInfo["entity_id"] as? String
+    }
+}
+```
+
+---
 
 ## Files to Create
 
 | File | Purpose |
 |------|---------|
+| `Core/Models/PushPreferences.swift` | Preferences model |
+| `Core/Models/DeviceTokenRegistration.swift` | Token registration model |
+| `Core/Models/NotificationPayload.swift` | Push payload parsing |
+| `Core/Services/PushNotificationService.swift` | API calls for tokens/preferences |
+| `Core/Services/DeepLinkHandler.swift` | Parse notification and navigate |
+| `Features/Settings/SettingsView.swift` | Settings screen UI |
 | `Features/Settings/SettingsViewModel.swift` | Settings logic |
-| `Features/Settings/NotificationSettingsView.swift` | Push preferences UI |
-| `Features/Settings/NotificationSettingsViewModel.swift` | Preferences logic |
-| `Features/Settings/AppearanceSettingsView.swift` | Dark mode toggle |
-| `Features/Settings/AboutView.swift` | App info |
-| `Core/Notifications/DeepLinkHandler.swift` | Notification navigation |
+| `Features/Settings/NotificationSettingsView.swift` | Push preferences toggles |
+| `Features/Settings/NotificationSettingsViewModel.swift` | Preferences API calls |
 
 ---
 
-## Implementation Details
+## AppDelegate Integration
 
-### SettingsViewModel.swift
+Push notifications require AppDelegate methods:
 
 ```swift
-// Features/Settings/SettingsViewModel.swift
-
-import Foundation
-
-@MainActor
-@Observable
-final class SettingsViewModel {
-    private(set) var user: User?
-    private(set) var isLoading = false
-
-    func loadUser() async {
-        user = AuthManager.shared.currentUser
-
-        // Refresh if needed
-        if user == nil {
-            await AuthManager.shared.fetchCurrentUser()
-            user = AuthManager.shared.currentUser
-        }
+func application(
+    _ application: UIApplication,
+    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+) {
+    let token = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
+    Task {
+        await PushNotificationService.shared.registerToken(token)
     }
+}
 
-    func logout() async {
-        await AuthManager.shared.logout()
-    }
+func application(
+    _ application: UIApplication,
+    didFailToRegisterForRemoteNotificationsWithError error: Error
+) {
+    print("Failed to register for push: \(error)")
 }
 ```
 
 ---
 
-### SettingsView.swift
+## Token Lifecycle
 
-```swift
-// Features/Settings/SettingsView.swift
-
-import SwiftUI
-
-struct SettingsView: View {
-    @State private var viewModel = SettingsViewModel()
-    @State private var showLogoutConfirmation = false
-
-    var body: some View {
-        NavigationStack {
-            List {
-                // User Profile Section
-                Section {
-                    if let user = viewModel.user {
-                        HStack(spacing: 12) {
-                            // Avatar
-                            Circle()
-                                .fill(Color.accentColor.opacity(0.2))
-                                .frame(width: 60, height: 60)
-                                .overlay {
-                                    Text(user.fullName.prefix(1).uppercased())
-                                        .font(.title2)
-                                        .fontWeight(.semibold)
-                                        .foregroundStyle(.accentColor)
-                                }
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(user.fullName)
-                                    .font(.headline)
-                                Text(user.email)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                if let company = user.company {
-                                    Text(company.name)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                        .padding(.vertical, 8)
-                    } else {
-                        ProgressView()
-                    }
-                }
-
-                // Notifications Section
-                Section("Notifications") {
-                    NavigationLink {
-                        NotificationSettingsView()
-                    } label: {
-                        Label("Push Notifications", systemImage: "bell.badge")
-                    }
-                }
-
-                // Appearance Section
-                Section("Appearance") {
-                    NavigationLink {
-                        AppearanceSettingsView()
-                    } label: {
-                        Label("Theme", systemImage: "paintbrush")
-                    }
-                }
-
-                // About Section
-                Section("About") {
-                    NavigationLink {
-                        AboutView()
-                    } label: {
-                        Label("About Repair Minder", systemImage: "info.circle")
-                    }
-
-                    Link(destination: URL(string: "https://repairminder.com/support")!) {
-                        Label("Help & Support", systemImage: "questionmark.circle")
-                    }
-
-                    Link(destination: URL(string: "https://repairminder.com/privacy")!) {
-                        Label("Privacy Policy", systemImage: "hand.raised")
-                    }
-                }
-
-                // Logout Section
-                Section {
-                    Button(role: .destructive) {
-                        showLogoutConfirmation = true
-                    } label: {
-                        Label("Logout", systemImage: "rectangle.portrait.and.arrow.right")
-                    }
-                }
-            }
-            .navigationTitle("Settings")
-            .confirmationDialog(
-                "Logout",
-                isPresented: $showLogoutConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Logout", role: .destructive) {
-                    Task { await viewModel.logout() }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Are you sure you want to logout?")
-            }
-            .task {
-                await viewModel.loadUser()
-            }
-        }
-    }
-}
-```
+1. **On Login**: Request push permission, register token with `appType: "staff"`
+2. **On App Launch**: Re-register token (handles token refresh)
+3. **On Logout**: Unregister token via DELETE endpoint
+4. **On Token Refresh**: System calls `didRegisterForRemoteNotificationsWithDeviceToken` - re-register
 
 ---
 
-### NotificationSettingsViewModel.swift
+## Deep Link Handling
+
+Parse notification payload and navigate:
 
 ```swift
-// Features/Settings/NotificationSettingsViewModel.swift
-
-import Foundation
-
-@MainActor
-@Observable
-final class NotificationSettingsViewModel {
-    private(set) var preferences: PushPreferences?
-    private(set) var isLoading = false
-    private(set) var isSaving = false
-    var error: String?
-
-    // MARK: - Load
-
-    func loadPreferences() async {
-        isLoading = true
-        error = nil
-
-        do {
-            preferences = try await APIClient.shared.request(
-                .pushPreferences(),
-                responseType: PushPreferences.self
-            )
-        } catch {
-            self.error = "Failed to load preferences"
-        }
-
-        isLoading = false
-    }
-
-    // MARK: - Update
-
-    func updatePreference(keyPath: WritableKeyPath<PushPreferences, Bool>, value: Bool) async {
-        guard var prefs = preferences else { return }
-
-        // Update local state immediately
-        prefs[keyPath: keyPath] = value
-        preferences = prefs
-
-        // Save to backend
-        await savePreferences()
-    }
-
-    func toggleMasterSwitch(_ enabled: Bool) async {
-        guard var prefs = preferences else { return }
-
-        prefs.enabled = enabled
-
-        // If disabling, turn off all
-        if !enabled {
-            prefs.orderCreated = false
-            prefs.orderStatusChanged = false
-            prefs.orderCollected = false
-            prefs.deviceStatusChanged = false
-            prefs.quoteApproved = false
-            prefs.quoteRejected = false
-            prefs.paymentReceived = false
-            prefs.newEnquiry = false
-            prefs.enquiryReply = false
-            prefs.deviceAssigned = false
-        }
-
-        preferences = prefs
-        await savePreferences()
-    }
-
-    private func savePreferences() async {
-        guard let prefs = preferences else { return }
-
-        isSaving = true
-        error = nil
-
-        do {
-            try await APIClient.shared.requestVoid(
-                .updatePushPreferences(prefs)
-            )
-        } catch {
-            self.error = "Failed to save preferences"
-            // Reload to get server state
-            await loadPreferences()
-        }
-
-        isSaving = false
-    }
-}
-```
-
----
-
-### NotificationSettingsView.swift
-
-```swift
-// Features/Settings/NotificationSettingsView.swift
-
-import SwiftUI
-
-struct NotificationSettingsView: View {
-    @State private var viewModel = NotificationSettingsViewModel()
-
-    var body: some View {
-        List {
-            if let prefs = viewModel.preferences {
-                // Master Toggle
-                Section {
-                    Toggle("Enable Notifications", isOn: Binding(
-                        get: { prefs.enabled },
-                        set: { newValue in
-                            Task { await viewModel.toggleMasterSwitch(newValue) }
-                        }
-                    ))
-                } footer: {
-                    Text("Turn off to disable all push notifications")
-                }
-
-                // Order Notifications
-                Section("Orders") {
-                    NotificationToggle(
-                        title: "New Orders",
-                        subtitle: "When a new order is created",
-                        isOn: prefs.orderCreated,
-                        isEnabled: prefs.enabled
-                    ) { value in
-                        await viewModel.updatePreference(keyPath: \.orderCreated, value: value)
-                    }
-
-                    NotificationToggle(
-                        title: "Order Status Changes",
-                        subtitle: "When order status is updated",
-                        isOn: prefs.orderStatusChanged,
-                        isEnabled: prefs.enabled
-                    ) { value in
-                        await viewModel.updatePreference(keyPath: \.orderStatusChanged, value: value)
-                    }
-
-                    NotificationToggle(
-                        title: "Order Collected",
-                        subtitle: "When customer collects order",
-                        isOn: prefs.orderCollected,
-                        isEnabled: prefs.enabled
-                    ) { value in
-                        await viewModel.updatePreference(keyPath: \.orderCollected, value: value)
-                    }
-                }
-
-                // Device Notifications
-                Section("Devices") {
-                    NotificationToggle(
-                        title: "Device Status Changes",
-                        subtitle: "When device status is updated",
-                        isOn: prefs.deviceStatusChanged,
-                        isEnabled: prefs.enabled
-                    ) { value in
-                        await viewModel.updatePreference(keyPath: \.deviceStatusChanged, value: value)
-                    }
-
-                    NotificationToggle(
-                        title: "Device Assigned",
-                        subtitle: "When a device is assigned to you",
-                        isOn: prefs.deviceAssigned,
-                        isEnabled: prefs.enabled
-                    ) { value in
-                        await viewModel.updatePreference(keyPath: \.deviceAssigned, value: value)
-                    }
-                }
-
-                // Quote Notifications
-                Section("Quotes") {
-                    NotificationToggle(
-                        title: "Quote Approved",
-                        subtitle: "When customer approves a quote",
-                        isOn: prefs.quoteApproved,
-                        isEnabled: prefs.enabled
-                    ) { value in
-                        await viewModel.updatePreference(keyPath: \.quoteApproved, value: value)
-                    }
-
-                    NotificationToggle(
-                        title: "Quote Rejected",
-                        subtitle: "When customer rejects a quote",
-                        isOn: prefs.quoteRejected,
-                        isEnabled: prefs.enabled
-                    ) { value in
-                        await viewModel.updatePreference(keyPath: \.quoteRejected, value: value)
-                    }
-                }
-
-                // Payment Notifications
-                Section("Payments") {
-                    NotificationToggle(
-                        title: "Payment Received",
-                        subtitle: "When a payment is recorded",
-                        isOn: prefs.paymentReceived,
-                        isEnabled: prefs.enabled
-                    ) { value in
-                        await viewModel.updatePreference(keyPath: \.paymentReceived, value: value)
-                    }
-                }
-
-                // Enquiry Notifications
-                Section("Enquiries") {
-                    NotificationToggle(
-                        title: "New Enquiries",
-                        subtitle: "When a new enquiry is received",
-                        isOn: prefs.newEnquiry,
-                        isEnabled: prefs.enabled
-                    ) { value in
-                        await viewModel.updatePreference(keyPath: \.newEnquiry, value: value)
-                    }
-
-                    NotificationToggle(
-                        title: "Enquiry Replies",
-                        subtitle: "When customer replies to enquiry",
-                        isOn: prefs.enquiryReply,
-                        isEnabled: prefs.enabled
-                    ) { value in
-                        await viewModel.updatePreference(keyPath: \.enquiryReply, value: value)
-                    }
-                }
-            } else if viewModel.isLoading {
-                ProgressView()
-                    .frame(maxWidth: .infinity)
-            }
-        }
-        .navigationTitle("Notifications")
-        .navigationBarTitleDisplayMode(.inline)
-        .overlay {
-            if viewModel.isSaving {
-                ProgressView()
-                    .padding()
-                    .background(.ultraThinMaterial)
-                    .cornerRadius(8)
-            }
-        }
-        .alert("Error", isPresented: .constant(viewModel.error != nil)) {
-            Button("OK") { viewModel.error = nil }
-        } message: {
-            Text(viewModel.error ?? "")
-        }
-        .task {
-            await viewModel.loadPreferences()
-        }
-    }
-}
-
-// MARK: - Notification Toggle
-
-struct NotificationToggle: View {
-    let title: String
-    let subtitle: String
-    let isOn: Bool
-    let isEnabled: Bool
-    let onToggle: (Bool) async -> Void
-
-    var body: some View {
-        Toggle(isOn: Binding(
-            get: { isOn },
-            set: { newValue in
-                Task { await onToggle(newValue) }
-            }
-        )) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .disabled(!isEnabled)
-    }
-}
-```
-
----
-
-### AppearanceSettingsView.swift
-
-```swift
-// Features/Settings/AppearanceSettingsView.swift
-
-import SwiftUI
-
-struct AppearanceSettingsView: View {
-    @AppStorage("appearanceMode") private var appearanceMode: AppearanceMode = .system
-
-    var body: some View {
-        List {
-            Section("Theme") {
-                ForEach(AppearanceMode.allCases) { mode in
-                    Button {
-                        appearanceMode = mode
-                        applyAppearance(mode)
-                    } label: {
-                        HStack {
-                            Label(mode.displayName, systemImage: mode.icon)
-                            Spacer()
-                            if appearanceMode == mode {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(.accentColor)
-                            }
-                        }
-                    }
-                    .foregroundStyle(.primary)
-                }
-            }
-        }
-        .navigationTitle("Appearance")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-
-    private func applyAppearance(_ mode: AppearanceMode) {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = windowScene.windows.first else { return }
-
-        UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve) {
-            switch mode {
-            case .system:
-                window.overrideUserInterfaceStyle = .unspecified
-            case .light:
-                window.overrideUserInterfaceStyle = .light
-            case .dark:
-                window.overrideUserInterfaceStyle = .dark
-            }
-        }
-    }
-}
-
-enum AppearanceMode: String, CaseIterable, Identifiable {
-    case system
-    case light
-    case dark
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .system: return "System"
-        case .light: return "Light"
-        case .dark: return "Dark"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .system: return "gear"
-        case .light: return "sun.max"
-        case .dark: return "moon"
-        }
-    }
-}
-```
-
----
-
-### AboutView.swift
-
-```swift
-// Features/Settings/AboutView.swift
-
-import SwiftUI
-
-struct AboutView: View {
-    var body: some View {
-        List {
-            Section {
-                VStack(spacing: 16) {
-                    Image("AppLogo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(height: 80)
-
-                    Text("Repair Minder")
-                        .font(.title2)
-                        .fontWeight(.bold)
-
-                    Text("Version \(appVersion) (\(buildNumber))")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical)
-            }
-
-            Section("Information") {
-                LabeledContent("Version", value: appVersion)
-                LabeledContent("Build", value: buildNumber)
-                LabeledContent("iOS Version", value: UIDevice.current.systemVersion)
-            }
-
-            Section {
-                Link(destination: URL(string: "https://repairminder.com")!) {
-                    Label("Website", systemImage: "globe")
-                }
-
-                Link(destination: URL(string: "https://twitter.com/repairminder")!) {
-                    Label("Twitter", systemImage: "bird")
-                }
-            }
-        }
-        .navigationTitle("About")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-
-    private var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-    }
-
-    private var buildNumber: String {
-        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
-    }
-}
-```
-
----
-
-### DeepLinkHandler.swift
-
-```swift
-// Core/Notifications/DeepLinkHandler.swift
-
-import Foundation
-import os.log
-
-struct DeepLinkHandler {
-    private static let logger = Logger(subsystem: "com.mendmyi.Repair-Minder", category: "DeepLink")
-
-    /// Parse notification payload and return appropriate deep link
-    static func parseNotification(userInfo: [AnyHashable: Any]) -> DeepLink? {
-        guard let type = userInfo["type"] as? String else {
-            logger.warning("Notification missing type")
-            return nil
-        }
-
-        logger.debug("Parsing notification type: \(type)")
+class DeepLinkHandler {
+    func handle(payload: NotificationPayload) {
+        guard let type = payload.type, let entityId = payload.entityId else { return }
 
         switch type {
-        // Order notifications
-        case "order_created", "order_status_changed", "order_collected", "payment_received":
-            if let orderId = userInfo["order_id"] as? String {
-                return .order(id: orderId)
-            }
+        case .orderCreated, .orderStatusChanged, .quoteApproved, .quoteRejected, .paymentReceived:
+            // Navigate to order detail
+            NavigationManager.shared.navigateToOrder(id: entityId)
 
-        // Device notifications
-        case "device_status_changed", "quote_approved", "quote_rejected", "device_assigned":
-            if let orderId = userInfo["order_id"] as? String,
-               let deviceId = userInfo["device_id"] as? String {
-                return .device(orderId: orderId, deviceId: deviceId)
-            } else if let orderId = userInfo["order_id"] as? String {
-                return .order(id: orderId)
-            }
+        case .deviceAssigned, .deviceStatusChanged:
+            // Navigate to device detail
+            NavigationManager.shared.navigateToDevice(id: entityId)
 
-        // Ticket notifications
-        case "new_enquiry", "enquiry_reply":
-            if let ticketId = userInfo["ticket_id"] as? String {
-                return .ticket(id: ticketId)
-            }
+        case .enquiryReceived, .enquiryReply:
+            // Navigate to enquiry detail
+            NavigationManager.shared.navigateToEnquiry(id: entityId)
 
-        default:
-            logger.warning("Unknown notification type: \(type)")
+        case .ticketMessage:
+            // Navigate to ticket/support
+            NavigationManager.shared.navigateToTicket(id: entityId)
         }
-
-        return nil
-    }
-
-    /// Handle URL scheme deep links
-    static func parseURL(_ url: URL) -> DeepLink? {
-        guard url.scheme == "repairminder" else { return nil }
-
-        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        let path = url.host ?? ""
-        let queryItems = components?.queryItems ?? []
-
-        switch path {
-        case "order":
-            if let orderId = queryItems.first(where: { $0.name == "id" })?.value {
-                return .order(id: orderId)
-            }
-
-        case "device":
-            if let orderId = queryItems.first(where: { $0.name == "order_id" })?.value,
-               let deviceId = queryItems.first(where: { $0.name == "id" })?.value {
-                return .device(orderId: orderId, deviceId: deviceId)
-            }
-
-        case "ticket", "enquiry":
-            if let ticketId = queryItems.first(where: { $0.name == "id" })?.value {
-                return .ticket(id: ticketId)
-            }
-
-        default:
-            break
-        }
-
-        return nil
     }
 }
 ```
 
 ---
 
-### Update PushNotificationManager.swift
+## Settings Screen Layout
 
-Add to `handleNotificationTap` in [See: Stage 03]:
+```
+Settings
+├── Account
+│   ├── Profile (name, email)
+│   └── Change Password
+├── Notifications
+│   └── Push Notification Settings →
+├── About
+│   ├── App Version
+│   └── Terms & Privacy
+└── Sign Out
+```
 
-```swift
-// In PushNotificationManager.swift
+### Notification Settings Screen
 
-func handleNotificationTap(userInfo: [AnyHashable: Any]) {
-    if let deepLink = DeepLinkHandler.parseNotification(userInfo: userInfo) {
-        AppState.shared.handleDeepLink(deepLink)
-    }
-}
+```
+Push Notifications
+├── Enable Notifications (master toggle)
+├── Orders
+│   ├── Order Created
+│   ├── Status Changed
+│   └── Order Collected
+├── Quotes & Payments
+│   ├── Quote Approved
+│   ├── Quote Rejected
+│   └── Payment Received
+├── Devices
+│   └── Device Status Changed
+└── Enquiries
+    ├── New Enquiry
+    └── Enquiry Reply
 ```
 
 ---
 
-### Push Notification Payload Examples
+## Verification
 
-**Order Created**:
-```json
-{
-  "aps": {
-    "alert": {
-      "title": "New Order",
-      "body": "Order #12345 has been created"
-    },
-    "sound": "default",
-    "badge": 1
-  },
-  "type": "order_created",
-  "order_id": "uuid-here"
-}
+### Test Token Registration
+
+```bash
+# Register token
+curl -X POST https://api.repairminder.mendmyi.com/api/user/device-token \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deviceToken": "test_apns_token",
+    "platform": "ios",
+    "appType": "staff",
+    "deviceName": "iPhone 15 Pro",
+    "osVersion": "17.4",
+    "appVersion": "1.0.0"
+  }'
+
+# Get preferences
+curl https://api.repairminder.mendmyi.com/api/user/push-preferences \
+  -H "Authorization: Bearer {token}" | jq .
+
+# Update preferences
+curl -X PUT https://api.repairminder.mendmyi.com/api/user/push-preferences \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{"newEnquiry": false}'
 ```
 
-**Device Assigned**:
-```json
-{
-  "aps": {
-    "alert": {
-      "title": "Device Assigned",
-      "body": "iPhone 12 Pro has been assigned to you"
-    },
-    "sound": "default"
-  },
-  "type": "device_assigned",
-  "order_id": "uuid-here",
-  "device_id": "uuid-here"
-}
-```
+### Verify in D1 Database
 
-**Quote Approved**:
-```json
-{
-  "aps": {
-    "alert": {
-      "title": "Quote Approved",
-      "body": "Customer approved quote for Order #12345"
-    },
-    "sound": "default"
-  },
-  "type": "quote_approved",
-  "order_id": "uuid-here",
-  "device_id": "uuid-here"
-}
-```
-
-**New Enquiry**:
-```json
-{
-  "aps": {
-    "alert": {
-      "title": "New Enquiry",
-      "body": "New message from John Doe"
-    },
-    "sound": "default",
-    "badge": 1
-  },
-  "type": "new_enquiry",
-  "ticket_id": "uuid-here"
-}
+```bash
+npx wrangler d1 execute repairminder_database --remote --json \
+  --command "SELECT device_token, platform, app_type, device_name FROM device_tokens WHERE is_active = 1 LIMIT 5"
 ```
 
 ---
 
-## Database Changes
+## Acceptance Criteria
 
-None (iOS only)
-
-## Test Cases
-
-| Test | Steps | Expected |
-|------|-------|----------|
-| Settings loads | Navigate to Settings | User info displays |
-| Push prefs load | Open notification settings | All toggles show |
-| Master toggle off | Turn off Enable | All toggles disable |
-| Individual toggle | Toggle one setting | Saves to backend |
-| Appearance change | Select Dark mode | Theme changes |
-| Logout | Tap logout | Returns to login |
-| Push order tap | Tap order notification | Opens order detail |
-| Push device tap | Tap device notification | Opens device detail |
-| Push ticket tap | Tap enquiry notification | Opens enquiry detail |
-| Foreground notification | Receive while app open | Banner shows |
-
-## Acceptance Checklist
-
-- [ ] Settings screen shows user info
-- [ ] Push preferences load from backend
-- [ ] Master toggle disables all preferences
-- [ ] Individual toggles save immediately
-- [ ] Appearance settings work (light/dark/system)
-- [ ] About screen shows version info
-- [ ] Logout clears auth and navigates to login
-- [ ] Push notifications navigate to correct screen
-- [ ] Deep links work for orders, devices, tickets
-- [ ] Foreground notifications show banner
-- [ ] Badge counts update correctly
-
-## Deployment
-
-1. Build and run on physical device
-2. Login and navigate to Settings
-3. Open notification settings
-4. Toggle preferences and verify saves
-5. Test appearance modes
-6. Send test push notification from backend
-7. Verify notification appears
-8. Tap notification and verify navigation
-9. Test logout flow
-
-## Handoff Notes
-
-- Push preferences have 10 individual toggles
-- Master toggle controls all others
-- Appearance mode persisted via @AppStorage
-- Deep links parsed from notification payload
-- URL scheme: `repairminder://order?id=xxx`
-- All stages complete - ready for integration testing
-- [See: 00-master-plan.md] for final verification steps
+- [ ] Token registers on login with correct `appType: "staff"`
+- [ ] Token unregisters on logout
+- [ ] Push preferences load correctly
+- [ ] Individual preferences can be toggled
+- [ ] Master toggle disables all notifications
+- [ ] Push notifications received when app backgrounded
+- [ ] Tapping notification navigates to correct screen
+- [ ] No decode errors in API responses

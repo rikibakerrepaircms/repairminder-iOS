@@ -20,8 +20,8 @@ Create the customer search, selection, and entry form for the first wizard step.
 
 | File | Purpose |
 |------|---------|
-| `Features/Booking/Steps/ClientStepView.swift` | Main client entry step |
-| `Features/Booking/Components/ClientSearchView.swift` | Search input with results |
+| `Features/Staff/Booking/Steps/ClientStepView.swift` | Main client entry step |
+| `Features/Staff/Booking/Components/ClientSearchView.swift` | Search input with results |
 
 ---
 

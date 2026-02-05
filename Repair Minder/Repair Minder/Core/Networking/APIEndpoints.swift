@@ -2,630 +2,512 @@
 //  APIEndpoints.swift
 //  Repair Minder
 //
-//  Created by Claude on 03/02/2026.
+//  Created on 04/02/2026.
 //
 
 import Foundation
 
-/// Type-erasing wrapper for Encodable bodies
-struct AnyEncodable: Encodable {
-    private let encodeClosure: (Encoder) throws -> Void
-
-    init<T: Encodable>(_ wrapped: T) {
-        encodeClosure = { encoder in
-            try wrapped.encode(to: encoder)
-        }
-    }
-
-    func encode(to encoder: Encoder) throws {
-        try encodeClosure(encoder)
-    }
+/// HTTP methods supported by the API
+enum HTTPMethod: String {
+    case get = "GET"
+    case post = "POST"
+    case put = "PUT"
+    case patch = "PATCH"
+    case delete = "DELETE"
 }
 
-/// Represents an API endpoint with all necessary request information
-struct APIEndpoint {
-    let path: String
-    let method: HTTPMethod
-    let body: AnyEncodable?
-    let queryParameters: [String: String]?
+/// All API endpoints with their paths and methods
+enum APIEndpoint {
 
-    init(
-        path: String,
-        method: HTTPMethod = .get,
-        body: (some Encodable)? = nil as AnyEncodable?,
-        queryParameters: [String: String]? = nil
-    ) {
-        self.path = path
-        self.method = method
-        self.body = body.map { AnyEncodable($0) }
-        self.queryParameters = queryParameters
-    }
+    // MARK: - Auth
 
-    init(
-        path: String,
-        method: HTTPMethod = .get,
-        queryParameters: [String: String]? = nil
-    ) {
-        self.path = path
-        self.method = method
-        self.body = nil
-        self.queryParameters = queryParameters
-    }
-}
+    case login
+    case twoFactorRequest
+    case twoFactorVerify
+    case magicLinkRequest
+    case magicLinkVerifyCode
+    case refreshToken
+    case me
+    case logout
+    case totpSetup
+    case totpVerifySetup
+    case totpDisable
+    case totpStatus
 
-// MARK: - Auth Endpoints
-extension APIEndpoint {
-    static func login(email: String, password: String, twoFactorToken: String? = nil) -> APIEndpoint {
-        struct LoginBody: Encodable {
-            let email: String
-            let password: String
-            let twoFactorToken: String?
+    // MARK: - Customer Auth
+
+    case customerMagicLinkRequest
+    case customerVerifyCode
+    case customerMe
+    case customerLogout
+
+    // MARK: - Dashboard
+
+    case dashboardStats(scope: String?, period: String?)
+    case enquiryStats(scope: String?, includeBreakdown: Bool?)
+    case lifecycle
+    case categoryBreakdown
+    case activityLog
+    case bookingHeatmap
+    case buybackStats
+    case bookingsByTime
+
+    // MARK: - Devices
+
+    case devices(filter: DeviceListFilter)
+    case myQueue(page: Int, limit: Int, search: String?, category: String?)
+    case myActiveWork
+    case orderDevices(orderId: String)
+    case createOrderDevice(orderId: String)
+    case orderDevice(orderId: String, deviceId: String)
+    case updateOrderDevice(orderId: String, deviceId: String)
+    case deleteOrderDevice(orderId: String, deviceId: String)
+    case updateDeviceStatus(orderId: String, deviceId: String)
+    case deviceActions(orderId: String, deviceId: String)
+    case executeDeviceAction(orderId: String, deviceId: String)
+
+    // MARK: - Orders
+
+    case orders(page: Int, limit: Int, status: String?)
+    case createOrder
+    case order(id: String)
+    case updateOrder(id: String)
+    case orderItems(orderId: String)
+    case createOrderItem(orderId: String)
+    case updateOrderItem(orderId: String, itemId: String)
+    case deleteOrderItem(orderId: String, itemId: String)
+    case orderPayments(orderId: String)
+    case createOrderPayment(orderId: String)
+    case deleteOrderPayment(orderId: String, paymentId: String)
+    case orderSignatures(orderId: String)
+    case createOrderSignature(orderId: String)
+    case sendQuote(orderId: String)
+    case authorizeOrder(orderId: String)
+    case despatchOrder(orderId: String)
+    case collectOrder(orderId: String)
+
+    // MARK: - Clients
+
+    case clients(page: Int, limit: Int, search: String?)
+    case createClient
+    case client(id: String)
+    case updateClient(id: String)
+    case deleteClient(id: String)
+    case clientSearch(query: String)
+    case clientsExport
+    case clientsImport
+
+    // MARK: - Tickets/Enquiries
+
+    case tickets(page: Int, limit: Int, status: String?, ticketType: String?, locationId: String?, assignedUserId: String?, workflowStatus: String?, sortBy: String?, sortOrder: String?)
+    case createTicket
+    case ticket(id: String)
+    case updateTicket(id: String)
+    case ticketReply(id: String)
+    case ticketNote(id: String)
+    case ticketGenerateResponse(id: String)
+    case ticketMacroExecutions(id: String)
+    case ticketExecuteMacro(id: String)
+    case ticketResolve(id: String)
+    case ticketReassign(id: String)
+    case createEnquiry
+
+    // MARK: - Macros
+
+    case macros(category: String?, includeStages: Bool?)
+    case macro(id: String)
+
+    // MARK: - Macro Executions
+
+    case macroExecutions(status: String?, ticketId: String?, page: Int?, perPage: Int?)
+    case macroExecution(id: String)
+    case pauseMacroExecution(id: String)
+    case resumeMacroExecution(id: String)
+    case cancelMacroExecution(id: String)
+
+    // MARK: - Push Notifications
+
+    case registerDeviceToken
+    case unregisterDeviceToken
+    case deviceTokens
+    case pushPreferences
+    case updatePushPreferences
+
+    // MARK: - Customer Portal
+
+    case customerOrders
+    case customerOrder(orderId: String)
+    case customerApproveQuote(orderId: String)
+    case customerOrderReply(orderId: String)
+    case customerOrderInvoice(orderId: String)
+    case customerDeviceImage(deviceId: String, imageId: String)
+
+    // MARK: - Path
+
+    var path: String {
+        switch self {
+        // Auth
+        case .login:
+            return "/api/auth/login"
+        case .twoFactorRequest:
+            return "/api/auth/2fa/request"
+        case .twoFactorVerify:
+            return "/api/auth/2fa/verify"
+        case .magicLinkRequest:
+            return "/api/auth/magic-link/request"
+        case .magicLinkVerifyCode:
+            return "/api/auth/magic-link/verify-code"
+        case .refreshToken:
+            return "/api/auth/refresh"
+        case .me:
+            return "/api/auth/me"
+        case .logout:
+            return "/api/auth/logout"
+        case .totpSetup:
+            return "/api/auth/totp/setup"
+        case .totpVerifySetup:
+            return "/api/auth/totp/verify-setup"
+        case .totpDisable:
+            return "/api/auth/totp/disable"
+        case .totpStatus:
+            return "/api/auth/totp/status"
+
+        // Customer Auth
+        case .customerMagicLinkRequest:
+            return "/api/customer/auth/request-magic-link"
+        case .customerVerifyCode:
+            return "/api/customer/auth/verify-code"
+        case .customerMe:
+            return "/api/customer/auth/me"
+        case .customerLogout:
+            return "/api/customer/auth/logout"
+
+        // Dashboard
+        case .dashboardStats:
+            return "/api/dashboard/stats"
+        case .enquiryStats:
+            return "/api/dashboard/enquiry-stats"
+        case .lifecycle:
+            return "/api/dashboard/lifecycle"
+        case .categoryBreakdown:
+            return "/api/dashboard/category-breakdown"
+        case .activityLog:
+            return "/api/dashboard/activity-log"
+        case .bookingHeatmap:
+            return "/api/dashboard/booking-heatmap"
+        case .buybackStats:
+            return "/api/dashboard/buyback-stats"
+        case .bookingsByTime:
+            return "/api/dashboard/bookings-by-time"
+
+        // Devices
+        case .devices:
+            return "/api/devices"
+        case .myQueue:
+            return "/api/devices/my-queue"
+        case .myActiveWork:
+            return "/api/devices/my-active-work"
+        case .orderDevices(let orderId), .createOrderDevice(let orderId):
+            return "/api/orders/\(orderId)/devices"
+        case .orderDevice(let orderId, let deviceId),
+             .updateOrderDevice(let orderId, let deviceId),
+             .deleteOrderDevice(let orderId, let deviceId):
+            return "/api/orders/\(orderId)/devices/\(deviceId)"
+        case .updateDeviceStatus(let orderId, let deviceId):
+            return "/api/orders/\(orderId)/devices/\(deviceId)/status"
+        case .deviceActions(let orderId, let deviceId):
+            return "/api/orders/\(orderId)/devices/\(deviceId)/actions"
+        case .executeDeviceAction(let orderId, let deviceId):
+            return "/api/orders/\(orderId)/devices/\(deviceId)/action"
+
+        // Orders
+        case .orders, .createOrder:
+            return "/api/orders"
+        case .order(let id), .updateOrder(let id):
+            return "/api/orders/\(id)"
+        case .orderItems(let orderId), .createOrderItem(let orderId):
+            return "/api/orders/\(orderId)/items"
+        case .updateOrderItem(let orderId, let itemId), .deleteOrderItem(let orderId, let itemId):
+            return "/api/orders/\(orderId)/items/\(itemId)"
+        case .orderPayments(let orderId), .createOrderPayment(let orderId):
+            return "/api/orders/\(orderId)/payments"
+        case .deleteOrderPayment(let orderId, let paymentId):
+            return "/api/orders/\(orderId)/payments/\(paymentId)"
+        case .orderSignatures(let orderId), .createOrderSignature(let orderId):
+            return "/api/orders/\(orderId)/signatures"
+        case .sendQuote(let orderId):
+            return "/api/orders/\(orderId)/send-quote"
+        case .authorizeOrder(let orderId):
+            return "/api/orders/\(orderId)/authorize"
+        case .despatchOrder(let orderId):
+            return "/api/orders/\(orderId)/despatch"
+        case .collectOrder(let orderId):
+            return "/api/orders/\(orderId)/collect"
+
+        // Clients
+        case .clients, .createClient:
+            return "/api/clients"
+        case .client(let id), .updateClient(let id), .deleteClient(let id):
+            return "/api/clients/\(id)"
+        case .clientSearch:
+            return "/api/clients/search"
+        case .clientsExport:
+            return "/api/clients/export"
+        case .clientsImport:
+            return "/api/clients/import"
+
+        // Tickets
+        case .tickets, .createTicket:
+            return "/api/tickets"
+        case .ticket(let id), .updateTicket(let id):
+            return "/api/tickets/\(id)"
+        case .ticketReply(let id):
+            return "/api/tickets/\(id)/reply"
+        case .ticketNote(let id):
+            return "/api/tickets/\(id)/note"
+        case .ticketGenerateResponse(let id):
+            return "/api/tickets/\(id)/generate-response"
+        case .ticketMacroExecutions(let id):
+            return "/api/tickets/\(id)/macro-executions"
+        case .ticketExecuteMacro(let id):
+            return "/api/tickets/\(id)/macro"
+        case .ticketResolve(let id):
+            return "/api/tickets/\(id)/resolve"
+        case .ticketReassign(let id):
+            return "/api/tickets/\(id)/reassign"
+        case .createEnquiry:
+            return "/api/tickets/enquiry"
+
+        // Macros
+        case .macros:
+            return "/api/macros"
+        case .macro(let id):
+            return "/api/macros/\(id)"
+
+        // Macro Executions
+        case .macroExecutions:
+            return "/api/macro-executions"
+        case .macroExecution(let id), .cancelMacroExecution(let id):
+            return "/api/macro-executions/\(id)"
+        case .pauseMacroExecution(let id):
+            return "/api/macro-executions/\(id)/pause"
+        case .resumeMacroExecution(let id):
+            return "/api/macro-executions/\(id)/resume"
+
+        // Push Notifications
+        case .registerDeviceToken, .unregisterDeviceToken:
+            return "/api/user/device-token"
+        case .deviceTokens:
+            return "/api/user/device-tokens"
+        case .pushPreferences, .updatePushPreferences:
+            return "/api/user/push-preferences"
+
+        // Customer Portal
+        case .customerOrders:
+            return "/api/customer/orders"
+        case .customerOrder(let orderId):
+            return "/api/customer/orders/\(orderId)"
+        case .customerApproveQuote(let orderId):
+            return "/api/customer/orders/\(orderId)/approve"
+        case .customerOrderReply(let orderId):
+            return "/api/customer/orders/\(orderId)/reply"
+        case .customerOrderInvoice(let orderId):
+            return "/api/customer/orders/\(orderId)/invoice"
+        case .customerDeviceImage(let deviceId, let imageId):
+            return "/api/customer/devices/\(deviceId)/images/\(imageId)/file"
         }
-        return APIEndpoint(
-            path: "/api/auth/login",
-            method: .post,
-            body: LoginBody(email: email, password: password, twoFactorToken: twoFactorToken)
-        )
     }
 
-    static func logout() -> APIEndpoint {
-        APIEndpoint(path: "/api/auth/logout", method: .post)
-    }
+    // MARK: - Method
 
-    static func refreshToken(refreshToken: String) -> APIEndpoint {
-        struct RefreshBody: Encodable {
-            let refreshToken: String
+    var method: HTTPMethod {
+        switch self {
+        // GET endpoints
+        case .me, .totpStatus,
+             .customerMe,
+             .dashboardStats, .enquiryStats, .lifecycle, .categoryBreakdown, .activityLog,
+             .bookingHeatmap, .buybackStats, .bookingsByTime,
+             .devices, .myQueue, .myActiveWork, .orderDevices, .orderDevice, .deviceActions,
+             .orders, .order, .orderItems, .orderPayments, .orderSignatures,
+             .clients, .client, .clientSearch, .clientsExport,
+             .tickets, .ticket, .ticketMacroExecutions,
+             .macros, .macro, .macroExecutions, .macroExecution,
+             .deviceTokens, .pushPreferences,
+             .customerOrders, .customerOrder, .customerOrderInvoice, .customerDeviceImage:
+            return .get
+
+        // POST endpoints
+        case .login, .twoFactorRequest, .twoFactorVerify,
+             .magicLinkRequest, .magicLinkVerifyCode, .refreshToken, .logout,
+             .totpSetup, .totpVerifySetup, .totpDisable,
+             .customerMagicLinkRequest, .customerVerifyCode, .customerLogout,
+             .createOrderDevice, .executeDeviceAction,
+             .createOrder, .createOrderItem, .createOrderPayment, .createOrderSignature,
+             .sendQuote, .authorizeOrder, .despatchOrder, .collectOrder,
+             .createClient, .clientsImport,
+             .createTicket, .ticketReply, .ticketNote, .ticketGenerateResponse, .ticketExecuteMacro,
+             .ticketResolve, .ticketReassign, .createEnquiry,
+             .registerDeviceToken,
+             .customerApproveQuote, .customerOrderReply:
+            return .post
+
+        // PATCH endpoints
+        case .updateOrderDevice, .updateDeviceStatus,
+             .updateOrder, .updateOrderItem,
+             .updateClient,
+             .updateTicket,
+             .pauseMacroExecution, .resumeMacroExecution:
+            return .patch
+
+        // PUT endpoints
+        case .updatePushPreferences:
+            return .put
+
+        // DELETE endpoints
+        case .deleteOrderDevice, .deleteOrderItem, .deleteOrderPayment,
+             .deleteClient,
+             .unregisterDeviceToken,
+             .cancelMacroExecution:
+            return .delete
         }
-        return APIEndpoint(
-            path: "/api/auth/refresh",
-            method: .post,
-            body: RefreshBody(refreshToken: refreshToken)
-        )
     }
 
-    static func me() -> APIEndpoint {
-        APIEndpoint(path: "/api/auth/me")
-    }
+    // MARK: - Query Parameters
 
-    static func requestMagicLink(email: String) -> APIEndpoint {
-        struct MagicLinkBody: Encodable {
-            let email: String
-        }
-        return APIEndpoint(
-            path: "/api/auth/magic-link/request",
-            method: .post,
-            body: MagicLinkBody(email: email)
-        )
-    }
+    /// Query parameters for GET requests
+    var queryItems: [URLQueryItem]? {
+        switch self {
+        case .dashboardStats(let scope, let period):
+            var items: [URLQueryItem] = []
+            if let scope = scope {
+                items.append(URLQueryItem(name: "scope", value: scope))
+            }
+            if let period = period {
+                items.append(URLQueryItem(name: "period", value: period))
+            }
+            return items.isEmpty ? nil : items
 
-    static func verifyMagicLinkCode(email: String, code: String) -> APIEndpoint {
-        struct VerifyCodeBody: Encodable {
-            let email: String
-            let code: String
-        }
-        return APIEndpoint(
-            path: "/api/auth/magic-link/verify-code",
-            method: .post,
-            body: VerifyCodeBody(email: email, code: code)
-        )
-    }
-}
+        case .enquiryStats(let scope, let includeBreakdown):
+            var items: [URLQueryItem] = []
+            if let scope = scope {
+                items.append(URLQueryItem(name: "scope", value: scope))
+            }
+            if let includeBreakdown = includeBreakdown, includeBreakdown {
+                items.append(URLQueryItem(name: "include_breakdown", value: "true"))
+            }
+            return items.isEmpty ? nil : items
 
-// MARK: - Dashboard Endpoints
-extension APIEndpoint {
-    static func dashboardStats(scope: String = "user", period: String = "this_month") -> APIEndpoint {
-        APIEndpoint(
-            path: "/api/dashboard/stats",
-            queryParameters: ["scope": scope, "period": period]
-        )
-    }
-
-    static func enquiryStats(scope: String = "user", includeBreakdown: Bool = false) -> APIEndpoint {
-        APIEndpoint(
-            path: "/api/dashboard/enquiry-stats",
-            queryParameters: [
-                "scope": scope,
-                "include_breakdown": String(includeBreakdown)
+        case .myQueue(let page, let limit, let search, let category):
+            var items = [
+                URLQueryItem(name: "page", value: String(page)),
+                URLQueryItem(name: "limit", value: String(limit))
             ]
-        )
-    }
-
-    static func categoryBreakdown(scope: String = "user", period: String = "this_month") -> APIEndpoint {
-        APIEndpoint(
-            path: "/api/dashboard/category-breakdown",
-            queryParameters: ["scope": scope, "period": period]
-        )
-    }
-}
-
-// MARK: - Orders Endpoints
-extension APIEndpoint {
-    static func orders(
-        page: Int = 1,
-        limit: Int = 20,
-        status: String? = nil,
-        search: String? = nil
-    ) -> APIEndpoint {
-        var params: [String: String] = [
-            "page": String(page),
-            "limit": String(limit)
-        ]
-        if let status = status { params["status"] = status }
-        if let search = search { params["search"] = search }
-
-        return APIEndpoint(path: "/api/orders", queryParameters: params)
-    }
-
-    static func order(id: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/orders/\(id)")
-    }
-
-    static func createOrder<T: Encodable>(body: T) -> APIEndpoint {
-        APIEndpoint(path: "/api/orders", method: .post, body: body)
-    }
-
-    static func updateOrder<T: Encodable>(id: String, body: T) -> APIEndpoint {
-        APIEndpoint(path: "/api/orders/\(id)", method: .patch, body: body)
-    }
-}
-
-// MARK: - Devices Endpoints
-extension APIEndpoint {
-    static func devices(
-        page: Int = 1,
-        limit: Int = 20,
-        status: String? = nil,
-        orderId: String? = nil
-    ) -> APIEndpoint {
-        var params: [String: String] = [
-            "page": String(page),
-            "limit": String(limit)
-        ]
-        if let status = status { params["status"] = status }
-        if let orderId = orderId { params["order_id"] = orderId }
-
-        return APIEndpoint(path: "/api/devices", queryParameters: params)
-    }
-
-    static func device(id: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/devices/\(id)")
-    }
-
-    static func updateDevice<T: Encodable>(id: String, body: T) -> APIEndpoint {
-        APIEndpoint(path: "/api/devices/\(id)", method: .patch, body: body)
-    }
-
-    static func myQueue(page: Int = 1, limit: Int = 20) -> APIEndpoint {
-        APIEndpoint(
-            path: "/api/devices/my-queue",
-            queryParameters: ["page": String(page), "limit": String(limit)]
-        )
-    }
-}
-
-// MARK: - Clients Endpoints
-extension APIEndpoint {
-    static func clients(
-        page: Int = 1,
-        limit: Int = 20,
-        search: String? = nil
-    ) -> APIEndpoint {
-        var params: [String: String] = [
-            "page": String(page),
-            "limit": String(limit)
-        ]
-        if let search = search { params["search"] = search }
-
-        return APIEndpoint(path: "/api/clients", queryParameters: params)
-    }
-
-    static func client(id: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/clients/\(id)")
-    }
-
-    static func clientOrders(id: String, page: Int = 1, limit: Int = 20) -> APIEndpoint {
-        APIEndpoint(
-            path: "/api/clients/\(id)/orders",
-            queryParameters: ["page": String(page), "limit": String(limit)]
-        )
-    }
-}
-
-// MARK: - Tickets/Enquiries Endpoints
-extension APIEndpoint {
-    static func tickets(
-        page: Int = 1,
-        limit: Int = 20,
-        status: String? = nil
-    ) -> APIEndpoint {
-        var params: [String: String] = [
-            "page": String(page),
-            "limit": String(limit)
-        ]
-        if let status = status { params["status"] = status }
-
-        return APIEndpoint(path: "/api/tickets", queryParameters: params)
-    }
-
-    static func ticket(id: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/tickets/\(id)")
-    }
-
-    static func ticketMessages(id: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/tickets/\(id)/messages")
-    }
-
-    static func sendTicketMessage<T: Encodable>(id: String, body: T) -> APIEndpoint {
-        APIEndpoint(path: "/api/tickets/\(id)/messages", method: .post, body: body)
-    }
-}
-
-// MARK: - Scanner/Lookup Endpoints
-extension APIEndpoint {
-    static func lookupByQR(code: String) -> APIEndpoint {
-        APIEndpoint(
-            path: "/api/lookup/qr",
-            queryParameters: ["code": code]
-        )
-    }
-
-    static func lookupByBarcode(barcode: String) -> APIEndpoint {
-        APIEndpoint(
-            path: "/api/lookup/barcode",
-            queryParameters: ["barcode": barcode]
-        )
-    }
-}
-
-// MARK: - User Settings Endpoints
-extension APIEndpoint {
-    static func userSettings() -> APIEndpoint {
-        APIEndpoint(path: "/api/user/settings")
-    }
-
-    static func updateUserSettings<T: Encodable>(body: T) -> APIEndpoint {
-        APIEndpoint(path: "/api/user/settings", method: .patch, body: body)
-    }
-}
-
-// MARK: - Push Notification Endpoints
-extension APIEndpoint {
-    /// Register a device token for push notifications
-    static func registerDeviceToken(token: String, appType: String = "staff") -> APIEndpoint {
-        struct DeviceTokenBody: Encodable {
-            let deviceToken: String
-            let platform: String
-            let appType: String
-        }
-        return APIEndpoint(
-            path: "/api/user/device-token",
-            method: .post,
-            body: DeviceTokenBody(deviceToken: token, platform: "ios", appType: appType)
-        )
-    }
-
-    /// Unregister a device token (call on logout)
-    static func unregisterDeviceToken(token: String) -> APIEndpoint {
-        struct DeviceTokenBody: Encodable {
-            let deviceToken: String
-        }
-        return APIEndpoint(
-            path: "/api/user/device-token",
-            method: .delete,
-            body: DeviceTokenBody(deviceToken: token)
-        )
-    }
-
-    /// Get push notification preferences
-    static func getPushPreferences() -> APIEndpoint {
-        APIEndpoint(path: "/api/user/push-preferences")
-    }
-
-    /// Update push notification preferences
-    static func updatePushPreferences(preferences: PushNotificationPreferences) -> APIEndpoint {
-        APIEndpoint(
-            path: "/api/user/push-preferences",
-            method: .put,
-            body: preferences
-        )
-    }
-}
-
-/// Push notification preferences model
-struct PushNotificationPreferences: Codable {
-    var notificationsEnabled: Bool
-    var orderStatusChanged: Bool
-    var orderCreated: Bool
-    var orderCollected: Bool
-    var deviceStatusChanged: Bool
-    var quoteApproved: Bool
-    var quoteRejected: Bool
-    var paymentReceived: Bool
-    var newEnquiry: Bool
-    var enquiryReply: Bool
-
-    static let defaultPreferences = PushNotificationPreferences(
-        notificationsEnabled: true,
-        orderStatusChanged: true,
-        orderCreated: true,
-        orderCollected: true,
-        deviceStatusChanged: true,
-        quoteApproved: true,
-        quoteRejected: true,
-        paymentReceived: true,
-        newEnquiry: true,
-        enquiryReply: true
-    )
-}
-
-// MARK: - Customer Portal Authentication Endpoints
-extension APIEndpoint {
-    /// Request a magic link code for customer authentication
-    /// - Parameters:
-    ///   - email: Customer's email address
-    ///   - companyId: Optional company ID (ignored if on custom domain)
-    static func customerRequestMagicLink(email: String, companyId: String? = nil) -> APIEndpoint {
-        struct MagicLinkBody: Encodable {
-            let email: String
-            let companyId: String?
-        }
-        return APIEndpoint(
-            path: "/api/customer/auth/request-magic-link",
-            method: .post,
-            body: MagicLinkBody(email: email, companyId: companyId)
-        )
-    }
-
-    /// Verify the magic link code for customer
-    /// - Parameters:
-    ///   - email: Customer's email address
-    ///   - code: The verification code
-    ///   - companyId: Optional company ID (if provided, completes login; if not, returns company list)
-    static func customerVerifyCode(email: String, code: String, companyId: String? = nil) -> APIEndpoint {
-        struct VerifyCodeBody: Encodable {
-            let email: String
-            let code: String
-            let companyId: String?
-        }
-        return APIEndpoint(
-            path: "/api/customer/auth/verify-code",
-            method: .post,
-            body: VerifyCodeBody(email: email, code: code, companyId: companyId)
-        )
-    }
-
-    /// Get current customer session info
-    static func customerGetMe() -> APIEndpoint {
-        APIEndpoint(path: "/api/customer/auth/me")
-    }
-
-    /// Customer logout
-    static func customerLogout() -> APIEndpoint {
-        APIEndpoint(path: "/api/customer/auth/logout", method: .post)
-    }
-
-    /// Verify order access token (for magic link direct order access)
-    static func customerOrderAccess(token: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/customer/order-access/\(token)")
-    }
-}
-
-// MARK: - Customer Orders Endpoints
-extension APIEndpoint {
-    /// Get customer's orders
-    static func customerOrders(page: Int = 1, limit: Int = 20) -> APIEndpoint {
-        APIEndpoint(
-            path: "/api/customer/orders",
-            queryParameters: ["page": String(page), "limit": String(limit)]
-        )
-    }
-
-    /// Get a specific customer order with full details
-    /// Returns: order info, devices, items, totals, messages, company info
-    static func customerOrder(id: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/customer/orders/\(id)")
-    }
-
-    /// Approve or reject an order quote
-    /// - Parameters:
-    ///   - orderId: The order ID
-    ///   - action: "approve" or "reject"
-    ///   - signatureType: "typed" or "drawn"
-    ///   - signatureData: The signature data (typed name or base64 drawing)
-    ///   - amountAcknowledged: The total amount the customer acknowledges
-    ///   - rejectionReason: Optional reason for rejection (only for reject action)
-    static func customerApproveOrder(
-        orderId: String,
-        action: String,
-        signatureType: String,
-        signatureData: String,
-        amountAcknowledged: Double? = nil,
-        rejectionReason: String? = nil
-    ) -> APIEndpoint {
-        struct ApproveBody: Encodable {
-            let action: String
-            let signature_type: String
-            let signature_data: String
-            let amount_acknowledged: Double?
-            let rejection_reason: String?
-        }
-        return APIEndpoint(
-            path: "/api/customer/orders/\(orderId)/approve",
-            method: .post,
-            body: ApproveBody(
-                action: action,
-                signature_type: signatureType,
-                signature_data: signatureData,
-                amount_acknowledged: amountAcknowledged,
-                rejection_reason: rejectionReason
-            )
-        )
-    }
-
-    /// Send a reply/message for an order
-    /// - Parameters:
-    ///   - orderId: The order ID
-    ///   - message: The message content
-    ///   - deviceId: Optional device ID if the message is about a specific device
-    static func customerReply(orderId: String, message: String, deviceId: String? = nil) -> APIEndpoint {
-        struct ReplyBody: Encodable {
-            let message: String
-            let device_id: String?
-        }
-        return APIEndpoint(
-            path: "/api/customer/orders/\(orderId)/reply",
-            method: .post,
-            body: ReplyBody(message: message, device_id: deviceId)
-        )
-    }
-
-    /// Download invoice for an order (returns HTML)
-    static func customerDownloadInvoice(orderId: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/customer/orders/\(orderId)/invoice")
-    }
-}
-
-// MARK: - Customer Device Endpoints
-extension APIEndpoint {
-    /// Authorize a specific device for repair
-    /// - Parameters:
-    ///   - deviceId: The device ID to authorize
-    ///   - authorized: Whether to authorize or reject
-    ///   - signatureType: "typed" or "drawn"
-    ///   - signatureData: The signature data
-    static func customerAuthorizeDevice(
-        deviceId: String,
-        authorized: Bool,
-        signatureType: String,
-        signatureData: String
-    ) -> APIEndpoint {
-        struct AuthorizeBody: Encodable {
-            let authorized: Bool
-            let signature_type: String
-            let signature_data: String
-        }
-        return APIEndpoint(
-            path: "/api/customer/devices/\(deviceId)/authorize",
-            method: .post,
-            body: AuthorizeBody(
-                authorized: authorized,
-                signature_type: signatureType,
-                signature_data: signatureData
-            )
-        )
-    }
-
-    /// Get device image URL for customer portal
-    static func customerDeviceImage(deviceId: String, imageId: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/customer/devices/\(deviceId)/images/\(imageId)/file")
-    }
-}
-
-// MARK: - Staff Enquiries Endpoints (uses /api/tickets backend)
-extension APIEndpoint {
-    /// Fetch paginated list of enquiries for staff
-    static func enquiries(
-        page: Int = 1,
-        limit: Int = 20,
-        status: String? = nil
-    ) -> APIEndpoint {
-        var params: [String: String] = [
-            "page": String(page),
-            "limit": String(limit)
-        ]
-        if let status = status { params["status"] = status }
-        return APIEndpoint(path: "/api/tickets", queryParameters: params)
-    }
-
-    /// Fetch a single enquiry by ID
-    static func enquiry(id: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/tickets/\(id)")
-    }
-
-    /// Fetch messages for an enquiry
-    static func enquiryMessages(id: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/tickets/\(id)/messages")
-    }
-
-    /// Send a reply to an enquiry
-    static func sendEnquiryReply(id: String, message: String) -> APIEndpoint {
-        struct ReplyBody: Encodable { let message: String }
-        return APIEndpoint(
-            path: "/api/tickets/\(id)/messages",
-            method: .post,
-            body: ReplyBody(message: message)
-        )
-    }
-
-    /// Fetch enquiry statistics for staff dashboard
-    static func enquiryStatsEndpoint() -> APIEndpoint {
-        APIEndpoint(path: "/api/tickets/stats")
-    }
-
-    /// Mark an enquiry as read
-    static func markEnquiryRead(id: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/tickets/\(id)/read", method: .post)
-    }
-
-    /// Archive an enquiry
-    static func archiveEnquiry(id: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/tickets/\(id)/archive", method: .post)
-    }
-
-    /// Mark an enquiry as spam
-    static func markEnquirySpam(id: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/tickets/\(id)/spam", method: .post)
-    }
-
-    /// Convert an enquiry to an order
-    static func convertEnquiryToOrder<T: Encodable>(id: String, body: T) -> APIEndpoint {
-        APIEndpoint(path: "/api/tickets/\(id)/convert", method: .post, body: body)
-    }
-
-    /// Generate an AI reply for an enquiry
-    static func generateEnquiryReply(id: String, locationId: String? = nil) -> APIEndpoint {
-        struct GenerateBody: Encodable {
-            let locationId: String?
-            enum CodingKeys: String, CodingKey {
-                case locationId = "location_id"
+            if let search = search, !search.isEmpty {
+                items.append(URLQueryItem(name: "search", value: search))
             }
-        }
-        return APIEndpoint(
-            path: "/api/tickets/\(id)/generate-response",
-            method: .post,
-            body: GenerateBody(locationId: locationId)
-        )
-    }
-
-    /// Execute a workflow on an enquiry
-    static func executeEnquiryWorkflow(enquiryId: String, workflowId: String, variableOverrides: [String: String]? = nil) -> APIEndpoint {
-        struct ExecuteBody: Encodable {
-            let macroId: String
-            let variableOverrides: [String: String]?
-            enum CodingKeys: String, CodingKey {
-                case macroId = "macro_id"
-                case variableOverrides = "variable_overrides"
+            if let category = category, !category.isEmpty {
+                items.append(URLQueryItem(name: "category", value: category))
             }
+            return items
+
+        case .devices(let filter):
+            return filter.queryItems
+
+        case .orders(let page, let limit, let status):
+            var items = [
+                URLQueryItem(name: "page", value: String(page)),
+                URLQueryItem(name: "limit", value: String(limit))
+            ]
+            if let status = status {
+                items.append(URLQueryItem(name: "status", value: status))
+            }
+            return items
+
+        case .clients(let page, let limit, let search):
+            var items = [
+                URLQueryItem(name: "page", value: String(page)),
+                URLQueryItem(name: "limit", value: String(limit))
+            ]
+            if let search = search {
+                items.append(URLQueryItem(name: "search", value: search))
+            }
+            return items
+
+        case .clientSearch(let query):
+            return [URLQueryItem(name: "q", value: query)]
+
+        case .tickets(let page, let limit, let status, let ticketType, let locationId, let assignedUserId, let workflowStatus, let sortBy, let sortOrder):
+            var items = [
+                URLQueryItem(name: "page", value: String(page)),
+                URLQueryItem(name: "limit", value: String(limit))
+            ]
+            if let status = status {
+                items.append(URLQueryItem(name: "status", value: status))
+            }
+            if let ticketType = ticketType {
+                items.append(URLQueryItem(name: "ticket_type", value: ticketType))
+            }
+            if let locationId = locationId {
+                items.append(URLQueryItem(name: "location_id", value: locationId))
+            }
+            if let assignedUserId = assignedUserId {
+                items.append(URLQueryItem(name: "assigned_user_id", value: assignedUserId))
+            }
+            if let workflowStatus = workflowStatus {
+                items.append(URLQueryItem(name: "workflow_status", value: workflowStatus))
+            }
+            if let sortBy = sortBy {
+                items.append(URLQueryItem(name: "sort_by", value: sortBy))
+            }
+            if let sortOrder = sortOrder {
+                items.append(URLQueryItem(name: "sort_order", value: sortOrder))
+            }
+            return items
+
+        case .macros(let category, let includeStages):
+            var items: [URLQueryItem] = []
+            if let category = category {
+                items.append(URLQueryItem(name: "category", value: category))
+            }
+            if let includeStages = includeStages, includeStages {
+                items.append(URLQueryItem(name: "include_stages", value: "true"))
+            }
+            return items.isEmpty ? nil : items
+
+        case .macroExecutions(let status, let ticketId, let page, let perPage):
+            var items: [URLQueryItem] = []
+            if let status = status {
+                items.append(URLQueryItem(name: "status", value: status))
+            }
+            if let ticketId = ticketId {
+                items.append(URLQueryItem(name: "ticket_id", value: ticketId))
+            }
+            if let page = page {
+                items.append(URLQueryItem(name: "page", value: String(page)))
+            }
+            if let perPage = perPage {
+                items.append(URLQueryItem(name: "per_page", value: String(perPage)))
+            }
+            return items.isEmpty ? nil : items
+
+        default:
+            return nil
         }
-        return APIEndpoint(
-            path: "/api/tickets/\(enquiryId)/macro",
-            method: .post,
-            body: ExecuteBody(macroId: workflowId, variableOverrides: variableOverrides)
-        )
-    }
-}
-
-// MARK: - Workflow (Macro) Endpoints
-extension APIEndpoint {
-    /// Fetch list of available workflows
-    static func workflows(includeStages: Bool = true) -> APIEndpoint {
-        var params: [String: String] = [:]
-        if includeStages { params["include_stages"] = "true" }
-        return APIEndpoint(path: "/api/macros", queryParameters: params)
     }
 
-    /// Fetch a single workflow by ID
-    static func workflow(id: String) -> APIEndpoint {
-        APIEndpoint(path: "/api/macros/\(id)")
+    // MARK: - Authentication Required
+
+    /// Whether this endpoint requires authentication
+    var requiresAuth: Bool {
+        switch self {
+        // Public endpoints (no auth required)
+        case .login, .twoFactorRequest, .twoFactorVerify,
+             .magicLinkRequest, .magicLinkVerifyCode, .refreshToken,
+             .customerMagicLinkRequest, .customerVerifyCode,
+             .createEnquiry:
+            return false
+        default:
+            return true
+        }
     }
 }

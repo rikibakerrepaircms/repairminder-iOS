@@ -2,50 +2,51 @@
 //  SettingsViewModel.swift
 //  Repair Minder
 //
-//  Created by Claude on 04/02/2026.
+//  Created on 04/02/2026.
 //
 
-import SwiftUI
-import UIKit
+import Foundation
 
+// MARK: - Settings View Model
+
+/// View model for the settings screen
 @MainActor
-@Observable
-final class SettingsViewModel {
-    var showLogoutConfirmation = false
+final class SettingsViewModel: ObservableObject {
 
-    private let appState: AppState
+    // MARK: - Published State
 
-    init(appState: AppState) {
-        self.appState = appState
+    /// Show logout confirmation dialog
+    @Published var showLogoutConfirmation: Bool = false
+
+    /// Loading state
+    @Published var isLoading: Bool = false
+
+    /// Error message
+    @Published var errorMessage: String?
+
+    // MARK: - Computed Properties
+
+    /// App version string
+    var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
     }
 
-    var currentUser: User? {
-        appState.currentUser
+    /// Build number string
+    var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
     }
 
-    var currentCompany: Company? {
-        appState.currentCompany
-    }
+    // MARK: - Actions
 
+    /// Logout the current user
     func logout() async {
-        await appState.logout()
-    }
+        isLoading = true
+        defer { isLoading = false }
 
-    func openSystemSettings() {
-        if let url = URL(string: UIApplication.openSettingsURLString) {
-            UIApplication.shared.open(url)
-        }
-    }
+        // Unregister push token before logout
+        await PushNotificationService.shared.unregisterToken()
 
-    func openHelpCenter() {
-        if let url = URL(string: "https://repairminder.com/help") {
-            UIApplication.shared.open(url)
-        }
-    }
-
-    func openContactSupport() {
-        if let url = URL(string: "mailto:support@repairminder.com") {
-            UIApplication.shared.open(url)
-        }
+        // Logout from auth manager
+        await AuthManager.shared.logout()
     }
 }

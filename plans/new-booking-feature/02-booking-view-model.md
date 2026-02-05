@@ -19,7 +19,7 @@ Create the central state management (BookingViewModel) and form data model (Book
 | File | Purpose |
 |------|---------|
 | `Core/Models/BookingFormData.swift` | Data structure for all booking form fields |
-| `Features/Booking/BookingViewModel.swift` | Observable view model managing wizard state |
+| `Features/Staff/Booking/BookingViewModel.swift` | Observable view model managing wizard state |
 
 ---
 

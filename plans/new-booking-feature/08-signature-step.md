@@ -19,8 +19,8 @@ Create the terms agreement and signature capture step with a native iOS signatur
 
 | File | Purpose |
 |------|---------|
-| `Features/Booking/Steps/SignatureStepView.swift` | Terms and signature capture |
-| `Features/Booking/Components/SignaturePadView.swift` | Canvas for signature drawing |
+| `Features/Staff/Booking/Steps/SignatureStepView.swift` | Terms and signature capture |
+| `Features/Staff/Booking/Components/SignaturePadView.swift` | Canvas for signature drawing |
 
 ---
 

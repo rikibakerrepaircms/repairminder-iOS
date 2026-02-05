@@ -19,8 +19,8 @@ Create the main wizard container with step progress indicator and navigation con
 
 | File | Purpose |
 |------|---------|
-| `Features/Booking/BookingWizardView.swift` | Main wizard container with step navigation |
-| `Features/Booking/Components/StepProgressView.swift` | Progress indicator showing current step |
+| `Features/Staff/Booking/BookingWizardView.swift` | Main wizard container with step navigation |
+| `Features/Staff/Booking/Components/StepProgressView.swift` | Progress indicator showing current step |
 
 ---
 

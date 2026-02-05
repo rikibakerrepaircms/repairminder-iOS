@@ -2,238 +2,210 @@
 //  CustomerOrder.swift
 //  Repair Minder
 //
-//  Created by Claude on 04/02/2026.
+//  Created on 04/02/2026.
 //
 
 import Foundation
-import SwiftUI
 
-/// Customer-facing order model with friendly status descriptions
-struct CustomerOrder: Identifiable, Codable, Equatable, Sendable {
+// MARK: - Customer Order Summary (List View)
+
+/// Order summary returned from GET /api/customer/orders
+/// Used for order list display
+struct CustomerOrderSummary: Codable, Identifiable, Sendable {
     let id: String
-    let orderNumber: Int
-    let status: CustomerOrderStatus
-    let deviceSummary: String
-    let total: Decimal?
-    let deposit: Decimal?
-    let balance: Decimal?
-    let shopName: String?
+    let ticketNumber: Int
+    let status: String
     let createdAt: Date
-    let updatedAt: Date
-    let devices: [CustomerDevice]?
+    let quoteSentAt: Date?
+    let quoteApprovedAt: Date?
+    let rejectedAt: Date?
+    let updatedAt: Date?
+    let devices: [CustomerDeviceSummary]
+    let totals: CustomerOrderTotals
 
-    var displayRef: String { "#\(orderNumber)" }
-
-    var isPaid: Bool {
-        (balance ?? 0) <= 0
-    }
-
+    // Note: Using automatic snake_case conversion via decoder.keyDecodingStrategy
     enum CodingKeys: String, CodingKey {
-        case id, status, total, deposit, balance
-        case orderNumber, deviceSummary, shopName
-        case createdAt, updatedAt, devices
+        case id, ticketNumber, status, createdAt, quoteSentAt
+        case quoteApprovedAt, rejectedAt, updatedAt, devices, totals
     }
 
+    /// Custom decoding to handle flexible date formats from API
+    /// API sends dates as "2025-12-20 11:36:29" or ISO8601 format
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
         id = try container.decode(String.self, forKey: .id)
-        orderNumber = try container.decode(Int.self, forKey: .orderNumber)
-        status = try container.decode(CustomerOrderStatus.self, forKey: .status)
-        deviceSummary = try container.decodeIfPresent(String.self, forKey: .deviceSummary) ?? ""
-        shopName = try container.decodeIfPresent(String.self, forKey: .shopName)
-        createdAt = try container.decode(Date.self, forKey: .createdAt)
-        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
-        devices = try container.decodeIfPresent([CustomerDevice].self, forKey: .devices)
+        ticketNumber = try container.decode(Int.self, forKey: .ticketNumber)
+        status = try container.decode(String.self, forKey: .status)
+        devices = try container.decode([CustomerDeviceSummary].self, forKey: .devices)
+        totals = try container.decode(CustomerOrderTotals.self, forKey: .totals)
 
-        // Handle Decimal decoding from String or Double
-        if let totalString = try? container.decode(String.self, forKey: .total) {
-            total = Decimal(string: totalString)
-        } else if let totalDouble = try? container.decode(Double.self, forKey: .total) {
-            total = Decimal(totalDouble)
-        } else {
-            total = nil
+        // Decode dates with flexible format handling
+        createdAt = try Self.decodeDate(from: container, forKey: .createdAt) ?? Date()
+        quoteSentAt = try Self.decodeDate(from: container, forKey: .quoteSentAt)
+        quoteApprovedAt = try Self.decodeDate(from: container, forKey: .quoteApprovedAt)
+        rejectedAt = try Self.decodeDate(from: container, forKey: .rejectedAt)
+        updatedAt = try Self.decodeDate(from: container, forKey: .updatedAt)
+    }
+
+    /// Decode date from string with multiple format support
+    private static func decodeDate(from container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys) throws -> Date? {
+        guard let dateString = try container.decodeIfPresent(String.self, forKey: key) else {
+            return nil
         }
 
-        if let depositString = try? container.decode(String.self, forKey: .deposit) {
-            deposit = Decimal(string: depositString)
-        } else if let depositDouble = try? container.decode(Double.self, forKey: .deposit) {
-            deposit = Decimal(depositDouble)
-        } else {
-            deposit = nil
+        // Try ISO8601 with fractional seconds first
+        let iso8601Formatter = ISO8601DateFormatter()
+        iso8601Formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = iso8601Formatter.date(from: dateString) {
+            return date
         }
 
-        if let balanceString = try? container.decode(String.self, forKey: .balance) {
-            balance = Decimal(string: balanceString)
-        } else if let balanceDouble = try? container.decode(Double.self, forKey: .balance) {
-            balance = Decimal(balanceDouble)
-        } else {
-            balance = nil
+        // Try ISO8601 without fractional seconds
+        iso8601Formatter.formatOptions = [.withInternetDateTime]
+        if let date = iso8601Formatter.date(from: dateString) {
+            return date
         }
+
+        // Try MySQL-style format "2025-12-20 11:36:29"
+        let mysqlFormatter = DateFormatter()
+        mysqlFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        mysqlFormatter.timeZone = TimeZone(identifier: "UTC")
+        if let date = mysqlFormatter.date(from: dateString) {
+            return date
+        }
+
+        return nil
+    }
+
+    /// Whether the order is awaiting customer action (approval/rejection)
+    var isAwaitingAction: Bool {
+        quoteSentAt != nil && quoteApprovedAt == nil && rejectedAt == nil
+    }
+
+    /// Whether the order has been approved
+    var isApproved: Bool {
+        quoteApprovedAt != nil
+    }
+
+    /// Whether the order has been rejected
+    var isRejected: Bool {
+        rejectedAt != nil
+    }
+
+    /// Primary status display text for customer
+    var customerStatusLabel: String {
+        if isRejected {
+            return "Declined"
+        }
+        if isApproved {
+            return "Approved"
+        }
+        if isAwaitingAction {
+            return "Action Required"
+        }
+        if devices.first?.status == "device_received" {
+            return "Received"
+        }
+        if devices.first?.status == "diagnosing" {
+            return "Being Assessed"
+        }
+        return status.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+
+    /// Formatted order reference
+    var orderReference: String {
+        "#\(ticketNumber)"
     }
 }
 
-/// Device information for customer view
-struct CustomerDevice: Identifiable, Codable, Equatable, Sendable {
+// MARK: - Customer Device Summary (List View)
+
+/// Minimal device info for order list display
+struct CustomerDeviceSummary: Codable, Identifiable, Sendable {
     let id: String
-    let type: String
-    let brand: String?
-    let model: String?
-    let status: CustomerDeviceStatus
-    let issue: String?
-    let price: Decimal?
+    let status: String
+    let displayName: String
 
-    var displayName: String {
-        if let brand = brand, let model = model, !brand.isEmpty, !model.isEmpty {
-            return "\(brand) \(model)"
-        }
-        return type
-    }
-
+    // Note: Using automatic snake_case conversion via decoder.keyDecodingStrategy
     enum CodingKeys: String, CodingKey {
-        case id, type, brand, model, status, issue, price
+        case id, status, displayName
     }
 
+    /// Parsed device status enum
+    var deviceStatus: DeviceStatus? {
+        DeviceStatus(rawValue: status)
+    }
+}
+
+// MARK: - Customer Order Totals
+
+/// Pricing totals for an order
+struct CustomerOrderTotals: Codable, Sendable {
+    let subtotal: Decimal
+    let vatTotal: Decimal
+    let grandTotal: Decimal
+    let depositsPaid: Decimal?
+    let finalPaymentsPaid: Decimal?
+    let amountPaid: Decimal?
+    let balanceDue: Decimal?
+
+    // Note: Using automatic snake_case conversion via decoder.keyDecodingStrategy
+    enum CodingKeys: String, CodingKey {
+        case subtotal, vatTotal, grandTotal, depositsPaid
+        case finalPaymentsPaid, amountPaid, balanceDue
+    }
+
+    /// Custom decoding to handle numeric values that may come as Int or Double
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
-        id = try container.decode(String.self, forKey: .id)
-        type = try container.decode(String.self, forKey: .type)
-        brand = try container.decodeIfPresent(String.self, forKey: .brand)
-        model = try container.decodeIfPresent(String.self, forKey: .model)
-        status = try container.decode(CustomerDeviceStatus.self, forKey: .status)
-        issue = try container.decodeIfPresent(String.self, forKey: .issue)
+        subtotal = Self.decodeDecimal(from: container, forKey: .subtotal) ?? 0
+        vatTotal = Self.decodeDecimal(from: container, forKey: .vatTotal) ?? 0
+        grandTotal = Self.decodeDecimal(from: container, forKey: .grandTotal) ?? 0
+        depositsPaid = Self.decodeDecimal(from: container, forKey: .depositsPaid)
+        finalPaymentsPaid = Self.decodeDecimal(from: container, forKey: .finalPaymentsPaid)
+        amountPaid = Self.decodeDecimal(from: container, forKey: .amountPaid)
+        balanceDue = Self.decodeDecimal(from: container, forKey: .balanceDue)
+    }
 
-        if let priceString = try? container.decode(String.self, forKey: .price) {
-            price = Decimal(string: priceString)
-        } else if let priceDouble = try? container.decode(Double.self, forKey: .price) {
-            price = Decimal(priceDouble)
-        } else {
-            price = nil
+    private static func decodeDecimal(from container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys) -> Decimal? {
+        if let doubleValue = try? container.decode(Double.self, forKey: key) {
+            return Decimal(doubleValue)
         }
+        if let intValue = try? container.decode(Int.self, forKey: key) {
+            return Decimal(intValue)
+        }
+        return nil
+    }
+
+    init(subtotal: Decimal, vatTotal: Decimal, grandTotal: Decimal, depositsPaid: Decimal? = nil, finalPaymentsPaid: Decimal? = nil, amountPaid: Decimal? = nil, balanceDue: Decimal? = nil) {
+        self.subtotal = subtotal
+        self.vatTotal = vatTotal
+        self.grandTotal = grandTotal
+        self.depositsPaid = depositsPaid
+        self.finalPaymentsPaid = finalPaymentsPaid
+        self.amountPaid = amountPaid
+        self.balanceDue = balanceDue
     }
 }
 
-/// Customer-friendly device status
-enum CustomerDeviceStatus: String, Codable, Sendable {
-    case received = "booked_in"
-    case diagnosing = "diagnosing"
-    case awaitingApproval = "awaiting_approval"
-    case approved = "approved"
-    case inRepair = "in_repair"
-    case awaitingParts = "awaiting_parts"
-    case repaired = "repaired"
-    case qualityCheck = "quality_check"
-    case ready = "ready"
-    case collected = "collected"
-    case unrepairable = "unrepairable"
+// MARK: - Customer Order List Response
 
-    var displayName: String {
-        switch self {
-        case .received: return "Received"
-        case .diagnosing: return "Being Checked"
-        case .awaitingApproval: return "Quote Ready"
-        case .approved: return "Approved"
-        case .inRepair: return "Repairing"
-        case .awaitingParts: return "Waiting for Parts"
-        case .repaired: return "Repaired"
-        case .qualityCheck: return "Final Checks"
-        case .ready: return "Ready"
-        case .collected: return "Collected"
-        case .unrepairable: return "Cannot Repair"
-        }
+/// Response wrapper for GET /api/customer/orders
+struct CustomerOrderListResponse: Decodable {
+    let orders: [CustomerOrderSummary]
+    let currencyCode: String
+
+    init(from decoder: Decoder) throws {
+        // The data is the array directly, currency_code is at root level
+        let container = try decoder.singleValueContainer()
+        orders = try container.decode([CustomerOrderSummary].self)
+        currencyCode = "GBP" // Default, will be set from APIResponse
     }
 
-    var color: Color {
-        switch self {
-        case .received: return .blue
-        case .diagnosing: return .purple
-        case .awaitingApproval: return .orange
-        case .approved: return .teal
-        case .inRepair: return .indigo
-        case .awaitingParts: return .gray
-        case .repaired: return .mint
-        case .qualityCheck: return .cyan
-        case .ready: return .green
-        case .collected: return .gray
-        case .unrepairable: return .red
-        }
-    }
-}
-
-/// Customer-friendly order status with descriptions
-enum CustomerOrderStatus: String, Codable, CaseIterable, Sendable {
-    case received = "booked_in"
-    case diagnosing = "diagnosing"
-    case awaitingApproval = "awaiting_approval"
-    case inRepair = "in_progress"
-    case awaitingParts = "awaiting_parts"
-    case qualityCheck = "quality_check"
-    case ready = "ready"
-    case collected = "collected"
-
-    var customerDisplayName: String {
-        switch self {
-        case .received: return "Received"
-        case .diagnosing: return "Being Diagnosed"
-        case .awaitingApproval: return "Approval Needed"
-        case .inRepair: return "Being Repaired"
-        case .awaitingParts: return "Waiting for Parts"
-        case .qualityCheck: return "Final Checks"
-        case .ready: return "Ready for Collection"
-        case .collected: return "Collected"
-        }
-    }
-
-    var customerDescription: String {
-        switch self {
-        case .received: return "We've received your device and it's in our queue"
-        case .diagnosing: return "Our technician is examining your device"
-        case .awaitingApproval: return "Please review and approve the repair quote"
-        case .inRepair: return "Your device is being repaired"
-        case .awaitingParts: return "We're waiting for parts to arrive"
-        case .qualityCheck: return "We're running final quality checks"
-        case .ready: return "Your device is ready! Come collect it anytime"
-        case .collected: return "Thanks for choosing us!"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .received: return "tray.and.arrow.down.fill"
-        case .diagnosing: return "magnifyingglass"
-        case .awaitingApproval: return "hand.raised.fill"
-        case .inRepair: return "wrench.and.screwdriver.fill"
-        case .awaitingParts: return "shippingbox.fill"
-        case .qualityCheck: return "checkmark.shield.fill"
-        case .ready: return "checkmark.circle.fill"
-        case .collected: return "hand.thumbsup.fill"
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .received: return .blue
-        case .diagnosing: return .orange
-        case .awaitingApproval: return .yellow
-        case .inRepair: return .purple
-        case .awaitingParts: return .gray
-        case .qualityCheck: return .teal
-        case .ready: return .green
-        case .collected: return .gray
-        }
-    }
-
-    var isActive: Bool {
-        switch self {
-        case .collected:
-            return false
-        default:
-            return true
-        }
-    }
-
-    var requiresAction: Bool {
-        self == .awaitingApproval
+    init(orders: [CustomerOrderSummary], currencyCode: String) {
+        self.orders = orders
+        self.currencyCode = currencyCode
     }
 }

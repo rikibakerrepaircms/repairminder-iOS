@@ -19,7 +19,7 @@ Create the success confirmation view showing order details after successful book
 
 | File | Purpose |
 |------|---------|
-| `Features/Booking/Steps/ConfirmationStepView.swift` | Success view with order details |
+| `Features/Staff/Booking/Steps/ConfirmationStepView.swift` | Success view with order details |
 
 ---
 

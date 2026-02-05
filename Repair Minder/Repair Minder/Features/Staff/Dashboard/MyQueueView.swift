@@ -1,0 +1,235 @@
+//
+//  MyQueueView.swift
+//  Repair Minder
+//
+//  Created on 04/02/2026.
+//
+
+import SwiftUI
+
+// MARK: - Device Navigation
+
+/// Navigation target for device detail
+private struct DeviceNavigation: Hashable {
+    let orderId: String
+    let deviceId: String
+}
+
+// MARK: - My Queue View
+
+/// Staff work queue showing devices assigned to the current user
+struct MyQueueView: View {
+    @State private var viewModel = MyQueueViewModel()
+    @State private var searchText = ""
+    @State private var deviceNavigation: DeviceNavigation?
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Compact Filter Header
+                filterHeader
+
+                // Main content
+                if viewModel.isEmpty && !viewModel.isLoading {
+                    emptyState
+                } else {
+                    deviceList
+                }
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    EmptyView()
+                }
+            }
+            .refreshable {
+                await viewModel.refresh()
+            }
+            .task {
+                await viewModel.loadQueue()
+            }
+            .overlay {
+                if viewModel.isLoading && viewModel.devices.isEmpty {
+                    ProgressView()
+                }
+            }
+            .navigationDestination(item: $deviceNavigation) { nav in
+                DeviceDetailView(orderId: nav.orderId, deviceId: nav.deviceId)
+            }
+        }
+    }
+
+    // MARK: - Filter Header
+
+    private var filterHeader: some View {
+        VStack(spacing: 6) {
+            // Search Bar
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.secondary)
+                TextField("Search devices...", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .onChange(of: searchText) { _, newValue in
+                        Task {
+                            await viewModel.setSearch(newValue)
+                        }
+                    }
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                        Task { await viewModel.clearSearch() }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(Color(.systemBackground))
+            .cornerRadius(8)
+
+            // Category Filter Boxes
+            HStack(spacing: 4) {
+                ForEach(QueueCategory.allCases) { category in
+                    QueueCategoryBox(
+                        category: category,
+                        count: count(for: category),
+                        isSelected: viewModel.selectedCategory == category
+                    ) {
+                        Task {
+                            await viewModel.setCategory(category)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color(.systemGroupedBackground))
+    }
+
+    private func count(for category: QueueCategory) -> Int {
+        let counts = viewModel.categoryCounts
+        switch category {
+        case .all: return counts.total
+        case .repair: return counts.repair ?? 0
+        case .buyback: return counts.buyback ?? 0
+        case .unassigned: return counts.unassigned ?? 0
+        }
+    }
+
+    // MARK: - Device List
+
+    @ViewBuilder
+    private var deviceList: some View {
+        List {
+            ForEach(viewModel.devices) { device in
+                DeviceQueueRow(device: device) {
+                    if let orderId = device.orderId {
+                        deviceNavigation = DeviceNavigation(orderId: orderId, deviceId: device.id)
+                    }
+                }
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                .listRowBackground(Color(.secondarySystemGroupedBackground))
+                .onAppear {
+                    Task {
+                        await viewModel.loadMoreIfNeeded(currentItem: device)
+                    }
+                }
+            }
+
+            // Loading more indicator
+            if viewModel.isLoadingMore {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .padding()
+                    Spacer()
+                }
+                .listRowBackground(Color.clear)
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    // MARK: - Empty State
+
+    @ViewBuilder
+    private var emptyState: some View {
+        VStack(spacing: 16) {
+            Spacer()
+
+            Image(systemName: emptyStateIcon)
+                .font(.system(size: 48))
+                .foregroundStyle(.secondary)
+
+            Text(viewModel.emptyMessage)
+                .font(.headline)
+                .foregroundStyle(.secondary)
+
+            if viewModel.selectedCategory != .all || !viewModel.searchText.isEmpty {
+                Button("Clear Filters") {
+                    Task {
+                        viewModel.selectedCategory = .all
+                        await viewModel.clearSearch()
+                    }
+                }
+                .buttonStyle(.bordered)
+            }
+
+            Spacer()
+        }
+        .padding()
+    }
+
+    private var emptyStateIcon: String {
+        switch viewModel.selectedCategory {
+        case .all:
+            return "tray"
+        case .repair:
+            return "wrench.and.screwdriver"
+        case .buyback:
+            return "arrow.triangle.2.circlepath"
+        case .unassigned:
+            return "questionmark.folder"
+        }
+    }
+}
+
+// MARK: - Queue Category Box
+
+private struct QueueCategoryBox: View {
+    let category: QueueCategory
+    let count: Int
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 1) {
+                Text("\(count)")
+                    .font(.caption.bold())
+                Text(category.shortLabel)
+                    .font(.caption2)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .background(isSelected ? category.color.opacity(0.15) : Color(.secondarySystemGroupedBackground))
+            .foregroundColor(isSelected ? category.color : .secondary)
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? category.color : Color.clear, lineWidth: 2)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Preview
+
+#Preview {
+    MyQueueView()
+}
