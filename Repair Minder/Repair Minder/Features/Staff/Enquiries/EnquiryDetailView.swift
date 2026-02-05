@@ -13,6 +13,7 @@ struct EnquiryDetailView: View {
 
     @StateObject private var viewModel: EnquiryDetailViewModel
     @FocusState private var isReplyFocused: Bool
+    @State private var isReplyExpanded = false
 
     init(ticketId: String) {
         self.ticketId = ticketId
@@ -48,6 +49,21 @@ struct EnquiryDetailView: View {
         }
         .refreshable {
             await viewModel.refresh()
+        }
+        .onChange(of: viewModel.replyText) { oldValue, newValue in
+            // Auto-expand fully when AI generates text (large jump in content)
+            if newValue.count > 100 && oldValue.isEmpty && !isReplyExpanded {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    isReplyExpanded = true
+                }
+            }
+            // Auto-collapse when text is cleared
+            if newValue.isEmpty && (isReplyExpanded || isReplyFocused) {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    isReplyExpanded = false
+                    isReplyFocused = false
+                }
+            }
         }
         .sheet(isPresented: $viewModel.showingMacroPicker) {
             MacroPickerSheet(
@@ -233,14 +249,26 @@ struct EnquiryDetailView: View {
 
     // MARK: - Reply Composer
 
+    /// Text area height based on state: compact → focused → expanded
+    private var textAreaHeight: CGFloat {
+        let screen = UIScreen.main.bounds.height
+        if isReplyExpanded {
+            return screen * 0.65
+        } else if isReplyFocused {
+            return screen * 0.35
+        } else {
+            return 48
+        }
+    }
+
+    /// Whether the composer is in an active editing state
+    private var isComposerActive: Bool {
+        isReplyFocused || isReplyExpanded
+    }
+
     private var replyComposer: some View {
         VStack(spacing: 0) {
             Divider()
-
-            // AI response preview
-            if viewModel.aiGeneratedText != nil {
-                aiResponsePreview
-            }
 
             // Error banner
             if let error = viewModel.error {
@@ -254,7 +282,7 @@ struct EnquiryDetailView: View {
                 .padding(.top, 8)
             }
 
-            // Mode picker row with workflow and AI buttons
+            // Mode picker row with workflow, AI, and expand/collapse
             HStack {
                 Picker("Mode", selection: $viewModel.replyMode) {
                     ForEach(EnquiryDetailViewModel.ReplyMode.allCases, id: \.self) { mode in
@@ -263,6 +291,51 @@ struct EnquiryDetailView: View {
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 180)
+
+                // Collapse pill (shown when active)
+                if isComposerActive {
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            isReplyExpanded = false
+                            isReplyFocused = false
+                        }
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "chevron.down.2")
+                                .imageScale(.small)
+                            Text("Collapse")
+                        }
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.blue.opacity(0.12))
+                        .foregroundStyle(.blue)
+                        .clipShape(Capsule())
+                    }
+                }
+
+                // Expand pill (when focused but not fully expanded, and has text)
+                if isReplyFocused && !isReplyExpanded && !viewModel.replyText.isEmpty {
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            isReplyExpanded = true
+                        }
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "chevron.up.2")
+                                .imageScale(.small)
+                            Text("Expand")
+                        }
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.blue.opacity(0.12))
+                        .foregroundStyle(.blue)
+                        .clipShape(Capsule())
+                    }
+                }
 
                 Spacer()
 
@@ -310,10 +383,39 @@ struct EnquiryDetailView: View {
 
             // Text input with status dropdown and send button
             HStack(alignment: .bottom, spacing: 8) {
-                TextField(viewModel.replyMode.placeholder, text: $viewModel.replyText, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                    .lineLimit(3...6)
-                    .focused($isReplyFocused)
+                ZStack(alignment: .bottom) {
+                    ScrollView {
+                        TextField(viewModel.replyMode.placeholder, text: $viewModel.replyText, axis: .vertical)
+                            .textFieldStyle(.plain)
+                            .focused($isReplyFocused)
+                            .padding(8)
+                            .frame(minHeight: textAreaHeight, alignment: .topLeading)
+                    }
+                    .scrollIndicators(isComposerActive ? .automatic : .never)
+                    .scrollDisabled(!isComposerActive)
+                    .frame(height: textAreaHeight)
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(isReplyFocused ? Color.blue.opacity(0.5) : Color(.systemGray4), lineWidth: isReplyFocused ? 1 : 0.5)
+                    )
+
+                    // Fade gradient when compact and has text
+                    if !isComposerActive && !viewModel.replyText.isEmpty {
+                        LinearGradient(
+                            stops: [
+                                .init(color: .clear, location: 0),
+                                .init(color: Color(.systemGray6), location: 1),
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 30)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .allowsHitTesting(false)
+                    }
+                }
 
                 // Right side: status dropdown above send button
                 VStack(spacing: 4) {
@@ -361,37 +463,13 @@ struct EnquiryDetailView: View {
                     .disabled(!viewModel.canSendReply)
                 }
             }
-            .padding()
+            .padding(.horizontal)
+            .padding(.top, 8)
         }
+        .padding(.bottom, 8)
         .background(Color(.systemBackground))
-    }
-
-    private var aiResponsePreview: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: "sparkles")
-                    .foregroundColor(.purple)
-                Text("AI Generated Response")
-                    .font(.caption.weight(.semibold))
-                Spacer()
-                Button("Use") {
-                    viewModel.useAIResponse()
-                }
-                .font(.caption)
-                Button {
-                    viewModel.clearAIResponse()
-                } label: {
-                    Image(systemName: "xmark.circle")
-                }
-            }
-
-            Text(viewModel.aiGeneratedText ?? "")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(4)
-        }
-        .padding()
-        .background(Color.purple.opacity(0.1))
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isReplyExpanded)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isReplyFocused)
     }
 
     private func closedBanner(_ ticket: Ticket) -> some View {

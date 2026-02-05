@@ -9,6 +9,7 @@ import SwiftUI
 
 struct PasscodeLockView: View {
     @StateObject private var viewModel = PasscodeLockViewModel()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -76,8 +77,13 @@ struct PasscodeLockView: View {
         .sheet(isPresented: $viewModel.showResetFlow) {
             ResetPasscodeView()
         }
-        .onAppear {
+        .task {
             viewModel.attemptBiometricOnAppear()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                viewModel.attemptBiometricOnAppear()
+            }
         }
     }
 }

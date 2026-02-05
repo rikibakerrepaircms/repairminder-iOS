@@ -153,6 +153,8 @@ final class PasscodeService: ObservableObject {
         // Verify immediately to get hash + salt for local cache
         try await verifyAndCachePasscode(passcode)
         hasPasscode = true
+        passcodeEnabled = true
+        keychain.setPasscodeEnabled(true)
     }
 
     // MARK: - Verify Passcode

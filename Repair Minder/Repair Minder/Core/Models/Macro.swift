@@ -74,33 +74,33 @@ struct MacroStage: Codable, Identifiable, Sendable, Equatable {
     let actionType: String
     let subject: String?
     let content: String?
-    let sendEmail: Int
-    let addNote: Int
-    let changeStatus: Int
+    let sendEmail: Int?
+    let addNote: Int?
+    let changeStatus: Int?
     let newStatus: String?
     let noteContent: String?
-    let isActive: Int
+    let isActive: Int?
 
     // MARK: - Computed Properties
 
     /// Whether this stage sends an email
     var sendsEmail: Bool {
-        sendEmail == 1
+        (sendEmail ?? 0) == 1
     }
 
     /// Whether this stage adds an internal note
     var addsNote: Bool {
-        addNote == 1
+        (addNote ?? 0) == 1
     }
 
     /// Whether this stage changes the ticket status
     var changesStatus: Bool {
-        changeStatus == 1
+        (changeStatus ?? 0) == 1
     }
 
     /// Whether this stage is enabled
     var isEnabled: Bool {
-        isActive == 1
+        (isActive ?? 1) == 1
     }
 
     /// Human-readable delay description

@@ -14,6 +14,7 @@ struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
     @ObservedObject private var authManager = AuthManager.shared
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
 
     var body: some View {
         NavigationStack {
@@ -29,6 +30,9 @@ struct SettingsView: View {
 
                 // Security section
                 securitySection
+
+                // Appearance section
+                appearanceSection
 
                 // About section
                 aboutSection
@@ -136,6 +140,24 @@ struct SettingsView: View {
                 } icon: {
                     Image(systemName: "lock.shield")
                 }
+            }
+        }
+    }
+
+    // MARK: - Appearance Section
+
+    private var appearanceSection: some View {
+        Section("Appearance") {
+            Picker(selection: Binding(
+                get: { appearanceManager.currentMode },
+                set: { appearanceManager.currentMode = $0 }
+            )) {
+                ForEach(AppearanceMode.allCases, id: \.self) { mode in
+                    Label(mode.displayName, systemImage: mode.icon)
+                        .tag(mode)
+                }
+            } label: {
+                Label("Theme", systemImage: "paintbrush.fill")
             }
         }
     }

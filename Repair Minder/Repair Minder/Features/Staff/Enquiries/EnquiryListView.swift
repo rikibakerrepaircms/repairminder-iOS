@@ -12,8 +12,11 @@ struct EnquiryListView: View {
     @StateObject private var viewModel = EnquiryListViewModel()
     @State private var showingFilters = false
     @State private var showingSortOptions = false
-    @State private var selectedTicket: Ticket?
-    @State private var searchText = ""
+    @State private var editMode: EditMode = .inactive
+    @State private var selectedTicketIds: Set<String> = []
+    @State private var showingBulkStatusPicker = false
+
+    private var isSelectMode: Bool { editMode.isEditing }
 
     var body: some View {
         NavigationStack {
@@ -29,13 +32,40 @@ struct EnquiryListView: View {
                 ToolbarItem(placement: .principal) {
                     EmptyView()
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        sortMenu
-                        Divider()
-                        filterMenu
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        withAnimation {
+                            if editMode.isEditing {
+                                editMode = .inactive
+                                selectedTicketIds.removeAll()
+                            } else {
+                                editMode = .active
+                            }
+                        }
                     } label: {
-                        Image(systemName: viewModel.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        Text(isSelectMode ? "Done" : "Select")
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    if isSelectMode {
+                        Button {
+                            if selectedTicketIds.count == viewModel.tickets.count {
+                                selectedTicketIds.removeAll()
+                            } else {
+                                selectedTicketIds = Set(viewModel.tickets.map(\.id))
+                            }
+                        } label: {
+                            Text(selectedTicketIds.count == viewModel.tickets.count ? "Deselect All" : "Select All")
+                                .font(.subheadline)
+                        }
+                    } else {
+                        Menu {
+                            sortMenu
+                            Divider()
+                            filterMenu
+                        } label: {
+                            Image(systemName: viewModel.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        }
                     }
                 }
             }
@@ -45,7 +75,7 @@ struct EnquiryListView: View {
             .task {
                 await viewModel.loadTickets()
             }
-            .navigationDestination(item: $selectedTicket) { ticket in
+            .navigationDestination(for: Ticket.self) { ticket in
                 EnquiryDetailView(ticketId: ticket.id)
             }
         }
@@ -59,11 +89,11 @@ struct EnquiryListView: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
-                TextField("Search enquiries...", text: $searchText)
+                TextField("Search enquiries...", text: $viewModel.searchText)
                     .textFieldStyle(.plain)
-                if !searchText.isEmpty {
+                if !viewModel.searchText.isEmpty {
                     Button {
-                        searchText = ""
+                        viewModel.searchText = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.secondary)
@@ -75,38 +105,38 @@ struct EnquiryListView: View {
             .background(Color(.systemBackground))
             .cornerRadius(8)
 
-            // Row 1: Type Filters (Lead / Order)
+            // Row 1: Type Filters (Lead / Order) - multi-select
             HStack(spacing: 6) {
                 TypeFilterBox(
                     title: "Leads",
                     icon: "person.badge.plus",
                     count: viewModel.ticketTypeCounts?.lead ?? 0,
-                    isSelected: viewModel.selectedType == .lead,
+                    isSelected: viewModel.selectedTypes.contains(.lead),
                     color: .purple
                 ) {
-                    viewModel.setType(viewModel.selectedType == .lead ? nil : .lead)
+                    viewModel.toggleType(.lead)
                 }
 
                 TypeFilterBox(
                     title: "Orders",
                     icon: "doc.text",
                     count: viewModel.ticketTypeCounts?.order ?? 0,
-                    isSelected: viewModel.selectedType == .order,
+                    isSelected: viewModel.selectedTypes.contains(.order),
                     color: .blue
                 ) {
-                    viewModel.setType(viewModel.selectedType == .order ? nil : .order)
+                    viewModel.toggleType(.order)
                 }
             }
 
-            // Row 2: Status Filters
+            // Row 2: Status Filters - multi-select
             HStack(spacing: 4) {
                 ForEach(TicketStatus.allCases, id: \.self) { status in
                     StatusFilterBox(
                         status: status,
                         count: countFor(status: status),
-                        isSelected: viewModel.selectedStatus == status
+                        isSelected: viewModel.selectedStatuses.contains(status)
                     ) {
-                        viewModel.setStatus(viewModel.selectedStatus == status ? nil : status)
+                        viewModel.toggleStatus(status)
                     }
                 }
             }
@@ -137,30 +167,75 @@ struct EnquiryListView: View {
         } else if viewModel.tickets.isEmpty {
             emptyView
         } else {
-            List {
-                ForEach(viewModel.tickets) { ticket in
-                    TicketRow(ticket: ticket)
+            VStack(spacing: 0) {
+                List(selection: $selectedTicketIds) {
+                    ForEach(viewModel.tickets) { ticket in
+                        NavigationLink(value: ticket) {
+                            TicketRow(ticket: ticket)
+                        }
+                        .tag(ticket.id)
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                         .listRowSeparator(.hidden)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            selectedTicket = ticket
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            if !isSelectMode {
+                                if ticket.status != .pending {
+                                    Button {
+                                        Task { await viewModel.updateTicketStatus(ticket.id, to: .pending) }
+                                    } label: {
+                                        Label("Pend", systemImage: "clock")
+                                    }
+                                    .tint(.orange)
+                                }
+                                if ticket.status != .resolved {
+                                    Button {
+                                        Task { await viewModel.updateTicketStatus(ticket.id, to: .resolved) }
+                                    } label: {
+                                        Label("Resolve", systemImage: "checkmark.circle")
+                                    }
+                                    .tint(.green)
+                                }
+                                if ticket.status != .closed {
+                                    Button {
+                                        Task { await viewModel.updateTicketStatus(ticket.id, to: .closed) }
+                                    } label: {
+                                        Label("Close", systemImage: "archivebox")
+                                    }
+                                    .tint(.gray)
+                                }
+                            }
+                        }
+                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                            if !isSelectMode && ticket.status != .open {
+                                Button {
+                                    Task { await viewModel.updateTicketStatus(ticket.id, to: .open) }
+                                } label: {
+                                    Label("Reopen", systemImage: "envelope.open")
+                                }
+                                .tint(.blue)
+                            }
                         }
                         .task {
                             await viewModel.loadMoreIfNeeded(currentTicket: ticket)
                         }
-                }
-
-                if viewModel.isLoadingMore {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
                     }
-                    .listRowSeparator(.hidden)
+
+                    if viewModel.isLoadingMore {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                            Spacer()
+                        }
+                        .listRowSeparator(.hidden)
+                    }
+                }
+                .listStyle(.plain)
+                .environment(\.editMode, $editMode)
+
+                // Bulk action bar
+                if isSelectMode && !selectedTicketIds.isEmpty {
+                    bulkActionBar
                 }
             }
-            .listStyle(.plain)
         }
     }
 
@@ -206,7 +281,7 @@ struct EnquiryListView: View {
             Text("There are no enquiries matching your filters")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-            if viewModel.hasActiveFilters {
+            if viewModel.hasActiveFilters || !viewModel.selectedStatuses.isEmpty || !viewModel.searchText.isEmpty {
                 Button("Clear Filters") {
                     viewModel.clearFilters()
                 }
@@ -215,6 +290,42 @@ struct EnquiryListView: View {
             Spacer()
         }
         .padding()
+    }
+
+    // MARK: - Bulk Action Bar
+
+    private var bulkActionBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack(spacing: 16) {
+                Text("\(selectedTicketIds.count) selected")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(.secondary)
+
+                Spacer()
+
+                ForEach(TicketStatus.allCases, id: \.self) { status in
+                    Button {
+                        Task {
+                            await viewModel.bulkUpdateStatus(selectedTicketIds, to: status)
+                            selectedTicketIds.removeAll()
+                            editMode = .inactive
+                        }
+                    } label: {
+                        VStack(spacing: 2) {
+                            Image(systemName: status.icon)
+                                .font(.body)
+                            Text(status.label)
+                                .font(.caption2)
+                        }
+                        .foregroundColor(status.color)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial)
+        }
     }
 
     // MARK: - Menus
@@ -256,15 +367,28 @@ struct EnquiryListView: View {
         // Type filter
         Menu("Type") {
             Button("All Types") {
-                viewModel.setType(nil)
+                // Select all types
+                for type in TicketType.allCases {
+                    if !viewModel.selectedTypes.contains(type) {
+                        viewModel.toggleType(type)
+                    }
+                }
             }
+            Button("Clear Types") {
+                for type in TicketType.allCases {
+                    if viewModel.selectedTypes.contains(type) {
+                        viewModel.toggleType(type)
+                    }
+                }
+            }
+            Divider()
             ForEach(TicketType.allCases, id: \.self) { type in
                 Button {
-                    viewModel.setType(type)
+                    viewModel.toggleType(type)
                 } label: {
                     HStack {
                         Label(type.label, systemImage: type.icon)
-                        if viewModel.selectedType == type {
+                        if viewModel.selectedTypes.contains(type) {
                             Image(systemName: "checkmark")
                         }
                     }
@@ -314,7 +438,7 @@ struct EnquiryListView: View {
             }
         }
 
-        if viewModel.hasActiveFilters {
+        if viewModel.hasActiveFilters || !viewModel.selectedStatuses.isEmpty {
             Divider()
             Button(role: .destructive) {
                 viewModel.clearFilters()

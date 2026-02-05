@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import Combine
 
 /// ViewModel for the enquiry/ticket list
 @MainActor
@@ -24,12 +25,13 @@ final class EnquiryListViewModel: ObservableObject {
 
     // MARK: - Filters
 
-    @Published var selectedStatus: TicketStatus? = .open
-    @Published var selectedType: TicketType? = .lead
+    @Published var selectedStatuses: Set<TicketStatus> = [.open]
+    @Published var selectedTypes: Set<TicketType> = [.lead]
     @Published var selectedLocationId: String?
     @Published var selectedWorkflowStatus: WorkflowStatusFilter?
     @Published var sortBy: SortOption = .updatedAt
     @Published var sortOrder: SortOrder = .desc
+    @Published var searchText: String = ""
 
     // MARK: - Pagination
 
@@ -37,6 +39,20 @@ final class EnquiryListViewModel: ObservableObject {
     private var totalPages = 1
     private var hasMorePages: Bool { currentPage < totalPages }
     private let pageSize = 20
+
+    // MARK: - Search Debounce
+
+    private var searchCancellable: AnyCancellable?
+
+    init() {
+        searchCancellable = $searchText
+            .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                guard let self else { return }
+                Task { await self.loadTickets() }
+            }
+    }
 
     // MARK: - Sort Options
 
@@ -75,7 +91,46 @@ final class EnquiryListViewModel: ObservableObject {
 
     /// Whether there are any active filters
     var hasActiveFilters: Bool {
-        selectedType != nil || selectedLocationId != nil || selectedWorkflowStatus != nil
+        !selectedTypes.isEmpty || selectedLocationId != nil || selectedWorkflowStatus != nil
+    }
+
+    // MARK: - API Parameter Helpers
+
+    /// Single status for API, or nil when 0, 2-3, or all 4 are selected
+    private var statusParam: String? {
+        guard selectedStatuses.count == 1 else { return nil }
+        return selectedStatuses.first?.rawValue
+    }
+
+    /// Single type for API, or nil when 0 or both are selected
+    private var typeParam: String? {
+        guard selectedTypes.count == 1 else { return nil }
+        return selectedTypes.first?.rawValue
+    }
+
+    /// Whether we need to filter statuses client-side (2 or 3 selected)
+    private var needsClientSideStatusFilter: Bool {
+        let count = selectedStatuses.count
+        return count >= 2 && count < TicketStatus.allCases.count
+    }
+
+    /// Returns search text for API, or nil if empty
+    private var searchParam: String? {
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// Client-side search filter on tickets
+    private func applySearchFilter(_ tickets: [Ticket]) -> [Ticket] {
+        guard let query = searchParam?.lowercased() else { return tickets }
+        return tickets.filter { ticket in
+            ticket.subject.lowercased().contains(query)
+            || ticket.displayNumber.lowercased().contains(query)
+            || ticket.client.displayName.lowercased().contains(query)
+            || (ticket.order?.status.lowercased().contains(query) ?? false)
+            || (ticket.assignedUser?.fullName.lowercased().contains(query) ?? false)
+            || (ticket.location?.name.lowercased().contains(query) ?? false)
+        }
     }
 
     // MARK: - Loading
@@ -93,17 +148,22 @@ final class EnquiryListViewModel: ObservableObject {
                 .tickets(
                     page: 1,
                     limit: pageSize,
-                    status: selectedStatus?.rawValue,
-                    ticketType: selectedType?.rawValue,
+                    status: statusParam,
+                    ticketType: typeParam,
                     locationId: selectedLocationId,
                     assignedUserId: nil,
                     workflowStatus: selectedWorkflowStatus?.rawValue,
                     sortBy: sortBy.rawValue,
-                    sortOrder: sortOrder.rawValue
+                    sortOrder: sortOrder.rawValue,
+                    search: searchParam
                 )
             )
 
-            tickets = response.tickets
+            var filtered = response.tickets
+            if needsClientSideStatusFilter {
+                filtered = filtered.filter { selectedStatuses.contains($0.status) }
+            }
+            tickets = applySearchFilter(filtered)
             statusCounts = response.statusCounts
             ticketTypeCounts = response.ticketTypeCounts
             companyLocations = response.companyLocations ?? []
@@ -139,17 +199,22 @@ final class EnquiryListViewModel: ObservableObject {
                 .tickets(
                     page: currentPage + 1,
                     limit: pageSize,
-                    status: selectedStatus?.rawValue,
-                    ticketType: selectedType?.rawValue,
+                    status: statusParam,
+                    ticketType: typeParam,
                     locationId: selectedLocationId,
                     assignedUserId: nil,
                     workflowStatus: selectedWorkflowStatus?.rawValue,
                     sortBy: sortBy.rawValue,
-                    sortOrder: sortOrder.rawValue
+                    sortOrder: sortOrder.rawValue,
+                    search: searchParam
                 )
             )
 
-            tickets.append(contentsOf: response.tickets)
+            var newTickets = response.tickets
+            if needsClientSideStatusFilter {
+                newTickets = newTickets.filter { selectedStatuses.contains($0.status) }
+            }
+            tickets.append(contentsOf: applySearchFilter(newTickets))
             currentPage = response.page
             totalPages = response.totalPages
 
@@ -168,15 +233,21 @@ final class EnquiryListViewModel: ObservableObject {
 
     // MARK: - Filter Actions
 
-    func setStatus(_ status: TicketStatus?) {
-        guard selectedStatus != status else { return }
-        selectedStatus = status
+    func toggleStatus(_ status: TicketStatus) {
+        if selectedStatuses.contains(status) {
+            selectedStatuses.remove(status)
+        } else {
+            selectedStatuses.insert(status)
+        }
         Task { await loadTickets() }
     }
 
-    func setType(_ type: TicketType?) {
-        guard selectedType != type else { return }
-        selectedType = type
+    func toggleType(_ type: TicketType) {
+        if selectedTypes.contains(type) {
+            selectedTypes.remove(type)
+        } else {
+            selectedTypes.insert(type)
+        }
         Task { await loadTickets() }
     }
 
@@ -193,9 +264,11 @@ final class EnquiryListViewModel: ObservableObject {
     }
 
     func clearFilters() {
-        selectedType = nil
+        selectedTypes.removeAll()
+        selectedStatuses.removeAll()
         selectedLocationId = nil
         selectedWorkflowStatus = nil
+        searchText = ""
         Task { await loadTickets() }
     }
 
@@ -204,5 +277,54 @@ final class EnquiryListViewModel: ObservableObject {
         sortBy = by
         sortOrder = order
         Task { await loadTickets() }
+    }
+
+    // MARK: - Status Updates
+
+    /// Update a single ticket's status
+    func updateTicketStatus(_ ticketId: String, to status: TicketStatus) async {
+        // Optimistically remove the row with animation (it's moving to a different status tab)
+        withAnimation(.easeInOut(duration: 0.3)) {
+            tickets.removeAll { $0.id == ticketId }
+        }
+
+        let body: [String: String] = ["status": status.rawValue]
+        do {
+            try await APIClient.shared.requestVoid(
+                .updateTicket(id: ticketId),
+                body: body
+            )
+        } catch {
+            self.error = error.localizedDescription
+        }
+        await loadTickets()
+    }
+
+    /// Bulk update status for multiple tickets
+    func bulkUpdateStatus(_ ticketIds: Set<String>, to status: TicketStatus) async {
+        var failedCount = 0
+        await withTaskGroup(of: Bool.self) { group in
+            for id in ticketIds {
+                group.addTask {
+                    let body: [String: String] = ["status": status.rawValue]
+                    do {
+                        try await APIClient.shared.requestVoid(
+                            .updateTicket(id: id),
+                            body: body
+                        )
+                        return true
+                    } catch {
+                        return false
+                    }
+                }
+            }
+            for await success in group {
+                if !success { failedCount += 1 }
+            }
+        }
+        if failedCount > 0 {
+            error = "Failed to update \(failedCount) ticket\(failedCount == 1 ? "" : "s")"
+        }
+        await loadTickets()
     }
 }

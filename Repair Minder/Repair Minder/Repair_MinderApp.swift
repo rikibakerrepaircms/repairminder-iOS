@@ -13,6 +13,7 @@ struct Repair_MinderApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var appState = AppState.shared
     @ObservedObject private var passcodeService = PasscodeService.shared
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var backgroundTime: Date?
@@ -34,6 +35,7 @@ struct Repair_MinderApp: App {
                         ))
                 }
             }
+            .preferredColorScheme(appearanceManager.preferredColorScheme)
             .animation(passcodeService.isLocked ? nil : .easeInOut(duration: 0.25), value: passcodeService.isLocked)
             .onChange(of: scenePhase) { _, newPhase in
                 handleScenePhaseChange(newPhase)
@@ -339,12 +341,18 @@ private enum StaffTab: Hashable {
 /// Has a "Set up later" button — passcode setup is optional.
 private struct PasscodeSetupView: View {
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var passcodeService = PasscodeService.shared
+    @State private var showBiometricPrompt = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
             SetPasscodeView(mode: .create) { success in
                 if success {
-                    appState.onPasscodeSet()
+                    if passcodeService.isBiometricAvailable {
+                        showBiometricPrompt = true
+                    } else {
+                        appState.onPasscodeSet()
+                    }
                 }
                 // Cancel (success=false) is ignored — only "Set up later" skips
             }
@@ -355,6 +363,17 @@ private struct PasscodeSetupView: View {
             .font(.subheadline)
             .foregroundStyle(.secondary)
             .padding(.bottom, 32)
+        }
+        .alert("Use \(passcodeService.biometricType.displayName)?", isPresented: $showBiometricPrompt) {
+            Button("Enable") {
+                passcodeService.setBiometric(enabled: true)
+                appState.onPasscodeSet()
+            }
+            Button("Not Now", role: .cancel) {
+                appState.onPasscodeSet()
+            }
+        } message: {
+            Text("Unlock Repair Minder with \(passcodeService.biometricType.displayName) instead of entering your passcode each time.")
         }
     }
 }

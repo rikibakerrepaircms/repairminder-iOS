@@ -21,7 +21,6 @@ final class EnquiryDetailViewModel: ObservableObject {
     @Published private(set) var isSending = false
     @Published private(set) var isGeneratingAI = false
     @Published private(set) var error: String?
-    @Published var aiGeneratedText: String?
     @Published var showingMacroPicker = false
     @Published var showingStatusPicker = false
 
@@ -192,7 +191,6 @@ final class EnquiryDetailViewModel: ObservableObject {
             // Clear and reload
             replyText = ""
             selectedReplyStatus = .pending
-            aiGeneratedText = nil
             await loadTicket()
 
         } catch let apiError as APIError {
@@ -218,7 +216,6 @@ final class EnquiryDetailViewModel: ObservableObject {
                 body: request
             )
 
-            aiGeneratedText = response.text
             replyText = response.text
             replyMode = .reply
 
@@ -333,16 +330,4 @@ final class EnquiryDetailViewModel: ObservableObject {
         }
     }
 
-    /// Use AI-generated text
-    func useAIResponse() {
-        if let text = aiGeneratedText {
-            replyText = text
-            replyMode = .reply
-        }
-    }
-
-    /// Clear AI response
-    func clearAIResponse() {
-        aiGeneratedText = nil
-    }
 }

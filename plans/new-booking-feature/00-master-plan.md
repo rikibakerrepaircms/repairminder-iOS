@@ -8,9 +8,13 @@ Implement a full booking wizard in the iOS app that mirrors the web app's `Booki
 
 **Reference Implementation:**
 - [Ref: /Volumes/Riki Repos/repairminder/src/pages/BookingPage.tsx] - Service type selection
-- [Ref: /Volumes/Riki Repos/repairminder/src/components/booking/BookingWizard.tsx] - 5-step wizard
-- [Ref: /Volumes/Riki Repos/repairminder/src/components/booking/steps/ClientStep.tsx] - Customer entry
-- [Ref: /Volumes/Riki Repos/repairminder/src/components/booking/steps/DevicesStep.tsx] - Device entry
+- [Ref: /Volumes/Riki Repos/repairminder/src/components/booking/BookingWizard.tsx] - 5-step wizard + order creation payload
+- [Ref: /Volumes/Riki Repos/repairminder/src/components/booking/steps/ClientStep.tsx] - Customer entry with address + location
+- [Ref: /Volumes/Riki Repos/repairminder/src/components/booking/steps/DevicesStep.tsx] - Device entry with brand/model
+- [Ref: /Volumes/Riki Repos/repairminder/src/components/booking/steps/SummaryStep.tsx] - Review + ready-by date + pre-auth
+- [Ref: /Volumes/Riki Repos/repairminder/src/components/booking/steps/SignatureStep.tsx] - Terms + signature capture
+- [Ref: /Volumes/Riki Repos/repairminder/src/components/booking/steps/ConfirmationStep.tsx] - Success screen
+- [Ref: /Volumes/Riki Repos/repairminder/src/components/ui/SignatureCanvas.tsx] - Canvas-based signature drawing
 
 ---
 
@@ -19,15 +23,21 @@ Implement a full booking wizard in the iOS app that mirrors the web app's `Booki
 | Criteria | Measurement |
 |----------|-------------|
 | Service type selection works | User can select Repair, Buyback, Accessories, or Device Sale |
+| Location selection works | User can select from available locations (auto-selects if only 1) |
 | Client search functional | Can search existing clients by name/email/phone |
 | New client creation works | Can create new client with email, name, phone, address |
+| No-email option works | Can create client without email (generates placeholder) |
 | Device entry complete | Can add devices with brand, model, serial, IMEI, condition, issues |
 | Multi-device support | Can add multiple devices to a single booking |
-| Signature capture works | Can capture customer signature on device |
+| Ready-by date works | Can optionally set a ready-by date and time |
+| Pre-authorisation works | Can optionally set a diagnostic/assessment fee amount |
+| Terms & conditions display | Fetches and displays company T&Cs from API |
+| Signature capture works | Can draw signature on canvas OR type name as fallback |
+| Signature stored correctly | Base64 PNG data URL sent inline with order creation (matches web app) |
 | Order creation successful | API creates order and devices, returns order number |
 | Confirmation displays | Shows order number and success state |
 | Build passes | `xcodebuild` completes without errors |
-| Feature accessible | Blue plus icon in toolbar (top right) launches the wizard |
+| Feature accessible | Accessible from DashboardView toolbar |
 
 ---
 
@@ -39,6 +49,7 @@ Implement a full booking wizard in the iOS app that mirrors the web app's `Booki
 3. ✅ TabView + NavigationStack navigation in place (StaffMainView)
 4. ✅ APIClient and APIEndpoint patterns established
 5. ✅ Existing models: Client, Device, Order
+6. ✅ Existing reusable component: `CustomerSignatureView` (drawn + typed signature capture with base64 PNG output)
 
 ### External Dependencies
 - Backend API endpoints exist (verified in web app usage)
@@ -51,10 +62,10 @@ Implement a full booking wizard in the iOS app that mirrors the web app's `Booki
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
 | API response format differences | High | Medium | Test each endpoint individually, handle edge cases |
-| Signature capture complexity | Medium | Medium | Use native PencilKit or simple canvas drawing |
+| Signature data too large for JSON | Low | Low | Canvas renders at 300x150pt — PNG is small. Web app stores as TEXT with no issues |
 | Large form state management | Medium | Low | Use Observable view model, break into sub-states |
 | Brand/Model data volume | Low | High | Implement search with API filtering, not local |
-| Offline booking not supported | Medium | N/A | Out of scope - clearly indicate online-only |
+| Offline booking not supported | Medium | N/A | Out of scope — clearly indicate online-only |
 
 ---
 
@@ -66,12 +77,12 @@ Implement a full booking wizard in the iOS app that mirrors the web app's `Booki
 | 02 | Booking View Model | Create central state management for the wizard | Medium |
 | 03 | Service Type Selection | BookingView with 4 service type cards | Low |
 | 04 | Wizard Container | BookingWizardView with step navigation and progress | Medium |
-| 05 | Client Step | Customer search, creation, and selection | High |
+| 05 | Client Step | Customer search, creation, location, and address | High |
 | 06 | Devices Step | Device entry form with brand/model selection | High |
-| 07 | Summary Step | Review all data, set ready-by date | Low |
-| 08 | Signature Step | Terms agreement and signature capture | Medium |
-| 09 | Confirmation Step | Success view with order details | Low |
-| 10 | Toolbar Integration | Add blue plus icon to StaffMainView toolbar | Low |
+| 07 | Summary Step | Review all data, ready-by date, optional pre-auth | Medium |
+| 08 | Signature Step | Terms display, agreement, signature capture | Medium |
+| 09 | Confirmation Step | Submit order, show success with order details | Medium |
+| 10 | Navigation Integration | Add entry point to DashboardView toolbar | Low |
 
 ---
 
@@ -79,16 +90,16 @@ Implement a full booking wizard in the iOS app that mirrors the web app's `Booki
 
 The following are explicitly **NOT** included in this implementation:
 
-1. **Offline booking support** - Bookings require network connectivity
-2. **Accessories wizard** - Will show "Coming Soon" placeholder
-3. **Device Sale wizard** - Will show alert directing to buyback list
-4. **Ticket linking** - Complex feature from web, defer to future
-5. **Email verification** - Simplified validation only
-6. **Address autocomplete** - Manual entry only
-7. **Pre-authorization** - Payment feature, defer to future
-8. **PDF receipt generation** - iOS doesn't need this (web-only)
-9. **Sub-location assignment** - Defer to future (requires location setup)
-10. **Engineer assignment** - Defer to future
+1. **Offline booking support** — Bookings require network connectivity
+2. **Accessories wizard** — Will show "Coming Soon" placeholder (web app has a separate simplified flow)
+3. **Device Sale wizard** — Will show alert directing to buyback list
+4. **Ticket linking** — Complex feature from web (search tickets, show comms history), defer to future
+5. **Email verification** — Simplified validation only
+6. **Address autocomplete** — Manual entry only (web uses Google Maps API)
+7. **PDF receipt generation** — iOS doesn't need this (web-only)
+8. **Sub-location assignment** — Defer to future (requires location setup)
+9. **Engineer assignment** — Defer to future
+10. **Find My / passcode fields** — Defer to future (nice-to-have, not essential for MVP)
 
 ---
 
@@ -98,59 +109,163 @@ The following are explicitly **NOT** included in this implementation:
 Repair Minder/
 ├── Features/
 │   └── Staff/
-│       └── Booking/                          # New feature folder
-│           ├── BookingView.swift             # Stage 03 - Service type selection
-│           ├── BookingWizardView.swift       # Stage 04 - Wizard container
-│           ├── BookingViewModel.swift        # Stage 02 - Central state
+│       └── Booking/                              # New feature folder
+│           ├── BookingView.swift                 # Stage 03 - Service type selection
+│           ├── BookingWizardView.swift           # Stage 04 - Wizard container
+│           ├── BookingViewModel.swift            # Stage 02 - Central state
 │           ├── Steps/
-│           │   ├── ClientStepView.swift      # Stage 05
-│           │   ├── DevicesStepView.swift     # Stage 06
-│           │   ├── SummaryStepView.swift     # Stage 07
-│           │   ├── SignatureStepView.swift   # Stage 08
-│           │   └── ConfirmationStepView.swift # Stage 09
+│           │   ├── ClientStepView.swift          # Stage 05
+│           │   ├── DevicesStepView.swift         # Stage 06
+│           │   ├── SummaryStepView.swift         # Stage 07
+│           │   ├── SignatureStepView.swift       # Stage 08
+│           │   └── ConfirmationStepView.swift    # Stage 09
 │           └── Components/
-│               ├── ClientSearchView.swift    # Stage 05
-│               ├── DeviceEntryFormView.swift # Stage 06
-│               ├── BrandModelPicker.swift    # Stage 06
-│               └── SignaturePadView.swift    # Stage 08
+│               ├── ClientSearchView.swift        # Stage 05
+│               ├── DeviceEntryFormView.swift     # Stage 06
+│               └── BrandModelPicker.swift        # Stage 06
 ├── Core/
 │   ├── Models/
-│   │   ├── Location.swift                    # Stage 01
-│   │   ├── Brand.swift                       # Stage 01
-│   │   ├── DeviceModel.swift                 # Stage 01
-│   │   ├── DeviceType.swift                  # Stage 01
-│   │   └── BookingFormData.swift             # Stage 02
+│   │   ├── Location.swift                        # Stage 01
+│   │   ├── Brand.swift                           # Stage 01
+│   │   ├── DeviceModel.swift                     # Stage 01
+│   │   ├── DeviceType.swift                      # Stage 01
+│   │   └── BookingFormData.swift                 # Stage 02
 │   └── Networking/
-│       └── APIEndpoints.swift                # Stage 01 (modify - add new cases)
-└── Repair_MinderApp.swift                    # Stage 10 (modify StaffMainView)
+│       └── APIEndpoints.swift                    # Stage 01 (modify - add new cases)
+├── Features/
+│   └── Customer/
+│       └── Components/
+│           └── CustomerSignatureView.swift       # EXISTING - reuse for signature capture
+└── Features/
+    └── Staff/
+        └── Dashboard/
+            └── DashboardView.swift               # Stage 10 (modify - add toolbar button)
 ```
 
 **Notes:**
-- Booking goes inside `Features/Staff/` to match the existing pattern where staff features are organized under that folder (Dashboard, Orders, Devices, etc.).
-- `APIEndpoints.swift` is an existing file that needs new enum cases added for booking-related endpoints.
+- Booking goes inside `Features/Staff/` to match the existing pattern.
+- `CustomerSignatureView.swift` already exists with drawn (base64 PNG) + typed (name) support — reuse it in `SignatureStepView` rather than creating a new component.
+- No separate `SignaturePadView` needed — the existing component already handles canvas drawing, clear, and base64 encoding.
 
 ---
 
 ## API Endpoints Required
 
-All backend endpoints already exist. Some already have `APIEndpoint` enum cases; others need new cases added.
+All backend endpoints already exist (verified via web app). Some already have `APIEndpoint` enum cases; others need new cases added.
 
 | Endpoint | Method | Purpose | APIEndpoint Case |
 |----------|--------|---------|------------------|
 | `/api/clients/search?q=` | GET | Search clients | `.clientSearch(query:)` ✅ exists |
 | `/api/clients/:id` | GET | Get client details | `.client(id:)` ✅ exists |
 | `/api/clients` | POST | Create new client | `.createClient` ✅ exists |
-| `/api/orders` | POST | Create order | `.createOrder` ✅ exists |
+| `/api/orders` | POST | Create order (with inline signature) | `.createOrder` ✅ exists |
 | `/api/orders/:id/devices` | POST | Add device to order | `.createOrderDevice(orderId:)` ✅ exists |
-| `/api/orders/:id/signatures` | POST | Add signature | `.createOrderSignature(orderId:)` ✅ exists |
 | `/api/locations` | GET | Get locations list | `.locations` ⚠️ **add in Stage 01** |
 | `/api/brands` | GET | Get brands list | `.brands` ⚠️ **add in Stage 01** |
 | `/api/brands/:id/models` | GET | Get models for brand | `.brandModels(brandId:)` ⚠️ **add in Stage 01** |
 | `/api/device-types` | GET | Get device types | `.deviceTypes` ⚠️ **add in Stage 01** |
+| `/api/company/public-info` | GET | Get company name + T&Cs | `.companyPublicInfo` ⚠️ **add in Stage 01** |
 
-**Note:** Stage 01 must add new cases to `APIEndpoints.swift` for locations, brands, brandModels, and deviceTypes.
+**Important — Signature is NOT a separate API call:**
+The web app sends signature data **inline** with the `POST /api/orders` payload. The existing `.createOrderSignature(orderId:)` endpoint is for adding signatures to existing orders (e.g., collection signatures) — it is NOT used during booking creation.
 
-### API Client Usage Patterns
+---
+
+## Order Creation Payload (matches web app)
+
+The `POST /api/orders` request body must match this structure:
+
+```swift
+struct CreateOrderRequest: Encodable {
+    let clientEmail: String?
+    let noEmail: Bool?
+    let clientFirstName: String
+    let clientLastName: String?
+    let clientPhone: String?
+    let clientCountryCode: String?
+
+    // Address fields
+    let addressLine1: String?
+    let addressLine2: String?
+    let city: String?
+    let county: String?
+    let postcode: String?
+    let country: String?
+
+    let locationId: String
+    let intakeMethod: String          // Always "walk_in" for booking wizard
+    let serviceType: String           // "repair" or "buyback"
+    let readyBy: String?              // ISO format: "YYYY-MM-DDTHH:MM:SS"
+
+    // Inline signature (NOT a separate API call)
+    let signature: SignaturePayload
+
+    // Optional pre-authorisation
+    let preAuthorization: PreAuthPayload?
+}
+
+struct SignaturePayload: Encodable {
+    let signatureData: String?        // Base64 PNG data URL from canvas, or nil
+    let typedName: String?            // Typed name string, or nil
+    let termsAgreed: Bool             // Must be true
+    let marketingConsent: Bool
+    let userAgent: String             // e.g. "RepairMinder-iOS/1.0"
+    let geolocation: GeoPayload?      // Optional device location
+}
+
+struct GeoPayload: Encodable {
+    let latitude: Double
+    let longitude: Double
+}
+
+struct PreAuthPayload: Encodable {
+    let amount: Double
+    let notes: String?
+    let authorizedAt: String          // ISO timestamp
+}
+```
+
+**Backend behaviour on receiving this:**
+1. Creates/finds client from the client fields
+2. Creates the order record
+3. Inserts a row into `order_signatures` with `signature_type = 'drop_off'`
+4. Stores signature as base64 text, captures IP from CF headers, snapshots T&Cs
+5. Returns `{ success: true, data: { id, order_number } }`
+
+**Then for each device:**
+`POST /api/orders/{orderId}/devices` with device payload (called sequentially per device).
+
+---
+
+## Add Device Payload
+
+```swift
+struct CreateOrderDeviceRequest: Encodable {
+    let brandId: String?
+    let modelId: String?
+    let customBrand: String?          // If not using brandId
+    let customModel: String?          // If not using modelId
+    let displayName: String           // Required
+    let serialNumber: String?
+    let imei: String?
+    let colour: String?
+    let storageCapacity: String?
+    let conditionGrade: String?
+    let customerReportedIssues: String?
+    let deviceTypeId: String?
+    let workflowType: String?         // "repair" or "buyback" (defaults to order serviceType)
+    let accessories: [AccessoryItem]?
+}
+
+struct AccessoryItem: Encodable {
+    let accessoryType: String
+    let description: String
+}
+```
+
+---
+
+## API Client Usage Patterns
 
 Use the `APIEndpoint` enum cases with type-inferred responses:
 
@@ -168,7 +283,9 @@ let searchResults: ClientSearchResponse = try await APIClient.shared.request(
 )
 
 // POST request with body - pass body as second parameter
-let order: Order = try await APIClient.shared.request(.createOrder, body: createOrderRequest)
+let order: CreateOrderResponse = try await APIClient.shared.request(
+    .createOrder, body: createOrderRequest
+)
 
 // POST device to order
 let device: OrderDevice = try await APIClient.shared.request(
@@ -181,13 +298,50 @@ let device: OrderDevice = try await APIClient.shared.request(
 - Response type is inferred from the return type (no `responseType:` parameter)
 - Encoder auto-converts camelCase → snake_case for request bodies
 - Decoder auto-converts snake_case → camelCase for responses
-- Use `.convertFromSnakeCase` - don't add explicit raw values in CodingKeys
+- Use `.convertFromSnakeCase` — don't add explicit raw values in CodingKeys
+
+---
+
+## Signature Capture — Matching the Web App
+
+The web app stores signatures as follows:
+
+| Field | Value | Notes |
+|-------|-------|-------|
+| `signature_data` | `data:image/png;base64,iVBORw0KG...` | Base64 PNG data URL from canvas |
+| `typed_name` | `"John Smith"` | Alternative to drawn signature |
+| `signature_method` | `"drawn"` or `"typed"` | How signature was captured |
+| `terms_agreed` | `1` | Boolean — must be true |
+| `marketing_consent` | `0` or `1` | Optional |
+| `user_agent` | Browser/app identifier | Audit trail |
+| `geolocation` | `{"latitude":51.5,"longitude":-0.1}` | Optional, JSON string |
+| `ip_address` | Captured server-side | From CF-Connecting-IP header |
+| `terms_snapshot` | JSON of T&Cs at signing time | Captured server-side |
+
+**iOS implementation (reusing `CustomerSignatureView`):**
+
+The existing `CustomerSignatureView` already:
+- ✅ Supports drawn signatures via SwiftUI Canvas with DragGesture
+- ✅ Renders to `UIImage` via `ImageRenderer` at 3x scale
+- ✅ Converts to base64 PNG data URL: `"data:image/png;base64," + data.base64EncodedString()`
+- ✅ Supports typed name with cursive preview (Snell Roundhand font)
+- ✅ Has a `signatureData` computed property returning the correct format
+- ✅ Has `isValid` validation
+- ✅ Has clear button for drawn signatures
+
+The `SignatureStepView` (Stage 08) wraps this component with:
+- Terms & conditions text (fetched from `/api/company/public-info`)
+- Terms agreement checkbox (required)
+- Marketing consent checkbox (optional, default true)
+- The signature capture component itself
+
+No new signature drawing component is needed.
 
 ---
 
 ## ViewModel Pattern
 
-Use `@Observable` macro (iOS 17+) for all new ViewModels to match the modern pattern:
+Use `@Observable` macro (iOS 17+) for all new ViewModels to match the modern pattern used by `DashboardViewModel`:
 
 ```swift
 import SwiftUI
@@ -230,36 +384,37 @@ struct BookingWizardView: View {
 
 ## Estimated Effort
 
-| Stage | Estimated Time | Dependencies |
-|-------|----------------|--------------|
-| 01 | 1 session | None |
-| 02 | 1 session | Stage 01 |
-| 03 | 0.5 session | None |
-| 04 | 1 session | Stage 02, 03 |
-| 05 | 2 sessions | Stage 01, 02, 04 |
-| 06 | 2 sessions | Stage 01, 02, 04 |
-| 07 | 0.5 session | Stage 02, 04 |
-| 08 | 1.5 sessions | Stage 02, 04 |
-| 09 | 0.5 session | Stage 02, 04 |
-| 10 | 0.5 session | All stages |
-| **Total** | **~10 sessions** | |
+| Stage | Estimated Effort | Dependencies |
+|-------|------------------|--------------|
+| 01 | Small | None |
+| 02 | Medium | Stage 01 |
+| 03 | Small | None |
+| 04 | Medium | Stage 02, 03 |
+| 05 | Large | Stage 01, 02, 04 |
+| 06 | Large | Stage 01, 02, 04 |
+| 07 | Medium | Stage 02, 04 |
+| 08 | Medium | Stage 02, 04 |
+| 09 | Medium | Stage 02, 04 |
+| 10 | Small | All stages |
 
 ---
 
 ## Testing Strategy
 
-1. **Unit testing** - View models with mock API responses
-2. **UI testing** - Navigation flow through wizard steps
-3. **Integration testing** - Create actual booking on staging environment
-4. **Manual testing** - Full end-to-end with real device
+1. **Build verification** — Each stage must compile without errors
+2. **Manual testing** — Run in simulator, walk through full booking flow
+3. **Integration testing** — Create actual booking on staging environment with real API
+4. **Signature verification** — Confirm drawn signature arrives in backend as valid base64 PNG
+5. **Edge cases** — No email flow, buyback with address, multiple devices, typed vs drawn signature
 
 ---
 
 ## Deployment
 
-1. Merge all stages to feature branch
-2. Run full test suite
-3. Build for TestFlight
-4. QA testing on staging API
-5. Merge to main
-6. App Store release
+1. Implement stages sequentially (01 → 10)
+2. Build and test after each stage
+3. Full end-to-end test on staging API
+4. Build for TestFlight
+5. QA testing
+6. Merge to main
+7. App Store release

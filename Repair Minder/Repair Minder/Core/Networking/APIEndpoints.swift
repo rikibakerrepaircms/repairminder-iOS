@@ -109,7 +109,7 @@ enum APIEndpoint {
 
     // MARK: - Tickets/Enquiries
 
-    case tickets(page: Int, limit: Int, status: String?, ticketType: String?, locationId: String?, assignedUserId: String?, workflowStatus: String?, sortBy: String?, sortOrder: String?)
+    case tickets(page: Int, limit: Int, status: String?, ticketType: String?, locationId: String?, assignedUserId: String?, workflowStatus: String?, sortBy: String?, sortOrder: String?, search: String?)
     case createTicket
     case ticket(id: String)
     case updateTicket(id: String)
@@ -465,7 +465,7 @@ enum APIEndpoint {
         case .clientSearch(let query):
             return [URLQueryItem(name: "q", value: query)]
 
-        case .tickets(let page, let limit, let status, let ticketType, let locationId, let assignedUserId, let workflowStatus, let sortBy, let sortOrder):
+        case .tickets(let page, let limit, let status, let ticketType, let locationId, let assignedUserId, let workflowStatus, let sortBy, let sortOrder, let search):
             var items = [
                 URLQueryItem(name: "page", value: String(page)),
                 URLQueryItem(name: "limit", value: String(limit))
@@ -490,6 +490,9 @@ enum APIEndpoint {
             }
             if let sortOrder = sortOrder {
                 items.append(URLQueryItem(name: "sort_order", value: sortOrder))
+            }
+            if let search = search, !search.isEmpty {
+                items.append(URLQueryItem(name: "search", value: search))
             }
             return items
 
