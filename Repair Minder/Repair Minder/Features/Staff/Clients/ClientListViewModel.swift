@@ -31,8 +31,8 @@ final class ClientListViewModel: ObservableObject {
 
     // MARK: - Initialization
 
-    init(apiClient: APIClient = .shared) {
-        self.apiClient = apiClient
+    init(apiClient: APIClient? = nil) {
+        self.apiClient = apiClient ?? APIClient.shared
     }
 
     // MARK: - Public Methods

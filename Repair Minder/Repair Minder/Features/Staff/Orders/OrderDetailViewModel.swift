@@ -23,9 +23,9 @@ final class OrderDetailViewModel: ObservableObject {
 
     // MARK: - Initialization
 
-    init(orderId: String, apiClient: APIClient = .shared) {
+    init(orderId: String, apiClient: APIClient? = nil) {
         self.orderId = orderId
-        self.apiClient = apiClient
+        self.apiClient = apiClient ?? APIClient.shared
     }
 
     // MARK: - Public Methods

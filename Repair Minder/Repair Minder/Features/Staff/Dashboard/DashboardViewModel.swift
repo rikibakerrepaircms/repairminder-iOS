@@ -60,9 +60,9 @@ final class DashboardViewModel {
         error = nil
 
         // Load stats, enquiry stats, and active work in parallel
-        async let statsTask = loadStats()
-        async let enquiryTask = loadEnquiryStats()
-        async let activeWorkTask = loadActiveWork()
+        async let statsTask: Void = loadStats()
+        async let enquiryTask: Void = loadEnquiryStats()
+        async let activeWorkTask: Void = loadActiveWork()
 
         // Await all tasks
         _ = await (statsTask, enquiryTask, activeWorkTask)

@@ -36,8 +36,8 @@ final class OrderListViewModel: ObservableObject {
 
     // MARK: - Initialization
 
-    init(apiClient: APIClient = .shared) {
-        self.apiClient = apiClient
+    init(apiClient: APIClient? = nil) {
+        self.apiClient = apiClient ?? APIClient.shared
     }
 
     // MARK: - Public Methods
@@ -149,13 +149,7 @@ final class OrderListViewModel: ObservableObject {
     // MARK: - Private Methods
 
     private func fetchOrders(page: Int) async throws -> (orders: [Order], pagination: Pagination, filters: OrderFilters) {
-        // Build status filter string
-        let statusFilter = selectedStatus
-
-        // Build endpoint with filters
-        let endpoint = APIEndpoint.orders(page: page, limit: pageSize, status: statusFilter)
-
-        // For now, use the simple endpoint - additional filters would need URL modification
+        // For now, use URL building directly - additional filters would need URL modification
         // The backend supports: status, payment_status, location_id, assigned_user_id, search
 
         // Perform request - note: the response structure is different

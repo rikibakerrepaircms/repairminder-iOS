@@ -23,9 +23,9 @@ final class ClientDetailViewModel: ObservableObject {
 
     // MARK: - Initialization
 
-    init(clientId: String, apiClient: APIClient = .shared) {
+    init(clientId: String, apiClient: APIClient? = nil) {
         self.clientId = clientId
-        self.apiClient = apiClient
+        self.apiClient = apiClient ?? APIClient.shared
     }
 
     // MARK: - Public Methods

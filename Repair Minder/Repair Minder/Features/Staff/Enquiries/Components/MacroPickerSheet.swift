@@ -249,7 +249,7 @@ private struct MacroPreviewSheet: View {
                     }
 
                     // Reply behavior
-                    if let behavior = macro.replyBehavior {
+                    if macro.replyBehavior != nil {
                         GroupBox("When Customer Replies") {
                             Text(macro.replyBehaviorDescription)
                                 .font(.subheadline)

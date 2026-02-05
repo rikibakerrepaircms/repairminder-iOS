@@ -45,21 +45,6 @@
 			path = "Repair MinderUITests";
 			sourceTree = "<group>";
 		};
-		3C22F21C2F32EC6E006D564A /* Repair Minder Customer */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "Repair Minder Customer";
-			sourceTree = "<group>";
-		};
-		3C22F22A2F32EC6F006D564A /* Repair Minder CustomerTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "Repair Minder CustomerTests";
-			sourceTree = "<group>";
-		};
-		3C22F2342F32EC6F006D564A /* Repair Minder CustomerUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "Repair Minder CustomerUITests";
-			sourceTree = "<group>";
-		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -93,9 +78,6 @@
 				3C22E8AC2F32B211006D564A /* Repair Minder */,
 				3C22E8BA2F32B213006D564A /* Repair MinderTests */,
 				3C22E8C42F32B213006D564A /* Repair MinderUITests */,
-				3C22F21C2F32EC6E006D564A /* Repair Minder Customer */,
-				3C22F22A2F32EC6F006D564A /* Repair Minder CustomerTests */,
-				3C22F2342F32EC6F006D564A /* Repair Minder CustomerUITests */,
 				3C22E8AB2F32B211006D564A /* Products */,
 			);
 			sourceTree = "<group>";
