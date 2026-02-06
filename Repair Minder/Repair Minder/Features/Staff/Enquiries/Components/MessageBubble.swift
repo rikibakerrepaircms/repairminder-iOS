@@ -84,6 +84,7 @@ struct MessageBubble: View {
             Text(message.displayContent)
                 .font(.body)
                 .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
 
             // Device association (for notes)
             if let deviceName = message.deviceName {
@@ -96,6 +97,7 @@ struct MessageBubble: View {
                 .padding(.top, 4)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Attachments
