@@ -61,7 +61,9 @@ final class NotificationSettingsViewModel: ObservableObject {
         do {
             preferences = try await pushService.fetchPreferences()
         } catch {
+            #if DEBUG
             print("[NotificationSettingsViewModel] Failed to fetch preferences: \(error)")
+            #endif
             // Use defaults on error
             preferences = .allEnabled
         }

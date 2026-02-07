@@ -17,6 +17,7 @@ struct CustomerDeviceCard: View {
     @State private var showDiagnostics: Bool = false
     @State private var showChecklist: Bool = false
     @State private var showImages: Bool = false
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -103,15 +104,9 @@ struct CustomerDeviceCard: View {
                     .lineLimit(2)
 
                 HStack(spacing: 8) {
-                    // Workflow badge
-                    Text(device.workflowType.displayName)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundStyle(device.isBuyback ? .purple : .blue)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background((device.isBuyback ? Color.purple : Color.blue).opacity(0.15))
-                        .clipShape(Capsule())
+                    if horizontalSizeClass != .regular {
+                        workflowBadge
+                    }
 
                     // Serial/IMEI
                     if let serial = device.serialNumber {
@@ -127,7 +122,31 @@ struct CustomerDeviceCard: View {
             }
 
             Spacer()
+
+            if horizontalSizeClass == .regular {
+                workflowBadge
+            }
         }
+    }
+
+    private var workflowBadge: some View {
+        Text(device.workflowType.displayName)
+            .font(.caption)
+            .fontWeight(.medium)
+            .foregroundStyle(device.isBuyback ? .purple : .blue)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background((device.isBuyback ? Color.purple : Color.blue).opacity(0.15))
+            .clipShape(Capsule())
+    }
+
+    private var diagnosticItems: [(label: String, value: String)] {
+        var items: [(label: String, value: String)] = []
+        if let v = device.visualCheck { items.append(("Visual Check", v)) }
+        if let v = device.electricalCheck { items.append(("Electrical Check", v)) }
+        if let v = device.mechanicalCheck { items.append(("Mechanical Check", v)) }
+        if let v = device.damageMatchesReported { items.append(("Damage Assessment", v)) }
+        return items
     }
 
     private var deviceIcon: String {
@@ -208,7 +227,8 @@ struct CustomerDeviceCard: View {
             // Maps Buttons
             if location.hasMapsUrl {
                 HStack(spacing: 12) {
-                    if let googleUrl = location.googleMapsUrl, let url = URL(string: googleUrl) {
+                    if let googleUrl = location.googleMapsUrl, let url = URL(string: googleUrl),
+                       let scheme = url.scheme?.lowercased(), ["https", "http", "comgooglemaps"].contains(scheme) {
                         Button {
                             UIApplication.shared.open(url)
                         } label: {
@@ -218,7 +238,8 @@ struct CustomerDeviceCard: View {
                         .buttonStyle(.bordered)
                     }
 
-                    if let appleUrl = location.appleMapsUrl, let url = URL(string: appleUrl) {
+                    if let appleUrl = location.appleMapsUrl, let url = URL(string: appleUrl),
+                       let scheme = url.scheme?.lowercased(), ["https", "http", "maps"].contains(scheme) {
                         Button {
                             UIApplication.shared.open(url)
                         } label: {
@@ -285,33 +306,36 @@ struct CustomerDeviceCard: View {
             }
 
             if showDiagnostics {
-                VStack(alignment: .leading, spacing: 8) {
-                    if let visual = device.visualCheck {
-                        diagnosticRow("Visual Check", value: visual)
-                    }
-                    if let electrical = device.electricalCheck {
-                        diagnosticRow("Electrical Check", value: electrical)
-                    }
-                    if let mechanical = device.mechanicalCheck {
-                        diagnosticRow("Mechanical Check", value: mechanical)
-                    }
-                    if let damageMatch = device.damageMatchesReported {
-                        diagnosticRow("Damage Assessment", value: damageMatch)
-                    }
-                    if let conclusion = device.diagnosisConclusion {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Diagnosis")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.secondary)
-                            Text(conclusion)
-                                .font(.subheadline)
+                Group {
+                    if horizontalSizeClass == .regular && diagnosticItems.count > 1 {
+                        LazyVGrid(columns: [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)], spacing: 8) {
+                            ForEach(diagnosticItems, id: \.label) { item in
+                                diagnosticRow(item.label, value: item.value)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
                         }
-                        .padding(8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.blue.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    } else {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(diagnosticItems, id: \.label) { item in
+                                diagnosticRow(item.label, value: item.value)
+                            }
+                        }
                     }
+                }
+
+                if let conclusion = device.diagnosisConclusion {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Diagnosis")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.secondary)
+                        Text(conclusion)
+                            .font(.subheadline)
+                    }
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.blue.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
             }
         }
@@ -420,7 +444,13 @@ struct CustomerDeviceCard: View {
             }
 
             if showChecklist, let checklist = device.preRepairChecklist {
-                VStack(alignment: .leading, spacing: 6) {
+                LazyVGrid(
+                    columns: horizontalSizeClass == .regular
+                        ? [GridItem(.flexible()), GridItem(.flexible())]
+                        : [GridItem(.flexible())],
+                    alignment: .leading,
+                    spacing: 6
+                ) {
                     ForEach(checklist.results.allItems, id: \.name) { item in
                         HStack(spacing: 8) {
                             Image(systemName: item.checklistStatus.icon)
@@ -520,10 +550,7 @@ struct CustomerDeviceCard: View {
     }
 
     private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
+        DateFormatters.formatHumanDate(date)
     }
 }
 

@@ -121,6 +121,14 @@ enum APIError: Error, LocalizedError {
     }
 }
 
+// MARK: - Notification Names
+
+extension Notification.Name {
+    /// Posted when the API returns a 403 with code CONSENT_REQUIRED
+    /// Observed by AppState to transition to the terms-required blocking screen
+    static let consentRequired = Notification.Name("consentRequired")
+}
+
 /// Token refresh response from `/api/auth/refresh`
 struct TokenRefreshResponse: Decodable {
     let token: String

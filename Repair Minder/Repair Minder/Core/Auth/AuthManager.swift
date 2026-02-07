@@ -285,7 +285,9 @@ final class AuthManager: ObservableObject, TokenProvider {
         do {
             try await APIClient.shared.requestVoid(.logout)
         } catch {
+            #if DEBUG
             print("[AuthManager] Logout API call failed: \(error)")
+            #endif
         }
     }
 
@@ -327,7 +329,9 @@ final class AuthManager: ObservableObject, TokenProvider {
         if pushService.authorizationStatus == .notDetermined {
             let granted = await pushService.requestAuthorization()
             if granted {
+                #if DEBUG
                 print("[AuthManager] Push notification permission granted")
+                #endif
             }
         } else if pushService.authorizationStatus == .authorized {
             // Already authorized, just register for remote notifications

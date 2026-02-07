@@ -97,8 +97,9 @@ enum StatPeriod: String, CaseIterable, Identifiable, Sendable {
 struct UserEnquiryBreakdown: Decodable, Equatable, Sendable, Identifiable {
     let userId: String
     let name: String
-    let leadsCount: Int
-    let repliesCount: Int
+    let firstReplies: Int
+    let allReplies: Int
+    let notes: Int
     let avgResponseMinutes: Double?
 
     var id: String { userId }

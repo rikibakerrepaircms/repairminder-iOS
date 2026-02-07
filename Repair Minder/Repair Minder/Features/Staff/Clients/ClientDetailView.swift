@@ -10,6 +10,9 @@ import SwiftUI
 struct ClientDetailView: View {
     @StateObject private var viewModel: ClientDetailViewModel
     @State private var selectedOrderId: String?
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var isRegular: Bool { horizontalSizeClass == .regular }
 
     init(clientId: String) {
         _viewModel = StateObject(wrappedValue: ClientDetailViewModel(clientId: clientId))
@@ -82,6 +85,8 @@ struct ClientDetailView: View {
                 }
             }
             .padding()
+            .frame(maxWidth: isRegular ? 700 : .infinity)
+            .frame(maxWidth: .infinity)
         }
         .refreshable {
             await viewModel.refresh()
@@ -190,12 +195,17 @@ struct ClientDetailView: View {
 
     // MARK: - Stats Section
 
+    private var statsColumns: [GridItem] {
+        if isRegular {
+            return Array(repeating: GridItem(.flexible()), count: 4)
+        } else {
+            return Array(repeating: GridItem(.flexible()), count: 2)
+        }
+    }
+
     private func statsSection(_ stats: ClientStats) -> some View {
         SectionCard(title: "Statistics", icon: "chart.bar") {
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 16) {
+            LazyVGrid(columns: statsColumns, spacing: 16) {
                 statItem(value: "\(stats.orderCount)", label: "Orders", icon: "doc.text")
                 statItem(value: "\(stats.deviceCount)", label: "Devices", icon: "iphone")
                 statItem(value: stats.formattedTotalSpend, label: "Total Spend", icon: "sterlingsign.circle")
@@ -275,21 +285,45 @@ struct ClientDetailView: View {
 
     private func spendBreakdownSection(_ breakdown: SpendBreakdown) -> some View {
         SectionCard(title: "Spend Breakdown", icon: "chart.pie") {
-            VStack(spacing: 8) {
-                if let repair = breakdown.repair, repair.count > 0 {
-                    breakdownRow(label: "Repairs", count: repair.count, total: repair.formattedTotal, color: .blue)
+            let rows = breakdownRows(breakdown)
+            if isRegular && rows.count > 1 {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                    ForEach(rows, id: \.label) { row in
+                        breakdownRow(label: row.label, count: row.count, total: row.total, color: row.color)
+                    }
                 }
-                if let deviceSale = breakdown.deviceSale, deviceSale.count > 0 {
-                    breakdownRow(label: "Device Sales", count: deviceSale.count, total: deviceSale.formattedTotal, color: .green)
-                }
-                if let accessory = breakdown.accessory, accessory.count > 0 {
-                    breakdownRow(label: "Accessories", count: accessory.count, total: accessory.formattedTotal, color: .orange)
-                }
-                if let buyback = breakdown.buyback, buyback.count > 0 {
-                    breakdownRow(label: "Buyback", count: buyback.count, total: buyback.formattedTotal, color: .purple)
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(rows, id: \.label) { row in
+                        breakdownRow(label: row.label, count: row.count, total: row.total, color: row.color)
+                    }
                 }
             }
         }
+    }
+
+    private struct BreakdownRowData {
+        let label: String
+        let count: Int
+        let total: String
+        let color: Color
+    }
+
+    private func breakdownRows(_ breakdown: SpendBreakdown) -> [BreakdownRowData] {
+        var rows: [BreakdownRowData] = []
+        if let repair = breakdown.repair, repair.count > 0 {
+            rows.append(BreakdownRowData(label: "Repairs", count: repair.count, total: repair.formattedTotal, color: .blue))
+        }
+        if let deviceSale = breakdown.deviceSale, deviceSale.count > 0 {
+            rows.append(BreakdownRowData(label: "Device Sales", count: deviceSale.count, total: deviceSale.formattedTotal, color: .green))
+        }
+        if let accessory = breakdown.accessory, accessory.count > 0 {
+            rows.append(BreakdownRowData(label: "Accessories", count: accessory.count, total: accessory.formattedTotal, color: .orange))
+        }
+        if let buyback = breakdown.buyback, buyback.count > 0 {
+            rows.append(BreakdownRowData(label: "Buyback", count: buyback.count, total: buyback.formattedTotal, color: .purple))
+        }
+        return rows
     }
 
     private func breakdownRow(label: String, count: Int, total: String, color: Color) -> some View {

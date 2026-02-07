@@ -11,10 +11,15 @@ import SwiftUI
 
 /// Full device detail view
 struct DeviceDetailView: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var viewModel: DeviceDetailViewModel
     @State private var showingActionSheet = false
     @State private var selectedAction: DeviceAction?
     @State private var actionNotes = ""
+
+    private var isRegularWidth: Bool {
+        horizontalSizeClass == .regular
+    }
 
     init(orderId: String, deviceId: String) {
         _viewModel = State(initialValue: DeviceDetailViewModel(orderId: orderId, deviceId: deviceId))
@@ -168,70 +173,109 @@ struct DeviceDetailView: View {
             timestampsSection(device)
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(isRegularWidth ? .hidden : .automatic)
+        .frame(maxWidth: isRegularWidth ? 700 : .infinity)
+        .frame(maxWidth: .infinity)
+        .background(isRegularWidth ? Color(.systemGroupedBackground) : .clear)
     }
 
     // MARK: - Status Section
 
     private func statusSection(_ device: DeviceDetail) -> some View {
         Section {
-            // Current status
-            HStack {
-                Text("Status")
-                Spacer()
-                DeviceStatusBadge(status: device.deviceStatus, size: .large)
-            }
-
-            // Priority
-            HStack {
-                Text("Priority")
-                Spacer()
-                PriorityBadge(priority: device.devicePriority)
-            }
-
-            // Workflow type
-            HStack {
-                Text("Workflow")
-                Spacer()
-                WorkflowTypeBadge(workflowType: device.workflow)
-            }
-
-            // Assigned engineer
-            if let engineer = device.assignedEngineer {
-                HStack {
-                    Text("Assigned To")
-                    Spacer()
-                    Text(engineer.name)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            // Sub-location
-            if let subLocation = device.subLocation {
-                HStack {
-                    Text("Location")
-                    Spacer()
-                    VStack(alignment: .trailing) {
-                        Text(subLocation.code)
-                        if let description = subLocation.description {
-                            Text(description)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+            if isRegularWidth {
+                Grid(alignment: .topLeading, horizontalSpacing: 32, verticalSpacing: 16) {
+                    GridRow {
+                        gridField("Status") {
+                            DeviceStatusBadge(status: device.deviceStatus, size: .large)
                         }
+                        gridField("Priority") {
+                            PriorityBadge(priority: device.devicePriority)
+                        }
+                    }
+                    GridRow {
+                        gridField("Workflow") {
+                            WorkflowTypeBadge(workflowType: device.workflow)
+                        }
+                        if let engineer = device.assignedEngineer {
+                            gridField("Assigned To") {
+                                Text(engineer.name)
+                            }
+                        }
+                    }
+                    if device.subLocation != nil || device.formattedDueDate != nil {
+                        GridRow {
+                            if let subLocation = device.subLocation {
+                                gridField("Location") {
+                                    VStack(alignment: .leading) {
+                                        Text(subLocation.code)
+                                        if let description = subLocation.description {
+                                            Text(description)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                            }
+                            if let dueDate = device.formattedDueDate {
+                                gridField("Due") {
+                                    Text(dueDate)
+                                        .foregroundStyle(device.isOverdue ? .red : .primary)
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            } else {
+                HStack {
+                    Text("Status")
+                    Spacer()
+                    DeviceStatusBadge(status: device.deviceStatus, size: .large)
+                }
+                HStack {
+                    Text("Priority")
+                    Spacer()
+                    PriorityBadge(priority: device.devicePriority)
+                }
+                HStack {
+                    Text("Workflow")
+                    Spacer()
+                    WorkflowTypeBadge(workflowType: device.workflow)
+                }
+                if let engineer = device.assignedEngineer {
+                    HStack {
+                        Text("Assigned To")
+                        Spacer()
+                        Text(engineer.name)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if let subLocation = device.subLocation {
+                    HStack {
+                        Text("Location")
+                        Spacer()
+                        VStack(alignment: .trailing) {
+                            Text(subLocation.code)
+                            if let description = subLocation.description {
+                                Text(description)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                if let dueDate = device.formattedDueDate {
+                    HStack {
+                        Text("Due")
+                        Spacer()
+                        Text(dueDate)
+                            .foregroundStyle(device.isOverdue ? .red : .secondary)
                     }
                 }
             }
 
-            // Due date
-            if let dueDate = device.formattedDueDate {
-                HStack {
-                    Text("Due")
-                    Spacer()
-                    Text(dueDate)
-                        .foregroundStyle(device.isOverdue ? .red : .secondary)
-                }
-            }
-
-            // Available actions
+            // Available actions always full width
             if !viewModel.devicePageActions.isEmpty {
                 ForEach(viewModel.devicePageActions) { action in
                     Button {
@@ -257,41 +301,87 @@ struct DeviceDetailView: View {
 
     private func deviceInfoSection(_ device: DeviceDetail) -> some View {
         Section("Device") {
-            if let brand = device.brand {
-                LabeledContent("Brand", value: brand.name)
-            } else if let customBrand = device.customBrand {
-                LabeledContent("Brand", value: customBrand)
-            }
-
-            if let model = device.model {
-                LabeledContent("Model", value: model.name)
-            } else if let customModel = device.customModel {
-                LabeledContent("Model", value: customModel)
-            }
-
-            if let colour = device.colour {
-                LabeledContent("Colour", value: colour)
-            }
-
-            if let storage = device.storageCapacity {
-                LabeledContent("Storage", value: storage)
-            }
-
-            if let conditionGrade = device.conditionGrade {
-                LabeledContent("Condition Grade", value: conditionGrade)
-            }
-
-            if let findMyStatus = device.findMyStatus {
-                HStack {
-                    Text("Find My")
-                    Spacer()
-                    Text(findMyStatus.capitalized)
-                        .foregroundStyle(findMyStatus == "enabled" ? .orange : .green)
+            if isRegularWidth {
+                let brand = device.brand?.name ?? device.customBrand
+                let model = device.model?.name ?? device.customModel
+                Grid(alignment: .topLeading, horizontalSpacing: 32, verticalSpacing: 16) {
+                    if brand != nil || model != nil {
+                        GridRow {
+                            if let brand {
+                                gridField("Brand") { Text(brand) }
+                            }
+                            if let model {
+                                gridField("Model") { Text(model) }
+                            }
+                        }
+                    }
+                    if device.colour != nil || device.storageCapacity != nil {
+                        GridRow {
+                            if let colour = device.colour {
+                                gridField("Colour") { Text(colour) }
+                            }
+                            if let storage = device.storageCapacity {
+                                gridField("Storage") { Text(storage) }
+                            }
+                        }
+                    }
+                    if device.conditionGrade != nil || device.findMyStatus != nil {
+                        GridRow {
+                            if let conditionGrade = device.conditionGrade {
+                                gridField("Condition Grade") { Text(conditionGrade) }
+                            }
+                            if let findMyStatus = device.findMyStatus {
+                                gridField("Find My") {
+                                    Text(findMyStatus.capitalized)
+                                        .foregroundStyle(findMyStatus == "enabled" ? .orange : .green)
+                                }
+                            }
+                        }
+                    }
+                    if let passcodeType = device.passcodeType {
+                        GridRow {
+                            gridField("Passcode Type") { Text(passcodeType.capitalized) }
+                        }
+                    }
                 }
-            }
+                .padding(.vertical, 4)
+            } else {
+                if let brand = device.brand {
+                    LabeledContent("Brand", value: brand.name)
+                } else if let customBrand = device.customBrand {
+                    LabeledContent("Brand", value: customBrand)
+                }
 
-            if let passcodeType = device.passcodeType {
-                LabeledContent("Passcode Type", value: passcodeType.capitalized)
+                if let model = device.model {
+                    LabeledContent("Model", value: model.name)
+                } else if let customModel = device.customModel {
+                    LabeledContent("Model", value: customModel)
+                }
+
+                if let colour = device.colour {
+                    LabeledContent("Colour", value: colour)
+                }
+
+                if let storage = device.storageCapacity {
+                    LabeledContent("Storage", value: storage)
+                }
+
+                if let conditionGrade = device.conditionGrade {
+                    LabeledContent("Condition Grade", value: conditionGrade)
+                }
+
+                if let findMyStatus = device.findMyStatus {
+                    HStack {
+                        Text("Find My")
+                        Spacer()
+                        Text(findMyStatus.capitalized)
+                            .foregroundStyle(findMyStatus == "enabled" ? .orange : .green)
+                    }
+                }
+
+                if let passcodeType = device.passcodeType {
+                    LabeledContent("Passcode Type", value: passcodeType.capitalized)
+                }
             }
         }
     }
@@ -300,19 +390,41 @@ struct DeviceDetailView: View {
 
     private func identifiersSection(_ device: DeviceDetail) -> some View {
         Section("Identifiers") {
-            if let serial = device.serialNumber {
-                LabeledContent("Serial Number") {
-                    Text(serial)
-                        .font(.system(.body, design: .monospaced))
-                        .textSelection(.enabled)
+            if isRegularWidth {
+                Grid(alignment: .topLeading, horizontalSpacing: 32, verticalSpacing: 16) {
+                    GridRow {
+                        if let serial = device.serialNumber {
+                            gridField("Serial Number") {
+                                Text(serial)
+                                    .font(.system(.body, design: .monospaced))
+                                    .textSelection(.enabled)
+                            }
+                        }
+                        if let imei = device.imei {
+                            gridField("IMEI") {
+                                Text(imei)
+                                    .font(.system(.body, design: .monospaced))
+                                    .textSelection(.enabled)
+                            }
+                        }
+                    }
                 }
-            }
+                .padding(.vertical, 4)
+            } else {
+                if let serial = device.serialNumber {
+                    LabeledContent("Serial Number") {
+                        Text(serial)
+                            .font(.system(.body, design: .monospaced))
+                            .textSelection(.enabled)
+                    }
+                }
 
-            if let imei = device.imei {
-                LabeledContent("IMEI") {
-                    Text(imei)
-                        .font(.system(.body, design: .monospaced))
-                        .textSelection(.enabled)
+                if let imei = device.imei {
+                    LabeledContent("IMEI") {
+                        Text(imei)
+                            .font(.system(.body, design: .monospaced))
+                            .textSelection(.enabled)
+                    }
                 }
             }
         }
@@ -340,12 +452,12 @@ struct DeviceDetailView: View {
                 }
             }
 
-            if let additionalIssues = device.additionalIssuesFound {
+            if let additionalIssues = device.additionalIssuesFound, additionalIssues != 0 {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Additional Issues")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text(additionalIssues)
+                    Text("Yes")
                 }
             }
         }
@@ -568,20 +680,49 @@ struct DeviceDetailView: View {
 
     private func timestampsSection(_ device: DeviceDetail) -> some View {
         Section("Timeline") {
-            if let received = device.timestamps.formattedReceivedAt {
-                LabeledContent("Received", value: received)
-            }
+            if isRegularWidth {
+                Grid(alignment: .topLeading, horizontalSpacing: 32, verticalSpacing: 16) {
+                    GridRow {
+                        if let received = device.timestamps.formattedReceivedAt {
+                            gridField("Received") { Text(received) }
+                        }
+                        if let diagnosisStarted = device.timestamps.formattedDiagnosisStarted {
+                            gridField("Diagnosis Started") { Text(diagnosisStarted) }
+                        }
+                    }
+                    if let repairStarted = device.timestamps.formattedRepairStarted {
+                        GridRow {
+                            gridField("Repair Started") { Text(repairStarted) }
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            } else {
+                if let received = device.timestamps.formattedReceivedAt {
+                    LabeledContent("Received", value: received)
+                }
 
-            if let diagnosisStarted = device.timestamps.formattedDiagnosisStarted {
-                HStack {
+                if let diagnosisStarted = device.timestamps.formattedDiagnosisStarted {
                     LabeledContent("Diagnosis Started", value: diagnosisStarted)
                 }
-            }
 
-            if let repairStarted = device.timestamps.formattedRepairStarted {
-                LabeledContent("Repair Started", value: repairStarted)
+                if let repairStarted = device.timestamps.formattedRepairStarted {
+                    LabeledContent("Repair Started", value: repairStarted)
+                }
             }
         }
+    }
+
+    // MARK: - Grid Field Helper
+
+    private func gridField<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Helpers

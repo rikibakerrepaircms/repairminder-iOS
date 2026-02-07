@@ -42,10 +42,14 @@ final class CustomerOrderListViewModel: ObservableObject {
             currencyCode = response.currencyCode
         } catch let error as APIError {
             errorMessage = error.localizedDescription
+            #if DEBUG
             print("[CustomerOrderListVM] Error loading orders: \(error)")
+            #endif
         } catch {
             errorMessage = "Failed to load orders"
+            #if DEBUG
             print("[CustomerOrderListVM] Unexpected error: \(error)")
+            #endif
         }
 
         isLoading = false

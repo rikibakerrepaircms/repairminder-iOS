@@ -37,6 +37,7 @@ struct MessageBubble: View {
             .padding(12)
             .background(bubbleBackground)
             .cornerRadius(16)
+            .frame(maxWidth: 500)
             .contextMenu {
                 contextMenuItems
             }
@@ -49,17 +50,27 @@ struct MessageBubble: View {
 
     // MARK: - Message Header
 
+    private var isPortalMessage: Bool {
+        message.type == .inbound && message.source == "portal"
+    }
+
     private var messageHeader: some View {
         HStack(spacing: 8) {
             // Type icon
-            Image(systemName: message.type.icon)
-                .font(.caption)
-                .foregroundColor(typeColor)
+            if isPortalMessage {
+                Image(systemName: "globe")
+                    .font(.caption)
+                    .foregroundColor(.purple)
+            } else {
+                Image(systemName: message.type.icon)
+                    .font(.caption)
+                    .foregroundColor(typeColor)
+            }
 
             // Sender name
-            Text(message.senderName)
+            Text(isPortalMessage ? "\(message.senderName) (via Portal)" : message.senderName)
                 .font(.caption.weight(.semibold))
-                .foregroundColor(typeColor)
+                .foregroundColor(isPortalMessage ? .purple : typeColor)
 
             Spacer()
 
@@ -209,7 +220,7 @@ private struct AttachmentRow: View {
 
 #Preview {
     VStack(spacing: 16) {
-        // Customer message
+        // Customer message (via portal)
         MessageBubble(message: TicketMessage(
             id: "1",
             type: .inbound,
@@ -223,6 +234,7 @@ private struct AttachmentRow: View {
             deviceName: nil,
             createdAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-3600)),
             createdBy: nil,
+            source: "portal",
             events: nil,
             attachments: nil
         ))
@@ -241,6 +253,7 @@ private struct AttachmentRow: View {
             deviceName: nil,
             createdAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-1800)),
             createdBy: CreatedByUser(id: "user1", firstName: "Jane", lastName: "Doe"),
+            source: nil,
             events: [
                 MessageEvent(id: "e1", eventType: "sent", eventData: nil, createdAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-1800))),
                 MessageEvent(id: "e2", eventType: "delivered", eventData: nil, createdAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-1790))),
@@ -265,6 +278,7 @@ private struct AttachmentRow: View {
             deviceName: "Apple iPhone 14 Pro",
             createdAt: ISO8601DateFormatter().string(from: Date()),
             createdBy: CreatedByUser(id: "user1", firstName: "Jane", lastName: "Doe"),
+            source: nil,
             events: nil,
             attachments: nil
         ))

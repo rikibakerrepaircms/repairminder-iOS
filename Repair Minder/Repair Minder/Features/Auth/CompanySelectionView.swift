@@ -23,10 +23,11 @@ struct CompanySelectionView: View {
                 Text("Select a Shop")
                     .font(.title2)
                     .fontWeight(.bold)
+                    .foregroundStyle(.white)
 
                 Text("You have accounts with multiple repair shops.\nChoose one to continue.")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.7))
                     .multilineTextAlignment(.center)
             }
 

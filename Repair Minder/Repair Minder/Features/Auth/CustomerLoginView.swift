@@ -13,25 +13,15 @@ struct CustomerLoginView: View {
     @ObservedObject private var appState = AppState.shared
 
     @State private var email = ""
-    @State private var codeDigits: [String] = Array(repeating: "", count: 6)
-    @State private var hiddenCode: String = "" // For auto-fill
+    @State private var code: String = ""
     @State private var isResending = false
     @State private var resendCooldown = 0
 
     @FocusState private var focusedField: CustomerLoginField?
-    @FocusState private var focusedCodeIndex: Int?
     @FocusState private var hiddenFieldFocused: Bool
 
     private enum CustomerLoginField {
         case email
-    }
-
-    private var code: String {
-        codeDigits.joined()
-    }
-
-    private var nextEmptyIndex: Int {
-        codeDigits.firstIndex(where: { $0.isEmpty }) ?? 5
     }
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -48,32 +38,38 @@ struct CustomerLoginView: View {
                 Color.black.opacity(0.5)
                     .ignoresSafeArea()
 
-                ScrollView {
-                    VStack(spacing: 24) {
-                        Spacer()
-                            .frame(height: 60)
+                GeometryReader { geometry in
+                    ScrollView {
+                        VStack(spacing: 24) {
+                            Spacer()
+                                .frame(height: 60)
 
-                        // Header
-                        Image("login_logo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: 100)
+                            // Header
+                            Image("login_logo")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 100)
 
-                        // Content based on state
-                        switch customerAuth.authState {
-                        case .unauthenticated, .unknown:
-                            emailEntryView
-                        case .awaitingCode:
-                            codeEntryView
-                        case .companySelection:
-                            CompanySelectionView()
-                        case .authenticated:
-                            // Should not show - handled by parent
-                            EmptyView()
+                            // Content based on state
+                            switch customerAuth.authState {
+                            case .unauthenticated, .unknown:
+                                emailEntryView
+                            case .awaitingCode:
+                                codeEntryView
+                            case .companySelection:
+                                CompanySelectionView()
+                            case .authenticated:
+                                // Should not show - handled by parent
+                                EmptyView()
+                            }
+
+                            Spacer(minLength: 40)
                         }
-
-                        Spacer(minLength: 40)
+                        .frame(maxWidth: 500)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: geometry.size.height)
                     }
+                    .scrollDismissesKeyboard(.immediately)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -171,36 +167,32 @@ struct CustomerLoginView: View {
 
             // 6-digit code input boxes
             ZStack {
-                // Hidden TextField for auto-fill support
-                TextField("", text: $hiddenCode)
+                // Single hidden TextField — sole keyboard input target
+                TextField("", text: $code)
                     .keyboardType(.numberPad)
                     .textContentType(.oneTimeCode)
                     .focused($hiddenFieldFocused)
                     .opacity(0.01)
                     .frame(width: 1, height: 1)
-                    .onChange(of: hiddenCode) { _, newValue in
-                        handleAutoFill(newValue)
+                    .onChange(of: code) { _, newValue in
+                        let digits = String(newValue.filter { $0.isNumber }.prefix(6))
+                        if digits != newValue {
+                            code = digits
+                        } else if digits.count == 6 && !customerAuth.isLoading {
+                            verifyCode()
+                        }
                     }
 
                 HStack(spacing: 8) {
                     ForEach(0..<6, id: \.self) { index in
                         CodeDigitBox(
-                            digit: $codeDigits[index],
-                            isFocused: focusedCodeIndex == index || (hiddenFieldFocused && index == nextEmptyIndex),
-                            onTap: {
-                                hiddenFieldFocused = true
-                                focusedCodeIndex = index
-                            },
-                            onDigitEntered: { digit in
-                                handleDigitEntry(digit, at: index)
-                            },
-                            onBackspace: {
-                                handleBackspace(at: index)
-                            }
+                            digit: index < code.count ? String(code[code.index(code.startIndex, offsetBy: index)]) : "",
+                            isFocused: hiddenFieldFocused && index == min(code.count, 5)
                         )
-                        .focused($focusedCodeIndex, equals: index)
                     }
                 }
+                .contentShape(Rectangle())
+                .onTapGesture { hiddenFieldFocused = true }
             }
 
             if let error = customerAuth.errorMessage {
@@ -244,70 +236,7 @@ struct CustomerLoginView: View {
         .padding(.horizontal, 24)
         .onAppear {
             hiddenFieldFocused = true
-            focusedCodeIndex = 0
             startResendCooldown()
-        }
-    }
-
-    private func handleAutoFill(_ value: String) {
-        let digits = value.filter { $0.isNumber }
-
-        if digits.count >= 6 {
-            let codeArray = Array(digits.prefix(6))
-            for (index, char) in codeArray.enumerated() {
-                codeDigits[index] = String(char)
-            }
-            hiddenCode = ""
-            hiddenFieldFocused = false
-            focusedCodeIndex = nil
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                if code.count == 6 {
-                    verifyCode()
-                }
-            }
-        } else if digits.count == 1 {
-            let index = nextEmptyIndex
-            codeDigits[index] = digits
-            hiddenCode = ""
-
-            if index < 5 {
-                focusedCodeIndex = index + 1
-            } else {
-                hiddenFieldFocused = false
-                focusedCodeIndex = nil
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    if code.count == 6 {
-                        verifyCode()
-                    }
-                }
-            }
-        }
-    }
-
-    private func handleDigitEntry(_ digit: String, at index: Int) {
-        if let char = digit.last, char.isNumber {
-            codeDigits[index] = String(char)
-
-            if index < 5 {
-                focusedCodeIndex = index + 1
-            } else {
-                focusedCodeIndex = nil
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    if code.count == 6 {
-                        verifyCode()
-                    }
-                }
-            }
-        }
-    }
-
-    private func handleBackspace(at index: Int) {
-        if codeDigits[index].isEmpty && index > 0 {
-            focusedCodeIndex = index - 1
-            codeDigits[index - 1] = ""
-        } else {
-            codeDigits[index] = ""
         }
     }
 
@@ -334,14 +263,14 @@ struct CustomerLoginView: View {
     private func verifyCode() {
         guard code.count == 6 else { return }
 
-        focusedCodeIndex = nil
+        hiddenFieldFocused = false
 
         Task {
             do {
                 try await customerAuth.verifyCode(code)
             } catch {
-                codeDigits = Array(repeating: "", count: 6)
-                focusedCodeIndex = 0
+                code = ""
+                hiddenFieldFocused = true
             }
         }
     }

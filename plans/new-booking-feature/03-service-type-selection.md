@@ -6,11 +6,11 @@ Create the initial service type selection screen that launches the appropriate b
 
 ## Dependencies
 
-`[Requires: None]` - Can be built independently.
+`[Requires: Stage 02 complete]` - Needs `BookingViewModel` for state management, `buybackEnabled` flag, and `loadInitialData()`.
 
 ## Complexity
 
-**Low** - Simple UI with 4 cards and navigation.
+**Low** - Simple UI with 2 cards (repair/buyback) and navigation. Only `ServiceType` cases where `isAvailable == true` are shown.
 
 ---
 
@@ -18,7 +18,15 @@ Create the initial service type selection screen that launches the appropriate b
 
 | File | Purpose |
 |------|---------|
-| `Features/Staff/Booking/BookingView.swift` | Service type selection with 4 cards |
+| `Features/Staff/Booking/BookingView.swift` | Service type selection with available service cards |
+
+---
+
+## Design Decisions
+
+> **Why only 2 service types?** Stage 01 defines 4 `ServiceType` enum cases (`.repair`, `.buyback`, `.accessories`, `.deviceSale`) but marks `.accessories` and `.deviceSale` as `isAvailable = false` because the backend `POST /api/orders` has no dedicated booking wizard flow for them. This view only shows types where `isAvailable == true`. If buyback is disabled for the company (via `CompanyPublicInfo.buybackEnabled`), only `.repair` is shown — and in that case we skip this screen entirely and go straight to the wizard.
+>
+> **Backend reference:** `GET /api/company/public-info` returns `buyback_enabled: Boolean(company.buyback_enabled)` (see `worker/index.js` ~line 10855). The `CompanyPublicInfo` model (Stage 01/02) decodes this as `buybackEnabled: Bool?` with Bool-or-Int handling.
 
 ---
 
@@ -34,75 +42,67 @@ Create the initial service type selection screen that launches the appropriate b
 
 import SwiftUI
 
-enum ServiceType: String, CaseIterable, Identifiable {
-    case repair = "repair"
-    case buyback = "buyback"
-    case accessories = "accessories"
-    case deviceSale = "device_sale"
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .repair: return "Repair"
-        case .buyback: return "Buyback"
-        case .accessories: return "Accessories"
-        case .deviceSale: return "Device Sale"
-        }
-    }
-
-    var subtitle: String {
-        switch self {
-        case .repair: return "Book in a device for repair"
-        case .buyback: return "Purchase a customer device"
-        case .accessories: return "Sell accessories or parts"
-        case .deviceSale: return "Sell a buyback device"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .repair: return "wrench.and.screwdriver.fill"
-        case .buyback: return "sterlingsign.circle.fill"
-        case .accessories: return "bag.fill"
-        case .deviceSale: return "tag.fill"
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .repair: return .blue
-        case .buyback: return .green
-        case .accessories: return .purple
-        case .deviceSale: return .orange
-        }
-    }
-}
+// NOTE: ServiceType enum is defined in Core/Models/ServiceType.swift (Stage 01)
+// NOTE: BookingViewModel is defined in Features/Staff/Booking/BookingViewModel.swift (Stage 02)
 
 struct BookingView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedServiceType: ServiceType?
-    @State private var showDeviceSaleAlert = false
+    @State private var viewModel = BookingViewModel()
+
+    /// Filtered service types: only those with backend support AND enabled by company settings.
+    /// Uses `isAvailable` (Stage 01) to exclude .accessories/.deviceSale which lack backend flows,
+    /// and `buybackEnabled` (from CompanyPublicInfo API) to conditionally hide .buyback.
+    var availableServiceTypes: [ServiceType] {
+        ServiceType.allCases.filter { type in
+            guard type.isAvailable else { return false }
+            switch type {
+            case .buyback:
+                return viewModel.buybackEnabled
+            default:
+                return true
+            }
+        }
+    }
+
+    /// True while initial data (locations, device types, company info) is still loading.
+    /// We wait for this before showing cards so the buybackEnabled flag is resolved
+    /// and we don't flash cards that will disappear.
+    var isLoading: Bool {
+        viewModel.isLoadingLocations
+    }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 24) {
-                Spacer()
+                if isLoading {
+                    ProgressView("Loading...")
+                } else if availableServiceTypes.count == 1,
+                          let onlyType = availableServiceTypes.first {
+                    // Only one available type (e.g. buyback disabled) — skip selection,
+                    // go straight to wizard
+                    Color.clear
+                        .onAppear {
+                            selectedServiceType = onlyType
+                        }
+                } else {
+                    Spacer()
 
-                // Service Type Grid
-                LazyVGrid(columns: [
-                    GridItem(.flexible()),
-                    GridItem(.flexible())
-                ], spacing: 16) {
-                    ForEach(ServiceType.allCases) { serviceType in
-                        ServiceTypeCard(serviceType: serviceType) {
-                            handleServiceSelection(serviceType)
+                    // Service Type Grid
+                    LazyVGrid(columns: [
+                        GridItem(.flexible()),
+                        GridItem(.flexible())
+                    ], spacing: 16) {
+                        ForEach(availableServiceTypes) { serviceType in
+                            ServiceTypeCard(serviceType: serviceType) {
+                                selectedServiceType = serviceType
+                            }
                         }
                     }
-                }
-                .padding(.horizontal)
+                    .padding(.horizontal)
 
-                Spacer()
+                    Spacer()
+                }
             }
             .navigationTitle("New Booking")
             .navigationBarTitleDisplayMode(.inline)
@@ -117,29 +117,13 @@ struct BookingView: View {
                 }
             }
             .navigationDestination(item: $selectedServiceType) { serviceType in
-                if serviceType == .accessories {
-                    AccessoriesPlaceholderView()
-                } else {
-                    BookingWizardView(serviceType: serviceType)
-                }
-            }
-            .alert("Device Sale", isPresented: $showDeviceSaleAlert) {
-                Button("Go to Buyback") {
-                    // Navigate to buyback/devices list
+                BookingWizardView(viewModel: viewModel, serviceType: serviceType, onComplete: {
                     dismiss()
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Make sure the device is at the 'For Sale' status and click 'Sell Now' on the device details.")
+                })
             }
         }
-    }
-
-    private func handleServiceSelection(_ serviceType: ServiceType) {
-        if serviceType == .deviceSale {
-            showDeviceSaleAlert = true
-        } else {
-            selectedServiceType = serviceType
+        .task {
+            await viewModel.loadInitialData()
         }
     }
 }
@@ -185,38 +169,6 @@ struct ServiceTypeCard: View {
     }
 }
 
-// MARK: - Accessories Placeholder
-
-struct AccessoriesPlaceholderView: View {
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Spacer()
-
-            Image(systemName: "bag.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(.purple)
-
-            VStack(spacing: 8) {
-                Text("Accessories")
-                    .font(.title2)
-                    .fontWeight(.bold)
-
-                Text("Accessories sales wizard is coming soon.")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-
-            Spacer()
-        }
-        .padding()
-        .navigationTitle("Accessories")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
 #Preview {
     BookingView()
 }
@@ -239,42 +191,43 @@ struct AccessoriesPlaceholderView: View {
 
 ## Test Cases
 
-### Test 1: Service Type Display
-- All 4 service types display with correct icons and labels
-- Grid layout shows 2x2
+### Test 1: Service Type Display (buyback enabled)
+- With `buybackEnabled = true` (default), 2 service types display: Repair and Buyback
+- `.accessories` and `.deviceSale` are NOT shown (they have `isAvailable = false`)
+- Grid layout shows 1x2
 
-### Test 2: Repair Selection
+### Test 2: Service Type Display (buyback disabled)
+- With `buybackEnabled = false`, only Repair is available
+- View auto-navigates to BookingWizardView with `.repair` (skips selection screen)
+
+### Test 3: Repair Selection
 - Tap "Repair" card
 - Navigates to BookingWizardView with serviceType = .repair
 
-### Test 3: Buyback Selection
+### Test 4: Buyback Selection
 - Tap "Buyback" card
 - Navigates to BookingWizardView with serviceType = .buyback
 
-### Test 4: Accessories Selection
-- Tap "Accessories" card
-- Shows placeholder view
-
-### Test 5: Device Sale Selection
-- Tap "Device Sale" card
-- Shows alert with instructions
-- "Go to Buyback" dismisses view
-- "Cancel" dismisses alert
-
-### Test 6: Dismiss
+### Test 5: Dismiss
 - Tap X button
 - View dismisses
+
+### Test 6: Loading State
+- While `loadInitialData()` is in progress, a loading spinner is shown
+- Cards only appear after loading completes (so `buybackEnabled` is resolved)
 
 ---
 
 ## Acceptance Checklist
 
 - [ ] `BookingView.swift` created
-- [ ] `ServiceType` enum with all 4 cases
+- [ ] Only service types with `isAvailable == true` are shown (currently: `.repair`, `.buyback`)
+- [ ] `.buyback` is further gated by `viewModel.buybackEnabled` (from CompanyPublicInfo API)
+- [ ] `.accessories` and `.deviceSale` are NOT shown (no backend booking flow — `isAvailable = false`)
+- [ ] When only one type is available, view auto-navigates to wizard (skips selection)
 - [ ] `ServiceTypeCard` component renders correctly
-- [ ] Navigation to `BookingWizardView` works for repair/buyback
-- [ ] Accessories shows placeholder
-- [ ] Device Sale shows alert
+- [ ] Navigation to `BookingWizardView` passes `serviceType` parameter correctly
+- [ ] Loading spinner shown until `loadInitialData()` completes
 - [ ] Dismiss button works
 - [ ] Preview renders without error
 - [ ] Project compiles without errors
@@ -292,7 +245,10 @@ xcodebuild -scheme "Repair Minder" -destination 'platform=iOS Simulator,name=iPh
 
 ## Handoff Notes
 
-- `ServiceType` enum is used throughout the booking flow
-- Navigation uses `navigationDestination(item:)` pattern
+- `ServiceType` enum is defined in Stage 01 — this view only uses `.isAvailable` types
+- `BookingViewModel` is defined in Stage 02 — this view creates it and passes it to the wizard
+- `loadInitialData()` is called in `.task` when BookingView appears, loading locations, device types, and company info (including `buybackEnabled`) before the wizard needs them
+- Navigation uses `navigationDestination(item:)` pattern — all available types go to `BookingWizardView`
+- No `AccessoriesPlaceholderView` or device sale alert — unavailable types are simply not shown
 - [See: Stage 04] will implement `BookingWizardView` that this navigates to
-- [See: Stage 10] will wire this up to blue plus icon in toolbar
+- [See: Stage 10] will wire this up to branded blue FAB overlay in StaffMainView + `.fullScreenCover { BookingView() }` presentation

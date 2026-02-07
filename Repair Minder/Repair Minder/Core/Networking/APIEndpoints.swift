@@ -143,6 +143,13 @@ enum APIEndpoint {
     case pushPreferences
     case updatePushPreferences
 
+    // MARK: - Booking / Lookup
+
+    case locations
+    case deviceSearch(query: String)
+    case deviceTypes
+    case companyPublicInfo
+
     // MARK: - Customer Portal
 
     case customerOrders
@@ -320,6 +327,16 @@ enum APIEndpoint {
         case .resumeMacroExecution(let id):
             return "/api/macro-executions/\(id)/resume"
 
+        // Booking / Lookup
+        case .locations:
+            return "/api/locations"
+        case .deviceSearch:
+            return "/api/device-search"
+        case .deviceTypes:
+            return "/api/device-types"
+        case .companyPublicInfo:
+            return "/api/company/public-info"
+
         // Push Notifications
         case .registerDeviceToken, .unregisterDeviceToken:
             return "/api/user/device-token"
@@ -358,6 +375,7 @@ enum APIEndpoint {
              .clients, .client, .clientSearch, .clientsExport,
              .tickets, .ticket, .ticketMacroExecutions,
              .macros, .macro, .macroExecutions, .macroExecution,
+             .locations, .deviceSearch, .deviceTypes, .companyPublicInfo,
              .deviceTokens, .pushPreferences,
              .customerOrders, .customerOrder, .customerOrderInvoice, .customerDeviceImage:
             return .get
@@ -463,6 +481,9 @@ enum APIEndpoint {
             return items
 
         case .clientSearch(let query):
+            return [URLQueryItem(name: "email", value: query)]
+
+        case .deviceSearch(let query):
             return [URLQueryItem(name: "q", value: query)]
 
         case .tickets(let page, let limit, let status, let ticketType, let locationId, let assignedUserId, let workflowStatus, let sortBy, let sortOrder, let search):

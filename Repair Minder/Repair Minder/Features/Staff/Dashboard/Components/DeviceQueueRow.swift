@@ -12,82 +12,158 @@ import SwiftUI
 /// Row component for displaying a device in the work queue
 struct DeviceQueueRow: View {
     let device: DeviceQueueItem
+    var isCompact: Bool = true
     let onTap: () -> Void
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 12) {
-                // Status indicator
-                statusIndicator
+            if isCompact {
+                compactLayout
+            } else {
+                wideLayout
+            }
+        }
+        .buttonStyle(.plain)
+    }
 
-                // Main content
-                VStack(alignment: .leading, spacing: 4) {
-                    // Device name and order number
-                    HStack {
-                        Text(device.displayName)
-                            .font(.headline)
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
+    // MARK: - Compact Layout (iPhone)
 
-                        if let orderNumber = device.orderNumber {
-                            Text("#\(String(orderNumber))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+    private var compactLayout: some View {
+        HStack(spacing: 8) {
+            // Status indicator
+            statusIndicator
 
-                    // Status badge and metadata
-                    HStack(spacing: 8) {
-                        DeviceStatusBadge(status: device.deviceStatus)
+            // Main content
+            VStack(alignment: .leading, spacing: 3) {
+                // Device name on its own line for maximum width
+                Text(device.displayName)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
 
-                        if device.isOverdue {
-                            Label("Overdue", systemImage: "exclamationmark.triangle.fill")
-                                .font(.caption2)
-                                .foregroundStyle(.red)
-                        }
-
-                        if let dueDate = device.formattedDueDate {
-                            Text(dueDate)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    // Sub-location or notes preview
-                    if let subLocation = device.subLocation {
-                        HStack(spacing: 4) {
-                            Image(systemName: "mappin")
-                                .font(.caption2)
-                            Text(subLocation.code)
-                                .font(.caption)
-                        }
-                        .foregroundStyle(.secondary)
-                    } else if let notePreview = device.notePreview {
-                        Text(notePreview)
-                            .font(.caption)
+                // Order number + status badge
+                HStack(spacing: 6) {
+                    if let orderNumber = device.orderNumber {
+                        Text("#\(String(orderNumber))")
+                            .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
+
+                    DeviceStatusBadge(status: device.deviceStatus, size: .small)
+
+                    if device.isOverdue {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.red)
+                    }
                 }
 
-                Spacer()
-
-                // Checklist progress or chevron
-                VStack(alignment: .trailing, spacing: 4) {
-                    if device.checklistProgress > 0 && device.checklistProgress < 100 {
-                        CircularProgress(progress: Double(device.checklistProgress) / 100.0)
-                            .frame(width: 24, height: 24)
+                // Metadata row: received date, due date, sub-location, or notes
+                HStack(spacing: 6) {
+                    if let received = device.formattedReceivedAt {
+                        Label(received, systemImage: "arrow.down.circle")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
 
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                    if let dueDate = device.formattedDueDate {
+                        Label(dueDate, systemImage: "clock")
+                            .font(.caption2)
+                            .foregroundStyle(device.isOverdue ? .red : .secondary)
+                            .lineLimit(1)
+                    }
+
+                    if let subLocation = device.subLocation {
+                        HStack(spacing: 2) {
+                            Image(systemName: "mappin")
+                                .font(.system(size: 8))
+                            Text(subLocation.code)
+                                .font(.caption2)
+                        }
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    }
                 }
             }
-            .padding(.vertical, 8)
-            .contentShape(Rectangle())
+            .layoutPriority(1)
+
+            // Checklist progress or chevron
+            if device.checklistProgress > 0 && device.checklistProgress < 100 {
+                CircularProgress(progress: Double(device.checklistProgress) / 100.0)
+                    .frame(width: 20, height: 20)
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
-        .buttonStyle(.plain)
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
+    }
+
+    // MARK: - Wide Layout (iPad)
+
+    private var wideLayout: some View {
+        HStack(spacing: 16) {
+            statusIndicator
+
+            Text(device.displayName)
+                .font(.headline)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .frame(minWidth: 140, alignment: .leading)
+
+            if let orderNumber = device.orderNumber {
+                Text("#\(String(orderNumber))")
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            DeviceStatusBadge(status: device.deviceStatus)
+
+            if device.isOverdue {
+                Label("Overdue", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            Spacer()
+
+            if let received = device.formattedReceivedAt {
+                Label(received, systemImage: "arrow.down.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let subLocation = device.subLocation {
+                HStack(spacing: 4) {
+                    Image(systemName: "mappin")
+                        .font(.caption2)
+                    Text(subLocation.code)
+                        .font(.caption)
+                }
+                .foregroundStyle(.secondary)
+            }
+
+            if let dueDate = device.formattedDueDate {
+                Label(dueDate, systemImage: "clock")
+                    .font(.caption)
+                    .foregroundStyle(device.isOverdue ? .red : .secondary)
+            }
+
+            if device.checklistProgress > 0 && device.checklistProgress < 100 {
+                CircularProgress(progress: Double(device.checklistProgress) / 100.0)
+                    .frame(width: 24, height: 24)
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
     }
 
     // MARK: - Status Indicator
@@ -128,58 +204,117 @@ struct CircularProgress: View {
 /// Row for displaying active work (diagnosis/repair in progress)
 struct ActiveWorkRow: View {
     let item: ActiveWorkItem
+    var isCompact: Bool = true
     let onTap: () -> Void
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 12) {
-                // Work type icon
-                Image(systemName: item.activeWorkType.icon)
-                    .font(.title3)
-                    .foregroundStyle(item.isLongRunning ? .orange : .blue)
-                    .frame(width: 32)
-
-                // Content
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(item.displayName)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-
-                    HStack(spacing: 8) {
-                        Text(item.activeWorkType.displayName)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.blue)
-
-                        Text("#\(String(item.orderNumber))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Spacer()
-
-                // Duration
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(item.duration)
-                        .font(.subheadline.weight(.medium).monospacedDigit())
-                        .foregroundStyle(item.isLongRunning ? .orange : .primary)
-
-                    if item.isLongRunning {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                    }
-                }
-
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+            if isCompact {
+                compactLayout
+            } else {
+                wideLayout
             }
-            .padding(.vertical, 8)
-            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Compact Layout (iPhone)
+
+    private var compactLayout: some View {
+        HStack(spacing: 12) {
+            Image(systemName: item.activeWorkType.icon)
+                .font(.title3)
+                .foregroundStyle(item.isLongRunning ? .orange : .blue)
+                .frame(width: 32)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.displayName)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                HStack(spacing: 8) {
+                    Text(item.activeWorkType.displayName)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.blue)
+
+                    Text("#\(String(item.orderNumber))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(item.duration)
+                    .font(.subheadline.weight(.medium).monospacedDigit())
+                    .foregroundStyle(item.isLongRunning ? .orange : .primary)
+
+                if item.isLongRunning {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+    }
+
+    // MARK: - Wide Layout (iPad)
+
+    private var wideLayout: some View {
+        HStack(spacing: 16) {
+            Image(systemName: item.activeWorkType.icon)
+                .font(.title3)
+                .foregroundStyle(item.isLongRunning ? .orange : .blue)
+                .frame(width: 32)
+
+            Text(item.displayName)
+                .font(.headline)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .frame(minWidth: 140, alignment: .leading)
+
+            Text("#\(String(item.orderNumber))")
+                .font(.subheadline.monospacedDigit())
+                .foregroundStyle(.secondary)
+
+            DeviceStatusBadge(status: item.deviceStatus)
+
+            Text(item.activeWorkType.displayName)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.blue)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.blue.opacity(0.1))
+                .cornerRadius(6)
+
+            Spacer()
+
+            HStack(spacing: 6) {
+                if item.isLongRunning {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+
+                Text(item.duration)
+                    .font(.subheadline.weight(.medium).monospacedDigit())
+                    .foregroundStyle(item.isLongRunning ? .orange : .primary)
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
     }
 }
 
@@ -285,7 +420,9 @@ struct CategoryChip: View {
                 source: "order"
             )
         ) {
+            #if DEBUG
             print("Tapped")
+            #endif
         }
     }
 }

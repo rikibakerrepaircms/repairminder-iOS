@@ -25,7 +25,7 @@ struct DeviceTokenRegistration: Codable {
             deviceToken: token,
             platform: "ios",
             appType: "staff",
-            deviceName: UIDevice.current.name,
+            deviceName: UIDevice.current.model,
             osVersion: UIDevice.current.systemVersion,
             appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
         )
@@ -37,7 +37,7 @@ struct DeviceTokenRegistration: Codable {
             deviceToken: token,
             platform: "ios",
             appType: "customer",
-            deviceName: UIDevice.current.name,
+            deviceName: UIDevice.current.model,
             osVersion: UIDevice.current.systemVersion,
             appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
         )

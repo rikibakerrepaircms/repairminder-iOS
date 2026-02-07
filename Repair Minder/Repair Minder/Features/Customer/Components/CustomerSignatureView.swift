@@ -13,8 +13,8 @@ struct CustomerSignatureView: View {
     @Binding var typedName: String
     @Binding var drawnSignature: UIImage?
 
-    @State private var currentPath: Path = Path()
-    @State private var paths: [Path] = []
+    @State private var showFullscreenCanvas = false
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     enum SignatureType: String, CaseIterable {
         case typed = "typed"
@@ -43,8 +43,11 @@ struct CustomerSignatureView: View {
             case .typed:
                 typedSignatureInput
             case .drawn:
-                drawnSignatureCanvas
+                drawnSignaturePreview
             }
+        }
+        .fullScreenCover(isPresented: $showFullscreenCanvas) {
+            FullscreenSignatureView(drawnSignature: $drawnSignature)
         }
     }
 
@@ -73,90 +76,61 @@ struct CustomerSignatureView: View {
         }
     }
 
-    // MARK: - Drawn Signature Canvas
+    // MARK: - Drawn Signature (Preview / Tap to Expand)
 
-    private var drawnSignatureCanvas: some View {
+    private var drawnSignaturePreview: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Draw your signature below")
+                Text(drawnSignature == nil ? "Tap below to sign" : "Tap to re-sign")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
                 Spacer()
 
-                Button("Clear") {
-                    paths.removeAll()
-                    currentPath = Path()
-                    drawnSignature = nil
-                }
-                .font(.caption)
-                .disabled(paths.isEmpty)
-            }
-
-            ZStack {
-                // Background
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(.systemGray6))
-
-                // Signature line
-                Rectangle()
-                    .fill(Color(.systemGray4))
-                    .frame(height: 1)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 100)
-
-                // Drawn paths
-                Canvas { context, size in
-                    for path in paths {
-                        context.stroke(path, with: .color(.primary), lineWidth: 2)
+                if drawnSignature != nil {
+                    Button {
+                        drawnSignature = nil
+                    } label: {
+                        Text("Clear")
+                            .font(.caption)
                     }
-                    context.stroke(currentPath, with: .color(.primary), lineWidth: 2)
                 }
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            let point = value.location
-                            if value.translation == .zero {
-                                currentPath.move(to: point)
-                            } else {
-                                currentPath.addLine(to: point)
-                            }
+            }
+
+            Button {
+                showFullscreenCanvas = true
+            } label: {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(.systemGray6))
+
+                    if let image = drawnSignature {
+                        // Show captured signature as preview
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .padding(12)
+                    } else {
+                        // Placeholder
+                        VStack(spacing: 8) {
+                            Image(systemName: "pencil.and.scribble")
+                                .font(.title2)
+                                .foregroundStyle(.secondary)
+                            Text("Tap to open signature pad")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
                         }
-                        .onEnded { _ in
-                            paths.append(currentPath)
-                            currentPath = Path()
-                            captureSignatureImage()
-                        }
+                    }
+                }
+                .frame(height: horizontalSizeClass == .regular ? 250 : 150)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(Color.accentColor.opacity(0.3), lineWidth: 1)
                 )
-
-                // Placeholder text
-                if paths.isEmpty {
-                    Text("Sign here")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                }
             }
-            .frame(height: 150)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .buttonStyle(.plain)
         }
-    }
-
-    // MARK: - Signature Capture
-
-    private func captureSignatureImage() {
-        let renderer = ImageRenderer(content: signatureCanvasContent)
-        renderer.scale = 3.0
-        drawnSignature = renderer.uiImage
-    }
-
-    private var signatureCanvasContent: some View {
-        Canvas { context, size in
-            for path in paths {
-                context.stroke(path, with: .color(.black), lineWidth: 2)
-            }
-        }
-        .frame(width: 300, height: 150)
-        .background(.white)
     }
 
     // MARK: - Validation

@@ -10,6 +10,11 @@ import SwiftUI
 struct OrderDetailView: View {
     @StateObject private var viewModel: OrderDetailViewModel
     @State private var selectedClientId: String?
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var isRegularWidth: Bool {
+        horizontalSizeClass == .regular
+    }
 
     init(orderId: String) {
         _viewModel = StateObject(wrappedValue: OrderDetailViewModel(orderId: orderId))
@@ -89,6 +94,8 @@ struct OrderDetailView: View {
                 }
             }
             .padding()
+            .frame(maxWidth: isRegularWidth ? 700 : .infinity)
+            .frame(maxWidth: .infinity)
         }
         .refreshable {
             await viewModel.refresh()
@@ -149,34 +156,68 @@ struct OrderDetailView: View {
                 Button {
                     selectedClientId = client.id
                 } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(client.displayName)
-                                .font(.headline)
-                                .foregroundStyle(.primary)
+                    if isRegularWidth {
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(client.displayName)
+                                    .font(.headline)
+                                    .foregroundStyle(.primary)
 
-                            if let email = client.email {
-                                Text(email)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
+                                if let address = client.fullAddress {
+                                    Label(address, systemImage: "location")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
 
-                            if let phone = client.phone {
-                                Text(phone)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
+                            Spacer(minLength: 24)
+
+                            VStack(alignment: .trailing, spacing: 4) {
+                                if let email = client.email {
+                                    Label(email, systemImage: "envelope")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                if let phone = client.phone {
+                                    Label(phone, systemImage: "phone")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
+
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(.secondary)
                         }
+                    } else {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(client.displayName)
+                                    .font(.headline)
+                                    .foregroundStyle(.primary)
 
-                        Spacer()
+                                if let email = client.email {
+                                    Text(email)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
 
-                        Image(systemName: "chevron.right")
-                            .foregroundStyle(.secondary)
+                                if let phone = client.phone {
+                                    Text(phone)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 .buttonStyle(.plain)
 
-                if let address = client.fullAddress {
+                if !isRegularWidth, let address = client.fullAddress {
                     Divider()
                     Label(address, systemImage: "location")
                         .font(.caption)
@@ -197,30 +238,43 @@ struct OrderDetailView: View {
 
     private func devicesSection(_ devices: [OrderDeviceSummary]) -> some View {
         SectionCard(title: "Devices", icon: "iphone") {
-            VStack(spacing: 8) {
-                ForEach(devices) { device in
-                    HStack {
-                        Circle()
-                            .fill(device.deviceStatus.color)
-                            .frame(width: 8, height: 8)
-
-                        Text(device.deviceStatus.label)
-                            .font(.subheadline)
-
-                        Spacer()
-
-                        if let auth = device.authorizationStatus {
-                            Text(auth.capitalized)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.vertical, 4)
-
-                    if device.id != devices.last?.id {
-                        Divider()
+            if isRegularWidth && devices.count > 1 {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                    ForEach(devices) { device in
+                        deviceRow(device)
+                            .padding(.vertical, 4)
                     }
                 }
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(devices) { device in
+                        deviceRow(device)
+                            .padding(.vertical, 4)
+
+                        if device.id != devices.last?.id {
+                            Divider()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func deviceRow(_ device: OrderDeviceSummary) -> some View {
+        HStack {
+            Circle()
+                .fill(device.deviceStatus.color)
+                .frame(width: 8, height: 8)
+
+            Text(device.deviceStatus.label)
+                .font(.subheadline)
+
+            Spacer()
+
+            if let auth = device.authorizationStatus {
+                Text(auth.capitalized)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -270,8 +324,15 @@ struct OrderDetailView: View {
     private func totalsSection(_ totals: OrderTotals, paymentStatus: PaymentStatus) -> some View {
         SectionCard(title: "Totals", icon: "sum") {
             VStack(spacing: 8) {
-                totalRow("Subtotal", value: totals.formattedSubtotal)
-                totalRow("VAT", value: totals.formattedVatTotal)
+                if isRegularWidth {
+                    HStack(spacing: 24) {
+                        totalRow("Subtotal", value: totals.formattedSubtotal)
+                        totalRow("VAT", value: totals.formattedVatTotal)
+                    }
+                } else {
+                    totalRow("Subtotal", value: totals.formattedSubtotal)
+                    totalRow("VAT", value: totals.formattedVatTotal)
+                }
 
                 Divider()
 
@@ -433,31 +494,34 @@ struct OrderDetailView: View {
     // MARK: - Dates Section
 
     private func datesSection(_ dates: OrderDates) -> some View {
-        SectionCard(title: "Timeline", icon: "clock") {
-            VStack(spacing: 8) {
-                if let created = dates.createdAt {
-                    dateRow("Created", date: created)
+        let entries = dateEntries(from: dates)
+        return SectionCard(title: "Timeline", icon: "clock") {
+            if isRegularWidth && entries.count > 2 {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                    ForEach(entries.indices, id: \.self) { i in
+                        dateRow(entries[i].label, date: entries[i].date, color: entries[i].color)
+                    }
                 }
-                if let quoteSent = dates.quoteSentAt {
-                    dateRow("Quote Sent", date: quoteSent)
-                }
-                if let authorised = dates.authorisedAt {
-                    dateRow("Authorised", date: authorised)
-                }
-                if let rejected = dates.rejectedAt {
-                    dateRow("Rejected", date: rejected, color: .red)
-                }
-                if let completed = dates.serviceCompletedAt {
-                    dateRow("Service Completed", date: completed)
-                }
-                if let collected = dates.collectedAt {
-                    dateRow("Collected", date: collected, color: .green)
-                }
-                if let despatched = dates.despatchedAt {
-                    dateRow("Despatched", date: despatched, color: .green)
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(entries.indices, id: \.self) { i in
+                        dateRow(entries[i].label, date: entries[i].date, color: entries[i].color)
+                    }
                 }
             }
         }
+    }
+
+    private func dateEntries(from dates: OrderDates) -> [(label: String, date: String, color: Color)] {
+        var entries: [(label: String, date: String, color: Color)] = []
+        if let d = dates.createdAt { entries.append(("Created", d, .primary)) }
+        if let d = dates.quoteSentAt { entries.append(("Quote Sent", d, .primary)) }
+        if let d = dates.authorisedAt { entries.append(("Authorised", d, .primary)) }
+        if let d = dates.rejectedAt { entries.append(("Rejected", d, .red)) }
+        if let d = dates.serviceCompletedAt { entries.append(("Service Completed", d, .primary)) }
+        if let d = dates.collectedAt { entries.append(("Collected", d, .green)) }
+        if let d = dates.despatchedAt { entries.append(("Despatched", d, .green)) }
+        return entries
     }
 
     private func dateRow(_ label: String, date: String, color: Color = .primary) -> some View {

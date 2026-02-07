@@ -96,7 +96,9 @@ final class DevicesViewModel {
             filters = response.filters
         } catch {
             self.error = error.localizedDescription
+            #if DEBUG
             print("Failed to load devices: \(error)")
+            #endif
         }
 
         isLoading = false
@@ -133,7 +135,9 @@ final class DevicesViewModel {
             pagination = response.pagination
             filters = response.filters
         } catch {
+            #if DEBUG
             print("Failed to load more: \(error)")
+            #endif
         }
 
         isLoadingMore = false
@@ -215,7 +219,9 @@ final class DevicesViewModel {
                 try await APIClient.shared.requestWithFilters(.devices(filter: searchFilter))
             return data.first
         } catch {
+            #if DEBUG
             print("Scanner lookup failed: \(error)")
+            #endif
             return nil
         }
     }

@@ -192,7 +192,9 @@ final class APIClient {
                 // Debug: print first 1000 chars of response for dashboard stats
                 if endpoint.path.contains("dashboard") {
                     let responseString = String(data: data, encoding: .utf8) ?? "N/A"
+                    #if DEBUG
                     print("🔍 [API] Response preview: \(responseString.prefix(1000))")
+                    #endif
                 }
                 return try decodeResponse(data)
 
@@ -207,6 +209,9 @@ final class APIClient {
 
             case 403:
                 let errorResponse = try? decodeResponse(data) as APIResponse<EmptyResponse>
+                if errorResponse?.code == "CONSENT_REQUIRED" {
+                    NotificationCenter.default.post(name: .consentRequired, object: nil)
+                }
                 throw APIError.forbidden(
                     message: errorResponse?.error,
                     code: errorResponse?.code
@@ -244,7 +249,9 @@ final class APIClient {
             throw APIError.invalidRequest("Invalid URL")
         }
 
+        #if DEBUG
         print("🌐 [API] \(endpoint.method.rawValue) \(url.absoluteString)")
+        #endif
 
         var request = URLRequest(url: url)
         request.httpMethod = endpoint.method.rawValue
@@ -270,6 +277,22 @@ final class APIClient {
         do {
             return try decoder.decode(APIResponse<T>.self, from: data)
         } catch {
+            #if DEBUG
+            if let decodingError = error as? DecodingError {
+                switch decodingError {
+                case .keyNotFound(let key, let context):
+                    print("❌ DECODE ERROR - Key not found: '\(key.stringValue)' at path: \(context.codingPath.map(\.stringValue).joined(separator: "."))")
+                case .typeMismatch(let type, let context):
+                    print("❌ DECODE ERROR - Type mismatch: expected \(type) at path: \(context.codingPath.map(\.stringValue).joined(separator: ".")) - \(context.debugDescription)")
+                case .valueNotFound(let type, let context):
+                    print("❌ DECODE ERROR - Value not found: \(type) at path: \(context.codingPath.map(\.stringValue).joined(separator: ".")) - \(context.debugDescription)")
+                case .dataCorrupted(let context):
+                    print("❌ DECODE ERROR - Data corrupted at path: \(context.codingPath.map(\.stringValue).joined(separator: ".")) - \(context.debugDescription)")
+                @unknown default:
+                    print("❌ DECODE ERROR - Unknown: \(decodingError)")
+                }
+            }
+            #endif
             throw APIError.decodingError(error)
         }
     }
@@ -293,12 +316,16 @@ final class APIClient {
                 // Debug logging for my-queue
                 if endpoint.path.contains("my-queue") {
                     let responseString = String(data: data, encoding: .utf8) ?? "N/A"
+                    #if DEBUG
                     print("🔍 [API] my-queue response: \(responseString.prefix(2000))")
+                    #endif
                 }
                 do {
                     return try decoder.decode(APIResponseWithFilters<T, F>.self, from: data)
                 } catch {
+                    #if DEBUG
                     print("❌ [API] Decoding error for \(endpoint.path): \(error)")
+                    #endif
                     throw error
                 }
 
@@ -311,6 +338,9 @@ final class APIClient {
 
             case 403:
                 let errorResponse = try? decodeResponse(data) as APIResponse<EmptyResponse>
+                if errorResponse?.code == "CONSENT_REQUIRED" {
+                    NotificationCenter.default.post(name: .consentRequired, object: nil)
+                }
                 throw APIError.forbidden(
                     message: errorResponse?.error,
                     code: errorResponse?.code

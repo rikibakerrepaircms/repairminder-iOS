@@ -171,7 +171,9 @@ final class KeychainManager {
 
         let status = SecItemAdd(query as CFDictionary, nil)
         if status != errSecSuccess {
+            #if DEBUG
             print("[Keychain] Failed to set value for key \(key): \(status)")
+            #endif
         }
     }
 

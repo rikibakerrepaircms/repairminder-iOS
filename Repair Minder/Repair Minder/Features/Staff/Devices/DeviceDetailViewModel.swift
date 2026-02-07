@@ -74,7 +74,9 @@ final class DeviceDetailViewModel {
             await loadActions()
         } catch {
             self.error = error.localizedDescription
+            #if DEBUG
             print("Failed to load device: \(error)")
+            #endif
         }
 
         isLoading = false
@@ -93,7 +95,9 @@ final class DeviceDetailViewModel {
             )
             availableActions = response.availableActions
         } catch {
+            #if DEBUG
             print("Failed to load actions: \(error)")
+            #endif
             availableActions = []
         }
     }
@@ -114,7 +118,9 @@ final class DeviceDetailViewModel {
             await loadActions()
         } catch {
             self.error = error.localizedDescription
+            #if DEBUG
             print("Failed to update device: \(error)")
+            #endif
         }
 
         isUpdating = false
@@ -135,7 +141,9 @@ final class DeviceDetailViewModel {
             await loadActions()
         } catch {
             self.error = error.localizedDescription
+            #if DEBUG
             print("Failed to update status: \(error)")
+            #endif
         }
 
         isUpdating = false
@@ -160,7 +168,9 @@ final class DeviceDetailViewModel {
             await loadActions()
         } catch {
             self.error = error.localizedDescription
+            #if DEBUG
             print("Failed to execute action: \(error)")
+            #endif
         }
 
         isUpdating = false

@@ -24,6 +24,7 @@ struct TicketMessage: Codable, Identifiable, Sendable, Equatable {
     let deviceName: String?
     let createdAt: String
     let createdBy: CreatedByUser?
+    let source: String?
     let events: [MessageEvent]?
     let attachments: [MessageAttachment]?
 

@@ -22,6 +22,11 @@ struct DashboardView: View {
     @State private var viewModel = DashboardViewModel()
     @State private var showingPeriodPicker = false
     @State private var deviceNavigation: DeviceNavigation?
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var isRegularWidth: Bool {
+        horizontalSizeClass == .regular
+    }
 
     var body: some View {
         NavigationStack {
@@ -38,19 +43,33 @@ struct DashboardView: View {
                     // Main stats grid
                     statsSection
 
-                    // Lifecycle comparison
-                    if let comparison = viewModel.stats?.companyComparison {
-                        lifecycleSection(comparison)
-                    }
-
-                    // Enquiry stats
-                    if let enquiryStats = viewModel.enquiryStats {
-                        enquirySection(enquiryStats)
+                    // Lifecycle + Enquiries: side by side on iPad
+                    if isRegularWidth {
+                        HStack(alignment: .top, spacing: 20) {
+                            if let comparison = viewModel.stats?.companyComparison {
+                                lifecycleSection(comparison)
+                                    .frame(maxWidth: .infinity)
+                            }
+                            if let enquiryStats = viewModel.enquiryStats {
+                                enquirySection(enquiryStats)
+                                    .frame(maxWidth: .infinity)
+                            }
+                        }
+                    } else {
+                        if let comparison = viewModel.stats?.companyComparison {
+                            lifecycleSection(comparison)
+                        }
+                        if let enquiryStats = viewModel.enquiryStats {
+                            enquirySection(enquiryStats)
+                        }
                     }
                 }
                 .padding()
+                .frame(maxWidth: isRegularWidth ? 900 : .infinity)
+                .frame(maxWidth: .infinity)
             }
             .background(Color(.systemGroupedBackground))
+            .hidesBookingFABOnScroll()
             .navigationTitle("Dashboard")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -137,7 +156,7 @@ struct DashboardView: View {
             }
 
             ForEach(viewModel.activeWork) { item in
-                ActiveWorkRow(item: item) {
+                ActiveWorkRow(item: item, isCompact: !isRegularWidth) {
                     if let orderId = item.orderId {
                         deviceNavigation = DeviceNavigation(orderId: orderId, deviceId: item.id)
                     }
@@ -158,7 +177,7 @@ struct DashboardView: View {
                 .font(.headline)
 
             if let stats = viewModel.stats {
-                StatGrid {
+                StatGrid(columns: isRegularWidth ? 4 : 2) {
                     StatCard.deviceCount(
                         stats.devices.current.count,
                         change: viewModel.deviceComparison?.change,
@@ -185,7 +204,7 @@ struct DashboardView: View {
                     )
                 }
             } else {
-                StatGrid {
+                StatGrid(columns: isRegularWidth ? 4 : 2) {
                     StatCardPlaceholder()
                     StatCardPlaceholder()
                     StatCardPlaceholder()
@@ -419,6 +438,7 @@ struct EnquiryStatCard: View {
             }
         }
         .padding()
+        .frame(maxHeight: .infinity, alignment: .top)
         .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(12)
     }

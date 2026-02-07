@@ -28,7 +28,7 @@ struct DeviceDetail: Decodable, Identifiable, Sendable {
     let conditionGrade: String?
     let customerReportedIssues: String?
     let technicianFoundIssues: String?
-    let additionalIssuesFound: String?
+    let additionalIssuesFound: Int?
     let conditionNotes: String?
     let dataBackupOffered: Bool
     let dataBackupAccepted: Bool
@@ -102,7 +102,7 @@ struct DeviceDetail: Decodable, Identifiable, Sendable {
 
     /// Whether device has any issues documented
     var hasIssuesDocumented: Bool {
-        customerReportedIssues != nil || technicianFoundIssues != nil || additionalIssuesFound != nil
+        customerReportedIssues != nil || technicianFoundIssues != nil || (additionalIssuesFound ?? 0) != 0
     }
 
     /// Whether diagnostic checks have been performed
@@ -334,9 +334,9 @@ struct DeviceLineItem: Decodable, Sendable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case id, description, quantity
-        case unitPrice = "unit_price"
-        case vatRate = "vat_rate"
-        case lineTotalIncVat = "line_total_inc_vat"
+        case unitPrice
+        case vatRate
+        case lineTotalIncVat
     }
 
     /// Formatted unit price

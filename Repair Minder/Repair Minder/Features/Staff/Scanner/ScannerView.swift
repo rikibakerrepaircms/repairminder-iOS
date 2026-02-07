@@ -158,6 +158,7 @@ struct ScannerView: View {
                 scannedCodeView(code)
             }
         }
+        .frame(maxWidth: 500)
         .padding(.bottom, 32)
     }
 
@@ -341,31 +342,30 @@ struct ScannerView: View {
 struct CameraPreviewView: UIViewRepresentable {
     let session: AVCaptureSession?
 
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView(frame: .zero)
+    func makeUIView(context: Context) -> CameraPreviewUIView {
+        let view = CameraPreviewUIView()
         view.backgroundColor = .black
 
         if let session = session {
             let previewLayer = AVCaptureVideoPreviewLayer(session: session)
             previewLayer.videoGravity = .resizeAspectFill
-            previewLayer.frame = view.bounds
+            view.previewLayer = previewLayer
             view.layer.addSublayer(previewLayer)
-            context.coordinator.previewLayer = previewLayer
         }
 
         return view
     }
 
-    func updateUIView(_ uiView: UIView, context: Context) {
-        context.coordinator.previewLayer?.frame = uiView.bounds
-    }
+    func updateUIView(_ uiView: CameraPreviewUIView, context: Context) {}
+}
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
+/// Custom UIView that keeps the camera preview layer sized to bounds on rotation
+class CameraPreviewUIView: UIView {
+    var previewLayer: AVCaptureVideoPreviewLayer?
 
-    class Coordinator {
-        var previewLayer: AVCaptureVideoPreviewLayer?
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        previewLayer?.frame = bounds
     }
 }
 

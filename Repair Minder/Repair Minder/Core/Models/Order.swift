@@ -277,6 +277,30 @@ struct OrderItem: Decodable, Identifiable, Equatable, Sendable {
     let authorizationStatus: String?
     let authorizationRound: Int?
 
+    private enum CodingKeys: String, CodingKey {
+        case id, itemType, description, quantity, unitPrice, vatRate
+        case lineTotal, vatAmount, lineTotalIncVat, deviceId, createdAt
+        case authorizationStatus, authorizationRound
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        // Gracefully handle unknown item types
+        itemType = try? container.decode(OrderItemType.self, forKey: .itemType)
+        description = try container.decode(String.self, forKey: .description)
+        quantity = try container.decode(Int.self, forKey: .quantity)
+        unitPrice = try container.decode(Double.self, forKey: .unitPrice)
+        vatRate = try container.decode(Double.self, forKey: .vatRate)
+        lineTotal = try container.decode(Double.self, forKey: .lineTotal)
+        vatAmount = try container.decode(Double.self, forKey: .vatAmount)
+        lineTotalIncVat = try container.decode(Double.self, forKey: .lineTotalIncVat)
+        deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
+        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
+        authorizationStatus = try container.decodeIfPresent(String.self, forKey: .authorizationStatus)
+        authorizationRound = try container.decodeIfPresent(Int.self, forKey: .authorizationRound)
+    }
+
     var formattedUnitPrice: String {
         CurrencyFormatter.format(unitPrice)
     }

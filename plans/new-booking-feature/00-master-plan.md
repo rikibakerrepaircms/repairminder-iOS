@@ -4,7 +4,7 @@
 
 Implement a full booking wizard in the iOS app that mirrors the web app's `BookingPage.tsx` and `BookingWizard.tsx`. This allows staff to create new repair bookings, buyback transactions, and accessory sales directly from the iOS app without needing to use the web interface.
 
-**Why:** Currently, the "New Order" quick action button on the dashboard only shows a placeholder. Staff need the ability to create bookings on-the-go, especially for walk-in customers.
+**Why:** Staff need the ability to create bookings on-the-go, especially for walk-in customers. The booking feature should be instantly accessible from any screen via a persistent branded blue floating action button.
 
 **Reference Implementation:**
 - [Ref: /Volumes/Riki Repos/repairminder/src/pages/BookingPage.tsx] - Service type selection
@@ -37,7 +37,8 @@ Implement a full booking wizard in the iOS app that mirrors the web app's `Booki
 | Order creation successful | API creates order and devices, returns order number |
 | Confirmation displays | Shows order number and success state |
 | Build passes | `xcodebuild` completes without errors |
-| Feature accessible | Accessible from DashboardView toolbar |
+| Feature accessible | Branded blue "New Booking" button visible on all staff tab screens |
+| Full-screen experience | Booking wizard presents as a true `.fullScreenCover`, supporting both portrait and landscape, matching the web app's full-page booking flow |
 
 ---
 
@@ -64,7 +65,7 @@ Implement a full booking wizard in the iOS app that mirrors the web app's `Booki
 | API response format differences | High | Medium | Test each endpoint individually, handle edge cases |
 | Signature data too large for JSON | Low | Low | Canvas renders at 300x150pt — PNG is small. Web app stores as TEXT with no issues |
 | Large form state management | Medium | Low | Use Observable view model, break into sub-states |
-| Brand/Model data volume | Low | High | Implement search with API filtering, not local |
+| Brand/Model data volume | Low | High | Use `/api/device-search?q=` unified search endpoint — no local data needed |
 | Offline booking not supported | Medium | N/A | Out of scope — clearly indicate online-only |
 
 ---
@@ -78,11 +79,11 @@ Implement a full booking wizard in the iOS app that mirrors the web app's `Booki
 | 03 | Service Type Selection | BookingView with 4 service type cards | Low |
 | 04 | Wizard Container | BookingWizardView with step navigation and progress | Medium |
 | 05 | Client Step | Customer search, creation, location, and address | High |
-| 06 | Devices Step | Device entry form with brand/model selection | High |
+| 06 | Devices Step | Device entry form with unified device search (`/api/device-search`) | High |
 | 07 | Summary Step | Review all data, ready-by date, optional pre-auth | Medium |
 | 08 | Signature Step | Terms display, agreement, signature capture | Medium |
 | 09 | Confirmation Step | Submit order, show success with order details | Medium |
-| 10 | Navigation Integration | Add entry point to DashboardView toolbar | Low |
+| 10 | Navigation Integration | Add branded blue FAB to all staff tabs + full-screen `.fullScreenCover` presentation | Medium |
 
 ---
 
@@ -93,13 +94,11 @@ The following are explicitly **NOT** included in this implementation:
 1. **Offline booking support** — Bookings require network connectivity
 2. **Accessories wizard** — Will show "Coming Soon" placeholder (web app has a separate simplified flow)
 3. **Device Sale wizard** — Will show alert directing to buyback list
-4. **Ticket linking** — Complex feature from web (search tickets, show comms history), defer to future
-5. **Email verification** — Simplified validation only
-6. **Address autocomplete** — Manual entry only (web uses Google Maps API)
-7. **PDF receipt generation** — iOS doesn't need this (web-only)
-8. **Sub-location assignment** — Defer to future (requires location setup)
-9. **Engineer assignment** — Defer to future
-10. **Find My / passcode fields** — Defer to future (nice-to-have, not essential for MVP)
+4. **Email verification** — Simplified validation only
+5. **Address autocomplete** — Manual entry only (web uses Google Maps API)
+6. **PDF receipt generation** — iOS doesn't need this (web-only)
+7. **Sub-location assignment** — Defer to future (requires location setup)
+8. **Engineer assignment** — Defer to future
 
 ---
 
@@ -122,13 +121,12 @@ Repair Minder/
 │           └── Components/
 │               ├── ClientSearchView.swift        # Stage 05
 │               ├── DeviceEntryFormView.swift     # Stage 06
-│               └── BrandModelPicker.swift        # Stage 06
+│               └── DeviceSearchPicker.swift      # Stage 06 - unified brand/model search
 ├── Core/
 │   ├── Models/
-│   │   ├── Location.swift                        # Stage 01
-│   │   ├── Brand.swift                           # Stage 01
-│   │   ├── DeviceModel.swift                     # Stage 01
-│   │   ├── DeviceType.swift                      # Stage 01
+│   │   ├── Location.swift                        # Stage 01 (NOTE: LocationOption already exists in DeviceQueueItem.swift — this adds the full Location model with country_code)
+│   │   ├── DeviceSearchResult.swift              # Stage 01 - response model for /api/device-search
+│   │   ├── DeviceType.swift                      # Stage 01 (NOTE: DeviceTypeOption already exists — this is an alias or extension)
 │   │   └── BookingFormData.swift                 # Stage 02
 │   └── Networking/
 │       └── APIEndpoints.swift                    # Stage 01 (modify - add new cases)
@@ -138,14 +136,17 @@ Repair Minder/
 │           └── CustomerSignatureView.swift       # EXISTING - reuse for signature capture
 └── Features/
     └── Staff/
+        ├── StaffMainView.swift                   # Stage 10 (modify - add branded blue FAB overlay + fullScreenCover)
         └── Dashboard/
-            └── DashboardView.swift               # Stage 10 (modify - add toolbar button)
+            └── DashboardView.swift               # EXISTING - no modification needed
 ```
 
 **Notes:**
 - Booking goes inside `Features/Staff/` to match the existing pattern.
 - `CustomerSignatureView.swift` already exists with drawn (base64 PNG) + typed (name) support — reuse it in `SignatureStepView` rather than creating a new component.
 - No separate `SignaturePadView` needed — the existing component already handles canvas drawing, clear, and base64 encoding.
+- The "New Booking" button is a branded blue floating action button (FAB) added as an overlay in `StaffMainView`, so it appears on **all** staff tabs (Dashboard, Devices, Queue, etc.). It triggers a `.fullScreenCover` that supports both portrait and landscape.
+- `LocationOption` (id, name) and `DeviceTypeOption` (id, name, slug) already exist in `DeviceQueueItem.swift` — reuse or extend these rather than duplicating.
 
 ---
 
@@ -155,16 +156,18 @@ All backend endpoints already exist (verified via web app). Some already have `A
 
 | Endpoint | Method | Purpose | APIEndpoint Case |
 |----------|--------|---------|------------------|
-| `/api/clients/search?q=` | GET | Search clients | `.clientSearch(query:)` ✅ exists |
+| `/api/clients/search?email=` | GET | Search clients | `.clientSearch(query:)` ✅ exists |
 | `/api/clients/:id` | GET | Get client details | `.client(id:)` ✅ exists |
 | `/api/clients` | POST | Create new client | `.createClient` ✅ exists |
 | `/api/orders` | POST | Create order (with inline signature) | `.createOrder` ✅ exists |
 | `/api/orders/:id/devices` | POST | Add device to order | `.createOrderDevice(orderId:)` ✅ exists |
 | `/api/locations` | GET | Get locations list | `.locations` ⚠️ **add in Stage 01** |
-| `/api/brands` | GET | Get brands list | `.brands` ⚠️ **add in Stage 01** |
-| `/api/brands/:id/models` | GET | Get models for brand | `.brandModels(brandId:)` ⚠️ **add in Stage 01** |
+| `/api/device-search?q=` | GET | Search brands + models (unified) | `.deviceSearch(query:)` ⚠️ **add in Stage 01** |
 | `/api/device-types` | GET | Get device types | `.deviceTypes` ⚠️ **add in Stage 01** |
 | `/api/company/public-info` | GET | Get company name + T&Cs | `.companyPublicInfo` ⚠️ **add in Stage 01** |
+
+**Important — No separate `/api/brands` endpoint exists:**
+The web app uses a **unified search** endpoint `GET /api/device-search?q=<query>` (see `DeviceSearch.tsx`) which returns `{ brands: [...], models: [...] }` in a single response. Users type a search query (e.g. "iPhone") and get matching brands and models together. There is no browse-by-brand flow.
 
 **Important — Signature is NOT a separate API call:**
 The web app sends signature data **inline** with the `POST /api/orders` payload. The existing `.createOrderSignature(orderId:)` endpoint is for adding signatures to existing orders (e.g., collection signatures) — it is NOT used during booking creation.
@@ -192,10 +195,10 @@ struct CreateOrderRequest: Encodable {
     let postcode: String?
     let country: String?
 
-    let locationId: String
+    let locationId: String?
     let intakeMethod: String          // Always "walk_in" for booking wizard
-    let serviceType: String           // "repair" or "buyback"
     let readyBy: String?              // ISO format: "YYYY-MM-DDTHH:MM:SS"
+    let existingTicketId: String?     // Link to existing enquiry/ticket (optional)
 
     // Inline signature (NOT a separate API call)
     let signature: SignaturePayload
@@ -207,6 +210,7 @@ struct CreateOrderRequest: Encodable {
 struct SignaturePayload: Encodable {
     let signatureData: String?        // Base64 PNG data URL from canvas, or nil
     let typedName: String?            // Typed name string, or nil
+    let signatureMethod: String       // "drawn" or "typed"
     let termsAgreed: Bool             // Must be true
     let marketingConsent: Bool
     let userAgent: String             // e.g. "RepairMinder-iOS/1.0"
@@ -245,11 +249,13 @@ struct CreateOrderDeviceRequest: Encodable {
     let modelId: String?
     let customBrand: String?          // If not using brandId
     let customModel: String?          // If not using modelId
-    let displayName: String           // Required
     let serialNumber: String?
     let imei: String?
     let colour: String?
     let storageCapacity: String?
+    let passcode: String?
+    let passcodeType: String?         // "none", "pin", "pattern", "password", "biometric"
+    let findMyStatus: String?         // "enabled", "disabled", "unknown"
     let conditionGrade: String?
     let customerReportedIssues: String?
     let deviceTypeId: String?
@@ -273,22 +279,26 @@ Use the `APIEndpoint` enum cases with type-inferred responses:
 // GET request - response type is inferred from the variable type
 let locations: [Location] = try await APIClient.shared.request(.locations)
 
-// GET with parameters
-let brands: [Brand] = try await APIClient.shared.request(.brands)
-let models: [DeviceModel] = try await APIClient.shared.request(.brandModels(brandId: "123"))
+// Unified device search - returns brands + models matching query
+let searchResults: DeviceSearchResponse = try await APIClient.shared.request(
+    .deviceSearch(query: "iPhone")
+)
+// searchResults.brands: [DeviceSearchBrand]
+// searchResults.models: [DeviceSearchModel]
 
-// Search clients
-let searchResults: ClientSearchResponse = try await APIClient.shared.request(
+// Search clients (returns ClientSearchResponse wrapper)
+let result: ClientSearchResponse = try await APIClient.shared.request(
     .clientSearch(query: "john")
 )
+let clients = result.clients
 
 // POST request with body - pass body as second parameter
 let order: CreateOrderResponse = try await APIClient.shared.request(
     .createOrder, body: createOrderRequest
 )
 
-// POST device to order
-let device: OrderDevice = try await APIClient.shared.request(
+// POST device to order (returns { id } but we don't need it)
+try await APIClient.shared.requestVoid(
     .createOrderDevice(orderId: orderId),
     body: deviceRequest
 )
@@ -395,7 +405,7 @@ struct BookingWizardView: View {
 | 07 | Medium | Stage 02, 04 |
 | 08 | Medium | Stage 02, 04 |
 | 09 | Medium | Stage 02, 04 |
-| 10 | Small | All stages |
+| 10 | Medium | All stages |
 
 ---
 

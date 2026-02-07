@@ -133,12 +133,12 @@ struct Client: Identifiable, Equatable, Sendable {
 
     /// Effective order count (from stats or list)
     var effectiveOrderCount: Int {
-        stats?.orderCount ?? orderCount ?? 0
+        stats?.orderCount ?? orderCount ?? orders?.count ?? 0
     }
 
     /// Effective device count (from stats or list)
     var effectiveDeviceCount: Int {
-        stats?.deviceCount ?? deviceCount ?? 0
+        stats?.deviceCount ?? deviceCount ?? devices?.count ?? 0
     }
 
     /// Effective total spend (from stats or list)

@@ -7,6 +7,14 @@
 
 import SwiftUI
 
+// MARK: - Settings Destination
+
+enum SettingsDestination: Hashable {
+    case clients
+    case notifications
+    case security
+}
+
 // MARK: - Settings View
 
 /// Staff settings screen with profile, notifications, and logout
@@ -15,43 +23,92 @@ struct SettingsView: View {
     @ObservedObject private var authManager = AuthManager.shared
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var selectedDestination: SettingsDestination?
+
+    private var isRegularWidth: Bool {
+        horizontalSizeClass == .regular
+    }
 
     var body: some View {
-        NavigationStack {
-            List {
-                // User profile section
-                profileSection
-
-                // Navigation section
-                navigationSection
-
-                // Notifications section
-                notificationsSection
-
-                // Security section
-                securitySection
-
-                // Appearance section
-                appearanceSection
-
-                // About section
-                aboutSection
-
-                // Account actions section
-                accountActionsSection
+        Group {
+            if isRegularWidth {
+                iPadLayout
+            } else {
+                iPhoneLayout
             }
-            .navigationTitle("More")
-            .alert("Logout", isPresented: $viewModel.showLogoutConfirmation) {
-                Button("Cancel", role: .cancel) {}
-                Button("Logout", role: .destructive) {
-                    Task {
-                        await viewModel.logout()
-                        appState.onStaffLogout()
-                    }
+        }
+        .alert("Logout", isPresented: $viewModel.showLogoutConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Logout", role: .destructive) {
+                Task {
+                    await viewModel.logout()
+                    appState.onStaffLogout()
                 }
-            } message: {
-                Text("Are you sure you want to logout?")
             }
+        } message: {
+            Text("Are you sure you want to logout?")
+        }
+    }
+
+    // MARK: - iPhone Layout
+
+    private var iPhoneLayout: some View {
+        NavigationStack {
+            settingsList
+                .navigationDestination(for: SettingsDestination.self) { dest in
+                    destinationView(dest)
+                }
+        }
+    }
+
+    // MARK: - iPad Layout
+
+    private var iPadLayout: some View {
+        NavigationSplitView {
+            settingsList
+        } detail: {
+            if let dest = selectedDestination {
+                NavigationStack {
+                    destinationView(dest)
+                }
+            } else {
+                ContentUnavailableView(
+                    "Select an Option",
+                    systemImage: "gearshape",
+                    description: Text("Choose a setting from the list")
+                )
+            }
+        }
+    }
+
+    // MARK: - Shared Settings List
+
+    private var settingsList: some View {
+        List {
+            profileSection
+            navigationSection
+            notificationsSection
+            securitySection
+            appearanceSection
+            aboutSection
+            accountActionsSection
+        }
+        .hidesBookingFABOnScroll()
+        .navigationTitle("More")
+    }
+
+    // MARK: - Destination View
+
+    @ViewBuilder
+    private func destinationView(_ dest: SettingsDestination) -> some View {
+        switch dest {
+        case .clients:
+            ClientListView(isEmbedded: true)
+        case .notifications:
+            NotificationSettingsView()
+        case .security:
+            PasscodeSettingsView()
         }
     }
 
@@ -60,15 +117,17 @@ struct SettingsView: View {
     private var profileSection: some View {
         Section {
             if let user = authManager.currentUser {
-                HStack(spacing: 12) {
-                    // Avatar
+                HStack(spacing: isRegularWidth ? 16 : 12) {
                     ZStack {
                         Circle()
                             .fill(Color.blue.opacity(0.2))
-                            .frame(width: 56, height: 56)
+                            .frame(
+                                width: isRegularWidth ? 68 : 56,
+                                height: isRegularWidth ? 68 : 56
+                            )
 
                         Text(user.initials)
-                            .font(.title3)
+                            .font(isRegularWidth ? .title2 : .title3)
                             .fontWeight(.semibold)
                             .foregroundStyle(.blue)
                     }
@@ -89,11 +148,19 @@ struct SettingsView: View {
                         }
                         .foregroundStyle(.secondary)
                     }
+
+                    if isRegularWidth, let company = authManager.currentCompany {
+                        Spacer()
+
+                        Label(company.name, systemImage: "building.2")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, isRegularWidth ? 8 : 4)
             }
 
-            if let company = authManager.currentCompany {
+            if !isRegularWidth, let company = authManager.currentCompany {
                 HStack {
                     Label("Company", systemImage: "building.2")
                     Spacer()
@@ -108,11 +175,7 @@ struct SettingsView: View {
 
     private var navigationSection: some View {
         Section {
-            NavigationLink {
-                ClientListView()
-            } label: {
-                Label("Clients", systemImage: "person.2.fill")
-            }
+            settingsLink(.clients, label: "Clients", icon: "person.2.fill")
         }
     }
 
@@ -120,11 +183,7 @@ struct SettingsView: View {
 
     private var notificationsSection: some View {
         Section("Notifications") {
-            NavigationLink {
-                NotificationSettingsView()
-            } label: {
-                Label("Push Notifications", systemImage: "bell.badge")
-            }
+            settingsLink(.notifications, label: "Push Notifications", icon: "bell.badge")
         }
     }
 
@@ -132,14 +191,31 @@ struct SettingsView: View {
 
     private var securitySection: some View {
         Section("Security") {
-            NavigationLink {
-                PasscodeSettingsView()
+            settingsLink(.security, label: "Passcode & \(PasscodeService.shared.biometricType.displayName)", icon: "lock.shield")
+        }
+    }
+
+    // MARK: - Settings Link Helper
+
+    @ViewBuilder
+    private func settingsLink(_ dest: SettingsDestination, label: String, icon: String) -> some View {
+        if isRegularWidth {
+            Button {
+                selectedDestination = dest
             } label: {
-                Label {
-                    Text("Passcode & \(PasscodeService.shared.biometricType.displayName)")
-                } icon: {
-                    Image(systemName: "lock.shield")
+                HStack {
+                    Label(label, systemImage: icon)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
                 }
+            }
+            .foregroundStyle(.primary)
+            .listRowBackground(selectedDestination == dest ? Color.accentColor.opacity(0.1) : nil)
+        } else {
+            NavigationLink(value: dest) {
+                Label(label, systemImage: icon)
             }
         }
     }
@@ -187,6 +263,14 @@ struct SettingsView: View {
                     Text(company.currencyCode ?? "GBP")
                         .foregroundStyle(.secondary)
                 }
+            }
+
+            Link(destination: URL(string: "https://repairminder.com/privacy-policy")!) {
+                Label("Privacy Policy", systemImage: "hand.raised")
+            }
+
+            Link(destination: URL(string: "https://repairminder.com/terms")!) {
+                Label("Terms of Service", systemImage: "doc.text")
             }
         }
     }

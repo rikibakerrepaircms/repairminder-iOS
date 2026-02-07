@@ -27,7 +27,7 @@ struct Ticket: Codable, Identifiable, Sendable, Equatable, Hashable {
     let createdAt: String
     let updatedAt: String
     let lastClientUpdate: String?
-    let client: TicketClient
+    let client: TicketClient?
     let messages: [TicketMessage]?
     let order: TicketOrder?
     let notes: [TicketNote]?
@@ -56,19 +56,19 @@ struct Ticket: Codable, Identifiable, Sendable, Equatable, Hashable {
 
     /// Time since last update
     var lastUpdatedDate: Date? {
-        ISO8601DateFormatter().date(from: updatedAt)
+        DateFormatters.parseDate(updatedAt)
     }
 
     /// Time since last client message
     var lastClientUpdateDate: Date? {
         guard let lastClientUpdate else { return nil }
-        return ISO8601DateFormatter().date(from: lastClientUpdate)
+        return DateFormatters.parseDate(lastClientUpdate)
     }
 
     /// Formatted last update time
     var formattedLastUpdate: String {
         guard let date = lastUpdatedDate else { return updatedAt }
-        return date.relativeFormatted()
+        return DateFormatters.formatHumanDate(date)
     }
 
     // MARK: - Hashable
@@ -183,10 +183,10 @@ struct TicketNote: Codable, Equatable, Sendable {
     let deviceName: String?
 
     var formattedDate: String {
-        guard let date = ISO8601DateFormatter().date(from: createdAt) else {
+        guard let date = DateFormatters.parseDate(createdAt) else {
             return createdAt
         }
-        return date.relativeFormatted()
+        return DateFormatters.formatHumanDate(date)
     }
 }
 
@@ -240,12 +240,3 @@ struct CompanyLocation: Codable, Identifiable, Equatable, Sendable {
     let isPrimary: Bool?
 }
 
-// MARK: - Date Extension
-
-private extension Date {
-    func relativeFormatted() -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: self, relativeTo: Date())
-    }
-}

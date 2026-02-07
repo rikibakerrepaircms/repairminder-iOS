@@ -68,7 +68,9 @@ final class PushNotificationService: ObservableObject {
 
             return granted
         } catch {
+            #if DEBUG
             print("[PushNotificationService] Authorization error: \(error)")
+            #endif
             return false
         }
     }
@@ -86,19 +88,25 @@ final class PushNotificationService: ObservableObject {
     func didRegisterForRemoteNotifications(deviceToken: Data) {
         let token = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
         self.deviceToken = token
+        #if DEBUG
         print("[PushNotificationService] Device token: \(token)")
+        #endif
     }
 
     /// Called when APNs registration fails
     func didFailToRegisterForRemoteNotifications(error: Error) {
+        #if DEBUG
         print("[PushNotificationService] Failed to register: \(error)")
+        #endif
     }
 
     /// Register the current device token with the backend
     /// - Parameter appType: "staff" or "customer"
     func registerToken(appType: String = "staff") async {
         guard let token = deviceToken else {
+            #if DEBUG
             print("[PushNotificationService] No device token to register")
+            #endif
             return
         }
 
@@ -113,9 +121,13 @@ final class PushNotificationService: ObservableObject {
                 : DeviceTokenRegistration.forStaff(token: token)
 
             try await APIClient.shared.requestVoid(.registerDeviceToken, body: registration)
+            #if DEBUG
             print("[PushNotificationService] Token registered successfully")
+            #endif
         } catch {
+            #if DEBUG
             print("[PushNotificationService] Failed to register token: \(error)")
+            #endif
             errorMessage = "Failed to register for notifications"
         }
     }
@@ -123,17 +135,23 @@ final class PushNotificationService: ObservableObject {
     /// Unregister the current device token from the backend (call on logout)
     func unregisterToken() async {
         guard let token = deviceToken else {
+            #if DEBUG
             print("[PushNotificationService] No device token to unregister")
+            #endif
             return
         }
 
         do {
             let request = DeviceTokenUnregistration(deviceToken: token)
             try await APIClient.shared.requestVoid(.unregisterDeviceToken, body: request)
+            #if DEBUG
             print("[PushNotificationService] Token unregistered successfully")
+            #endif
         } catch {
             // Don't surface this error to user - we're logging out anyway
+            #if DEBUG
             print("[PushNotificationService] Failed to unregister token: \(error)")
+            #endif
         }
     }
 

@@ -40,11 +40,15 @@ final class DeepLinkHandler: ObservableObject {
         let payload = NotificationPayload(userInfo: userInfo)
 
         guard let destination = DeepLinkDestination.from(payload: payload) else {
+            #if DEBUG
             print("[DeepLinkHandler] Could not create destination from payload")
+            #endif
             return
         }
 
+        #if DEBUG
         print("[DeepLinkHandler] Setting pending destination: \(destination)")
+        #endif
         pendingDestination = destination
     }
 
@@ -70,7 +74,6 @@ final class DeepLinkHandler: ObservableObject {
     /// - Returns: Whether the URL was handled
     func handleURL(_ url: URL) -> Bool {
         // URL scheme: repairminder://order/uuid
-        // Universal link: https://app.repairminder.com/order/uuid
 
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: true) else {
             return false

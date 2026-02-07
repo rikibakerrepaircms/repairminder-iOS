@@ -36,117 +36,123 @@ struct StaffLoginView: View {
                 Color.black.opacity(0.5)
                     .ignoresSafeArea()
 
-                ScrollView {
-                    VStack(spacing: 24) {
-                        Spacer()
-                            .frame(height: 60)
+                GeometryReader { geometry in
+                    ScrollView {
+                        VStack(spacing: 24) {
+                            Spacer()
+                                .frame(height: 60)
 
-                        // Header
-                        Image("login_logo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: 100)
+                            // Header
+                            Image("login_logo")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 100)
 
-                        // Login form
-                        VStack(spacing: 16) {
-                            // Email field
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Email")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                    .foregroundStyle(.white)
+                            // Login form
+                            VStack(spacing: 16) {
+                                // Email field
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Email")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(.white)
 
-                                LoginTextField(placeholder: "staff@example.com", text: $email)
-                                    .textContentType(.emailAddress)
-                                    .keyboardType(.emailAddress)
-                                    .autocapitalization(.none)
-                                    .autocorrectionDisabled()
-                                    .focused($focusedField, equals: .email)
-                                    .submitLabel(.next)
-                                    .onSubmit {
-                                        focusedField = .password
+                                    LoginTextField(placeholder: "staff@example.com", text: $email)
+                                        .textContentType(.emailAddress)
+                                        .keyboardType(.emailAddress)
+                                        .autocapitalization(.none)
+                                        .autocorrectionDisabled()
+                                        .focused($focusedField, equals: .email)
+                                        .submitLabel(.next)
+                                        .onSubmit {
+                                            focusedField = .password
+                                        }
+                                }
+
+                                // Password field
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Password")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(.white)
+
+                                    LoginTextField(placeholder: "Enter your password", text: $password, isSecure: true)
+                                        .textContentType(.password)
+                                        .focused($focusedField, equals: .password)
+                                        .submitLabel(.go)
+                                        .onSubmit {
+                                            loginWithPassword()
+                                        }
+                                }
+
+                                // Error message
+                                if let error = authManager.errorMessage {
+                                    Text(error)
+                                        .font(.caption)
+                                        .foregroundStyle(.red)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+
+                                // Login button
+                                Button(action: loginWithPassword) {
+                                    if authManager.isLoading {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    } else {
+                                        Text("Sign In")
+                                            .fontWeight(.semibold)
                                     }
+                                }
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
+                                .background(isFormValid && !authManager.isLoading ? Color.blue : Color.blue.opacity(0.4))
+                                .foregroundStyle(.white)
+                                .contentShape(Rectangle())
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .disabled(!isFormValid || authManager.isLoading)
                             }
+                            .padding(.horizontal, 24)
 
-                            // Password field
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Password")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                    .foregroundStyle(.white)
+                            // Divider with "or"
+                            HStack {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.3))
+                                    .frame(height: 1)
 
-                                LoginTextField(placeholder: "Enter your password", text: $password, isSecure: true)
-                                    .textContentType(.password)
-                                    .focused($focusedField, equals: .password)
-                                    .submitLabel(.go)
-                                    .onSubmit {
-                                        loginWithPassword()
-                                    }
-                            }
-
-                            // Error message
-                            if let error = authManager.errorMessage {
-                                Text(error)
+                                Text("or")
                                     .font(.caption)
-                                    .foregroundStyle(.red)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
+                                    .foregroundStyle(.white.opacity(0.7))
 
-                            // Login button
-                            Button(action: loginWithPassword) {
-                                if authManager.isLoading {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                } else {
-                                    Text("Sign In")
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.3))
+                                    .frame(height: 1)
+                            }
+                            .padding(.horizontal, 24)
+
+                            // Magic link button
+                            Button(action: requestMagicLink) {
+                                HStack {
+                                    Image(systemName: "link")
+                                    Text("Sign in with Magic Link")
                                         .fontWeight(.semibold)
                                 }
                             }
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
-                            .background(isFormValid && !authManager.isLoading ? Color.blue : Color.blue.opacity(0.4))
+                            .background(isValidEmail && !authManager.isLoading ? Color.blue : Color.blue.opacity(0.4))
                             .foregroundStyle(.white)
                             .contentShape(Rectangle())
                             .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .disabled(!isFormValid || authManager.isLoading)
+                            .padding(.horizontal, 24)
+                            .disabled(!isValidEmail || authManager.isLoading)
+
+                            Spacer(minLength: 40)
                         }
-                        .padding(.horizontal, 24)
-
-                        // Divider with "or"
-                        HStack {
-                            Rectangle()
-                                .fill(Color.white.opacity(0.3))
-                                .frame(height: 1)
-
-                            Text("or")
-                                .font(.caption)
-                                .foregroundStyle(.white.opacity(0.7))
-
-                            Rectangle()
-                                .fill(Color.white.opacity(0.3))
-                                .frame(height: 1)
-                        }
-                        .padding(.horizontal, 24)
-
-                        // Magic link button
-                        Button(action: requestMagicLink) {
-                            HStack {
-                                Image(systemName: "link")
-                                Text("Sign in with Magic Link")
-                                    .fontWeight(.semibold)
-                            }
-                        }
+                        .frame(maxWidth: 500)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(isValidEmail && !authManager.isLoading ? Color.blue : Color.blue.opacity(0.4))
-                        .foregroundStyle(.white)
-                        .contentShape(Rectangle())
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .padding(.horizontal, 24)
-                        .disabled(!isValidEmail || authManager.isLoading)
-
-                        Spacer(minLength: 40)
+                        .frame(minHeight: geometry.size.height)
                     }
+                    .scrollDismissesKeyboard(.immediately)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)

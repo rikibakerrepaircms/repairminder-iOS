@@ -9,61 +9,119 @@ import SwiftUI
 
 // MARK: - Devices View
 
+/// Navigation target for device detail (iPad split view)
+private struct DeviceDetailNavigation: Hashable {
+    let orderId: String
+    let deviceId: String
+}
+
 /// Main device list view with filtering capabilities
 struct DevicesView: View {
     @State private var viewModel = DevicesViewModel()
     @State private var showingFilterSheet = false
     @State private var showingScanner = false
     @State private var searchText = ""
+    @State private var selectedDeviceNav: DeviceDetailNavigation?
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var isRegularWidth: Bool {
+        horizontalSizeClass == .regular
+    }
 
     var body: some View {
+        if isRegularWidth {
+            iPadBody
+        } else {
+            iPhoneBody
+        }
+    }
+
+    // MARK: - iPhone Layout
+
+    private var iPhoneBody: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Category filter tabs
-                categoryTabs
+            devicesContent(wideRows: false)
+                .navigationDestination(for: DeviceListItem.self) { device in
+                    if let orderId = device.orderId {
+                        DeviceDetailView(orderId: orderId, deviceId: device.id)
+                    } else {
+                        ContentUnavailableView(
+                            "No Order",
+                            systemImage: "doc.questionmark",
+                            description: Text("This device is not associated with an order")
+                        )
+                    }
+                }
+        }
+    }
 
-                // Device list
-                deviceList
+    // MARK: - iPad Layout
+
+    private var iPadBody: some View {
+        NavigationSplitView {
+            devicesContent(wideRows: true)
+        } detail: {
+            if let nav = selectedDeviceNav {
+                DeviceDetailView(orderId: nav.orderId, deviceId: nav.deviceId)
+                    .id("\(nav.orderId)-\(nav.deviceId)")
+            } else {
+                ContentUnavailableView(
+                    "Select a Device",
+                    systemImage: "iphone",
+                    description: Text("Choose a device from the list to view its details.")
+                )
             }
-            .navigationTitle("Devices")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 8) {
-                        // Scanner button
-                        Button {
-                            showingScanner = true
-                        } label: {
-                            Image(systemName: "barcode.viewfinder")
-                        }
+        }
+    }
 
-                        // Filter button
-                        Button {
-                            showingFilterSheet = true
-                        } label: {
-                            Image(systemName: viewModel.filterState.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                        }
+    // MARK: - Shared Content
+
+    private func devicesContent(wideRows: Bool) -> some View {
+        VStack(spacing: 0) {
+            // Category filter tabs
+            categoryTabs
+
+            // Device list
+            deviceListContent(wideRows: wideRows)
+        }
+        .navigationTitle("Devices")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                HStack(spacing: 8) {
+                    // Scanner button
+                    Button {
+                        showingScanner = true
+                    } label: {
+                        Image(systemName: "barcode.viewfinder")
+                    }
+
+                    // Filter button
+                    Button {
+                        showingFilterSheet = true
+                    } label: {
+                        Image(systemName: viewModel.filterState.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                     }
                 }
             }
-            .searchable(text: $searchText, prompt: "Search serial, IMEI, brand, model...")
-            .onChange(of: searchText) { _, newValue in
-                Task {
-                    await viewModel.setSearch(newValue)
-                }
+        }
+        .searchable(text: $searchText, prompt: "Search serial, IMEI, brand, model...")
+        .onChange(of: searchText) { _, newValue in
+            Task {
+                await viewModel.setSearch(newValue)
             }
-            .refreshable {
-                await viewModel.refresh()
-            }
-            .sheet(isPresented: $showingFilterSheet) {
-                DeviceFilterSheet(viewModel: viewModel)
-            }
-            .sheet(isPresented: $showingScanner) {
-                ScannerView(viewModel: viewModel)
-            }
-            .task {
-                if viewModel.devices.isEmpty {
-                    await viewModel.loadDevices()
-                }
+        }
+        .refreshable {
+            await viewModel.refresh()
+        }
+        .sheet(isPresented: $showingFilterSheet) {
+            DeviceFilterSheet(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showingScanner) {
+            ScannerView(viewModel: viewModel)
+        }
+        .task {
+            if viewModel.devices.isEmpty {
+                await viewModel.loadDevices()
             }
         }
     }
@@ -109,7 +167,7 @@ struct DevicesView: View {
     // MARK: - Device List
 
     @ViewBuilder
-    private var deviceList: some View {
+    private func deviceListContent(wideRows: Bool) -> some View {
         if viewModel.isLoading && viewModel.devices.isEmpty {
             loadingView
         } else if viewModel.isEmpty {
@@ -119,12 +177,35 @@ struct DevicesView: View {
         } else {
             List {
                 ForEach(viewModel.devices) { device in
-                    NavigationLink(value: device) {
-                        DeviceRow(device: device)
-                    }
-                    .onAppear {
-                        Task {
-                            await viewModel.loadMoreIfNeeded(currentItem: device)
+                    if wideRows {
+                        // iPad: use Button to drive split view selection
+                        Button {
+                            if let orderId = device.orderId {
+                                selectedDeviceNav = DeviceDetailNavigation(orderId: orderId, deviceId: device.id)
+                            }
+                        } label: {
+                            DeviceRow(device: device, isWide: true)
+                        }
+                        .buttonStyle(.plain)
+                        .listRowBackground(
+                            selectedDeviceNav?.deviceId == device.id
+                                ? Color.accentColor.opacity(0.1)
+                                : nil
+                        )
+                        .onAppear {
+                            Task {
+                                await viewModel.loadMoreIfNeeded(currentItem: device)
+                            }
+                        }
+                    } else {
+                        // iPhone: use NavigationLink
+                        NavigationLink(value: device) {
+                            DeviceRow(device: device)
+                        }
+                        .onAppear {
+                            Task {
+                                await viewModel.loadMoreIfNeeded(currentItem: device)
+                            }
                         }
                     }
                 }
@@ -140,17 +221,6 @@ struct DevicesView: View {
                 }
             }
             .listStyle(.plain)
-            .navigationDestination(for: DeviceListItem.self) { device in
-                if let orderId = device.orderId {
-                    DeviceDetailView(orderId: orderId, deviceId: device.id)
-                } else {
-                    ContentUnavailableView(
-                        "No Order",
-                        systemImage: "doc.questionmark",
-                        description: Text("This device is not associated with an order")
-                    )
-                }
-            }
         }
     }
 

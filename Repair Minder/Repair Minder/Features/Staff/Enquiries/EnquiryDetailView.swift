@@ -14,10 +14,15 @@ struct EnquiryDetailView: View {
     @StateObject private var viewModel: EnquiryDetailViewModel
     @FocusState private var isReplyFocused: Bool
     @State private var isReplyExpanded = false
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(ticketId: String) {
         self.ticketId = ticketId
         self._viewModel = StateObject(wrappedValue: EnquiryDetailViewModel(ticketId: ticketId))
+    }
+
+    private var isRegularWidth: Bool {
+        horizontalSizeClass == .regular
     }
 
     var body: some View {
@@ -31,6 +36,9 @@ struct EnquiryDetailView: View {
                 ticketContent(ticket)
             }
         }
+        .frame(maxWidth: isRegularWidth ? 700 : .infinity)
+        .frame(maxWidth: .infinity)
+        .background(isRegularWidth ? Color(.systemGroupedBackground) : .clear)
         .navigationTitle(viewModel.ticket?.displayNumber ?? "Ticket")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -151,9 +159,9 @@ struct EnquiryDetailView: View {
                 Image(systemName: "person.circle.fill")
                     .foregroundColor(.blue)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(ticket.client.displayName)
+                    Text(ticket.client?.displayName ?? "Unknown")
                         .font(.subheadline.weight(.medium))
-                    Text(ticket.client.email)
+                    Text(ticket.client?.email ?? "")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -161,6 +169,22 @@ struct EnquiryDetailView: View {
 
                 // Status badge
                 StatusBadge(status: ticket.status)
+            }
+
+            // Metadata row (iPad — show type, created, updated side by side)
+            if isRegularWidth {
+                Divider()
+                HStack(spacing: 16) {
+                    metadataItem(icon: ticket.ticketType.icon, label: "Type", value: ticket.ticketType.label, color: ticket.ticketType.color)
+                    Spacer()
+                    metadataItem(icon: "calendar", label: "Created", value: formattedDate(ticket.createdAt))
+                    Spacer()
+                    metadataItem(icon: "clock.arrow.circlepath", label: "Updated", value: ticket.formattedLastUpdate)
+                    if let user = ticket.assignedUser {
+                        Spacer()
+                        metadataItem(icon: "person", label: "Assigned", value: user.fullName)
+                    }
+                }
             }
 
             // Order info
@@ -251,11 +275,10 @@ struct EnquiryDetailView: View {
 
     /// Text area height based on state: compact → focused → expanded
     private var textAreaHeight: CGFloat {
-        let screen = UIScreen.main.bounds.height
         if isReplyExpanded {
-            return screen * 0.65
+            return isRegularWidth ? 350 : UIScreen.main.bounds.height * 0.65
         } else if isReplyFocused {
-            return screen * 0.35
+            return isRegularWidth ? 200 : UIScreen.main.bounds.height * 0.35
         } else {
             return 48
         }
@@ -470,6 +493,27 @@ struct EnquiryDetailView: View {
         .background(Color(.systemBackground))
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isReplyExpanded)
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isReplyFocused)
+    }
+
+    // MARK: - iPad Helpers
+
+    private func metadataItem(icon: String, label: String, value: String, color: Color = .secondary) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.caption)
+                    .foregroundColor(color)
+                Text(value)
+                    .font(.caption.weight(.medium))
+            }
+        }
+    }
+
+    private func formattedDate(_ isoString: String) -> String {
+        DateFormatters.formatRelativeDate(isoString) ?? isoString
     }
 
     private func closedBanner(_ ticket: Ticket) -> some View {

@@ -54,13 +54,33 @@ final class AppState: ObservableObject {
         case customerPortal
         /// User's company is in quarantine mode
         case quarantine(reason: String)
+        /// User must accept updated platform terms on the web app
+        case termsRequired
     }
 
     // MARK: - Initialization
 
+    /// Observer for consent-required notifications from APIClient
+    private var consentObserver: Any?
+
     private init() {
         // Load previously selected role
         selectedRole = AppUserRole.load()
+
+        // Listen for consent-required errors from any API call (mid-session)
+        consentObserver = NotificationCenter.default.addObserver(
+            forName: .consentRequired,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                // Only redirect if user is currently in the staff dashboard
+                if self.currentState == .staffDashboard {
+                    self.currentState = .termsRequired
+                }
+            }
+        }
     }
 
     // MARK: - App Lifecycle
@@ -89,6 +109,11 @@ final class AppState: ObservableObject {
 
         switch authManager.authState {
         case .authenticated:
+            // Check if platform terms acceptance is required before proceeding
+            if await isConsentRequired() {
+                currentState = .termsRequired
+                return
+            }
             await syncPasscodeState()
             if !PasscodeService.shared.hasPasscode && !hasSeenPasscodeSetup {
                 currentState = .passcodeSetup
@@ -147,6 +172,11 @@ final class AppState: ObservableObject {
 
         switch authManager.authState {
         case .authenticated:
+            // Check if platform terms acceptance is required before proceeding
+            if await isConsentRequired() {
+                currentState = .termsRequired
+                return
+            }
             if !PasscodeService.shared.hasPasscode && !hasSeenPasscodeSetup {
                 currentState = .passcodeSetup
             } else {
@@ -211,6 +241,48 @@ final class AppState: ObservableObject {
     func onPasscodeSetupSkipped() {
         markPasscodeSetupSeen()
         currentState = .staffDashboard
+    }
+
+    // MARK: - Consent Check
+
+    /// Check if the user needs to agree to updated platform terms
+    /// Makes a lightweight call to a non-exempt endpoint; the backend consent wall
+    /// returns 403/CONSENT_REQUIRED if terms are pending for this company.
+    private func isConsentRequired() async -> Bool {
+        // Master admins handle consent on the web app and are exempt from the wall
+        if authManager.currentUser?.role == .masterAdmin {
+            return false
+        }
+
+        do {
+            // Try a lightweight non-exempt API call. If consent is required,
+            // the backend middleware blocks it with 403/CONSENT_REQUIRED.
+            let _: EmptyResponse = try await APIClient.shared.request(
+                .dashboardStats(scope: "personal", period: "today")
+            )
+            return false
+        } catch let error as APIError {
+            if case .forbidden(_, let code) = error, code == "CONSENT_REQUIRED" {
+                return true
+            }
+            return false
+        } catch {
+            return false
+        }
+    }
+
+    /// Re-check consent status after user has accepted terms on the web app
+    func recheckConsent() async {
+        if await isConsentRequired() {
+            currentState = .termsRequired
+        } else {
+            await syncPasscodeState()
+            if !PasscodeService.shared.hasPasscode && !hasSeenPasscodeSetup {
+                currentState = .passcodeSetup
+            } else {
+                currentState = .staffDashboard
+            }
+        }
     }
 
     // MARK: - Full Logout

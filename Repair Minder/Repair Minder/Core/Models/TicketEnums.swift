@@ -59,11 +59,13 @@ enum TicketStatus: String, Codable, CaseIterable, Sendable {
 enum TicketType: String, Codable, CaseIterable, Sendable {
     case lead
     case order
+    case enquiry
 
     var label: String {
         switch self {
         case .lead: return "Lead/Enquiry"
         case .order: return "Order"
+        case .enquiry: return "Enquiry"
         }
     }
 
@@ -71,6 +73,7 @@ enum TicketType: String, Codable, CaseIterable, Sendable {
         switch self {
         case .lead: return "Lead"
         case .order: return "Order"
+        case .enquiry: return "Enquiry"
         }
     }
 
@@ -78,6 +81,7 @@ enum TicketType: String, Codable, CaseIterable, Sendable {
         switch self {
         case .lead: return "envelope"
         case .order: return "bag"
+        case .enquiry: return "questionmark.bubble"
         }
     }
 
@@ -85,6 +89,7 @@ enum TicketType: String, Codable, CaseIterable, Sendable {
         switch self {
         case .lead: return .purple
         case .order: return .blue
+        case .enquiry: return .orange
         }
     }
 }

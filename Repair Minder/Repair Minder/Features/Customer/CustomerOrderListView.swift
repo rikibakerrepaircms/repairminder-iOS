@@ -12,8 +12,35 @@ struct CustomerOrderListView: View {
     @StateObject private var viewModel = CustomerOrderListViewModel()
     @ObservedObject private var customerAuth = CustomerAuthManager.shared
     @ObservedObject private var appState = AppState.shared
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var selectedOrderId: String?
+
+    private var isRegularWidth: Bool {
+        horizontalSizeClass == .regular
+    }
 
     var body: some View {
+        Group {
+            if isRegularWidth {
+                iPadLayout
+            } else {
+                iPhoneLayout
+            }
+        }
+        .task {
+            await viewModel.loadOrders()
+        }
+        .onChange(of: viewModel.orders.isEmpty) { _, isEmpty in
+            if !isEmpty && isRegularWidth && selectedOrderId == nil {
+                selectedOrderId = viewModel.actionRequiredOrders.first?.id
+                    ?? viewModel.orders.first?.id
+            }
+        }
+    }
+
+    // MARK: - iPhone Layout
+
+    private var iPhoneLayout: some View {
         NavigationStack {
             Group {
                 if viewModel.isLoading && viewModel.orders.isEmpty {
@@ -36,12 +63,46 @@ struct CustomerOrderListView: View {
                 await viewModel.refresh()
             }
         }
-        .task {
-            await viewModel.loadOrders()
+    }
+
+    // MARK: - iPad Layout
+
+    private var iPadLayout: some View {
+        NavigationSplitView {
+            Group {
+                if viewModel.isLoading && viewModel.orders.isEmpty {
+                    loadingView
+                } else if let error = viewModel.errorMessage, viewModel.orders.isEmpty {
+                    errorView(error)
+                } else if viewModel.orders.isEmpty {
+                    emptyView
+                } else {
+                    iPadOrderList
+                }
+            }
+            .navigationTitle("My Orders")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    profileMenu
+                }
+            }
+            .refreshable {
+                await viewModel.refresh()
+            }
+        } detail: {
+            if let orderId = selectedOrderId {
+                CustomerOrderDetailView(orderId: orderId)
+            } else {
+                ContentUnavailableView(
+                    "Select an Order",
+                    systemImage: "doc.text",
+                    description: Text("Choose an order from the list to view its details.")
+                )
+            }
         }
     }
 
-    // MARK: - Order List
+    // MARK: - iPhone Order List
 
     private var orderList: some View {
         List {
@@ -89,6 +150,63 @@ struct CustomerOrderListView: View {
                                 currencyCode: viewModel.currencyCode
                             )
                         }
+                    }
+                } header: {
+                    Text("Completed")
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    // MARK: - iPad Order List
+
+    private var iPadOrderList: some View {
+        List(selection: $selectedOrderId) {
+            // Action Required Section
+            if !viewModel.actionRequiredOrders.isEmpty {
+                Section {
+                    ForEach(viewModel.actionRequiredOrders) { order in
+                        CustomerOrderRow(
+                            order: order,
+                            currencyCode: viewModel.currencyCode,
+                            isWideLayout: true
+                        )
+                        .tag(order.id)
+                    }
+                } header: {
+                    Label("Action Required", systemImage: "exclamationmark.circle.fill")
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            // Active Orders Section
+            let activeNonActionOrders = viewModel.activeOrders.filter { !$0.isAwaitingAction }
+            if !activeNonActionOrders.isEmpty {
+                Section {
+                    ForEach(activeNonActionOrders) { order in
+                        CustomerOrderRow(
+                            order: order,
+                            currencyCode: viewModel.currencyCode,
+                            isWideLayout: true
+                        )
+                        .tag(order.id)
+                    }
+                } header: {
+                    Text("In Progress")
+                }
+            }
+
+            // Completed Orders Section
+            if !viewModel.completedOrders.isEmpty {
+                Section {
+                    ForEach(viewModel.completedOrders) { order in
+                        CustomerOrderRow(
+                            order: order,
+                            currencyCode: viewModel.currencyCode,
+                            isWideLayout: true
+                        )
+                        .tag(order.id)
                     }
                 } header: {
                     Text("Completed")
@@ -204,6 +322,7 @@ struct CustomerOrderListView: View {
 struct CustomerOrderRow: View {
     let order: CustomerOrderSummary
     let currencyCode: String
+    var isWideLayout: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -218,16 +337,40 @@ struct CustomerOrderRow: View {
             }
 
             // Devices list
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(order.devices) { device in
-                    HStack(spacing: 6) {
-                        Image(systemName: "iphone")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+            if isWideLayout {
+                HStack(spacing: 6) {
+                    Image(systemName: "iphone")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
-                        Text(device.displayName)
-                            .font(.subheadline)
-                            .lineLimit(1)
+                    Text(order.devices.map(\.displayName).joined(separator: ", "))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+
+                    if order.devices.count > 1 {
+                        Text("\(order.devices.count)")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color(.systemGray5))
+                            .clipShape(Capsule())
+                    }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(order.devices) { device in
+                        HStack(spacing: 6) {
+                            Image(systemName: "iphone")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            Text(device.displayName)
+                                .font(.subheadline)
+                                .lineLimit(1)
+                        }
                     }
                 }
             }
@@ -302,10 +445,7 @@ struct CustomerOrderRow: View {
     // MARK: - Formatting
 
     private var formattedDate: String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter.string(from: order.createdAt)
+        DateFormatters.formatHumanDate(order.createdAt)
     }
 
     private func formatCurrency(_ amount: Decimal) -> String {

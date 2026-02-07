@@ -74,27 +74,27 @@ struct ConfirmationStepView: View {
 
             // Order Summary
             VStack(spacing: 16) {
-                SummaryRow(
+                ConfirmationSummaryRow(
                     icon: "person.fill",
                     label: "Customer",
                     value: viewModel.formData.clientDisplayName
                 )
 
-                SummaryRow(
+                ConfirmationSummaryRow(
                     icon: "iphone",
                     label: "Devices",
                     value: "\(viewModel.formData.devices.count) device\(viewModel.formData.devices.count != 1 ? "s" : "")"
                 )
 
                 if viewModel.formData.readyByDate != nil {
-                    SummaryRow(
+                    ConfirmationSummaryRow(
                         icon: "calendar",
                         label: "Ready By",
                         value: formattedReadyBy
                     )
                 }
 
-                SummaryRow(
+                ConfirmationSummaryRow(
                     icon: "tag.fill",
                     label: "Service Type",
                     value: viewModel.formData.serviceType.title
@@ -111,8 +111,15 @@ struct ConfirmationStepView: View {
                 // View Order Button
                 if let orderId = viewModel.formData.createdOrderId {
                     Button {
-                        // Navigate to order detail
-                        // For now, just dismiss
+                        // TODO: Navigate to OrderDetailView(orderId:) instead of dismissing.
+                        // Approach: use DeepLinkHandler.shared to set a pending destination,
+                        // then dismiss the wizard. StaffMainView already observes
+                        // deepLinkHandler.pendingDestination and has
+                        // .navigationDestination(item: $deepLinkOrderId) { orderId in
+                        //     OrderDetailView(orderId: orderId)
+                        // }
+                        // on the Orders tab. So: switch to .orders tab + set the deep link.
+                        // See Repair_MinderApp.swift StaffMainView for the existing pattern.
                         onDismiss()
                     } label: {
                         HStack {
@@ -175,9 +182,9 @@ struct ConfirmationStepView: View {
     }
 }
 
-// MARK: - Summary Row
+// MARK: - Confirmation Summary Row
 
-struct SummaryRow: View {
+struct ConfirmationSummaryRow: View {
     let icon: String
     let label: String
     let value: String
@@ -281,6 +288,7 @@ xcodebuild -scheme "Repair Minder" -destination 'platform=iOS Simulator,name=iPh
 
 - This is the final step after successful submission
 - Order ID and number come from API response stored in formData
-- "New Booking" calls `viewModel.reset()` to start fresh
-- [See: Stage 10] Dashboard will launch BookingView
-- Future: "View Order" could navigate to OrderDetailView
+- "New Booking" calls `viewModel.reset()` to start fresh — this creates a fresh `BookingFormData()` which has nil for `createdOrderId`/`createdOrderNumber`, so no stale data carries over
+- [See: Stage 10] Dashboard will launch BookingView via `.fullScreenCover`
+- **Dismiss chain:** `onDismiss` closure dismisses the fullScreenCover via BookingView's `dismiss()`, correctly returning to the main app. The chain is: `ConfirmationStepView.onDismiss` -> `BookingWizardView.onComplete` -> `BookingView.dismiss()` -> fullScreenCover dismissed.
+- Future: "View Order" should use the existing `DeepLinkHandler` pattern in `StaffMainView` to switch to the Orders tab and navigate to `OrderDetailView(orderId:)`

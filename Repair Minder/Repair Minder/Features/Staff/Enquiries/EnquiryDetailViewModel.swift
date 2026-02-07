@@ -134,7 +134,9 @@ final class EnquiryDetailViewModel: ObservableObject {
         } catch is CancellationError { }
         catch let urlError as URLError where urlError.code == .cancelled { }
         catch {
+            #if DEBUG
             print("Failed to load macros: \(error)")
+            #endif
         }
     }
 
@@ -148,7 +150,9 @@ final class EnquiryDetailViewModel: ObservableObject {
         } catch is CancellationError { }
         catch let urlError as URLError where urlError.code == .cancelled { }
         catch {
+            #if DEBUG
             print("Failed to load executions: \(error)")
+            #endif
         }
     }
 

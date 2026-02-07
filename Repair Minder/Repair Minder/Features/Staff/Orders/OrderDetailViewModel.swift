@@ -80,7 +80,28 @@ final class OrderDetailViewModel: ObservableObject {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
 
-        let apiResponse = try decoder.decode(OrderDetailAPIResponse.self, from: data)
+        let apiResponse: OrderDetailAPIResponse
+        do {
+            apiResponse = try decoder.decode(OrderDetailAPIResponse.self, from: data)
+        } catch {
+            #if DEBUG
+            if let decodingError = error as? DecodingError {
+                switch decodingError {
+                case .keyNotFound(let key, let context):
+                    print("❌ ORDER DECODE - Key not found: '\(key.stringValue)' at path: \(context.codingPath.map(\.stringValue).joined(separator: "."))")
+                case .typeMismatch(let type, let context):
+                    print("❌ ORDER DECODE - Type mismatch: expected \(type) at path: \(context.codingPath.map(\.stringValue).joined(separator: ".")) - \(context.debugDescription)")
+                case .valueNotFound(let type, let context):
+                    print("❌ ORDER DECODE - Value not found: \(type) at path: \(context.codingPath.map(\.stringValue).joined(separator: ".")) - \(context.debugDescription)")
+                case .dataCorrupted(let context):
+                    print("❌ ORDER DECODE - Data corrupted at path: \(context.codingPath.map(\.stringValue).joined(separator: ".")) - \(context.debugDescription)")
+                @unknown default:
+                    print("❌ ORDER DECODE - Unknown: \(decodingError)")
+                }
+            }
+            #endif
+            throw error
+        }
 
         guard apiResponse.success, let order = apiResponse.data else {
             throw APIError.serverError(message: apiResponse.error ?? "Unknown error", code: nil)

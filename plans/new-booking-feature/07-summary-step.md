@@ -8,6 +8,7 @@ Create the review step displaying all entered information with ready-by date sel
 
 `[Requires: Stage 02 complete]` - Needs BookingViewModel and BookingFormData
 `[Requires: Stage 04 complete]` - Needs wizard container
+`[Requires: Stage 05 complete]` - Needs `FormTextField` component (defined in ClientStepView.swift, used here for pre-auth fields)
 
 ## Complexity
 
@@ -52,7 +53,7 @@ struct SummaryStepView: View {
             }
 
             // Customer Section
-            SummarySection(
+            BookingSummarySection(
                 title: "Customer",
                 icon: "person.fill",
                 onEdit: { viewModel.goToStep(.client) }
@@ -96,7 +97,7 @@ struct SummaryStepView: View {
             }
 
             // Devices Section
-            SummarySection(
+            BookingSummarySection(
                 title: "Devices (\(viewModel.formData.devices.count))",
                 icon: "iphone",
                 onEdit: { viewModel.goToStep(.devices) }
@@ -110,7 +111,7 @@ struct SummaryStepView: View {
 
             // Location Section (if set)
             if let location = viewModel.locations.first(where: { $0.id == viewModel.formData.locationId }) {
-                SummarySection(
+                BookingSummarySection(
                     title: "Location",
                     icon: "building.2",
                     onEdit: { viewModel.goToStep(.client) }
@@ -128,6 +129,25 @@ struct SummaryStepView: View {
                     }
                 }
             }
+
+            // Internal Notes (Optional)
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Internal Notes (Optional)")
+                    .font(.headline)
+
+                Text("Staff-only notes added to the ticket. Not visible to the customer.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                TextField("e.g. Customer mentioned they need it back by Friday", text: $viewModel.formData.internalNotes, axis: .vertical)
+                    .lineLimit(3...6)
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .padding()
+            .background(Color(.systemGray6))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
 
             Divider()
 
@@ -173,6 +193,37 @@ struct SummaryStepView: View {
             .padding()
             .background(Color(.systemGray6))
             .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            // Pre-authorisation (Optional)
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Pre-authorisation (Optional)")
+                    .font(.headline)
+
+                Text("Set a diagnostic or assessment fee the customer agrees to upfront.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Toggle("Enable pre-authorisation", isOn: $viewModel.formData.preAuthEnabled)
+                    .tint(.accentColor)
+
+                if viewModel.formData.preAuthEnabled {
+                    FormTextField(
+                        label: "Amount",
+                        text: $viewModel.formData.preAuthAmount,
+                        placeholder: "0.00",
+                        keyboardType: .decimalPad
+                    )
+
+                    FormTextField(
+                        label: "Notes (optional)",
+                        text: $viewModel.formData.preAuthNotes,
+                        placeholder: "e.g. Diagnostic fee"
+                    )
+                }
+            }
+            .padding()
+            .background(Color(.systemGray6))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
     }
 
@@ -186,9 +237,9 @@ struct SummaryStepView: View {
     }
 }
 
-// MARK: - Summary Section
+// MARK: - Booking Summary Section
 
-struct SummarySection<Content: View>: View {
+struct BookingSummarySection<Content: View>: View {
     let title: String
     let icon: String
     let onEdit: () -> Void
@@ -269,11 +320,23 @@ struct DeviceSummaryCard: View {
                 HStack(spacing: 12) {
                     Label(device.conditionGrade.displayName, systemImage: "star")
                     if device.findMyStatus != .unknown {
-                        Label("Find My: \(device.findMyStatus.displayName)", systemImage: "location")
+                        Label("Find My: \(device.findMyStatus.displayName)", systemImage: "location.fill")
+                    }
+                    if device.passcodeType != .none {
+                        Label("Passcode", systemImage: "lock.fill")
                     }
                 }
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+
+                if !device.accessories.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "bag")
+                        Text("Accessories: \(device.accessories.map(\.accessoryType).joined(separator: ", "))")
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
             }
         }
         .padding()
@@ -286,7 +349,7 @@ struct DeviceSummaryCard: View {
     }
 
     private var deviceIcon: String {
-        device.workflowType == .buyback ? "sterlingsign.circle" : "wrench.and.screwdriver"
+        device.workflowType == .buyback ? "arrow.triangle.2.circlepath" : "wrench.and.screwdriver"
     }
 }
 
@@ -312,11 +375,12 @@ struct DeviceSummaryCard: View {
                     storageCapacity: "256GB",
                     passcode: "",
                     passcodeType: .none,
-                    findMyStatus: .off,
-                    conditionGrade: .good,
+                    findMyStatus: .disabled,
+                    conditionGrade: .b,
                     customerReportedIssues: "Cracked screen",
                     deviceTypeId: nil,
-                    workflowType: .repair
+                    workflowType: .repair,
+                    accessories: []
                 )
             ]
             return vm
@@ -351,21 +415,34 @@ struct DeviceSummaryCard: View {
   - Issues (truncated)
   - Condition grade
 
-### Test 3: Location Display
+### Test 3: Internal Notes
+- Text field is editable
+- Multiline input works (3-6 lines)
+- Placeholder text shows when empty
+- Notes persist when navigating away and back
+
+### Test 4: Location Display
 - Shows selected location name
 - Shows location address
 
-### Test 4: Edit Navigation
+### Test 5: Edit Navigation
 - Tap "Edit" on customer goes to client step
 - Tap "Edit" on devices goes to devices step
 - Tap "Edit" on location goes to client step
 
-### Test 5: Ready-By Date
+### Test 6: Ready-By Date
 - Date picker defaults to 3 days out
 - Selecting date shows time picker
 - Time defaults to 5 PM
 - "Clear" button removes date
 - Step always valid (optional field)
+
+### Test 7: Pre-authorisation
+- Toggle is off by default
+- Enabling shows amount and notes fields
+- Amount accepts decimal input
+- Notes is optional
+- Step always valid (optional feature)
 
 ---
 
@@ -375,10 +452,13 @@ struct DeviceSummaryCard: View {
 - [ ] Customer section with all details
 - [ ] Devices section with all devices listed
 - [ ] Location section (when selected)
+- [ ] Internal notes text field (multiline, editable)
 - [ ] Edit buttons navigate to correct steps
 - [ ] Ready-by date picker works
 - [ ] Ready-by time picker shows when date set
 - [ ] Clear button removes ready-by
+- [ ] Pre-authorisation toggle and fields
+- [ ] Amount and notes fields shown when enabled
 - [ ] Preview renders with sample data
 - [ ] Project compiles without errors
 
@@ -395,7 +475,7 @@ xcodebuild -scheme "Repair Minder" -destination 'platform=iOS Simulator,name=iPh
 
 ## Handoff Notes
 
-- Summary is read-only except for ready-by date
+- Summary is read-only except for ready-by date, internal notes, and pre-auth fields
 - Edit buttons use `viewModel.goToStep()` to navigate back
 - All data comes from `viewModel.formData`
 - [See: Stage 08] Signature step comes next

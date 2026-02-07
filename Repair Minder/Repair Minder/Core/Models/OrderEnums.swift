@@ -136,13 +136,14 @@ enum IntakeMethod: String, Codable, CaseIterable, Sendable {
 
 enum AuthorisationType: String, Codable, CaseIterable, Sendable {
     case preAuthorised = "pre_authorised"
+    case preApproved = "pre_approved"
     case phone
     case email
     case portal
 
     var label: String {
         switch self {
-        case .preAuthorised: return "Pre-Authorised"
+        case .preAuthorised, .preApproved: return "Pre-Approved"
         case .phone: return "Phone"
         case .email: return "Email"
         case .portal: return "Portal"
@@ -202,26 +203,24 @@ enum SignatureType: String, Codable, CaseIterable, Sendable {
 // MARK: - Order Item Type
 
 enum OrderItemType: String, Codable, CaseIterable, Sendable {
-    case repair
-    case deviceSale = "device_sale"
-    case accessory
-    case devicePurchase = "device_purchase"
+    case part
+    case labour
+    case labor
+    case other
 
     var label: String {
         switch self {
-        case .repair: return "Repair"
-        case .deviceSale: return "Device Sale"
-        case .accessory: return "Accessory"
-        case .devicePurchase: return "Device Purchase"
+        case .part: return "Part"
+        case .labour, .labor: return "Labour"
+        case .other: return "Other"
         }
     }
 
     var icon: String {
         switch self {
-        case .repair: return "wrench.and.screwdriver"
-        case .deviceSale: return "iphone"
-        case .accessory: return "cable.connector"
-        case .devicePurchase: return "arrow.down.circle"
+        case .part: return "cpu"
+        case .labour, .labor: return "wrench.and.screwdriver"
+        case .other: return "ellipsis.circle"
         }
     }
 }

@@ -58,6 +58,7 @@ struct ResetPasscodeView: View {
 
                 Spacer()
             }
+            .frame(maxWidth: 350)
             .padding()
             .navigationTitle("Reset Passcode")
             .navigationBarTitleDisplayMode(.inline)

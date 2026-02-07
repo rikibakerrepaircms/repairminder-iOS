@@ -12,25 +12,32 @@ struct OrderListView: View {
     @State private var showingFilters = false
     @State private var selectedOrder: Order?
     @State private var searchText = ""
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var isRegularWidth: Bool {
+        horizontalSizeClass == .regular
+    }
 
     var body: some View {
+        Group {
+            if isRegularWidth {
+                iPadLayout
+            } else {
+                iPhoneLayout
+            }
+        }
+        .task {
+            await viewModel.loadOrders()
+        }
+    }
+
+    // MARK: - iPhone Layout
+
+    private var iPhoneLayout: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Compact Filter Header
                 filterHeader
-
-                // Main content
-                Group {
-                    if viewModel.isLoading && viewModel.orders.isEmpty {
-                        loadingView
-                    } else if let error = viewModel.error, viewModel.orders.isEmpty {
-                        errorView(error)
-                    } else if viewModel.orders.isEmpty {
-                        emptyView
-                    } else {
-                        ordersList
-                    }
-                }
+                mainContent
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -48,8 +55,52 @@ struct OrderListView: View {
                 OrderDetailView(orderId: order.id)
             }
         }
-        .task {
-            await viewModel.loadOrders()
+    }
+
+    // MARK: - iPad Layout
+
+    private var iPadLayout: some View {
+        NavigationSplitView {
+            VStack(spacing: 0) {
+                filterHeader
+                mainContent
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    filterButton
+                }
+            }
+            .sheet(isPresented: $showingFilters) {
+                OrderFilterSheet(viewModel: viewModel)
+            }
+        } detail: {
+            if let order = selectedOrder {
+                OrderDetailView(orderId: order.id)
+            } else {
+                ContentUnavailableView(
+                    "Select an Order",
+                    systemImage: "doc.text",
+                    description: Text("Choose an order from the list")
+                )
+            }
+        }
+    }
+
+    // MARK: - Shared Content
+
+    @ViewBuilder
+    private var mainContent: some View {
+        if viewModel.isLoading && viewModel.orders.isEmpty {
+            loadingView
+        } else if let error = viewModel.error, viewModel.orders.isEmpty {
+            errorView(error)
+        } else if viewModel.orders.isEmpty {
+            emptyView
+        } else if isRegularWidth {
+            iPadOrdersList
+        } else {
+            iPhoneOrdersList
         }
     }
 
@@ -114,9 +165,9 @@ struct OrderListView: View {
         .background(Color(.systemGroupedBackground))
     }
 
-    // MARK: - Subviews
+    // MARK: - iPhone Orders List
 
-    private var ordersList: some View {
+    private var iPhoneOrdersList: some View {
         List {
             ForEach(viewModel.orders) { order in
                 OrderRowView(order: order)
@@ -139,10 +190,49 @@ struct OrderListView: View {
             }
         }
         .listStyle(.plain)
+        .hidesBookingFABOnScroll()
         .refreshable {
             await viewModel.refresh()
         }
     }
+
+    // MARK: - iPad Orders List
+
+    private var iPadOrdersList: some View {
+        List {
+            ForEach(viewModel.orders) { order in
+                Button {
+                    selectedOrder = order
+                } label: {
+                    OrderRowView(order: order)
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(
+                    selectedOrder?.id == order.id
+                        ? Color.accentColor.opacity(0.1)
+                        : nil
+                )
+                .task {
+                    await viewModel.loadMoreIfNeeded(currentItem: order)
+                }
+            }
+
+            if viewModel.isLoadingMore {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+                .listRowSeparator(.hidden)
+            }
+        }
+        .listStyle(.insetGrouped)
+        .refreshable {
+            await viewModel.refresh()
+        }
+    }
+
+    // MARK: - Subviews
 
     private var loadingView: some View {
         VStack(spacing: 16) {
@@ -197,36 +287,26 @@ struct OrderListView: View {
     }
 }
 
-// MARK: - Order Row View
+// MARK: - Order Row View (iPhone - Compact)
 
 struct OrderRowView: View {
     let order: Order
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Header row
+        VStack(alignment: .leading, spacing: 6) {
+            // Header row: order number + status
             HStack {
                 Text(order.formattedOrderNumber)
-                    .font(.headline)
+                    .font(.subheadline.monospaced())
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
 
                 Spacer()
 
                 OrderStatusBadge(status: order.status)
             }
 
-            // Client info
-            HStack {
-                Image(systemName: "person")
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
-
-                Text(order.clientDisplayName)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-
-            // Bottom row
+            // Payment + total
             HStack {
                 PaymentStatusBadge(status: order.effectivePaymentStatus)
 
@@ -237,29 +317,101 @@ struct OrderRowView: View {
                     .fontWeight(.medium)
             }
 
-            // Notes preview if available
-            if let firstNote = order.notes?.first {
-                HStack(alignment: .top, spacing: 4) {
-                    Image(systemName: "note.text")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
+            // Client + location (stacked)
+            VStack(alignment: .leading, spacing: 2) {
+                Label(order.clientDisplayName, systemImage: "person.circle")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
 
-                    Text(firstNote.body)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                if let location = order.location {
+                    Label(location.name, systemImage: "mappin")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
                 }
-                .padding(.top, 4)
             }
 
-            // Date
-            if let date = order.formattedCreatedDate {
-                Text(date)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+            // Assigned user + date
+            HStack(spacing: 0) {
+                if let assignedUser = order.assignedUser {
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.badge.shield.checkmark")
+                            .foregroundColor(.green)
+                        Text(assignedUser.name)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    Text(" · ")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                if let date = order.formattedCreatedDate {
+                    Text(date)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            // Notes preview if available
+            if let firstNote = order.notes?.first {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "note.text")
+                        .foregroundColor(.orange)
+                        .font(.caption)
+                    Text(firstNote.body)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                }
+                .padding(6)
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(6)
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Order Row View (iPad - Wide)
+
+struct OrderRowWideView: View {
+    let order: Order
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(order.formattedOrderNumber)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .monospacedDigit()
+
+            Text(order.clientDisplayName)
+                .font(.subheadline)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            OrderStatusBadge(status: order.status)
+
+            PaymentStatusBadge(status: order.effectivePaymentStatus)
+
+            if let date = order.formattedCreatedDate {
+                Text(date)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: 70, alignment: .trailing)
+            }
+
+            Text(CurrencyFormatter.format(order.displayTotal))
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .monospacedDigit()
+                .frame(minWidth: 70, alignment: .trailing)
+        }
+        .padding(.vertical, 6)
     }
 }
 

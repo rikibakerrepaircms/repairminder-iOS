@@ -6,7 +6,7 @@ Create the customer search, selection, and entry form for the first wizard step.
 
 ## Dependencies
 
-`[Requires: Stage 01 complete]` - Needs Location model and API endpoints
+`[Requires: Stage 01 complete]` - Needs Location model, API endpoints, and `.clientSearch` query param fix (`?q=` → `?email=`)
 `[Requires: Stage 02 complete]` - Needs BookingViewModel and BookingFormData
 `[Requires: Stage 04 complete]` - Needs wizard container
 
@@ -22,6 +22,7 @@ Create the customer search, selection, and entry form for the first wizard step.
 |------|---------|
 | `Features/Staff/Booking/Steps/ClientStepView.swift` | Main client entry step |
 | `Features/Staff/Booking/Components/ClientSearchView.swift` | Search input with results |
+| `Features/Staff/Booking/Components/FormTextField.swift` | Reusable form text field (used by Stages 05, 06, 07) |
 
 ---
 
@@ -161,8 +162,8 @@ struct ClientStepView: View {
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 12) {
-                    Label("\(client.orderCount) orders", systemImage: "doc.text")
-                    Label("\(client.deviceCount) devices", systemImage: "iphone")
+                    Label("\(client.effectiveOrderCount) orders", systemImage: "doc.text")
+                    Label("\(client.effectiveDeviceCount) devices", systemImage: "iphone")
                 }
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -290,40 +291,7 @@ struct ClientStepView: View {
     }
 }
 
-// MARK: - Form TextField Helper
-
-struct FormTextField: View {
-    let label: String
-    @Binding var text: String
-    var placeholder: String = ""
-    var keyboardType: UIKeyboardType = .default
-    var autocapitalization: TextInputAutocapitalization = .words
-    var isRequired: Bool = false
-    var isDisabled: Bool = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 4) {
-                Text(label)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                if isRequired {
-                    Text("*")
-                        .foregroundStyle(.red)
-                }
-            }
-
-            TextField(placeholder, text: $text)
-                .keyboardType(keyboardType)
-                .textInputAutocapitalization(autocapitalization)
-                .padding()
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .disabled(isDisabled)
-                .opacity(isDisabled ? 0.6 : 1)
-        }
-    }
-}
+// FormTextField is in Components/FormTextField.swift (see separate code block below)
 
 #Preview {
     ScrollView {
@@ -353,6 +321,7 @@ struct ClientSearchView: View {
     let onClear: () -> Void
 
     @State private var showResults = false
+    @State private var searchTask: Task<Void, Never>?
     @FocusState private var isFocused: Bool
 
     var body: some View {
@@ -371,7 +340,12 @@ struct ClientSearchView: View {
                     .focused($isFocused)
                     .onChange(of: query) { _, newValue in
                         showResults = !newValue.isEmpty
-                        onSearch(newValue)
+                        searchTask?.cancel()
+                        searchTask = Task {
+                            try? await Task.sleep(for: .milliseconds(300))
+                            guard !Task.isCancelled else { return }
+                            onSearch(newValue)
+                        }
                     }
 
                 if isSearching {
@@ -461,11 +435,11 @@ struct ClientSearchResultRow: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text("\(client.orderCount) orders")
+                Text("\(client.effectiveOrderCount) orders")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
 
-                Text("\(client.deviceCount) devices")
+                Text("\(client.effectiveDeviceCount) devices")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -478,12 +452,70 @@ struct ClientSearchResultRow: View {
     VStack {
         ClientSearchView(
             query: .constant("john"),
-            results: [Client.sample],
+            results: [],  // Empty for preview — Client.sample needs to be created separately
             isSearching: false,
             selectedClient: nil,
             onSearch: { _ in },
             onSelect: { _ in },
             onClear: {}
+        )
+    }
+    .padding()
+}
+```
+
+### FormTextField.swift
+
+Standalone reusable component at `Features/Staff/Booking/Components/FormTextField.swift`. Used by Stages 05, 06, and 07.
+
+```swift
+//
+//  FormTextField.swift
+//  Repair Minder
+//
+
+import SwiftUI
+
+struct FormTextField: View {
+    let label: String
+    @Binding var text: String
+    var placeholder: String = ""
+    var keyboardType: UIKeyboardType = .default
+    var autocapitalization: TextInputAutocapitalization = .words
+    var isRequired: Bool = false
+    var isDisabled: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Text(label)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                if isRequired {
+                    Text("*")
+                        .foregroundStyle(.red)
+                }
+            }
+
+            TextField(placeholder, text: $text)
+                .keyboardType(keyboardType)
+                .textInputAutocapitalization(autocapitalization)
+                .padding()
+                .background(Color(.systemGray6))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .disabled(isDisabled)
+                .opacity(isDisabled ? 0.6 : 1)
+        }
+    }
+}
+
+#Preview {
+    VStack {
+        FormTextField(
+            label: "Name",
+            text: .constant("John"),
+            placeholder: "Enter name",
+            isRequired: true
         )
     }
     .padding()
@@ -547,7 +579,7 @@ struct ClientSearchResultRow: View {
 
 - [ ] `ClientStepView.swift` created
 - [ ] `ClientSearchView.swift` created
-- [ ] `FormTextField` helper component
+- [ ] `FormTextField` extracted to `Components/FormTextField.swift` (shared with Stages 06, 07)
 - [ ] Search input with debounced API calls
 - [ ] Search results list with client info
 - [ ] Client selection populates form
@@ -573,7 +605,12 @@ xcodebuild -scheme "Repair Minder" -destination 'platform=iOS Simulator,name=iPh
 ## Handoff Notes
 
 - Client data is stored in `viewModel.formData`
-- Search uses `viewModel.searchClients(query:)` async method
+- Search uses `viewModel.searchClients(query:)` async method — uses `.clientSearch(query:)` returning `ClientSearchResponse` wrapper (`.clients` array extracted in ViewModel)
 - Selected client stored in `formData.existingClient`
-- [See: Stage 06] Devices step may trigger address requirement for buyback
-- FormTextField is reusable in other steps
+- Use `client.effectiveOrderCount` / `client.effectiveDeviceCount` (NOT `client.orderCount` / `client.deviceCount` — those are optional Int? and unsafe for direct interpolation). **Search response shape:** The `/api/clients/search` endpoint returns `orders` as an array and `device_count` as a flat integer (no `stats` object). The fallback chains handle this correctly: `effectiveOrderCount` falls through to `orders?.count`, and `effectiveDeviceCount` picks up `deviceCount` (decoded from the flat `device_count` field). Also uses `client.displayName` (computed property on Client model).
+- **Query parameter:** `.clientSearch(query:)` sends `?email=` (fixed in Stage 01 from `?q=`). Despite the param name, backend searches across email, name, and phone.
+- **Ticket linking:** When an existing client is selected, optionally allow linking an existing enquiry/ticket via `formData.existingTicketId`. The web app sends `existing_ticket_id` in the order payload. Consider adding a ticket selector dropdown that filters tickets by the selected client.
+- Address section shows automatically for buyback service type (`requiresAddress` checks `serviceType == .buyback`)
+- Address also shows if any individual device has `workflowType == .buyback` (for mixed repair+buyback orders)
+- [See: Stage 06] Adding buyback devices on a repair order also triggers address requirement
+- `FormTextField` is extracted to `Components/FormTextField.swift` — reused by Stages 06 and 07

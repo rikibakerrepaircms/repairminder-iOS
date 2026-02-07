@@ -11,6 +11,7 @@ import SwiftUI
 struct CustomerOrderDetailView: View {
     @StateObject private var viewModel: CustomerOrderDetailViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(orderId: String) {
         _viewModel = StateObject(wrappedValue: CustomerOrderDetailViewModel(orderId: orderId))
@@ -107,6 +108,8 @@ struct CustomerOrderDetailView: View {
                 }
             }
             .padding()
+            .frame(maxWidth: horizontalSizeClass == .regular ? 700 : .infinity)
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -386,7 +389,9 @@ struct CustomerOrderDetailView: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 12) {
                 ForEach(reviewLinks.availableLinks, id: \.name) { link in
                     Button {
-                        if let url = URL(string: link.url) {
+                        if let url = URL(string: link.url),
+                           let scheme = url.scheme?.lowercased(),
+                           ["https", "http"].contains(scheme) {
                             UIApplication.shared.open(url)
                         }
                     } label: {
@@ -544,10 +549,7 @@ struct CustomerOrderDetailView: View {
     // MARK: - Helpers
 
     private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .long
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
+        DateFormatters.formatHumanDate(date)
     }
 }
 
@@ -575,6 +577,7 @@ struct CustomerMessageBubble: View {
                             .font(.subheadline)
                     }
                 }
+                .frame(maxWidth: 500)
                 .padding(12)
                 .background(message.backgroundColor)
                 .foregroundStyle(message.textColor)

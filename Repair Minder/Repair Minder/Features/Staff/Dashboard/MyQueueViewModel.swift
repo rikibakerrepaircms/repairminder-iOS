@@ -83,7 +83,9 @@ final class MyQueueViewModel {
             filters = response.filters
         } catch {
             self.error = error.localizedDescription
+            #if DEBUG
             print("Failed to load queue: \(error)")
+            #endif
         }
 
         isLoading = false
@@ -119,7 +121,9 @@ final class MyQueueViewModel {
             pagination = response.pagination
             filters = response.filters
         } catch {
+            #if DEBUG
             print("Failed to load more: \(error)")
+            #endif
         }
 
         isLoadingMore = false

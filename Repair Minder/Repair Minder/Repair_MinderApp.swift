@@ -77,6 +77,16 @@ struct Repair_MinderApp: App {
 /// App delegate for handling push notifications and other system callbacks
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
 
+    /// Dynamically controlled orientation lock. Default allows all but upside-down.
+    static var orientationLock: UIInterfaceOrientationMask = .portrait
+
+    func application(
+        _ application: UIApplication,
+        supportedInterfaceOrientationsFor window: UIWindow?
+    ) -> UIInterfaceOrientationMask {
+        return AppDelegate.orientationLock
+    }
+
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
@@ -101,27 +111,37 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
         let tokenString = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
+        #if DEBUG
         print("🔔 [AppDelegate] Got APNs token: \(tokenString.prefix(20))...")
+        #endif
 
         Task { @MainActor in
             PushNotificationService.shared.didRegisterForRemoteNotifications(deviceToken: deviceToken)
 
             // Auto-register token if user is authenticated
             if AuthManager.shared.authState == .authenticated {
+                #if DEBUG
                 print("🔔 [AppDelegate] User authenticated, registering token with backend...")
+                #endif
                 await PushNotificationService.shared.registerToken(appType: "staff")
 
                 // Show feedback to user
+                #if DEBUG
                 if PushNotificationService.shared.errorMessage == nil {
                     print("🔔 [AppDelegate] Token registered successfully!")
                 } else {
                     print("🔔 [AppDelegate] Token registration failed: \(PushNotificationService.shared.errorMessage ?? "unknown")")
                 }
+                #endif
             } else if CustomerAuthManager.shared.authState == .authenticated {
+                #if DEBUG
                 print("🔔 [AppDelegate] Customer authenticated, registering token with backend...")
+                #endif
                 await PushNotificationService.shared.registerToken(appType: "customer")
             } else {
+                #if DEBUG
                 print("🔔 [AppDelegate] User not authenticated, skipping token registration")
+                #endif
             }
         }
     }
@@ -130,7 +150,9 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         _ application: UIApplication,
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
+        #if DEBUG
         print("❌ [AppDelegate] Failed to register for push notifications: \(error.localizedDescription)")
+        #endif
         Task { @MainActor in
             PushNotificationService.shared.didFailToRegisterForRemoteNotifications(error: error)
         }
@@ -203,6 +225,9 @@ struct RootView: View {
 
             case .quarantine(let reason):
                 QuarantineView(reason: reason)
+
+            case .termsRequired:
+                TermsRequiredView()
             }
         }
         .task {
@@ -235,6 +260,9 @@ private struct StaffMainView: View {
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var deepLinkHandler = DeepLinkHandler.shared
     @State private var selectedTab: StaffTab = .dashboard
+    @State private var showBookingSheet = false
+    @State private var fabDragOffset: CGFloat = 0
+    private var fabState = FABState.shared
 
     // Deep link navigation state
     @State private var deepLinkOrderId: String?
@@ -283,6 +311,53 @@ private struct StaffMainView: View {
                 }
                 .tag(StaffTab.more)
         }
+        // Dismiss FAB on any tap outside
+        .overlay {
+            if !fabState.isHidden {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { fabState.hide() }
+            }
+        }
+        // FAB — slides off right edge when hidden, showing a small arc
+        .overlay(alignment: .bottomTrailing) {
+            Image(systemName: "plus")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(width: 56, height: 56)
+                .background(Color.accentColor)
+                .clipShape(Circle())
+                .shadow(color: fabState.isHidden ? .clear : .accentColor.opacity(0.3),
+                        radius: 8, x: 0, y: 4)
+                .offset(x: fabState.isHidden ? min(fabDragOffset, 0) : 0)
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            guard fabState.isHidden else { return }
+                            fabDragOffset = value.translation.width
+                        }
+                        .onEnded { value in
+                            guard fabState.isHidden else { return }
+                            if value.translation.width < -20 {
+                                fabState.show()
+                            }
+                            fabDragOffset = 0
+                        }
+                )
+                .onTapGesture {
+                    if fabState.isHidden {
+                        fabState.show()
+                    } else {
+                        showBookingSheet = true
+                    }
+                }
+                .padding(.bottom, 90)
+                .padding(.trailing, fabState.isHidden ? -40 : 34)
+        }
+        .animation(.spring(response: 0.35, dampingFraction: 0.75), value: fabState.isHidden)
+        .fullScreenCover(isPresented: $showBookingSheet) {
+            BookingView()
+        }
         .onChange(of: deepLinkHandler.pendingDestination) { _, destination in
             handleDeepLink(destination)
         }
@@ -297,7 +372,9 @@ private struct StaffMainView: View {
     private func handleDeepLink(_ destination: DeepLinkDestination?) {
         guard let destination = destination else { return }
 
+        #if DEBUG
         print("[StaffMainView] Handling deep link: \(destination)")
+        #endif
 
         // Small delay to ensure tab switch completes
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -422,6 +499,89 @@ private struct QuarantineView: View {
             }
             .padding()
             .navigationTitle("Account Status")
+        }
+    }
+}
+
+// MARK: - Terms Required View
+
+/// Blocking view shown when the company has pending platform terms to accept.
+/// Users must visit the web app to review and agree before using the iOS app.
+private struct TermsRequiredView: View {
+    @ObservedObject private var authManager = AuthManager.shared
+    @ObservedObject private var appState = AppState.shared
+    @State private var isChecking = false
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                Spacer()
+
+                Image(systemName: "doc.text.fill")
+                    .font(.system(size: 64))
+                    .foregroundStyle(Color.accentColor)
+
+                Text("Updated Terms")
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                Text("Our platform terms have been updated. Please review and accept the updated terms on the web app to continue using Repair Minder.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+
+                Link(destination: URL(string: "https://app.repairminder.com/")!) {
+                    HStack {
+                        Image(systemName: "safari")
+                        Text("Open Repair Minder Web")
+                    }
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.accentColor)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .padding(.horizontal, 32)
+
+                Button {
+                    isChecking = true
+                    Task {
+                        await appState.recheckConsent()
+                        isChecking = false
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        if isChecking {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                        Text("I've Accepted \u{2014} Continue")
+                    }
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .disabled(isChecking)
+                .padding(.horizontal, 32)
+
+                Spacer()
+
+                Button("Log Out") {
+                    Task {
+                        await authManager.logout()
+                        appState.onStaffLogout()
+                    }
+                }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 32)
+            }
+            .navigationTitle("Terms Required")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }

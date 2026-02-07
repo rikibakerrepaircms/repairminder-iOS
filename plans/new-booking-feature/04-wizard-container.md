@@ -37,14 +37,14 @@ Create the main wizard container with step progress indicator and navigation con
 import SwiftUI
 
 struct BookingWizardView: View {
-    let serviceType: ServiceType
-
     @State private var viewModel: BookingViewModel
     @Environment(\.dismiss) private var dismiss
+    let onComplete: () -> Void
 
-    init(serviceType: ServiceType) {
-        self.serviceType = serviceType
-        self._viewModel = State(initialValue: BookingViewModel(serviceType: serviceType))
+    init(viewModel: BookingViewModel, serviceType: ServiceType, onComplete: @escaping () -> Void) {
+        self._viewModel = State(initialValue: viewModel)
+        viewModel.formData.serviceType = serviceType
+        self.onComplete = onComplete
     }
 
     var body: some View {
@@ -63,6 +63,27 @@ struct BookingWizardView: View {
             }
 
             Divider()
+
+            // Error Banner
+            if let error = viewModel.errorMessage {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text(error)
+                        .font(.caption)
+                    Spacer()
+                    Button("Retry") {
+                        viewModel.errorMessage = nil
+                        Task { await viewModel.loadInitialData() }
+                    }
+                    .font(.caption)
+                    .fontWeight(.medium)
+                }
+                .padding()
+                .background(Color.orange.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .padding(.horizontal)
+            }
 
             // Step Content
             ScrollView {
@@ -91,9 +112,6 @@ struct BookingWizardView: View {
                 }
             }
         }
-        .task {
-            await viewModel.loadInitialData()
-        }
         .alert("Error", isPresented: .constant(viewModel.submitError != nil)) {
             Button("OK") {
                 viewModel.submitError = nil
@@ -118,7 +136,7 @@ struct BookingWizardView: View {
             SignatureStepView(viewModel: viewModel)
         case .confirmation:
             ConfirmationStepView(viewModel: viewModel) {
-                dismiss()
+                onComplete()
             }
         }
     }
@@ -192,7 +210,7 @@ struct BookingWizardView: View {
 
 #Preview {
     NavigationStack {
-        BookingWizardView(serviceType: .repair)
+        BookingWizardView(viewModel: BookingViewModel(), serviceType: .repair, onComplete: {})
     }
 }
 ```
@@ -372,6 +390,8 @@ xcodebuild -scheme "Repair Minder" -destination 'platform=iOS Simulator,name=iPh
 ## Handoff Notes
 
 - Wizard container is the shell; step views render inside it
+- **viewModel comes from BookingView (Stage 03)**, not created internally — BookingView creates the viewModel, calls `loadInitialData()`, and passes it here along with the selected `serviceType`
+- `onComplete` closure dismisses the fullScreenCover via BookingView's `dismiss()`, correctly returning to the main app (not just popping the navigation stack)
 - viewModel is passed to each step view
 - [See: Stage 05] will implement ClientStepView
 - [See: Stage 06] will implement DevicesStepView

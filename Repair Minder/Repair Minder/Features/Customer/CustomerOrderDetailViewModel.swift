@@ -60,7 +60,9 @@ final class CustomerOrderDetailViewModel: ObservableObject {
             errorMessage = error.localizedDescription
         } catch let decodingError as DecodingError {
             errorMessage = "Failed to decode order data"
+            #if DEBUG
             print("[CustomerOrderDetailVM] Decode error: \(decodingError)")
+            #endif
         } catch {
             errorMessage = "Failed to load order"
         }
@@ -94,10 +96,14 @@ final class CustomerOrderDetailViewModel: ObservableObject {
             await loadOrder()
         } catch let error as APIError {
             approvalError = error.localizedDescription
+            #if DEBUG
             print("[CustomerOrderDetailVM] Approval error: \(error)")
+            #endif
         } catch {
             approvalError = "Failed to approve quote"
+            #if DEBUG
             print("[CustomerOrderDetailVM] Unexpected approval error: \(error)")
+            #endif
         }
 
         isSubmittingApproval = false
@@ -115,10 +121,14 @@ final class CustomerOrderDetailViewModel: ObservableObject {
             await loadOrder()
         } catch let error as APIError {
             approvalError = error.localizedDescription
+            #if DEBUG
             print("[CustomerOrderDetailVM] Rejection error: \(error)")
+            #endif
         } catch {
             approvalError = "Failed to reject quote"
+            #if DEBUG
             print("[CustomerOrderDetailVM] Unexpected rejection error: \(error)")
+            #endif
         }
 
         isSubmittingApproval = false
@@ -141,10 +151,14 @@ final class CustomerOrderDetailViewModel: ObservableObject {
             await loadOrder()
         } catch let error as APIError {
             messageError = error.localizedDescription
+            #if DEBUG
             print("[CustomerOrderDetailVM] Message send error: \(error)")
+            #endif
         } catch {
             messageError = "Failed to send message"
+            #if DEBUG
             print("[CustomerOrderDetailVM] Unexpected message error: \(error)")
+            #endif
         }
 
         isSendingMessage = false

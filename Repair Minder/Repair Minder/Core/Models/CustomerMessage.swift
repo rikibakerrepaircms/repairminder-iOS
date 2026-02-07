@@ -114,8 +114,7 @@ struct CustomerMessage: Codable, Identifiable, Sendable {
             formatter.dateFormat = "EEEE 'at' h:mm a"
             return formatter.string(from: createdAt)
         } else {
-            formatter.dateFormat = "d MMM yyyy 'at' h:mm a"
-            return formatter.string(from: createdAt)
+            return DateFormatters.formatHumanDate(createdAt)
         }
     }
 

@@ -22,40 +22,79 @@ struct MyQueueView: View {
     @State private var viewModel = MyQueueViewModel()
     @State private var searchText = ""
     @State private var deviceNavigation: DeviceNavigation?
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var isRegularWidth: Bool {
+        horizontalSizeClass == .regular
+    }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                // Compact Filter Header
-                filterHeader
+        if isRegularWidth {
+            iPadBody
+        } else {
+            iPhoneBody
+        }
+    }
 
-                // Main content
-                if viewModel.isEmpty && !viewModel.isLoading {
-                    emptyState
-                } else {
-                    deviceList
+    // MARK: - iPhone Layout
+
+    private var iPhoneBody: some View {
+        NavigationStack {
+            queueContent(wideRows: false)
+                .navigationDestination(item: $deviceNavigation) { nav in
+                    DeviceDetailView(orderId: nav.orderId, deviceId: nav.deviceId)
                 }
-            }
-            .background(Color(.systemGroupedBackground))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    EmptyView()
-                }
-            }
-            .refreshable {
-                await viewModel.refresh()
-            }
-            .task {
-                await viewModel.loadQueue()
-            }
-            .overlay {
-                if viewModel.isLoading && viewModel.devices.isEmpty {
-                    ProgressView()
-                }
-            }
-            .navigationDestination(item: $deviceNavigation) { nav in
+        }
+    }
+
+    // MARK: - iPad Layout
+
+    private var iPadBody: some View {
+        NavigationSplitView {
+            queueContent(wideRows: false)
+        } detail: {
+            if let nav = deviceNavigation {
                 DeviceDetailView(orderId: nav.orderId, deviceId: nav.deviceId)
+                    .id("\(nav.orderId)-\(nav.deviceId)")
+            } else {
+                ContentUnavailableView(
+                    "Select a Device",
+                    systemImage: "wrench.and.screwdriver",
+                    description: Text("Choose a device from your queue to view its details.")
+                )
+            }
+        }
+    }
+
+    // MARK: - Shared Queue Content
+
+    @ViewBuilder
+    private func queueContent(wideRows: Bool) -> some View {
+        VStack(spacing: 0) {
+            filterHeader
+
+            if viewModel.isEmpty && !viewModel.isLoading {
+                emptyState
+            } else {
+                deviceList(wideRows: wideRows)
+            }
+        }
+        .background(Color(.systemGroupedBackground))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                EmptyView()
+            }
+        }
+        .refreshable {
+            await viewModel.refresh()
+        }
+        .task {
+            await viewModel.loadQueue()
+        }
+        .overlay {
+            if viewModel.isLoading && viewModel.devices.isEmpty {
+                ProgressView()
             }
         }
     }
@@ -123,16 +162,20 @@ struct MyQueueView: View {
     // MARK: - Device List
 
     @ViewBuilder
-    private var deviceList: some View {
+    private func deviceList(wideRows: Bool) -> some View {
         List {
             ForEach(viewModel.devices) { device in
-                DeviceQueueRow(device: device) {
+                DeviceQueueRow(device: device, isCompact: !wideRows) {
                     if let orderId = device.orderId {
                         deviceNavigation = DeviceNavigation(orderId: orderId, deviceId: device.id)
                     }
                 }
                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                .listRowBackground(Color(.secondarySystemGroupedBackground))
+                .listRowBackground(
+                    isRegularWidth && deviceNavigation?.deviceId == device.id
+                        ? Color.accentColor.opacity(0.1)
+                        : Color(.secondarySystemGroupedBackground)
+                )
                 .onAppear {
                     Task {
                         await viewModel.loadMoreIfNeeded(currentItem: device)
@@ -152,6 +195,7 @@ struct MyQueueView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .hidesBookingFABOnScroll()
     }
 
     // MARK: - Empty State

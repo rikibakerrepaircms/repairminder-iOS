@@ -208,7 +208,9 @@ final class CustomerAuthManager: ObservableObject {
         do {
             try await performAuthenticatedRequestVoid(.customerLogout)
         } catch {
+            #if DEBUG
             print("[CustomerAuthManager] Logout API call failed: \(error)")
+            #endif
         }
     }
 
@@ -255,7 +257,9 @@ final class CustomerAuthManager: ObservableObject {
         if pushService.authorizationStatus == .notDetermined {
             let granted = await pushService.requestAuthorization()
             if granted {
+                #if DEBUG
                 print("[CustomerAuthManager] Push notification permission granted")
+                #endif
             }
         } else if pushService.authorizationStatus == .authorized {
             // Already authorized, just register for remote notifications

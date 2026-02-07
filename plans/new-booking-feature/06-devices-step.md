@@ -6,13 +6,13 @@ Create the device entry form allowing users to add multiple devices with brand, 
 
 ## Dependencies
 
-`[Requires: Stage 01 complete]` - Needs Brand, DeviceModel, DeviceType models
+`[Requires: Stage 01 complete]` - Needs DeviceSearchResult, DeviceType models and `.deviceSearch(query:)` endpoint
 `[Requires: Stage 02 complete]` - Needs BookingViewModel and BookingDeviceEntry
 `[Requires: Stage 04 complete]` - Needs wizard container
 
 ## Complexity
 
-**High** - Brand/model cascading selection, multiple devices, form validation.
+**High** - Unified device search (brand + model), multiple devices, form validation.
 
 ---
 
@@ -23,7 +23,7 @@ Create the device entry form allowing users to add multiple devices with brand, 
 | `Features/Staff/Booking/Steps/DevicesStepView.swift` | Main devices step with list and entry |
 | `Features/Staff/Booking/Components/DeviceEntryFormView.swift` | Form for adding/editing a device |
 | `Features/Staff/Booking/Components/DeviceListItemView.swift` | Display added device in list |
-| `Features/Staff/Booking/Components/BrandModelPicker.swift` | Cascading brand → model selection |
+| `Features/Staff/Booking/Components/DeviceSearchPicker.swift` | Unified brand/model search using `/api/device-search` |
 
 ---
 
@@ -160,9 +160,7 @@ struct DeviceEntryFormView: View {
     let onCancel: () -> Void
 
     @State private var device: BookingDeviceEntry
-    @State private var selectedBrand: Brand?
-    @State private var models: [DeviceModel] = []
-    @State private var isLoadingModels = false
+    @State private var deviceSearchQuery: String = ""
 
     init(
         viewModel: BookingViewModel,
@@ -192,32 +190,22 @@ struct DeviceEntryFormView: View {
 
             Divider()
 
-            // Brand & Model Selection
-            BrandModelPicker(
-                brands: viewModel.brands,
+            // Brand & Model Selection (unified search)
+            DeviceSearchPicker(
+                viewModel: viewModel,
                 selectedBrandId: $device.brandId,
                 selectedModelId: $device.modelId,
                 customBrand: $device.customBrand,
                 customModel: $device.customModel,
-                displayName: $device.displayName,
-                onBrandSelected: { brand in
-                    selectedBrand = brand
-                    device.modelId = nil
-                    device.customModel = nil
-                    if let brand = brand, !brand.isCustom {
-                        Task {
-                            models = await viewModel.loadModels(for: brand.id)
-                        }
-                    } else {
-                        models = []
-                    }
-                },
-                models: models,
-                isLoadingModels: viewModel.isLoadingModels
+                displayName: $device.displayName
             )
 
             // Device Type
-            if !viewModel.deviceTypes.isEmpty {
+            // Device types: only show custom (non-system) types.
+            // System types like "Repair" and "Buyback" are workflow markers,
+            // not user-selectable categories.
+            let selectableTypes = viewModel.deviceTypes.filter { $0.isSystem != true }
+            if !selectableTypes.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Device Type")
                         .font(.subheadline)
@@ -225,7 +213,7 @@ struct DeviceEntryFormView: View {
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            ForEach(viewModel.deviceTypes) { type in
+                            ForEach(selectableTypes) { type in
                                 Button {
                                     device.deviceTypeId = type.id
                                 } label: {
@@ -308,11 +296,11 @@ struct DeviceEntryFormView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
 
-                    if device.passcodeType != .none {
+                    if device.passcodeType != .none && device.passcodeType != .biometric {
                         FormTextField(
-                            label: "Passcode",
+                            label: device.passcodeType == .pin ? "PIN Code" : "Passcode",
                             text: $device.passcode,
-                            placeholder: "****"
+                            placeholder: device.passcodeType == .pin ? "1234" : "****"
                         )
                     }
                 }
@@ -348,7 +336,10 @@ struct DeviceEntryFormView: View {
                             Text(grade.displayName).tag(grade)
                         }
                     }
-                    .pickerStyle(.segmented)
+                    .pickerStyle(.menu)
+                    .padding(12)
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -365,6 +356,9 @@ struct DeviceEntryFormView: View {
             }
 
             // Workflow Type (for mixed repair/buyback)
+            // Only shown for repair orders — allows marking individual devices as buyback.
+            // For buyback orders, all devices default to .buyback (no picker needed).
+            // Backend accepts workflow_type per device (device_handlers.js line 1048).
             if viewModel.formData.serviceType == .repair {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Workflow")
@@ -377,6 +371,49 @@ struct DeviceEntryFormView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                }
+            }
+
+            // Accessories
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Accessories Included")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button {
+                        device.accessories.append(BookingAccessoryItem.empty())
+                    } label: {
+                        Label("Add", systemImage: "plus.circle")
+                            .font(.caption)
+                    }
+                }
+
+                if !device.accessories.isEmpty {
+                    ForEach($device.accessories) { $accessory in
+                        HStack(spacing: 8) {
+                            Picker("Type", selection: $accessory.accessoryType) {
+                                Text("Charger").tag("charger")
+                                Text("Cable").tag("cable")
+                                Text("Case").tag("case")
+                                Text("SIM Card").tag("sim_card")
+                                Text("Box").tag("box")
+                                Text("Other").tag("other")
+                            }
+                            .pickerStyle(.menu)
+
+                            TextField("Description (optional)", text: $accessory.description)
+                                .textFieldStyle(.roundedBorder)
+
+                            Button {
+                                device.accessories.removeAll { $0.id == accessory.id }
+                            } label: {
+                                Image(systemName: "trash")
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                    }
                 }
             }
 
@@ -401,7 +438,9 @@ struct DeviceEntryFormView: View {
     }
 
     private var isValid: Bool {
-        !device.displayName.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasDisplayName = !device.displayName.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasBrandOrCustomBrand = device.brandId != nil || !(device.customBrand ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+        return hasDisplayName && hasBrandOrCustomBrand
     }
 }
 
@@ -481,6 +520,15 @@ struct DeviceListItemView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
+
+                if !device.accessories.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "bag")
+                        Text("\(device.accessories.count) accessor\(device.accessories.count == 1 ? "y" : "ies")")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
             }
 
             Spacer()
@@ -510,7 +558,7 @@ struct DeviceListItemView: View {
     }
 
     private var workflowIcon: String {
-        device.workflowType == .buyback ? "sterlingsign.circle" : "wrench.and.screwdriver"
+        device.workflowType == .buyback ? "arrow.triangle.2.circlepath" : "wrench.and.screwdriver"
     }
 }
 
@@ -529,12 +577,13 @@ struct DeviceListItemView: View {
                 colour: "Black",
                 storageCapacity: "256GB",
                 passcode: "1234",
-                passcodeType: .pin4,
-                findMyStatus: .off,
-                conditionGrade: .good,
+                passcodeType: .pin,
+                findMyStatus: .disabled,
+                conditionGrade: .b,
                 customerReportedIssues: "Screen cracked, battery drains quickly",
                 deviceTypeId: nil,
-                workflowType: .repair
+                workflowType: .repair,
+                accessories: []
             ),
             defaultWorkflowType: .repair,
             onEdit: {},
@@ -545,161 +594,205 @@ struct DeviceListItemView: View {
 }
 ```
 
-### BrandModelPicker.swift
+### DeviceSearchPicker.swift
+
+Uses the unified `/api/device-search?q=<query>` endpoint. User types a search query (e.g. "iPhone 14") and sees matching brands and models. Selecting a result populates brandId/modelId and updates the display name. User can also type a custom brand/model if no match found.
+
+> **Optional enhancement:** The backend also supports an optional `category` query parameter (e.g. `?q=iPhone&category=phone`) to filter results by device category. This is not used in the initial implementation but could be added later to pre-filter results when a device type is already selected.
 
 ```swift
 //
-//  BrandModelPicker.swift
+//  DeviceSearchPicker.swift
 //  Repair Minder
 //
 
 import SwiftUI
 
-struct BrandModelPicker: View {
-    let brands: [Brand]
+struct DeviceSearchPicker: View {
+    @Bindable var viewModel: BookingViewModel
     @Binding var selectedBrandId: String?
     @Binding var selectedModelId: String?
     @Binding var customBrand: String?
     @Binding var customModel: String?
     @Binding var displayName: String
-    let onBrandSelected: (Brand?) -> Void
-    let models: [DeviceModel]
-    let isLoadingModels: Bool
 
-    private var selectedBrand: Brand? {
-        brands.first { $0.id == selectedBrandId }
-    }
-
-    private var selectedModel: DeviceModel? {
-        models.first { $0.id == selectedModelId }
-    }
-
-    private var isCustomBrand: Bool {
-        selectedBrand?.isCustom == true
-    }
+    @State private var searchQuery: String = ""
+    @State private var showResults = false
+    @State private var deviceSearchTask: Task<Void, Never>?
+    @FocusState private var isSearchFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Brand Picker
+            // Search Input
             VStack(alignment: .leading, spacing: 6) {
-                Text("Brand")
+                Text("Device")
                     .font(.subheadline)
                     .fontWeight(.medium)
 
-                Menu {
-                    ForEach(brands) { brand in
-                        Button {
-                            selectedBrandId = brand.id
-                            onBrandSelected(brand)
-                            updateDisplayName()
-                        } label: {
-                            HStack {
-                                Text(brand.name)
-                                if selectedBrandId == brand.id {
-                                    Image(systemName: "checkmark")
-                                }
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+
+                    TextField("Search brand or model...", text: $searchQuery)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .focused($isSearchFocused)
+                        .onChange(of: searchQuery) { _, newValue in
+                            showResults = !newValue.isEmpty
+                            deviceSearchTask?.cancel()
+                            deviceSearchTask = Task {
+                                try? await Task.sleep(for: .milliseconds(300))
+                                guard !Task.isCancelled else { return }
+                                await viewModel.searchDevices(query: newValue)
                             }
                         }
-                    }
-                } label: {
-                    HStack {
-                        Text(selectedBrand?.name ?? "Select brand...")
-                            .foregroundStyle(selectedBrandId == nil ? .secondary : .primary)
-                        Spacer()
-                        Image(systemName: "chevron.up.chevron.down")
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                }
-            }
 
-            // Custom Brand Input
-            if isCustomBrand {
-                FormTextField(
-                    label: "Custom Brand Name",
-                    text: Binding(
-                        get: { customBrand ?? "" },
-                        set: {
-                            customBrand = $0
-                            updateDisplayName()
-                        }
-                    ),
-                    placeholder: "Enter brand name"
-                )
-            }
-
-            // Model Picker (if brand selected and not custom)
-            if selectedBrandId != nil && !isCustomBrand {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Model")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-
-                    if isLoadingModels {
-                        HStack {
-                            ProgressView()
-                            Text("Loading models...")
+                    if viewModel.isSearchingDevices {
+                        ProgressView()
+                    } else if !searchQuery.isEmpty {
+                        Button {
+                            searchQuery = ""
+                            showResults = false
+                            viewModel.deviceSearchResults = nil
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
                                 .foregroundStyle(.secondary)
                         }
-                        .padding()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(.systemGray6))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                    } else {
-                        Menu {
-                            ForEach(models) { model in
-                                Button {
-                                    selectedModelId = model.id
-                                    updateDisplayName()
-                                } label: {
-                                    HStack {
-                                        Text(model.name)
-                                        if selectedModelId == model.id {
-                                            Image(systemName: "checkmark")
-                                        }
-                                    }
-                                }
-                            }
+                    }
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
 
-                            Divider()
+            // Search Results
+            if showResults, let results = viewModel.deviceSearchResults {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Models (more specific — show first)
+                    if !results.models.isEmpty {
+                        Text("Models")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 12)
+                            .padding(.top, 8)
 
+                        ForEach(results.models.prefix(8)) { model in
                             Button {
-                                selectedModelId = nil
-                                customModel = ""
+                                selectModel(model)
                             } label: {
-                                Text("Other / Custom")
+                                HStack {
+                                    Image(systemName: "iphone")
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 24)
+                                    Text(model.fullDisplayName)
+                                        .foregroundStyle(.primary)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
                             }
-                        } label: {
-                            HStack {
-                                Text(selectedModel?.name ?? (customModel?.isEmpty == false ? customModel! : "Select model..."))
-                                    .foregroundStyle(selectedModelId == nil && (customModel?.isEmpty ?? true) ? .secondary : .primary)
-                                Spacer()
-                                Image(systemName: "chevron.up.chevron.down")
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding()
-                            .background(Color(.systemGray6))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .buttonStyle(.plain)
                         }
                     }
+
+                    // Brands
+                    if !results.brands.isEmpty {
+                        if !results.models.isEmpty { Divider() }
+                        Text("Brands")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 12)
+                            .padding(.top, 8)
+
+                        ForEach(results.brands.prefix(5)) { brand in
+                            Button {
+                                selectBrand(brand)
+                            } label: {
+                                HStack {
+                                    Image(systemName: "building.2")
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 24)
+                                    Text(brand.name)
+                                        .foregroundStyle(.primary)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    // No results
+                    if results.brands.isEmpty && results.models.isEmpty {
+                        Text("No matches found — enter custom details below")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(12)
+                    }
+                }
+                .background(Color(.systemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+            }
+
+            // Selected indicator (when a model/brand was picked)
+            if selectedModelId != nil || selectedBrandId != nil {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Text(displayName)
+                        .font(.subheadline)
+                    Spacer()
+                    Button("Clear") {
+                        clearSelection()
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                }
+                .padding(10)
+                .background(Color.green.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+
+            // Custom brand/model (when no search result used, or manual entry)
+            if selectedBrandId == nil && selectedModelId == nil {
+                HStack(spacing: 12) {
+                    FormTextField(
+                        label: "Custom Brand",
+                        text: Binding(
+                            get: { customBrand ?? "" },
+                            set: {
+                                customBrand = $0
+                                updateDisplayName()
+                            }
+                        ),
+                        placeholder: "e.g. Apple"
+                    )
+
+                    FormTextField(
+                        label: "Custom Model",
+                        text: Binding(
+                            get: { customModel ?? "" },
+                            set: {
+                                customModel = $0
+                                updateDisplayName()
+                            }
+                        ),
+                        placeholder: "e.g. iPhone 14 Pro"
+                    )
                 }
             }
 
-            // Custom Model Input
-            if isCustomBrand || (selectedBrandId != nil && selectedModelId == nil && !models.isEmpty) {
-                FormTextField(
-                    label: "Custom Model Name",
-                    text: Binding(
-                        get: { customModel ?? "" },
-                        set: {
-                            customModel = $0
-                            updateDisplayName()
-                        }
-                    ),
-                    placeholder: "Enter model name"
-                )
+            // Validation: backend requires either a selected brand or custom brand
+            if selectedBrandId == nil && (customBrand ?? "").trimmingCharacters(in: .whitespaces).isEmpty {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text("Select a device from search or enter a custom brand name.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             // Display Name (always editable)
@@ -712,21 +805,40 @@ struct BrandModelPicker: View {
         }
     }
 
+    private func selectModel(_ model: DeviceSearchModel) {
+        selectedBrandId = model.brandId
+        selectedModelId = model.id
+        customBrand = nil
+        customModel = nil
+        displayName = model.fullDisplayName
+        searchQuery = ""
+        showResults = false
+        isSearchFocused = false
+    }
+
+    private func selectBrand(_ brand: DeviceSearchBrand) {
+        selectedBrandId = brand.id
+        selectedModelId = nil
+        customBrand = nil
+        customModel = nil
+        displayName = brand.name
+        searchQuery = ""
+        showResults = false
+        isSearchFocused = false
+    }
+
+    private func clearSelection() {
+        selectedBrandId = nil
+        selectedModelId = nil
+        customBrand = nil
+        customModel = nil
+        displayName = ""
+    }
+
     private func updateDisplayName() {
-        var parts: [String] = []
-
-        if let brand = selectedBrand, !brand.isCustom {
-            parts.append(brand.name)
-        } else if let custom = customBrand, !custom.isEmpty {
-            parts.append(custom)
-        }
-
-        if let model = selectedModel {
-            parts.append(model.name)
-        } else if let custom = customModel, !custom.isEmpty {
-            parts.append(custom)
-        }
-
+        let brand = customBrand ?? ""
+        let model = customModel ?? ""
+        let parts = [brand, model].filter { !$0.isEmpty }
         if !parts.isEmpty {
             displayName = parts.joined(separator: " ")
         }
@@ -734,16 +846,13 @@ struct BrandModelPicker: View {
 }
 
 #Preview {
-    BrandModelPicker(
-        brands: Brand.sampleList,
+    DeviceSearchPicker(
+        viewModel: BookingViewModel(),
         selectedBrandId: .constant(nil),
         selectedModelId: .constant(nil),
         customBrand: .constant(nil),
         customModel: .constant(nil),
-        displayName: .constant(""),
-        onBrandSelected: { _ in },
-        models: [],
-        isLoadingModels: false
+        displayName: .constant("")
     )
     .padding()
 }
@@ -770,11 +879,12 @@ struct BrandModelPicker: View {
 - Form has all device fields
 - Cancel returns to empty state
 
-### Test 3: Brand/Model Selection
-- Select brand loads models
-- Select model updates display name
-- "Other" option allows custom entry
-- Custom brand shows custom input
+### Test 3: Device Search
+- Type 2+ characters triggers API search
+- Results show matching models and brands
+- Selecting a model sets brandId, modelId, and displayName
+- Selecting a brand sets brandId and displayName
+- Custom brand/model inputs shown when no result selected
 
 ### Test 4: Save Device
 - Valid device (display name) can be saved
@@ -805,10 +915,11 @@ struct BrandModelPicker: View {
 - [ ] `DevicesStepView.swift` created
 - [ ] `DeviceEntryFormView.swift` created
 - [ ] `DeviceListItemView.swift` created
-- [ ] `BrandModelPicker.swift` created
-- [ ] Brand dropdown with API data
-- [ ] Model dropdown loads on brand select
-- [ ] Custom brand/model input works
+- [ ] `DeviceSearchPicker.swift` created
+- [ ] Device search calls `/api/device-search?q=` via `.deviceSearch(query:)`
+- [ ] Search results show matching brands and models
+- [ ] Selecting result populates brandId/modelId/displayName
+- [ ] Custom brand/model input works when no result selected
 - [ ] Device type selection works
 - [ ] All device fields editable
 - [ ] Add device saves to list
@@ -834,7 +945,8 @@ xcodebuild -scheme "Repair Minder" -destination 'platform=iOS Simulator,name=iPh
 
 - Devices stored in `viewModel.formData.devices`
 - Each device has unique UUID for identification
-- BrandModelPicker handles cascading selection
-- Workflow type can be mixed (repair + buyback on same order)
+- `DeviceSearchPicker` uses unified `/api/device-search?q=` — no separate brand/model endpoints
+- Workflow type can be mixed (repair + buyback on same order) — picker only shown for repair service type orders
+- Backend `/api/device-search` also accepts optional `category` param — not used initially but available for future enhancement
 - [See: Stage 07] Summary will display all added devices
 - [See: Stage 05] Adding buyback device triggers address requirement

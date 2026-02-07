@@ -126,7 +126,7 @@ final class EnquiryListViewModel: ObservableObject {
         return tickets.filter { ticket in
             ticket.subject.lowercased().contains(query)
             || ticket.displayNumber.lowercased().contains(query)
-            || ticket.client.displayName.lowercased().contains(query)
+            || (ticket.client?.displayName.lowercased().contains(query) ?? false)
             || (ticket.order?.status.lowercased().contains(query) ?? false)
             || (ticket.assignedUser?.fullName.lowercased().contains(query) ?? false)
             || (ticket.location?.name.lowercased().contains(query) ?? false)
@@ -220,7 +220,9 @@ final class EnquiryListViewModel: ObservableObject {
 
         } catch {
             // Silently fail on pagination errors
+            #if DEBUG
             print("Failed to load more tickets: \(error)")
+            #endif
         }
 
         isLoadingMore = false

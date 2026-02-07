@@ -79,24 +79,40 @@ final class DashboardViewModel {
 
     private func loadStats() async {
         do {
+            #if DEBUG
             print("📊 [Dashboard] Loading stats - scope: \(selectedScope.rawValue), period: \(selectedPeriod.rawValue)")
+            #endif
             stats = try await APIClient.shared.request(
                 .dashboardStats(scope: selectedScope.rawValue, period: selectedPeriod.rawValue)
             )
+            #if DEBUG
             print("📊 [Dashboard] Stats loaded - devices: \(stats?.devices.current.count ?? -1), revenue: \(stats?.revenue.current.total ?? -1)")
+            #endif
         } catch {
             self.error = error.localizedDescription
+            #if DEBUG
             print("📊 [Dashboard] Failed to load dashboard stats: \(error)")
+            #endif
         }
     }
 
     private func loadEnquiryStats() async {
         do {
+            #if DEBUG
+            print("📧 [Enquiry] Loading enquiry stats - scope: \(selectedScope.rawValue)")
+            #endif
             enquiryStats = try await APIClient.shared.request(
                 .enquiryStats(scope: selectedScope.rawValue, includeBreakdown: selectedScope == .company)
             )
+            #if DEBUG
+            if let stats = enquiryStats {
+                print("📧 [Enquiry] Loaded - leads this_month: \(stats.leads.thisMonth.count), first_replies this_month: \(stats.firstReplies.thisMonth.count)")
+            }
+            #endif
         } catch {
-            print("Failed to load enquiry stats: \(error)")
+            #if DEBUG
+            print("📧 [Enquiry] Failed to load enquiry stats: \(error)")
+            #endif
             // Don't set error for enquiry stats - it's supplementary
         }
     }
@@ -106,7 +122,9 @@ final class DashboardViewModel {
             let response: [ActiveWorkItem] = try await APIClient.shared.request(.myActiveWork)
             activeWork = response
         } catch {
+            #if DEBUG
             print("Failed to load active work: \(error)")
+            #endif
             // Don't set error for active work - it's supplementary
         }
     }

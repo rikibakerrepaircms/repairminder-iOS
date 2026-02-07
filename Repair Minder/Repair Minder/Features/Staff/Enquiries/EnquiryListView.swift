@@ -15,69 +15,107 @@ struct EnquiryListView: View {
     @State private var editMode: EditMode = .inactive
     @State private var selectedTicketIds: Set<String> = []
     @State private var showingBulkStatusPicker = false
+    @State private var selectedTicketId: String?
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var isSelectMode: Bool { editMode.isEditing }
+    private var isRegularWidth: Bool { horizontalSizeClass == .regular }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                // Compact Filter Header
-                filterHeader
+        if isRegularWidth {
+            iPadBody
+        } else {
+            iPhoneBody
+        }
+    }
 
-                // Ticket List
-                ticketList
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    EmptyView()
+    // MARK: - iPhone Layout
+
+    private var iPhoneBody: some View {
+        NavigationStack {
+            enquiryListContent(isSidebar: false)
+                .navigationDestination(for: Ticket.self) { ticket in
+                    EnquiryDetailView(ticketId: ticket.id)
                 }
-                ToolbarItem(placement: .topBarLeading) {
+        }
+    }
+
+    // MARK: - iPad Layout
+
+    private var iPadBody: some View {
+        NavigationSplitView {
+            enquiryListContent(isSidebar: true)
+        } detail: {
+            if let ticketId = selectedTicketId {
+                EnquiryDetailView(ticketId: ticketId)
+                    .id(ticketId)
+            } else {
+                ContentUnavailableView(
+                    "Select an Enquiry",
+                    systemImage: "envelope.open",
+                    description: Text("Choose an enquiry from the list to view the conversation.")
+                )
+            }
+        }
+    }
+
+    // MARK: - Shared List Content
+
+    private func enquiryListContent(isSidebar: Bool) -> some View {
+        VStack(spacing: 0) {
+            // Compact Filter Header
+            filterHeader
+
+            // Ticket List
+            ticketList(isSidebar: isSidebar)
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                EmptyView()
+            }
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    withAnimation {
+                        if editMode.isEditing {
+                            editMode = .inactive
+                            selectedTicketIds.removeAll()
+                        } else {
+                            editMode = .active
+                        }
+                    }
+                } label: {
+                    Text(isSelectMode ? "Done" : "Select")
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                if isSelectMode {
                     Button {
-                        withAnimation {
-                            if editMode.isEditing {
-                                editMode = .inactive
-                                selectedTicketIds.removeAll()
-                            } else {
-                                editMode = .active
-                            }
+                        if selectedTicketIds.count == viewModel.tickets.count {
+                            selectedTicketIds.removeAll()
+                        } else {
+                            selectedTicketIds = Set(viewModel.tickets.map(\.id))
                         }
                     } label: {
-                        Text(isSelectMode ? "Done" : "Select")
+                        Text(selectedTicketIds.count == viewModel.tickets.count ? "Deselect All" : "Select All")
+                            .font(.subheadline)
                     }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    if isSelectMode {
-                        Button {
-                            if selectedTicketIds.count == viewModel.tickets.count {
-                                selectedTicketIds.removeAll()
-                            } else {
-                                selectedTicketIds = Set(viewModel.tickets.map(\.id))
-                            }
-                        } label: {
-                            Text(selectedTicketIds.count == viewModel.tickets.count ? "Deselect All" : "Select All")
-                                .font(.subheadline)
-                        }
-                    } else {
-                        Menu {
-                            sortMenu
-                            Divider()
-                            filterMenu
-                        } label: {
-                            Image(systemName: viewModel.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                        }
+                } else {
+                    Menu {
+                        sortMenu
+                        Divider()
+                        filterMenu
+                    } label: {
+                        Image(systemName: viewModel.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                     }
                 }
             }
-            .refreshable {
-                await viewModel.refresh()
-            }
-            .task {
-                await viewModel.loadTickets()
-            }
-            .navigationDestination(for: Ticket.self) { ticket in
-                EnquiryDetailView(ticketId: ticket.id)
-            }
+        }
+        .refreshable {
+            await viewModel.refresh()
+        }
+        .task {
+            await viewModel.loadTickets()
         }
     }
 
@@ -159,7 +197,7 @@ struct EnquiryListView: View {
     // MARK: - Ticket List
 
     @ViewBuilder
-    private var ticketList: some View {
+    private func ticketList(isSidebar: Bool) -> some View {
         if viewModel.isLoading && viewModel.tickets.isEmpty {
             loadingView
         } else if let error = viewModel.error {
@@ -170,12 +208,27 @@ struct EnquiryListView: View {
             VStack(spacing: 0) {
                 List(selection: $selectedTicketIds) {
                     ForEach(viewModel.tickets) { ticket in
-                        NavigationLink(value: ticket) {
-                            TicketRow(ticket: ticket)
+                        Group {
+                            if isSidebar {
+                                Button {
+                                    selectedTicketId = ticket.id
+                                } label: {
+                                    TicketRow(ticket: ticket)
+                                }
+                                .buttonStyle(.plain)
+                                .listRowBackground(
+                                    !isSelectMode && selectedTicketId == ticket.id
+                                        ? Color.accentColor.opacity(0.1)
+                                        : nil
+                                )
+                            } else {
+                                NavigationLink(value: ticket) {
+                                    TicketRow(ticket: ticket)
+                                }
+                            }
                         }
                         .tag(ticket.id)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                        .listRowSeparator(.hidden)
+                        .listRowSeparator(.visible)
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             if !isSelectMode {
                                 if ticket.status != .pending {
@@ -228,7 +281,8 @@ struct EnquiryListView: View {
                         .listRowSeparator(.hidden)
                     }
                 }
-                .listStyle(.plain)
+                .listStyle(.insetGrouped)
+                .hidesBookingFABOnScroll()
                 .environment(\.editMode, $editMode)
 
                 // Bulk action bar
@@ -521,69 +575,33 @@ private struct TicketRow: View {
     let ticket: Ticket
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Header row
-            HStack {
-                Text(ticket.displayNumber)
-                    .font(.subheadline.monospaced())
-                    .foregroundColor(.secondary)
+        compactLayout
+    }
 
-                TypeBadge(type: ticket.ticketType)
-
-                Text("·")
-                    .foregroundColor(.secondary)
-                Text(ticket.formattedLastUpdate)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
-                Spacer()
-
-                // Status badge
-                HStack(spacing: 4) {
-                    Image(systemName: ticket.status.icon)
-                    Text(ticket.status.label)
-                }
-                .font(.caption.weight(.medium))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(ticket.status.color.opacity(0.15))
-                .foregroundColor(ticket.status.color)
-                .clipShape(Capsule())
-            }
+    private var compactLayout: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // Header row: number + type + status
+            headerRow
 
             // Subject
             Text(ticket.subject)
                 .font(.headline)
                 .lineLimit(2)
 
-            // Client info
-            HStack(spacing: 4) {
-                Image(systemName: "person.circle")
-                    .foregroundColor(.secondary)
-                Text(ticket.client.displayName)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-
-                if let location = ticket.location {
-                    Text("•")
-                        .foregroundColor(.secondary)
-                    Image(systemName: "mappin")
-                        .foregroundColor(.secondary)
-                    Text(location.name)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-            }
+            // Client info + location
+            clientLocationRow
 
             // Order info if present
             if let order = ticket.order {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     Label("\(order.deviceCount) device\(order.deviceCount == 1 ? "" : "s")", systemImage: "iphone")
                         .font(.caption)
                         .foregroundColor(.blue)
+                        .lineLimit(1)
 
                     Text(order.status.replacingOccurrences(of: "_", with: " ").capitalized)
                         .font(.caption)
+                        .lineLimit(1)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(Color.blue.opacity(0.1))
@@ -592,20 +610,32 @@ private struct TicketRow: View {
                 }
             }
 
-            // Assigned user
-            if let assignedUser = ticket.assignedUser {
-                HStack(spacing: 4) {
-                    Image(systemName: "person.badge.shield.checkmark")
-                        .foregroundColor(.green)
-                    Text("Assigned to \(assignedUser.fullName)")
+            // Assigned user + timestamp
+            HStack(spacing: 0) {
+                if let assignedUser = ticket.assignedUser {
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.badge.shield.checkmark")
+                            .foregroundColor(.green)
+                        Text(assignedUser.fullName)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    Text(" · ")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+
+                Text(ticket.formattedLastUpdate)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
             }
 
             // Notes preview
             if let notes = ticket.notes, let firstNote = notes.first {
-                HStack(alignment: .top, spacing: 8) {
+                HStack(alignment: .top, spacing: 6) {
                     Image(systemName: "note.text")
                         .foregroundColor(.orange)
                         .font(.caption)
@@ -614,15 +644,84 @@ private struct TicketRow: View {
                         .foregroundColor(.secondary)
                         .lineLimit(2)
                 }
-                .padding(8)
+                .padding(6)
                 .background(Color.orange.opacity(0.1))
-                .cornerRadius(8)
+                .cornerRadius(6)
             }
         }
-        .padding(12)
-        .background(Color(.secondarySystemGroupedBackground))
-        .cornerRadius(12)
+        .padding(.vertical, 4)
     }
+
+    // MARK: - Header Row
+
+    private var headerRow: some View {
+        ViewThatFits(in: .horizontal) {
+            // Wide: all on one line
+            HStack {
+                Text(ticket.displayNumber)
+                    .font(.subheadline.monospaced())
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+
+                TypeBadge(type: ticket.ticketType)
+
+                Spacer()
+
+                statusBadge
+            }
+
+            // Narrow: number + type on left, status wraps below
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(ticket.displayNumber)
+                        .font(.subheadline.monospaced())
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+
+                    TypeBadge(type: ticket.ticketType)
+
+                    Spacer()
+                }
+
+                statusBadge
+            }
+        }
+    }
+
+    private var statusBadge: some View {
+        HStack(spacing: 4) {
+            Image(systemName: ticket.status.icon)
+            Text(ticket.status.label)
+        }
+        .font(.caption.weight(.medium))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(ticket.status.color.opacity(0.15))
+        .foregroundColor(ticket.status.color)
+        .clipShape(Capsule())
+    }
+
+    // MARK: - Client + Location Row
+
+    @ViewBuilder
+    private var clientLocationRow: some View {
+        let clientName = ticket.client?.displayName ?? "Unknown"
+        let locationName = ticket.location?.name
+
+        VStack(alignment: .leading, spacing: 2) {
+            Label(clientName, systemImage: "person.circle")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+
+            if let locationName {
+                Label(locationName, systemImage: "mappin")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+
+
 }
 
 // MARK: - Type Badge

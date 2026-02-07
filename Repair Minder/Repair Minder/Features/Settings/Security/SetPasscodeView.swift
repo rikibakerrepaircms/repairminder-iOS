@@ -69,6 +69,7 @@ struct SetPasscodeView: View {
 
                 Spacer()
             }
+            .frame(maxWidth: 350)
             .padding()
             .navigationTitle(mode == .create ? "Set Passcode" : "Change Passcode")
             .navigationBarTitleDisplayMode(.inline)

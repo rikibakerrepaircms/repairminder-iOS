@@ -132,6 +132,12 @@ struct DeviceQueueItem: Decodable, Equatable, Sendable, Identifiable {
         return DateFormatters.formatRelativeDate(dueDate)
     }
 
+    /// Formatted received date
+    var formattedReceivedAt: String? {
+        guard let receivedAt = receivedAt else { return nil }
+        return DateFormatters.formatRelativeDate(receivedAt)
+    }
+
     /// Whether the device is overdue
     var isOverdue: Bool {
         guard let dueDate = dueDate,
@@ -322,18 +328,56 @@ enum DateFormatters {
         return formatter
     }()
 
-    private static let relativeFormatter: RelativeDateTimeFormatter = {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
+    private static let mysqlFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
         return formatter
     }()
 
+    private static let humanDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMMM yyyy HH:mm"
+        formatter.locale = Locale(identifier: "en_GB")
+        return formatter
+    }()
+
+    static func parseDate(_ string: String) -> Date? {
+        iso8601Formatter.date(from: string)
+            ?? iso8601FormatterNoFraction.date(from: string)
+            ?? mysqlFormatter.date(from: string)
+    }
+
     static func parseISO8601(_ string: String) -> Date? {
-        iso8601Formatter.date(from: string) ?? iso8601FormatterNoFraction.date(from: string)
+        parseDate(string)
     }
 
     static func formatRelativeDate(_ string: String) -> String? {
-        guard let date = parseISO8601(string) else { return nil }
-        return relativeFormatter.localizedString(for: date, relativeTo: Date())
+        guard let date = parseDate(string) else { return nil }
+        return formatHumanDate(date)
+    }
+
+    static func formatHumanDate(_ date: Date) -> String {
+        let day = Calendar.current.component(.day, from: date)
+        let suffix = ordinalSuffix(for: day)
+        let base = humanDateFormatter.string(from: date)
+        // Insert ordinal suffix after the day number
+        let parts = base.split(separator: " ", maxSplits: 1)
+        guard parts.count == 2 else { return base }
+        return "\(day)\(suffix) \(parts[1])"
+    }
+
+    private static func ordinalSuffix(for day: Int) -> String {
+        switch day {
+        case 11, 12, 13: return "th"
+        default:
+            switch day % 10 {
+            case 1: return "st"
+            case 2: return "nd"
+            case 3: return "rd"
+            default: return "th"
+            }
+        }
     }
 }

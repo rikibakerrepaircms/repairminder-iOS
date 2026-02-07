@@ -61,6 +61,7 @@ struct PasscodeLockView: View {
 
                 Spacer()
             }
+            .frame(maxWidth: 350)
             .padding()
         }
         .alert("Forgot Passcode?", isPresented: $viewModel.showForgotAlert) {

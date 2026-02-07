@@ -14,8 +14,19 @@ struct DeviceRow: View {
     let device: DeviceListItem
     var showClient: Bool = true
     var showOrderNumber: Bool = true
+    var isWide: Bool = false
 
     var body: some View {
+        if isWide {
+            wideLayout
+        } else {
+            compactLayout
+        }
+    }
+
+    // MARK: - Compact Layout (iPhone)
+
+    private var compactLayout: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Header row
             HStack(alignment: .top) {
@@ -129,6 +140,74 @@ struct DeviceRow: View {
             }
         }
         .padding(.vertical, 8)
+    }
+
+    // MARK: - Wide Layout (iPad)
+
+    private var wideLayout: some View {
+        HStack(spacing: 16) {
+            // Device name + client
+            VStack(alignment: .leading, spacing: 2) {
+                Text(device.displayName)
+                    .font(.headline)
+                    .lineLimit(1)
+
+                if showClient, let clientName = device.clientName {
+                    Text(clientName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            .frame(minWidth: 160, alignment: .leading)
+
+            // Device type
+            if let deviceType = device.deviceType {
+                Label(deviceType.name, systemImage: "iphone")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(minWidth: 100, alignment: .leading)
+            }
+
+            // Status badge
+            DeviceStatusBadge(status: device.deviceStatus)
+
+            // Workflow type
+            WorkflowTypeBadge(workflowType: device.workflow)
+
+            // Assigned engineer
+            if let engineer = device.assignedEngineer {
+                Label(engineer.name, systemImage: "person")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            // Sub-location
+            if let subLocation = device.subLocation {
+                HStack(spacing: 4) {
+                    Image(systemName: "mappin")
+                        .font(.caption2)
+                    Text(subLocation.code)
+                        .font(.caption)
+                }
+                .foregroundStyle(.blue)
+            }
+
+            // Due / overdue
+            if device.isOverdue {
+                OverdueBadge()
+            } else if let dueDate = device.formattedDueDate {
+                Label(dueDate, systemImage: "clock")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
     }
 }
 

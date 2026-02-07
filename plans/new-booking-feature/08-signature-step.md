@@ -2,7 +2,7 @@
 
 ## Objective
 
-Create the terms agreement and signature capture step with a native iOS signature pad.
+Create the terms agreement and signature capture step, reusing the existing `CustomerSignatureView` component.
 
 ## Dependencies
 
@@ -11,7 +11,7 @@ Create the terms agreement and signature capture step with a native iOS signatur
 
 ## Complexity
 
-**Medium** - Signature pad implementation using PencilKit or custom Canvas.
+**Medium** - Integrating existing signature component, API-fetched terms.
 
 ---
 
@@ -20,7 +20,8 @@ Create the terms agreement and signature capture step with a native iOS signatur
 | File | Purpose |
 |------|---------|
 | `Features/Staff/Booking/Steps/SignatureStepView.swift` | Terms and signature capture |
-| `Features/Staff/Booking/Components/SignaturePadView.swift` | Canvas for signature drawing |
+
+> **Note:** No `SignaturePadView` needed — reuse existing `CustomerSignatureView` from `Features/Customer/Components/CustomerSignatureView.swift`. It already supports drawn (Canvas + DragGesture) and typed signatures, outputs `"data:image/png;base64,..."` strings, and has a clear button.
 
 ---
 
@@ -85,7 +86,7 @@ struct SignatureStepView: View {
                         Text("Receive updates and promotions")
                             .font(.subheadline)
 
-                        Text("We'll send occasional emails about offers and updates")
+                        Text("Receive occasional emails about offers from \(viewModel.companyName)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -97,7 +98,7 @@ struct SignatureStepView: View {
 
             Divider()
 
-            // Signature Section
+            // Signature Section — reuses existing CustomerSignatureView
             VStack(alignment: .leading, spacing: 16) {
                 Text("Signature")
                     .font(.headline)
@@ -106,20 +107,18 @@ struct SignatureStepView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                // Signature Pad
-                SignaturePadView(signatureData: $viewModel.formData.signatureData)
-
-                // Typed Name Alternative
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Or type your name")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    TextField("Full name", text: $viewModel.formData.typedName)
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                }
+                // CustomerSignatureView requires 3 bindings:
+                // 1. signatureType — .typed or .drawn (stored in formData)
+                // 2. typedName — text input for typed signatures (stored in formData)
+                // 3. drawnSignature — UIImage? from canvas (stored in formData)
+                // The computed formData.signatureData property returns:
+                //   - Drawn: "data:image/png;base64,..." string
+                //   - Typed: nil (typed name is sent separately via typedName field)
+                CustomerSignatureView(
+                    signatureType: $viewModel.formData.signatureType,
+                    typedName: $viewModel.formData.typedName,
+                    drawnSignature: $viewModel.formData.drawnSignature
+                )
             }
 
             // Validation Message
@@ -134,7 +133,12 @@ struct SignatureStepView: View {
             }
         }
         .sheet(isPresented: $showTermsSheet) {
-            TermsAndConditionsSheet()
+            TermsAndConditionsSheet(termsContent: viewModel.termsContent)
+        }
+        .task {
+            if viewModel.termsContent.isEmpty {
+                await viewModel.loadTermsAndConditions()
+            }
         }
     }
 }
@@ -143,13 +147,18 @@ struct SignatureStepView: View {
 
 struct TermsAndConditionsSheet: View {
     @Environment(\.dismiss) private var dismiss
+    let termsContent: String
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text(termsText)
-                        .font(.body)
+                    if termsContent.isEmpty {
+                        ProgressView("Loading terms...")
+                    } else {
+                        Text(termsContent)
+                            .font(.body)
+                    }
                 }
                 .padding()
             }
@@ -164,38 +173,6 @@ struct TermsAndConditionsSheet: View {
             }
         }
     }
-
-    private var termsText: String {
-        """
-        REPAIR SERVICE TERMS AND CONDITIONS
-
-        1. ACCEPTANCE OF DEVICES
-        By signing this agreement, you confirm that you are the owner or authorized representative of the device(s) being submitted for service.
-
-        2. DIAGNOSTIC AND REPAIR SERVICES
-        We will diagnose and repair your device to the best of our ability. If additional work is required beyond the initial estimate, we will contact you for approval before proceeding.
-
-        3. DATA AND PRIVACY
-        We recommend backing up your data before submitting your device. While we take every precaution, we are not responsible for data loss during the repair process.
-
-        4. WARRANTIES
-        Repairs are covered by a warranty as specified at the time of service. This warranty does not cover physical damage, water damage, or modifications made after the repair.
-
-        5. UNCOLLECTED DEVICES
-        Devices not collected within 90 days of completion notice may be disposed of or recycled. We will attempt to contact you before taking this action.
-
-        6. LIABILITY
-        Our liability is limited to the cost of the repair service. We are not liable for any indirect, incidental, or consequential damages.
-
-        7. FIND MY / ACTIVATION LOCK
-        You must disable Find My iPhone/iPad/Mac before submitting your device. We cannot work on devices with activation lock enabled.
-
-        8. PAYMENT
-        Payment is due upon collection unless otherwise agreed. We accept cash, card, and bank transfer.
-
-        By signing, you acknowledge that you have read and agree to these terms.
-        """
-    }
 }
 
 #Preview {
@@ -206,204 +183,37 @@ struct TermsAndConditionsSheet: View {
 }
 ```
 
-### SignaturePadView.swift
+---
 
-```swift
-//
-//  SignaturePadView.swift
-//  Repair Minder
-//
+## Key Design Decisions
 
-import SwiftUI
-import PencilKit
+### Reuse CustomerSignatureView
+The existing `CustomerSignatureView` (in `Features/Customer/Components/`) already implements:
+- **Drawn signatures** via SwiftUI Canvas + DragGesture
+- **Typed signatures** via text field with cursive preview
+- **Clear button** to reset paths and nil out `drawnSignature`
+- **`signatureData` computed property** returning typed name or `"data:image/png;base64,..."` string
+- **`isValid` property** for validation
+- **Nested `SignatureType` enum** (`.typed`, `.drawn`) — accessed as `CustomerSignatureView.SignatureType`
 
-struct SignaturePadView: View {
-    @Binding var signatureData: Data?
-    @State private var canvasView = PKCanvasView()
-    @State private var hasDrawing = false
+**Required bindings (3):**
+1. `signatureType: Binding<CustomerSignatureView.SignatureType>` — toggles typed vs drawn
+2. `typedName: Binding<String>` — text input for typed signatures
+3. `drawnSignature: Binding<UIImage?>` — canvas output image
 
-    var body: some View {
-        VStack(spacing: 12) {
-            // Canvas
-            ZStack {
-                // Background
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white)
-                    .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+The `BookingFormData` stores all three as properties, and the computed `signatureData` property converts them to the string format the backend expects.
 
-                // Signature line
-                VStack {
-                    Spacer()
-                    Rectangle()
-                        .fill(Color(.systemGray4))
-                        .frame(height: 1)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 30)
-                }
+No need to create a separate `SignaturePadView` or bring in PencilKit. Just embed `CustomerSignatureView` in this step.
 
-                // Canvas wrapper
-                SignatureCanvasRepresentable(
-                    canvasView: $canvasView,
-                    onDrawingChanged: { hasContent in
-                        hasDrawing = hasContent
-                        if hasContent {
-                            saveSignature()
-                        } else {
-                            signatureData = nil
-                        }
-                    }
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+### API-Fetched Terms
+Terms and conditions are fetched from the backend via `GET /api/company/public-info` (which returns `{ name, terms_conditions }`). The `BookingViewModel.loadTermsAndConditions()` method fetches this and stores it in `viewModel.termsContent`. The `TermsAndConditionsSheet` displays the fetched content — no hardcoded T&Cs.
 
-                // Placeholder
-                if !hasDrawing {
-                    Text("Sign here")
-                        .font(.title3)
-                        .foregroundStyle(.secondary.opacity(0.5))
-                        .allowsHitTesting(false)
-                }
-            }
-            .frame(height: 200)
+### Signature Data Format
+`formData.signatureData` is a **computed** `String?` property (not stored directly). It derives the value from the CustomerSignatureView bindings:
+- **Typed:** returns `nil` (typed name is sent separately via the `typedName` field in the signature payload)
+- **Drawn:** converts `drawnSignature: UIImage?` to `"data:image/png;base64,..."` string, or `nil` if no drawing
 
-            // Clear Button
-            HStack {
-                Spacer()
-
-                Button {
-                    clearSignature()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "trash")
-                        Text("Clear")
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                }
-                .disabled(!hasDrawing)
-                .opacity(hasDrawing ? 1 : 0.5)
-            }
-        }
-    }
-
-    private func saveSignature() {
-        // Get the drawing as an image
-        let image = canvasView.drawing.image(
-            from: canvasView.bounds,
-            scale: UIScreen.main.scale
-        )
-
-        // Convert to PNG data
-        signatureData = image.pngData()
-    }
-
-    private func clearSignature() {
-        canvasView.drawing = PKDrawing()
-        hasDrawing = false
-        signatureData = nil
-    }
-}
-
-// MARK: - Canvas UIViewRepresentable
-
-struct SignatureCanvasRepresentable: UIViewRepresentable {
-    @Binding var canvasView: PKCanvasView
-    let onDrawingChanged: (Bool) -> Void
-
-    func makeUIView(context: Context) -> PKCanvasView {
-        canvasView.delegate = context.coordinator
-        canvasView.backgroundColor = .clear
-        canvasView.isOpaque = false
-
-        // Configure for finger drawing (works without Apple Pencil)
-        canvasView.drawingPolicy = .anyInput
-
-        // Set up ink tool (black pen)
-        let ink = PKInkingTool(.pen, color: .black, width: 3)
-        canvasView.tool = ink
-
-        return canvasView
-    }
-
-    func updateUIView(_ uiView: PKCanvasView, context: Context) {
-        // No updates needed
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onDrawingChanged: onDrawingChanged)
-    }
-
-    class Coordinator: NSObject, PKCanvasViewDelegate {
-        let onDrawingChanged: (Bool) -> Void
-
-        init(onDrawingChanged: @escaping (Bool) -> Void) {
-            self.onDrawingChanged = onDrawingChanged
-        }
-
-        func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
-            let hasContent = !canvasView.drawing.bounds.isEmpty
-            onDrawingChanged(hasContent)
-        }
-    }
-}
-
-// MARK: - Simple Fallback (if PencilKit unavailable)
-
-struct SimpleSignatureCanvas: View {
-    @Binding var signatureData: Data?
-    @State private var lines: [[CGPoint]] = []
-    @State private var currentLine: [CGPoint] = []
-
-    var body: some View {
-        Canvas { context, size in
-            for line in lines {
-                var path = Path()
-                if let first = line.first {
-                    path.move(to: first)
-                    for point in line.dropFirst() {
-                        path.addLine(to: point)
-                    }
-                }
-                context.stroke(path, with: .color(.black), lineWidth: 3)
-            }
-
-            // Current line
-            var currentPath = Path()
-            if let first = currentLine.first {
-                currentPath.move(to: first)
-                for point in currentLine.dropFirst() {
-                    currentPath.addLine(to: point)
-                }
-            }
-            context.stroke(currentPath, with: .color(.black), lineWidth: 3)
-        }
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { value in
-                    currentLine.append(value.location)
-                }
-                .onEnded { _ in
-                    lines.append(currentLine)
-                    currentLine = []
-                    saveAsImage()
-                }
-        )
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-
-    private func saveAsImage() {
-        // Simplified - in production use a proper renderer
-        // This is a fallback if PencilKit doesn't work
-    }
-}
-
-#Preview {
-    VStack {
-        SignaturePadView(signatureData: .constant(nil))
-            .padding()
-    }
-}
-```
+This matches what the backend expects in the `POST /api/orders` signature payload: `signature_data` for drawn signatures, `typed_name` for typed signatures (the backend requires one or the other). The submit method sends `signatureData` only for drawn mode and `typedName` only for typed mode.
 
 ---
 
@@ -420,44 +230,50 @@ struct SimpleSignatureCanvas: View {
 - Can toggle on/off
 - "View terms" opens sheet
 
-### Test 2: Marketing Toggle
+### Test 2: Terms Content Loaded from API
+- Terms sheet shows loading indicator initially
+- After API response, shows fetched terms text
+- NOT hardcoded — content comes from company settings
+
+### Test 3: Marketing Toggle
 - Toggle is on by default
+- Shows company name from API
 - Can toggle on/off
 
-### Test 3: Signature Drawing
+### Test 4: Signature Drawing
 - Can draw on canvas with finger
 - Drawing appears as black ink
 - "Sign here" placeholder disappears when drawing
 
-### Test 4: Clear Signature
+### Test 5: Clear Signature
 - Clear button removes drawing
 - Placeholder reappears
 - signatureData becomes nil
 
-### Test 5: Typed Name
+### Test 6: Typed Name
 - Can type name as alternative
 - Updates formData.typedName
 
-### Test 6: Validation
+### Test 7: Validation
 - Step invalid when: termsAgreed is false
 - Step invalid when: no signature AND no typed name
 - Step valid when: termsAgreed AND (signature OR typed name)
 
-### Test 7: Signature Export
-- Drawing exported as PNG data
-- Data stored in formData.signatureData
+### Test 8: Signature Export Format
+- Signature exported as base64 data URL string (`"data:image/png;base64,..."`)
+- Stored in `formData.signatureData` as `String?`
 
 ---
 
 ## Acceptance Checklist
 
 - [ ] `SignatureStepView.swift` created
-- [ ] `SignaturePadView.swift` created
+- [ ] Reuses existing `CustomerSignatureView` (no new `SignaturePadView`)
 - [ ] Terms agreement toggle works
-- [ ] Marketing consent toggle works
-- [ ] "View terms" sheet displays
+- [ ] Marketing consent toggle shows company name
+- [ ] "View terms" sheet displays API-fetched content
 - [ ] Signature canvas accepts finger drawing
-- [ ] Drawing exported as PNG data
+- [ ] Signature exported as base64 data URL string
 - [ ] Clear button works
 - [ ] Typed name alternative works
 - [ ] Validation message shows when incomplete
@@ -478,9 +294,11 @@ xcodebuild -scheme "Repair Minder" -destination 'platform=iOS Simulator,name=iPh
 
 ## Handoff Notes
 
-- Uses PencilKit for native signature experience
-- Works with finger (no Apple Pencil required)
-- Signature stored as PNG Data in formData.signatureData
-- Typed name is an alternative to drawing
+- Reuses `CustomerSignatureView` from `Features/Customer/Components/CustomerSignatureView.swift`
+- **3 bindings required:** `signatureType`, `typedName`, `drawnSignature` — all stored in `formData`
+- `formData.signatureData` is a **computed** `String?` property (converts bindings to backend format)
+- Terms fetched from `GET /api/company/public-info` (requires auth) via `viewModel.loadTermsAndConditions()`
+- Company name shown in marketing consent text via `viewModel.companyName`
+- `formData.signatureType` is `CustomerSignatureView.SignatureType` (`.typed` or `.drawn`)
 - [See: Stage 09] Confirmation shows after successful submit
 - Submit happens when user taps "Complete Booking" on this step
