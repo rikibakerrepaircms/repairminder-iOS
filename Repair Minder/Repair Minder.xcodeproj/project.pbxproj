@@ -388,7 +388,7 @@
 		3C22E8CC2F32B213006D564A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = repairmindericon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				BRAND_ID = repairminder;
 				CODE_SIGN_ENTITLEMENTS = "Repair Minder/Repair Minder.entitlements";
@@ -439,7 +439,7 @@
 		3C22E8CD2F32B213006D564A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = repairmindericon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				BRAND_ID = repairminder;
 				CODE_SIGN_ENTITLEMENTS = "Repair Minder/Repair MinderRelease.entitlements";

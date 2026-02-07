@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ClientListView: View {
     var isEmbedded: Bool = false
+    var onBack: (() -> Void)? = nil
 
     @StateObject private var viewModel = ClientListViewModel()
     @State private var selectedClientId: String?
@@ -51,11 +52,29 @@ struct ClientListView: View {
     // MARK: - iPad Layout
 
     private var iPadBody: some View {
-        NavigationSplitView {
-            clientsContent(wideRows: true)
+        AnimatedSplitView(showDetail: selectedClientId != nil) {
+            NavigationStack {
+                clientsContent(wideRows: true)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            if let onBack {
+                                Button {
+                                    onBack()
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "chevron.left")
+                                        Text("Settings")
+                                    }
+                                }
+                            }
+                        }
+                    }
+            }
         } detail: {
             if let clientId = selectedClientId {
-                ClientDetailView(clientId: clientId)
+                NavigationStack {
+                    ClientDetailView(clientId: clientId)
+                }
             } else {
                 ContentUnavailableView(
                     "Select a Client",
@@ -81,7 +100,7 @@ struct ClientListView: View {
             }
         }
         .navigationTitle("Clients")
-        .searchable(text: $viewModel.searchText, prompt: "Search clients...")
+        .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search clients...")
         .onChange(of: viewModel.searchText) { _, _ in
             viewModel.searchClients()
         }

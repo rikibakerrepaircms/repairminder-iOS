@@ -43,18 +43,16 @@ struct EnquiryListView: View {
     // MARK: - iPad Layout
 
     private var iPadBody: some View {
-        NavigationSplitView {
-            enquiryListContent(isSidebar: true)
+        AnimatedSplitView(showDetail: selectedTicketId != nil) {
+            NavigationStack {
+                enquiryListContent(isSidebar: true)
+            }
         } detail: {
             if let ticketId = selectedTicketId {
-                EnquiryDetailView(ticketId: ticketId)
-                    .id(ticketId)
-            } else {
-                ContentUnavailableView(
-                    "Select an Enquiry",
-                    systemImage: "envelope.open",
-                    description: Text("Choose an enquiry from the list to view the conversation.")
-                )
+                NavigationStack {
+                    EnquiryDetailView(ticketId: ticketId)
+                }
+                .id(ticketId)
             }
         }
     }
@@ -210,17 +208,18 @@ struct EnquiryListView: View {
                     ForEach(viewModel.tickets) { ticket in
                         Group {
                             if isSidebar {
-                                Button {
-                                    selectedTicketId = ticket.id
-                                } label: {
-                                    TicketRow(ticket: ticket)
-                                }
-                                .buttonStyle(.plain)
-                                .listRowBackground(
-                                    !isSelectMode && selectedTicketId == ticket.id
-                                        ? Color.accentColor.opacity(0.1)
-                                        : nil
-                                )
+                                TicketRow(ticket: ticket)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        if !isSelectMode {
+                                            selectedTicketId = ticket.id
+                                        }
+                                    }
+                                    .listRowBackground(
+                                        !isSelectMode && selectedTicketId == ticket.id
+                                            ? Color.accentColor.opacity(0.1)
+                                            : nil
+                                    )
                             } else {
                                 NavigationLink(value: ticket) {
                                     TicketRow(ticket: ticket)

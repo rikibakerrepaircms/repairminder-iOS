@@ -16,14 +16,15 @@ struct DeviceQueueRow: View {
     let onTap: () -> Void
 
     var body: some View {
-        Button(action: onTap) {
+        Group {
             if isCompact {
                 compactLayout
             } else {
                 wideLayout
             }
         }
-        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onTap)
     }
 
     // MARK: - Compact Layout (iPhone)

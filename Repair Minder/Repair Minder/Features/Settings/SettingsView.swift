@@ -64,20 +64,24 @@ struct SettingsView: View {
 
     // MARK: - iPad Layout
 
+    @ViewBuilder
     private var iPadLayout: some View {
-        NavigationSplitView {
-            settingsList
-        } detail: {
-            if let dest = selectedDestination {
+        if selectedDestination == .clients {
+            ClientListView(onBack: {
+                withAnimation { selectedDestination = nil }
+            })
+        } else {
+            AnimatedSplitView(showDetail: selectedDestination != nil) {
                 NavigationStack {
-                    destinationView(dest)
+                    settingsList
                 }
-            } else {
-                ContentUnavailableView(
-                    "Select an Option",
-                    systemImage: "gearshape",
-                    description: Text("Choose a setting from the list")
-                )
+            } detail: {
+                if let dest = selectedDestination {
+                    NavigationStack {
+                        destinationView(dest)
+                    }
+                    .id(dest)
+                }
             }
         }
     }
@@ -201,7 +205,7 @@ struct SettingsView: View {
     private func settingsLink(_ dest: SettingsDestination, label: String, icon: String) -> some View {
         if isRegularWidth {
             Button {
-                selectedDestination = dest
+                withAnimation { selectedDestination = dest }
             } label: {
                 HStack {
                     Label(label, systemImage: icon)

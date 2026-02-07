@@ -162,7 +162,7 @@ struct FullscreenSignatureView: View {
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
         windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: orientations))
         // Trigger the system to re-evaluate supported orientations
-        UIViewController.attemptRotationToDeviceOrientation()
+        windowScene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
     }
 }
 

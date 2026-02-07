@@ -60,29 +60,28 @@ struct OrderListView: View {
     // MARK: - iPad Layout
 
     private var iPadLayout: some View {
-        NavigationSplitView {
-            VStack(spacing: 0) {
-                filterHeader
-                mainContent
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    filterButton
+        AnimatedSplitView(showDetail: selectedOrder != nil) {
+            NavigationStack {
+                VStack(spacing: 0) {
+                    filterHeader
+                    mainContent
                 }
-            }
-            .sheet(isPresented: $showingFilters) {
-                OrderFilterSheet(viewModel: viewModel)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        filterButton
+                    }
+                }
+                .sheet(isPresented: $showingFilters) {
+                    OrderFilterSheet(viewModel: viewModel)
+                }
             }
         } detail: {
             if let order = selectedOrder {
-                OrderDetailView(orderId: order.id)
-            } else {
-                ContentUnavailableView(
-                    "Select an Order",
-                    systemImage: "doc.text",
-                    description: Text("Choose an order from the list")
-                )
+                NavigationStack {
+                    OrderDetailView(orderId: order.id)
+                }
+                .id(order.id)
             }
         }
     }
@@ -201,20 +200,19 @@ struct OrderListView: View {
     private var iPadOrdersList: some View {
         List {
             ForEach(viewModel.orders) { order in
-                Button {
-                    selectedOrder = order
-                } label: {
-                    OrderRowView(order: order)
-                }
-                .buttonStyle(.plain)
-                .listRowBackground(
-                    selectedOrder?.id == order.id
-                        ? Color.accentColor.opacity(0.1)
-                        : nil
-                )
-                .task {
-                    await viewModel.loadMoreIfNeeded(currentItem: order)
-                }
+                OrderRowView(order: order)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        selectedOrder = order
+                    }
+                    .listRowBackground(
+                        selectedOrder?.id == order.id
+                            ? Color.accentColor.opacity(0.1)
+                            : nil
+                    )
+                    .task {
+                        await viewModel.loadMoreIfNeeded(currentItem: order)
+                    }
             }
 
             if viewModel.isLoadingMore {

@@ -27,12 +27,12 @@ struct DeviceDetailView: View {
 
     var body: some View {
         Group {
-            if viewModel.isLoading && !viewModel.isLoaded {
-                loadingView
-            } else if let error = viewModel.error, !viewModel.isLoaded {
-                errorView(error)
-            } else if let device = viewModel.device {
+            if let device = viewModel.device {
                 deviceContent(device)
+            } else if let error = viewModel.error {
+                errorView(error)
+            } else {
+                loadingView
             }
         }
         .navigationTitle(viewModel.device?.displayName ?? "Device")

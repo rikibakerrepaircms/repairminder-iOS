@@ -58,18 +58,16 @@ struct DevicesView: View {
     // MARK: - iPad Layout
 
     private var iPadBody: some View {
-        NavigationSplitView {
-            devicesContent(wideRows: true)
+        AnimatedSplitView(showDetail: selectedDeviceNav != nil) {
+            NavigationStack {
+                devicesContent(wideRows: true)
+            }
         } detail: {
             if let nav = selectedDeviceNav {
-                DeviceDetailView(orderId: nav.orderId, deviceId: nav.deviceId)
-                    .id("\(nav.orderId)-\(nav.deviceId)")
-            } else {
-                ContentUnavailableView(
-                    "Select a Device",
-                    systemImage: "iphone",
-                    description: Text("Choose a device from the list to view its details.")
-                )
+                NavigationStack {
+                    DeviceDetailView(orderId: nav.orderId, deviceId: nav.deviceId)
+                }
+                .id("\(nav.orderId)-\(nav.deviceId)")
             }
         }
     }

@@ -30,12 +30,6 @@ struct CustomerOrderListView: View {
         .task {
             await viewModel.loadOrders()
         }
-        .onChange(of: viewModel.orders.isEmpty) { _, isEmpty in
-            if !isEmpty && isRegularWidth && selectedOrderId == nil {
-                selectedOrderId = viewModel.actionRequiredOrders.first?.id
-                    ?? viewModel.orders.first?.id
-            }
-        }
     }
 
     // MARK: - iPhone Layout
@@ -68,36 +62,35 @@ struct CustomerOrderListView: View {
     // MARK: - iPad Layout
 
     private var iPadLayout: some View {
-        NavigationSplitView {
-            Group {
-                if viewModel.isLoading && viewModel.orders.isEmpty {
-                    loadingView
-                } else if let error = viewModel.errorMessage, viewModel.orders.isEmpty {
-                    errorView(error)
-                } else if viewModel.orders.isEmpty {
-                    emptyView
-                } else {
-                    iPadOrderList
+        AnimatedSplitView(showDetail: selectedOrderId != nil) {
+            NavigationStack {
+                Group {
+                    if viewModel.isLoading && viewModel.orders.isEmpty {
+                        loadingView
+                    } else if let error = viewModel.errorMessage, viewModel.orders.isEmpty {
+                        errorView(error)
+                    } else if viewModel.orders.isEmpty {
+                        emptyView
+                    } else {
+                        iPadOrderList
+                    }
                 }
-            }
-            .navigationTitle("My Orders")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    profileMenu
+                .navigationTitle("My Orders")
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        profileMenu
+                    }
                 }
-            }
-            .refreshable {
-                await viewModel.refresh()
+                .refreshable {
+                    await viewModel.refresh()
+                }
             }
         } detail: {
             if let orderId = selectedOrderId {
-                CustomerOrderDetailView(orderId: orderId)
-            } else {
-                ContentUnavailableView(
-                    "Select an Order",
-                    systemImage: "doc.text",
-                    description: Text("Choose an order from the list to view its details.")
-                )
+                NavigationStack {
+                    CustomerOrderDetailView(orderId: orderId)
+                }
+                .id(orderId)
             }
         }
     }
@@ -162,7 +155,7 @@ struct CustomerOrderListView: View {
     // MARK: - iPad Order List
 
     private var iPadOrderList: some View {
-        List(selection: $selectedOrderId) {
+        List {
             // Action Required Section
             if !viewModel.actionRequiredOrders.isEmpty {
                 Section {
@@ -172,7 +165,11 @@ struct CustomerOrderListView: View {
                             currencyCode: viewModel.currencyCode,
                             isWideLayout: true
                         )
-                        .tag(order.id)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedOrderId = order.id
+                        }
+                        .listRowBackground(selectedOrderId == order.id ? Color.accentColor.opacity(0.1) : nil)
                     }
                 } header: {
                     Label("Action Required", systemImage: "exclamationmark.circle.fill")
@@ -190,7 +187,11 @@ struct CustomerOrderListView: View {
                             currencyCode: viewModel.currencyCode,
                             isWideLayout: true
                         )
-                        .tag(order.id)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedOrderId = order.id
+                        }
+                        .listRowBackground(selectedOrderId == order.id ? Color.accentColor.opacity(0.1) : nil)
                     }
                 } header: {
                     Text("In Progress")
@@ -206,7 +207,11 @@ struct CustomerOrderListView: View {
                             currencyCode: viewModel.currencyCode,
                             isWideLayout: true
                         )
-                        .tag(order.id)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedOrderId = order.id
+                        }
+                        .listRowBackground(selectedOrderId == order.id ? Color.accentColor.opacity(0.1) : nil)
                     }
                 } header: {
                     Text("Completed")

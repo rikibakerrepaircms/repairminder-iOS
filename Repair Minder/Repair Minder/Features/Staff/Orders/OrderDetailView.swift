@@ -587,6 +587,7 @@ struct OrderDetailView: View {
             Text("Loading order...")
                 .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func errorView(_ error: String) -> some View {

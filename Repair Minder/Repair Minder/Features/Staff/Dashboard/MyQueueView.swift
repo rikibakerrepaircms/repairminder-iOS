@@ -50,18 +50,16 @@ struct MyQueueView: View {
     // MARK: - iPad Layout
 
     private var iPadBody: some View {
-        NavigationSplitView {
-            queueContent(wideRows: false)
+        AnimatedSplitView(showDetail: deviceNavigation != nil) {
+            NavigationStack {
+                queueContent(wideRows: false)
+            }
         } detail: {
             if let nav = deviceNavigation {
-                DeviceDetailView(orderId: nav.orderId, deviceId: nav.deviceId)
-                    .id("\(nav.orderId)-\(nav.deviceId)")
-            } else {
-                ContentUnavailableView(
-                    "Select a Device",
-                    systemImage: "wrench.and.screwdriver",
-                    description: Text("Choose a device from your queue to view its details.")
-                )
+                NavigationStack {
+                    DeviceDetailView(orderId: nav.orderId, deviceId: nav.deviceId)
+                }
+                .id("\(nav.orderId)-\(nav.deviceId)")
             }
         }
     }
