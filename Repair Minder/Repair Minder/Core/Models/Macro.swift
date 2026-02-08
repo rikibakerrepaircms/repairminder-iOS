@@ -148,6 +148,7 @@ struct MacroListResponse: Decodable, Sendable {
 struct ExecuteMacroRequest: Encodable {
     let macroId: String
     let variableOverrides: [String: String]?
+    let sendSms: Bool?
 }
 
 // MARK: - Execute Macro Response

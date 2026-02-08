@@ -116,6 +116,7 @@ enum APIEndpoint {
     case ticketReply(id: String)
     case ticketNote(id: String)
     case ticketGenerateResponse(id: String)
+    case ticketRewriteResponse(id: String)
     case ticketMacroExecutions(id: String)
     case ticketExecuteMacro(id: String)
     case ticketResolve(id: String)
@@ -300,6 +301,8 @@ enum APIEndpoint {
             return "/api/tickets/\(id)/note"
         case .ticketGenerateResponse(let id):
             return "/api/tickets/\(id)/generate-response"
+        case .ticketRewriteResponse(let id):
+            return "/api/tickets/\(id)/rewrite-response"
         case .ticketMacroExecutions(let id):
             return "/api/tickets/\(id)/macro-executions"
         case .ticketExecuteMacro(let id):
@@ -391,7 +394,7 @@ enum APIEndpoint {
              .createOrder, .createOrderItem, .createOrderPayment, .createOrderSignature,
              .sendQuote, .authorizeOrder, .despatchOrder, .collectOrder,
              .createClient, .clientsImport,
-             .createTicket, .ticketReply, .ticketNote, .ticketGenerateResponse, .ticketExecuteMacro,
+             .createTicket, .ticketReply, .ticketNote, .ticketGenerateResponse, .ticketRewriteResponse, .ticketExecuteMacro,
              .ticketResolve, .ticketReassign, .createEnquiry,
              .registerDeviceToken,
              .customerApproveQuote, .customerOrderReply:

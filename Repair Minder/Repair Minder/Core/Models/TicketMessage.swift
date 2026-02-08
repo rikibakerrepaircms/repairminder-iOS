@@ -408,3 +408,9 @@ struct AIUsage: Decodable, Sendable {
 struct AIResponseRequest: Encodable {
     let locationId: String?
 }
+
+/// Request body for AI rewrite
+struct AIRewriteRequest: Encodable {
+    let text: String
+    let locationId: String?
+}

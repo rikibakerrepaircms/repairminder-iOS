@@ -20,6 +20,8 @@ final class EnquiryDetailViewModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var isSending = false
     @Published private(set) var isGeneratingAI = false
+    @Published private(set) var isRewritingAI = false
+    @Published private(set) var hasRewrittenAI = false
     @Published private(set) var error: String?
     @Published var showingMacroPicker = false
     @Published var showingStatusPicker = false
@@ -256,17 +258,48 @@ final class EnquiryDetailViewModel: ObservableObject {
         isGeneratingAI = false
     }
 
+    /// Rewrite the current reply text using AI
+    func rewriteResponse() async {
+        guard !isRewritingAI else { return }
+        guard !replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+
+        isRewritingAI = true
+        error = nil
+
+        do {
+            let request = AIRewriteRequest(text: replyText, locationId: ticket?.locationId)
+            let response: AIResponseResult = try await APIClient.shared.request(
+                .ticketRewriteResponse(id: ticketId),
+                body: request
+            )
+
+            replyText = response.text
+            hasRewrittenAI = true
+
+        } catch let apiError as APIError {
+            error = apiError.localizedDescription
+        } catch {
+            self.error = error.localizedDescription
+        }
+
+        isRewritingAI = false
+    }
+
     /// Execute a macro
     func executeMacro(_ macro: Macro, overrides: [String: String]? = nil) async {
         error = nil
 
         do {
-            let request = ExecuteMacroRequest(macroId: macro.id, variableOverrides: overrides)
+            let request = ExecuteMacroRequest(
+                macroId: macro.id,
+                variableOverrides: overrides,
+                sendSms: sendSms ? true : nil
+            )
             let _: ExecuteMacroResponse = try await APIClient.shared.request(
                 .ticketExecuteMacro(id: ticketId),
                 body: request
             )
-
+            sendSms = false
             await loadTicket()
 
         } catch let apiError as APIError {

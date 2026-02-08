@@ -82,7 +82,14 @@ struct EnquiryDetailView: View {
             )
         }
         .sheet(item: $viewModel.selectedWorkflowMacro) { macro in
-            WorkflowExecutionSheet(macro: macro) { overrides in
+            WorkflowExecutionSheet(
+                macro: macro,
+                canSendSms: viewModel.canSendSms,
+                sendSms: $viewModel.sendSms,
+                smsAlreadySent: viewModel.ticket?.smsAlreadySent == true,
+                smsRemaining: viewModel.ticket?.smsRemaining,
+                clientPhone: viewModel.ticket?.client?.phone
+            ) { overrides in
                 Task { await viewModel.executeMacro(macro, overrides: overrides) }
             }
         }
@@ -413,9 +420,24 @@ struct EnquiryDetailView: View {
                             .scaleEffect(0.8)
                     } else {
                         Image(systemName: "sparkles")
+                            .font(.title3)
                     }
                 }
                 .disabled(viewModel.isGeneratingAI)
+
+                // AI rewrite button
+                Button {
+                    Task { await viewModel.rewriteResponse() }
+                } label: {
+                    if viewModel.isRewritingAI {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "pencil.and.outline")
+                            .font(.title3)
+                    }
+                }
+                .disabled(viewModel.isRewritingAI || viewModel.hasRewrittenAI || viewModel.replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
             .padding(.horizontal)
             .padding(.top, 8)
@@ -737,6 +759,11 @@ private struct WorkflowCard: View {
 
 private struct WorkflowExecutionSheet: View {
     let macro: Macro
+    let canSendSms: Bool
+    @Binding var sendSms: Bool
+    let smsAlreadySent: Bool
+    let smsRemaining: Int?
+    let clientPhone: String?
     let onExecute: ([String: String]?) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -857,6 +884,53 @@ private struct WorkflowExecutionSheet: View {
                     Text(macro.initialContent)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                }
+
+                // SMS notification (only for email macros when SMS available)
+                if macro.isEmailMacro && canSendSms {
+                    Section {
+                        Toggle(isOn: $sendSms) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "message")
+                                    .foregroundStyle(.blue)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Also send SMS")
+                                        .font(.subheadline)
+                                    if let phone = clientPhone {
+                                        Text(phone)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                        .disabled(smsRemaining == 0)
+
+                        if let remaining = smsRemaining, remaining <= 10 {
+                            HStack {
+                                Image(systemName: remaining == 0 ? "exclamationmark.triangle" : "info.circle")
+                                    .foregroundStyle(remaining == 0 ? .red : .orange)
+                                    .font(.caption)
+                                Text(remaining == 0 ? "SMS limit reached" : "\(remaining) SMS remaining")
+                                    .font(.caption)
+                                    .foregroundStyle(remaining == 0 ? .red : .orange)
+                            }
+                        }
+
+                        if smsAlreadySent {
+                            HStack {
+                                Image(systemName: "checkmark.circle")
+                                    .foregroundStyle(.secondary)
+                                    .font(.caption)
+                                Text("SMS already sent to this enquiry")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .italic()
+                            }
+                        }
+                    } header: {
+                        Text("SMS Notification")
+                    }
                 }
             }
             .navigationTitle(macro.name)
