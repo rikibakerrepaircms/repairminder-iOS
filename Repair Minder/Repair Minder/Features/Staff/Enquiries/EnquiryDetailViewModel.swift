@@ -30,6 +30,7 @@ final class EnquiryDetailViewModel: ObservableObject {
     @Published var selectedReplyStatus: TicketStatus? = .pending
     @Published var replyMode: ReplyMode = .reply
     @Published var selectedWorkflowMacro: Macro?
+    @Published var sendSms = false
 
     enum ReplyMode: String, CaseIterable {
         case reply = "Reply"
@@ -88,6 +89,18 @@ final class EnquiryDetailViewModel: ObservableObject {
         ticket?.order?.devices ?? []
     }
 
+    /// Whether SMS can be sent (company has SMS + client has phone)
+    var canSendSms: Bool {
+        guard let ticket = ticket else { return false }
+        return ticket.smsAvailable == true && ticket.client?.phone != nil
+    }
+
+    /// Whether client needs SMS (no valid email)
+    private var clientNeedsSms: Bool {
+        guard let client = ticket?.client else { return false }
+        return client.isGeneratedEmail == 1 || client.emailSuppressed == 1
+    }
+
     // MARK: - Loading
 
     /// Load ticket details (initial load, skips if already loading)
@@ -109,6 +122,15 @@ final class EnquiryDetailViewModel: ObservableObject {
             try Task.checkCancellation()
             ticket = try await APIClient.shared.request(.ticket(id: ticketId))
             try Task.checkCancellation()
+
+            // Auto-check SMS toggle for no-email/suppressed clients
+            if let ticket = self.ticket, ticket.smsAvailable == true, ticket.client?.phone != nil {
+                let needsSms = (ticket.client?.isGeneratedEmail == 1 || ticket.client?.emailSuppressed == 1)
+                sendSms = needsSms && !(ticket.smsAlreadySent ?? false)
+            } else {
+                sendSms = false
+            }
+
             await loadMacros()
             await loadExecutions()
         } catch is CancellationError {
@@ -177,7 +199,8 @@ final class EnquiryDetailViewModel: ObservableObject {
                     textBody: text,
                     status: selectedReplyStatus?.rawValue,
                     fromCustomEmailId: nil,
-                    pendingAttachmentIds: nil
+                    pendingAttachmentIds: nil,
+                    sendSms: sendSms ? true : nil
                 )
                 let _: TicketReplyResponse = try await APIClient.shared.request(
                     .ticketReply(id: ticketId),
@@ -195,6 +218,7 @@ final class EnquiryDetailViewModel: ObservableObject {
             // Clear and reload
             replyText = ""
             selectedReplyStatus = .pending
+            sendSms = false
             await loadTicket()
 
         } catch let apiError as APIError {

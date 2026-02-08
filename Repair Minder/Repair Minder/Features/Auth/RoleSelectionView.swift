@@ -10,50 +10,65 @@ import SwiftUI
 /// Initial screen where users choose between Staff and Customer portals
 struct RoleSelectionView: View {
     @ObservedObject private var appState = AppState.shared
+    @State private var isDimming = false
 
     var body: some View {
         ZStack {
             // Background image with overlay
-            Image("login_background")
-                .resizable()
-                .aspectRatio(contentMode: .fill)
+            GeometryReader { geo in
+                Image("login_background")
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .clipped()
+            }
+            .ignoresSafeArea()
+
+            Color.black.opacity(isDimming ? 0.7 : 0.4)
                 .ignoresSafeArea()
+                .animation(.easeInOut(duration: 0.4), value: isDimming)
 
-            Color.black.opacity(0.5)
-                .ignoresSafeArea()
-
-            VStack(spacing: 40) {
-                Spacer()
-
-                // App logo
-                VStack(spacing: 16) {
+            VStack(spacing: 0) {
+                // App logo — pinned near top, above the mascot's head
+                VStack(spacing: 12) {
                     Image("login_logo")
                         .resizable()
                         .scaledToFit()
-                        .frame(height: 80)
+                        .frame(height: 70)
 
                     Text("Which best describes you?")
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.7))
                 }
+                .padding(.top, 60)
 
                 Spacer()
 
-                // Role selection buttons
+                // Role selection buttons — bottom third
                 VStack(spacing: 16) {
                     ForEach(AppUserRole.allCases, id: \.self) { role in
                         RoleButton(role: role) {
-                            Task {
-                                await appState.selectRole(role)
-                            }
+                            selectRole(role)
                         }
                     }
                 }
                 .padding(.horizontal, 24)
+                .opacity(isDimming ? 0 : 1)
+                .animation(.easeOut(duration: 0.3), value: isDimming)
 
                 Spacer()
+                    .frame(height: 60)
             }
             .padding()
+        }
+    }
+
+    private func selectRole(_ role: AppUserRole) {
+        isDimming = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            Task {
+                await appState.selectRole(role)
+            }
         }
     }
 }

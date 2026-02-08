@@ -31,6 +31,9 @@ struct Ticket: Codable, Identifiable, Sendable, Equatable, Hashable {
     let messages: [TicketMessage]?
     let order: TicketOrder?
     let notes: [TicketNote]?
+    let smsAvailable: Bool?
+    let smsRemaining: Int?
+    let smsAlreadySent: Bool?
 
     // MARK: - Computed Properties
 

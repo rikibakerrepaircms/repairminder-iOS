@@ -30,12 +30,16 @@ struct CustomerLoginView: View {
         NavigationStack {
             ZStack {
                 // Background image with overlay
-                Image("login_background")
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .ignoresSafeArea()
+                GeometryReader { geo in
+                    Image("login_background")
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .clipped()
+                }
+                .ignoresSafeArea()
 
-                Color.black.opacity(0.5)
+                Color.black.opacity(0.75)
                     .ignoresSafeArea()
 
                 GeometryReader { geometry in

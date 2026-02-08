@@ -352,6 +352,7 @@ struct TicketReplyRequest: Encodable {
     let status: String?
     let fromCustomEmailId: String?
     let pendingAttachmentIds: [String]?
+    let sendSms: Bool?
 }
 
 // MARK: - Note Request

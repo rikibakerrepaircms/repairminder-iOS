@@ -1,17 +1,8 @@
 {
   "images" : [
     {
-      "idiom" : "universal",
-      "scale" : "1x"
-    },
-    {
-      "idiom" : "universal",
-      "scale" : "2x"
-    },
-    {
-      "filename" : "login_background@3x.png",
-      "idiom" : "universal",
-      "scale" : "3x"
+      "filename" : "login_background_mascot.jpg",
+      "idiom" : "universal"
     }
   ],
   "info" : {

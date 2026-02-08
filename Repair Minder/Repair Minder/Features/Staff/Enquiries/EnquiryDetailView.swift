@@ -77,7 +77,7 @@ struct EnquiryDetailView: View {
             MacroPickerSheet(
                 macros: viewModel.macros,
                 onSelect: { macro in
-                    Task { await viewModel.executeMacro(macro) }
+                    viewModel.selectedWorkflowMacro = macro
                 }
             )
         }
@@ -169,6 +169,22 @@ struct EnquiryDetailView: View {
 
                 // Status badge
                 StatusBadge(status: ticket.status)
+            }
+
+            // No-email banner
+            if ticket.client?.isGeneratedEmail == 1 {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                        .font(.caption)
+                    Text("No email address — replies will not be emailed")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(8)
             }
 
             // Metadata row (iPad — show type, created, updated side by side)
@@ -403,6 +419,47 @@ struct EnquiryDetailView: View {
             }
             .padding(.horizontal)
             .padding(.top, 8)
+
+            // SMS toggle (only in reply mode when SMS is available)
+            if viewModel.replyMode == .reply && viewModel.canSendSms {
+                HStack(spacing: 6) {
+                    Toggle(isOn: $viewModel.sendSms) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "message")
+                                .font(.caption)
+                            Text("Also send SMS")
+                                .font(.caption)
+                        }
+                    }
+                    .toggleStyle(.switch)
+                    .scaleEffect(0.8)
+                    .disabled(viewModel.ticket?.smsRemaining == 0)
+
+                    if viewModel.sendSms, let phone = viewModel.ticket?.client?.phone {
+                        Text("to \(phone)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let remaining = viewModel.ticket?.smsRemaining, remaining <= 10 {
+                        Text(remaining == 0 ? "SMS limit reached" : "\(remaining) SMS left")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundStyle(remaining == 0 ? .red : .orange)
+                    }
+
+                    if viewModel.ticket?.smsAlreadySent == true {
+                        Text("SMS already sent")
+                            .font(.caption2)
+                            .italic()
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.top, 4)
+            }
 
             // Text input with status dropdown and send button
             HStack(alignment: .bottom, spacing: 8) {
@@ -684,21 +741,44 @@ private struct WorkflowExecutionSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var variableValues: [String: String] = [:]
+    @State private var validationErrors: Set<String> = []
 
-    private var templateVariables: [String] {
-        let pattern = "\\{\\{([^}]+)\\}\\}"
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
-        let content = macro.initialContent + (macro.initialSubject ?? "")
-        let matches = regex.matches(in: content, range: NSRange(content.startIndex..., in: content))
-        let vars = matches.compactMap { match -> String? in
-            guard let range = Range(match.range(at: 1), in: content) else { return nil }
-            return String(content[range]).trimmingCharacters(in: .whitespaces)
+    /// Variables that require user input when executing (matches web app PER_USE_VARIABLES)
+    private static let perUseVariables = ["device_type", "repair_type", "price", "reply"]
+
+    /// Labels for per-use variables
+    private static let variableLabels: [String: String] = [
+        "device_type": "Device Model",
+        "repair_type": "Repair Type",
+        "price": "Price",
+        "reply": "Reply Content",
+    ]
+
+    /// Placeholders for per-use variables
+    private static let variablePlaceholders: [String: String] = [
+        "device_type": "e.g., iPhone 14 Pro, Samsung Galaxy S24",
+        "repair_type": "e.g., Screen Replacement, Battery Replacement",
+        "price": "e.g., 149.99",
+        "reply": "Enter your reply message here...",
+    ]
+
+    /// Detect which per-use variables are used in the macro content (initial + all stages)
+    private var usedPerUseVariables: [String] {
+        var allContent = macro.initialContent + " " + (macro.initialSubject ?? "")
+        if let stages = macro.stages {
+            for stage in stages {
+                allContent += " " + (stage.subject ?? "") + " " + (stage.content ?? "")
+            }
         }
-        return Array(Set(vars)).sorted()
+        return Self.perUseVariables.filter { allContent.contains("{{\($0)}}") }
     }
 
-    private func displayName(for variable: String) -> String {
-        variable.replacingOccurrences(of: "_", with: " ").capitalized
+    private func label(for variable: String) -> String {
+        Self.variableLabels[variable] ?? variable.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+
+    private func placeholder(for variable: String) -> String {
+        Self.variablePlaceholders[variable] ?? label(for: variable)
     }
 
     var body: some View {
@@ -737,18 +817,26 @@ private struct WorkflowExecutionSheet: View {
                     }
                 }
 
-                // Variable inputs
-                if !templateVariables.isEmpty {
-                    Section("Variables") {
-                        ForEach(templateVariables, id: \.self) { variable in
+                // Per-use variable inputs
+                if !usedPerUseVariables.isEmpty {
+                    Section("Required Information") {
+                        ForEach(usedPerUseVariables, id: \.self) { variable in
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(displayName(for: variable))
+                                Text(label(for: variable))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                TextField(displayName(for: variable), text: Binding(
+                                TextField(placeholder(for: variable), text: Binding(
                                     get: { variableValues[variable] ?? "" },
-                                    set: { variableValues[variable] = $0 }
+                                    set: {
+                                        variableValues[variable] = $0
+                                        validationErrors.remove(variable)
+                                    }
                                 ))
+                                if validationErrors.contains(variable) {
+                                    Text("This field is required")
+                                        .font(.caption2)
+                                        .foregroundStyle(.red)
+                                }
                             }
                         }
                     }
@@ -778,7 +866,13 @@ private struct WorkflowExecutionSheet: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Execute") {
+                    Button(macro.isEmailMacro ? "Send Email" : "Add Note") {
+                        // Validate required per-use variables
+                        let missing = usedPerUseVariables.filter { (variableValues[$0] ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
+                        if !missing.isEmpty {
+                            validationErrors = Set(missing)
+                            return
+                        }
                         let nonEmpty = variableValues.filter { !$0.value.isEmpty }
                         onExecute(nonEmpty.isEmpty ? nil : nonEmpty)
                         dismiss()
