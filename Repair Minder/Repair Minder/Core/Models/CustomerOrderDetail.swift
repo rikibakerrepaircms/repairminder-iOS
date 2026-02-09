@@ -280,6 +280,11 @@ struct CustomerCompanyInfo: Codable, Sendable {
     let name: String
     let phone: String?
     let email: String?
+    let locationName: String?
+    let addressLine1: String?
+    let addressLine2: String?
+    let city: String?
+    let postcode: String?
     let logoUrl: String?
     let currencyCode: String?
     let termsConditions: String?
@@ -290,7 +295,8 @@ struct CustomerCompanyInfo: Codable, Sendable {
 
     // Note: Using automatic snake_case conversion via decoder.keyDecodingStrategy
     enum CodingKeys: String, CodingKey {
-        case name, phone, email, logoUrl, currencyCode, termsConditions
+        case name, phone, email, locationName, addressLine1, addressLine2, city, postcode
+        case logoUrl, currencyCode, termsConditions
         case collectionStorageFeeEnabled, collectionRecyclingEnabled
         case collectionStorageFeeDaily, collectionStorageFeeCap
     }
@@ -302,6 +308,11 @@ struct CustomerCompanyInfo: Codable, Sendable {
         name = try container.decode(String.self, forKey: .name)
         phone = try container.decodeIfPresent(String.self, forKey: .phone)
         email = try container.decodeIfPresent(String.self, forKey: .email)
+        locationName = try container.decodeIfPresent(String.self, forKey: .locationName)
+        addressLine1 = try container.decodeIfPresent(String.self, forKey: .addressLine1)
+        addressLine2 = try container.decodeIfPresent(String.self, forKey: .addressLine2)
+        city = try container.decodeIfPresent(String.self, forKey: .city)
+        postcode = try container.decodeIfPresent(String.self, forKey: .postcode)
         logoUrl = try container.decodeIfPresent(String.self, forKey: .logoUrl)
         currencyCode = try container.decodeIfPresent(String.self, forKey: .currencyCode)
         termsConditions = try container.decodeIfPresent(String.self, forKey: .termsConditions)
@@ -339,5 +350,11 @@ struct CustomerCompanyInfo: Codable, Sendable {
         } else {
             collectionStorageFeeCap = nil
         }
+    }
+
+    /// Formatted address string from location fields
+    var formattedAddress: String? {
+        let parts = [addressLine1, addressLine2, city, postcode].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 }

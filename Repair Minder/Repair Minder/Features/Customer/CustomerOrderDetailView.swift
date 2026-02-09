@@ -323,51 +323,88 @@ struct CustomerOrderDetailView: View {
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
 
-    // MARK: - Contact Section
+    // MARK: - Need Help Section
 
     private func contactSection(_ company: CustomerCompanyInfo) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Contact")
+            Text("Need Help?")
                 .font(.headline)
 
-            VStack(spacing: 8) {
-                if let phone = company.phone {
-                    Button {
-                        if let url = URL(string: "tel:\(phone.replacingOccurrences(of: " ", with: ""))") {
-                            UIApplication.shared.open(url)
-                        }
-                    } label: {
-                        HStack {
-                            Image(systemName: "phone.fill")
-                            Text(phone)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .foregroundStyle(.primary)
-                }
+            // Messaging prompt
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "message.fill")
+                    .foregroundStyle(.blue)
+                    .font(.subheadline)
+                    .padding(.top, 2)
 
-                if let email = company.email {
-                    Button {
-                        if let url = URL(string: "mailto:\(email)") {
-                            UIApplication.shared.open(url)
-                        }
-                    } label: {
-                        HStack {
-                            Image(systemName: "envelope.fill")
-                            Text(email)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .foregroundStyle(.primary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Send us a message above")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    Text("Messaging here doesn't interrupt our queue, which helps us turn jobs around faster.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
-            .font(.subheadline)
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.blue.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            // Location & phone fallback
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Need to reach us another way?")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    if company.locationName != nil || company.formattedAddress != nil {
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "mappin.circle.fill")
+                                .foregroundStyle(.secondary)
+                                .font(.subheadline)
+                                .frame(width: 20)
+                                .padding(.top, 1)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                if let locationName = company.locationName {
+                                    Text(locationName)
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                }
+
+                                if let address = company.formattedAddress {
+                                    Text(address)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+
+                    if let phone = company.phone {
+                        HStack(spacing: 8) {
+                            Image(systemName: "phone.fill")
+                                .foregroundStyle(.secondary)
+                                .font(.subheadline)
+                                .frame(width: 20)
+
+                            Button {
+                                if let url = URL(string: "tel:\(phone.replacingOccurrences(of: " ", with: ""))") {
+                                    UIApplication.shared.open(url)
+                                }
+                            } label: {
+                                Text(phone)
+                                    .font(.subheadline)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.systemGray6))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
         .padding()
         .background(Color(.systemBackground))
