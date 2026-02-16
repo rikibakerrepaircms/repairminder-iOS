@@ -24,6 +24,11 @@ struct CustomerLoginView: View {
         case email
     }
 
+    private static let demoAccounts: Set<String> = [
+        "appstore-demo@repairminder.com",
+        "appstore-customer@repairminder.com"
+    ]
+
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -168,6 +173,28 @@ struct CustomerLoginView: View {
                 }
             }
             .multilineTextAlignment(.center)
+
+            // Demo account hint
+            if let email = customerAuth.pendingEmail, Self.demoAccounts.contains(email.lowercased()) {
+                HStack(spacing: 8) {
+                    Image(systemName: "info.circle.fill")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Demo Account")
+                            .fontWeight(.semibold)
+                        Text("Verification code: ") + Text("123456").bold()
+                    }
+                    Spacer()
+                }
+                .font(.subheadline)
+                .foregroundStyle(.white)
+                .padding(12)
+                .background(Color.blue.opacity(0.3))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.blue.opacity(0.5), lineWidth: 1)
+                )
+            }
 
             // 6-digit code input boxes
             ZStack {

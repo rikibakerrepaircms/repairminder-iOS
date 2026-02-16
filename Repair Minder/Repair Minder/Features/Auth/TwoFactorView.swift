@@ -22,6 +22,11 @@ struct TwoFactorView: View {
 
     @FocusState private var hiddenFieldFocused: Bool
 
+    private static let demoAccounts: Set<String> = [
+        "appstore-demo@repairminder.com",
+        "appstore-customer@repairminder.com"
+    ]
+
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -95,6 +100,29 @@ struct TwoFactorView: View {
                             .onTapGesture { hiddenFieldFocused = true }
                         }
                         .padding(.horizontal, 24)
+
+                        // Demo account hint
+                        if let email = authManager.pendingEmail, Self.demoAccounts.contains(email.lowercased()) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "info.circle.fill")
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Demo Account")
+                                        .fontWeight(.semibold)
+                                    Text("Verification code: ") + Text("123456").bold()
+                                }
+                                Spacer()
+                            }
+                            .font(.subheadline)
+                            .foregroundStyle(.white)
+                            .padding(12)
+                            .background(Color.blue.opacity(0.3))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.blue.opacity(0.5), lineWidth: 1)
+                            )
+                            .padding(.horizontal, 24)
+                        }
 
                         // Error message
                         if let error = authManager.errorMessage {
