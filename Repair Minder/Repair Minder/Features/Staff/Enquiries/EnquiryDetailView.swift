@@ -488,7 +488,7 @@ struct EnquiryDetailView: View {
             }
 
             // Text input with status dropdown and send button
-            HStack(alignment: .bottom, spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
                 ZStack(alignment: .bottom) {
                     ScrollView {
                         TextField(viewModel.replyMode.placeholder, text: $viewModel.replyText, axis: .vertical)
