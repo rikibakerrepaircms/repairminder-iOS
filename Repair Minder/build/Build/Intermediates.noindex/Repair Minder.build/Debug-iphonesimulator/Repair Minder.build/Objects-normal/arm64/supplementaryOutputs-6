@@ -1,0 +1,86 @@
+{
+  "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Customer/CustomerOrderDetailView.swift" : {
+    "const-values" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/CustomerOrderDetailView.swiftconstvalues",
+    "dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/CustomerOrderDetailView.d",
+    "diagnostics" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/CustomerOrderDetailView.dia",
+    "object" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/CustomerOrderDetailView.o",
+    "swift-dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/CustomerOrderDetailView.swiftdeps"
+  },
+  "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Customer/CustomerOrderDetailViewModel.swift" : {
+    "const-values" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/CustomerOrderDetailViewModel.swiftconstvalues",
+    "dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/CustomerOrderDetailViewModel.d",
+    "diagnostics" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/CustomerOrderDetailViewModel.dia",
+    "object" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/CustomerOrderDetailViewModel.o",
+    "swift-dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/CustomerOrderDetailViewModel.swiftdeps"
+  },
+  "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Customer/CustomerOrderListView.swift" : {
+    "const-values" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/CustomerOrderListView.swiftconstvalues",
+    "dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/CustomerOrderListView.d",
+    "diagnostics" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/CustomerOrderListView.dia",
+    "object" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/CustomerOrderListView.o",
+    "swift-dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/CustomerOrderListView.swiftdeps"
+  },
+  "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Customer/CustomerOrderListViewModel.swift" : {
+    "const-values" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/CustomerOrderListViewModel.swiftconstvalues",
+    "dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/CustomerOrderListViewModel.d",
+    "diagnostics" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/CustomerOrderListViewModel.dia",
+    "object" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/CustomerOrderListViewModel.o",
+    "swift-dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/CustomerOrderListViewModel.swiftdeps"
+  },
+  "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Settings/NotificationSettingsView.swift" : {
+    "const-values" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/NotificationSettingsView.swiftconstvalues",
+    "dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/NotificationSettingsView.d",
+    "diagnostics" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/NotificationSettingsView.dia",
+    "object" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/NotificationSettingsView.o",
+    "swift-dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/NotificationSettingsView.swiftdeps"
+  },
+  "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Settings/Security/NumberPadView.swift" : {
+    "const-values" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/NumberPadView.swiftconstvalues",
+    "dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/NumberPadView.d",
+    "diagnostics" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/NumberPadView.dia",
+    "object" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/NumberPadView.o",
+    "swift-dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/NumberPadView.swiftdeps"
+  },
+  "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Settings/Security/PasscodeLockView.swift" : {
+    "const-values" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/PasscodeLockView.swiftconstvalues",
+    "dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/PasscodeLockView.d",
+    "diagnostics" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/PasscodeLockView.dia",
+    "object" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/PasscodeLockView.o",
+    "swift-dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/PasscodeLockView.swiftdeps"
+  },
+  "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Settings/Security/PasscodeLockViewModel.swift" : {
+    "const-values" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/PasscodeLockViewModel.swiftconstvalues",
+    "dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/PasscodeLockViewModel.d",
+    "diagnostics" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/PasscodeLockViewModel.dia",
+    "object" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/PasscodeLockViewModel.o",
+    "swift-dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/PasscodeLockViewModel.swiftdeps"
+  },
+  "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Settings/Security/PasscodeSettingsView.swift" : {
+    "const-values" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/PasscodeSettingsView.swiftconstvalues",
+    "dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/PasscodeSettingsView.d",
+    "diagnostics" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/PasscodeSettingsView.dia",
+    "object" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/PasscodeSettingsView.o",
+    "swift-dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/PasscodeSettingsView.swiftdeps"
+  },
+  "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Settings/Security/PasscodeSettingsViewModel.swift" : {
+    "const-values" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/PasscodeSettingsViewModel.swiftconstvalues",
+    "dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/PasscodeSettingsViewModel.d",
+    "diagnostics" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/PasscodeSettingsViewModel.dia",
+    "object" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/PasscodeSettingsViewModel.o",
+    "swift-dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/PasscodeSettingsViewModel.swiftdeps"
+  },
+  "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Settings/Security/ResetPasscodeView.swift" : {
+    "const-values" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/ResetPasscodeView.swiftconstvalues",
+    "dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/ResetPasscodeView.d",
+    "diagnostics" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/ResetPasscodeView.dia",
+    "object" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/ResetPasscodeView.o",
+    "swift-dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/ResetPasscodeView.swiftdeps"
+  },
+  "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Settings/Security/SetPasscodeView.swift" : {
+    "const-values" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/SetPasscodeView.swiftconstvalues",
+    "dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/SetPasscodeView.d",
+    "diagnostics" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/SetPasscodeView.dia",
+    "object" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/SetPasscodeView.o",
+    "swift-dependencies" : "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/build/Build/Intermediates.noindex/Repair Minder.build/Debug-iphonesimulator/Repair Minder.build/Objects-normal/arm64/SetPasscodeView.swiftdeps"
+  }
+}

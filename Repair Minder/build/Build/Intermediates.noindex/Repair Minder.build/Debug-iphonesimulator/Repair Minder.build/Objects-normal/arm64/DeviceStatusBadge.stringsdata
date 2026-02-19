@@ -1,0 +1,48 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Staff/Devices/Components/DeviceStatusBadge.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Overdue",
+        "location": {
+          "startingColumn": 15,
+          "startingLine": 108
+        }
+      },
+      {
+        "comment": "",
+        "key": "Status Badges",
+        "location": {
+          "startingColumn": 1,
+          "startingLine": 120
+        }
+      },
+      {
+        "comment": "",
+        "key": "Workflow Badges",
+        "location": {
+          "startingColumn": 1,
+          "startingLine": 120
+        }
+      },
+      {
+        "comment": "",
+        "key": "Priority Badges",
+        "location": {
+          "startingColumn": 1,
+          "startingLine": 120
+        }
+      },
+      {
+        "comment": "",
+        "key": "Overdue Badge",
+        "location": {
+          "startingColumn": 1,
+          "startingLine": 120
+        }
+      }
+    ]
+  },
+  "version": 1
+}

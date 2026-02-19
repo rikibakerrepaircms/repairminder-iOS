@@ -1,0 +1,240 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Staff/Enquiries/EnquiryListView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 41,
+          "startingLine": 86
+        }
+      },
+      {
+        "comment": "",
+        "key": "Select",
+        "location": {
+          "startingColumn": 50,
+          "startingLine": 86
+        }
+      },
+      {
+        "comment": "",
+        "key": "Deselect All",
+        "location": {
+          "startingColumn": 83,
+          "startingLine": 98
+        }
+      },
+      {
+        "comment": "",
+        "key": "Select All",
+        "location": {
+          "startingColumn": 100,
+          "startingLine": 98
+        }
+      },
+      {
+        "comment": "",
+        "key": "Sort By",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 387
+        }
+      },
+      {
+        "comment": "",
+        "key": "Type",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 421
+        }
+      },
+      {
+        "comment": "",
+        "key": "Location",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 454
+        }
+      },
+      {
+        "comment": "",
+        "key": "Workflow",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 478
+        }
+      },
+      {
+        "comment": "",
+        "key": "Search enquiries...",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 128
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pend",
+        "location": {
+          "startingColumn": 47,
+          "startingLine": 237
+        }
+      },
+      {
+        "comment": "",
+        "key": "Resolve",
+        "location": {
+          "startingColumn": 47,
+          "startingLine": 245
+        }
+      },
+      {
+        "comment": "",
+        "key": "Close",
+        "location": {
+          "startingColumn": 47,
+          "startingLine": 253
+        }
+      },
+      {
+        "comment": "",
+        "key": "Reopen",
+        "location": {
+          "startingColumn": 43,
+          "startingLine": 264
+        }
+      },
+      {
+        "comment": "",
+        "key": "Loading enquiries...",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 299
+        }
+      },
+      {
+        "comment": "",
+        "key": "Failed to load enquiries",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 311
+        }
+      },
+      {
+        "comment": "",
+        "key": "Retry",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 317
+        }
+      },
+      {
+        "comment": "",
+        "key": "No enquiries",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 332
+        }
+      },
+      {
+        "comment": "",
+        "key": "There are no enquiries matching your filters",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 334
+        }
+      },
+      {
+        "comment": "",
+        "key": "Clear Filters",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 338
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld selected",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 354
+        }
+      },
+      {
+        "comment": "",
+        "key": "All Types",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 422
+        }
+      },
+      {
+        "comment": "",
+        "key": "Clear Types",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 430
+        }
+      },
+      {
+        "comment": "",
+        "key": "All Locations",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 455
+        }
+      },
+      {
+        "comment": "",
+        "key": "Unassigned",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 458
+        }
+      },
+      {
+        "comment": "",
+        "key": "Clear Filters",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 499
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 523
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 552
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld device%@",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 596
+        }
+      },
+      {
+        "comment": "",
+        "key": " · ",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 624
+        }
+      }
+    ]
+  },
+  "version": 1
+}

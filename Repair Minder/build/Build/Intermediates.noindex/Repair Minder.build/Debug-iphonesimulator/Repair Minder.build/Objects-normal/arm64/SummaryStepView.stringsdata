@@ -1,0 +1,168 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Staff/Booking/Steps/SummaryStepView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Summary",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 16
+        }
+      },
+      {
+        "comment": "",
+        "key": "Review the booking details before proceeding.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 20
+        }
+      },
+      {
+        "comment": "",
+        "key": "No email address",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 40
+        }
+      },
+      {
+        "comment": "",
+        "key": "%@, %@",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 58
+        }
+      },
+      {
+        "comment": "",
+        "key": "Internal Notes (Optional)",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 124
+        }
+      },
+      {
+        "comment": "",
+        "key": "Staff-only notes added to the ticket. Not visible to the customer.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 127
+        }
+      },
+      {
+        "comment": "",
+        "key": "e.g. Customer mentioned they need it back by Friday",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 131
+        }
+      },
+      {
+        "comment": "",
+        "key": "Ready By (Optional)",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 145
+        }
+      },
+      {
+        "comment": "",
+        "key": "Set an expected completion date for the customer.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 148
+        }
+      },
+      {
+        "comment": "",
+        "key": "Date",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 153
+        }
+      },
+      {
+        "comment": "",
+        "key": "Time",
+        "location": {
+          "startingColumn": 21,
+          "startingLine": 164
+        }
+      },
+      {
+        "comment": "",
+        "key": "Clear ready-by date",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 176
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pre-authorisation (Optional)",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 190
+        }
+      },
+      {
+        "comment": "",
+        "key": "Set a diagnostic or assessment fee the customer agrees to upfront.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 193
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enable pre-authorisation",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 197
+        }
+      },
+      {
+        "comment": "",
+        "key": "Edit",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 249
+        }
+      },
+      {
+        "comment": "",
+        "key": "S/N: %@",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 291
+        }
+      },
+      {
+        "comment": "",
+        "key": "Find My: %@",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 313
+        }
+      },
+      {
+        "comment": "",
+        "key": "Passcode",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 316
+        }
+      },
+      {
+        "comment": "",
+        "key": "Accessories: %@",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 325
+        }
+      }
+    ]
+  },
+  "version": 1
+}

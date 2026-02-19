@@ -1,0 +1,88 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Staff/Booking/Steps/ClientStepView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Customer Details",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 16
+        }
+      },
+      {
+        "comment": "",
+        "key": "Search for an existing customer or enter new customer details.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 20
+        }
+      },
+      {
+        "comment": "",
+        "key": "Customer has no email",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 130
+        }
+      },
+      {
+        "comment": "",
+        "key": "A placeholder email will be generated",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 132
+        }
+      },
+      {
+        "comment": "",
+        "key": "Using existing customer",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 148
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld orders",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 158
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld devices",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 159
+        }
+      },
+      {
+        "comment": "",
+        "key": "Required for Buyback",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 187
+        }
+      },
+      {
+        "comment": "",
+        "key": "Address",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 183
+        }
+      },
+      {
+        "comment": "",
+        "key": "Location",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 247
+        }
+      }
+    ]
+  },
+  "version": 1
+}

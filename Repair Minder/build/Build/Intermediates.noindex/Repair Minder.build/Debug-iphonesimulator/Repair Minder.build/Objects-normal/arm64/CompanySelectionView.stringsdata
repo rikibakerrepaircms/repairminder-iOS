@@ -1,0 +1,24 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Auth/CompanySelectionView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Select a Shop",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 23
+        }
+      },
+      {
+        "comment": "",
+        "key": "You have accounts with multiple repair shops.\nChoose one to continue.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 28
+        }
+      }
+    ]
+  },
+  "version": 1
+}

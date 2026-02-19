@@ -1,0 +1,64 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Staff/Booking/Components/DeviceSearchPicker.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Device",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 25
+        }
+      },
+      {
+        "comment": "",
+        "key": "Search brand or model...",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 33
+        }
+      },
+      {
+        "comment": "",
+        "key": "Models",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 70
+        }
+      },
+      {
+        "comment": "",
+        "key": "Brands",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 98
+        }
+      },
+      {
+        "comment": "",
+        "key": "No matches found — enter custom details below",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 125
+        }
+      },
+      {
+        "comment": "",
+        "key": "Clear",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 144
+        }
+      },
+      {
+        "comment": "",
+        "key": "Select a device from search or enter a custom brand name.",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 189
+        }
+      }
+    ]
+  },
+  "version": 1
+}

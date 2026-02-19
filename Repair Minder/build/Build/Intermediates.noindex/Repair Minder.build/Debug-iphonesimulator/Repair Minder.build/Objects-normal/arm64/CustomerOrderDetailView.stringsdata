@@ -1,0 +1,248 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Customer/CustomerOrderDetailView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Order %@",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 122
+        }
+      },
+      {
+        "comment": "",
+        "key": "You pre-approved repairs up to %@",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 164
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pre-Authorized",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 158
+        }
+      },
+      {
+        "comment": "",
+        "key": "Please review the %@ below and approve or decline.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 191
+        }
+      },
+      {
+        "comment": "",
+        "key": "Action Required",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 185
+        }
+      },
+      {
+        "comment": "",
+        "key": "Review & Respond",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 197
+        }
+      },
+      {
+        "comment": "",
+        "key": "You have declined the quote. Please contact us to arrange collection of your device.",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 222
+        }
+      },
+      {
+        "comment": "",
+        "key": "Thank you! Your quote has been approved. We'll begin work shortly.",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 223
+        }
+      },
+      {
+        "comment": "",
+        "key": "Quote Declined",
+        "location": {
+          "startingColumn": 41,
+          "startingLine": 215
+        }
+      },
+      {
+        "comment": "",
+        "key": "Quote Approved",
+        "location": {
+          "startingColumn": 60,
+          "startingLine": 215
+        }
+      },
+      {
+        "comment": "",
+        "key": "Order Total",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 235
+        }
+      },
+      {
+        "comment": "",
+        "key": "Subtotal",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 240
+        }
+      },
+      {
+        "comment": "",
+        "key": "VAT",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 247
+        }
+      },
+      {
+        "comment": "",
+        "key": "Total",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 256
+        }
+      },
+      {
+        "comment": "",
+        "key": "Paid",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 265
+        }
+      },
+      {
+        "comment": "",
+        "key": "-%@",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 268
+        }
+      },
+      {
+        "comment": "",
+        "key": "Balance Due",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 274
+        }
+      },
+      {
+        "comment": "",
+        "key": "Messages",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 296
+        }
+      },
+      {
+        "comment": "",
+        "key": "Reply",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 307
+        }
+      },
+      {
+        "comment": "",
+        "key": "Need Help?",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 330
+        }
+      },
+      {
+        "comment": "",
+        "key": "Send us a message above",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 341
+        }
+      },
+      {
+        "comment": "",
+        "key": "Messaging here doesn't interrupt our queue, which helps us turn jobs around faster.",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 344
+        }
+      },
+      {
+        "comment": "",
+        "key": "Need to reach us another way?",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 356
+        }
+      },
+      {
+        "comment": "",
+        "key": "Leave a Review",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 419
+        }
+      },
+      {
+        "comment": "",
+        "key": "Happy with our service? We'd love to hear from you!",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 422
+        }
+      },
+      {
+        "comment": "",
+        "key": "Send Message",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 501
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 505
+        }
+      },
+      {
+        "comment": "",
+        "key": "Loading order...",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 522
+        }
+      },
+      {
+        "comment": "",
+        "key": "Something went wrong",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 536
+        }
+      },
+      {
+        "comment": "",
+        "key": "Try Again",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 545
+        }
+      }
+    ]
+  },
+  "version": 1
+}

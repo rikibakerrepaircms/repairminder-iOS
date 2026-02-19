@@ -1,0 +1,32 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Staff/Devices/Components/DeviceRow.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "·",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 133
+        }
+      },
+      {
+        "comment": "",
+        "key": "Full Device Row",
+        "location": {
+          "startingColumn": 1,
+          "startingLine": 262
+        }
+      },
+      {
+        "comment": "",
+        "key": "Compact Device Row",
+        "location": {
+          "startingColumn": 1,
+          "startingLine": 262
+        }
+      }
+    ]
+  },
+  "version": 1
+}

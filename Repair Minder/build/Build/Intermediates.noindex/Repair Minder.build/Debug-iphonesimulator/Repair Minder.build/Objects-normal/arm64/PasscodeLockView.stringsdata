@@ -1,0 +1,64 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Settings/Security/PasscodeLockView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Forgot Passcode?",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 67
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enter Passcode",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 25
+        }
+      },
+      {
+        "comment": "",
+        "key": "Forgot Passcode?",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 56
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 68
+        }
+      },
+      {
+        "comment": "",
+        "key": "Send Reset Email",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 69
+        }
+      },
+      {
+        "comment": "",
+        "key": "Logout",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 72
+        }
+      },
+      {
+        "comment": "",
+        "key": "We can send a reset code to your email, or you can logout and sign in again.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 76
+        }
+      }
+    ]
+  },
+  "version": 1
+}

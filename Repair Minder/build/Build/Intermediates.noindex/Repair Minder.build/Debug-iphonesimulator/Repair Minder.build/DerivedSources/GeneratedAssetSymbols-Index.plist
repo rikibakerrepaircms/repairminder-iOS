@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>colors</key>
+	<array/>
+	<key>images</key>
+	<array>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACImageNameLoginBackground</string>
+			<key>relativePath</key>
+			<string>./login_background.imageset</string>
+			<key>swiftSymbol</key>
+			<string>loginBackground</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACImageNameLoginLogo</string>
+			<key>relativePath</key>
+			<string>./login_logo.imageset</string>
+			<key>swiftSymbol</key>
+			<string>loginLogo</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACImageNameRepairminderLogo</string>
+			<key>relativePath</key>
+			<string>./repairminder_logo.imageset</string>
+			<key>swiftSymbol</key>
+			<string>repairminderLogo</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACImageNameRepairminderLogoSmall</string>
+			<key>relativePath</key>
+			<string>./repairminder_logo_small.imageset</string>
+			<key>swiftSymbol</key>
+			<string>repairminderLogoSmall</string>
+		</dict>
+	</array>
+	<key>symbols</key>
+	<array/>
+</dict>
+</plist>

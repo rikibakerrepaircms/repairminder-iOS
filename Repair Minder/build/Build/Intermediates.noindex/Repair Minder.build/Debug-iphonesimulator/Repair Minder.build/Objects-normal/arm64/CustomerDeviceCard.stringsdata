@@ -1,0 +1,168 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Customer/Components/CustomerDeviceCard.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Review %@",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 73
+        }
+      },
+      {
+        "comment": "",
+        "key": "IMEI: %@",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 117
+        }
+      },
+      {
+        "comment": "",
+        "key": "%@ Approved",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 175
+        }
+      },
+      {
+        "comment": "",
+        "key": "Ready for Collection",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 200
+        }
+      },
+      {
+        "comment": "",
+        "key": "Today: %@",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 221
+        }
+      },
+      {
+        "comment": "",
+        "key": "Google Maps",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 235
+        }
+      },
+      {
+        "comment": "",
+        "key": "Apple Maps",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 246
+        }
+      },
+      {
+        "comment": "",
+        "key": "Payment Complete",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 266
+        }
+      },
+      {
+        "comment": "",
+        "key": "Amount: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 273
+        }
+      },
+      {
+        "comment": "",
+        "key": "via %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 276
+        }
+      },
+      {
+        "comment": "",
+        "key": "Technical Report",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 296
+        }
+      },
+      {
+        "comment": "",
+        "key": "Diagnosis",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 328
+        }
+      },
+      {
+        "comment": "",
+        "key": "Device Photos",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 367
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 374
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pre-Repair Checklist",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 434
+        }
+      },
+      {
+        "comment": "",
+        "key": "Offer Details",
+        "location": {
+          "startingColumn": 37,
+          "startingLine": 482
+        }
+      },
+      {
+        "comment": "",
+        "key": "Quote Details",
+        "location": {
+          "startingColumn": 55,
+          "startingLine": 482
+        }
+      },
+      {
+        "comment": "",
+        "key": "Qty: %lld x %@",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 494
+        }
+      },
+      {
+        "comment": "",
+        "key": "Total",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 511
+        }
+      },
+      {
+        "comment": "",
+        "key": "Your Reported Issues",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 529
+        }
+      }
+    ]
+  },
+  "version": 1
+}

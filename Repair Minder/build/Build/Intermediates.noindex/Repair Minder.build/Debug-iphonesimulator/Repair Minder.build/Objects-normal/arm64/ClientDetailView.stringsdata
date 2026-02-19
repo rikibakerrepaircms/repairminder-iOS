@@ -1,0 +1,80 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Staff/Clients/ClientDetailView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Email Bounced",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 132
+        }
+      },
+      {
+        "comment": "",
+        "key": "Marketing",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 142
+        }
+      },
+      {
+        "comment": "",
+        "key": "(%lld)",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 267
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 340
+        }
+      },
+      {
+        "comment": "",
+        "key": "+ %lld more orders",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 395
+        }
+      },
+      {
+        "comment": "",
+        "key": "+ %lld more devices",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 444
+        }
+      },
+      {
+        "comment": "",
+        "key": "Loading client...",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 521
+        }
+      },
+      {
+        "comment": "",
+        "key": "Error",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 528
+        }
+      },
+      {
+        "comment": "",
+        "key": "Retry",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 532
+        }
+      }
+    ]
+  },
+  "version": 1
+}

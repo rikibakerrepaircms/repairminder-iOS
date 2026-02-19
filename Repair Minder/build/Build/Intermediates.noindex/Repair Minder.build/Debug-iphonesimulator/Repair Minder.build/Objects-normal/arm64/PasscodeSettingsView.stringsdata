@@ -1,0 +1,152 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Settings/Security/PasscodeSettingsView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Security",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 73
+        }
+      },
+      {
+        "comment": "",
+        "key": "Reset Passcode",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 79
+        }
+      },
+      {
+        "comment": "",
+        "key": "Disable Passcode Lock?",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 91
+        }
+      },
+      {
+        "comment": "",
+        "key": "Error",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 99
+        }
+      },
+      {
+        "comment": "",
+        "key": "Passcode",
+        "location": {
+          "startingColumn": 21,
+          "startingLine": 17
+        }
+      },
+      {
+        "comment": "",
+        "key": "Change Passcode",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 26
+        }
+      },
+      {
+        "comment": "",
+        "key": "Reset via Email",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 31
+        }
+      },
+      {
+        "comment": "",
+        "key": "Passcode Lock",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 22
+        }
+      },
+      {
+        "comment": "",
+        "key": "Unlock with %@ instead of passcode",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 46
+        }
+      },
+      {
+        "comment": "",
+        "key": "Require Passcode",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 64
+        }
+      },
+      {
+        "comment": "",
+        "key": "How long the app can be in the background before requiring the passcode again.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 70
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 80
+        }
+      },
+      {
+        "comment": "",
+        "key": "Send Reset Email",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 81
+        }
+      },
+      {
+        "comment": "",
+        "key": "We'll send a reset code to your registered email address.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 85
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 92
+        }
+      },
+      {
+        "comment": "",
+        "key": "Disable",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 93
+        }
+      },
+      {
+        "comment": "",
+        "key": "Your passcode will be kept but the lock screen will no longer appear.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 97
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 100
+        }
+      }
+    ]
+  },
+  "version": 1
+}

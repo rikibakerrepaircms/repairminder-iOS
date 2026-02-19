@@ -1,0 +1,464 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Staff/Devices/DeviceDetailView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Error",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 55
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 59
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 79
+        }
+      },
+      {
+        "comment": "",
+        "key": "Loading device...",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 96
+        }
+      },
+      {
+        "comment": "",
+        "key": "Error Loading Device",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 107
+        }
+      },
+      {
+        "comment": "",
+        "key": "Try Again",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 111
+        }
+      },
+      {
+        "comment": "",
+        "key": "Device",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 303
+        }
+      },
+      {
+        "comment": "",
+        "key": "Identifiers",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 392
+        }
+      },
+      {
+        "comment": "",
+        "key": "Issues",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 436
+        }
+      },
+      {
+        "comment": "",
+        "key": "Diagnosis",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 469
+        }
+      },
+      {
+        "comment": "",
+        "key": "Repair",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 527
+        }
+      },
+      {
+        "comment": "",
+        "key": "Quote Items",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 551
+        }
+      },
+      {
+        "comment": "",
+        "key": "Parts Used",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 580
+        }
+      },
+      {
+        "comment": "",
+        "key": "Accessories",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 619
+        }
+      },
+      {
+        "comment": "",
+        "key": "Photos",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 644
+        }
+      },
+      {
+        "comment": "",
+        "key": "Timeline",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 682
+        }
+      },
+      {
+        "comment": "",
+        "key": "Status",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 232
+        }
+      },
+      {
+        "comment": "",
+        "key": "Priority",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 237
+        }
+      },
+      {
+        "comment": "",
+        "key": "Workflow",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 242
+        }
+      },
+      {
+        "comment": "",
+        "key": "Assigned To",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 248
+        }
+      },
+      {
+        "comment": "",
+        "key": "Location",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 256
+        }
+      },
+      {
+        "comment": "",
+        "key": "Due",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 270
+        }
+      },
+      {
+        "comment": "",
+        "key": "Status",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 296
+        }
+      },
+      {
+        "comment": "",
+        "key": "Brand",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 350
+        }
+      },
+      {
+        "comment": "",
+        "key": "Brand",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 352
+        }
+      },
+      {
+        "comment": "",
+        "key": "Model",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 356
+        }
+      },
+      {
+        "comment": "",
+        "key": "Model",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 358
+        }
+      },
+      {
+        "comment": "",
+        "key": "Colour",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 362
+        }
+      },
+      {
+        "comment": "",
+        "key": "Storage",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 366
+        }
+      },
+      {
+        "comment": "",
+        "key": "Condition Grade",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 370
+        }
+      },
+      {
+        "comment": "",
+        "key": "Passcode Type",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 383
+        }
+      },
+      {
+        "comment": "",
+        "key": "Find My",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 375
+        }
+      },
+      {
+        "comment": "",
+        "key": "Serial Number",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 415
+        }
+      },
+      {
+        "comment": "",
+        "key": "IMEI",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 423
+        }
+      },
+      {
+        "comment": "",
+        "key": "Customer Reported",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 439
+        }
+      },
+      {
+        "comment": "",
+        "key": "Technician Found",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 448
+        }
+      },
+      {
+        "comment": "",
+        "key": "Additional Issues",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 457
+        }
+      },
+      {
+        "comment": "",
+        "key": "Yes",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 460
+        }
+      },
+      {
+        "comment": "",
+        "key": "Damage Matches Reported",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 498
+        }
+      },
+      {
+        "comment": "",
+        "key": "Visual Check",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 472
+        }
+      },
+      {
+        "comment": "",
+        "key": "Electrical Check",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 481
+        }
+      },
+      {
+        "comment": "",
+        "key": "Mechanical Check",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 490
+        }
+      },
+      {
+        "comment": "",
+        "key": "Conclusion",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 506
+        }
+      },
+      {
+        "comment": "",
+        "key": "Notes",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 515
+        }
+      },
+      {
+        "comment": "",
+        "key": "Repair Notes",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 530
+        }
+      },
+      {
+        "comment": "",
+        "key": "Technician Notes",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 539
+        }
+      },
+      {
+        "comment": "",
+        "key": "Qty: %lld × %@",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 557
+        }
+      },
+      {
+        "comment": "",
+        "key": "Total",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 568
+        }
+      },
+      {
+        "comment": "",
+        "key": "OEM",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 587
+        }
+      },
+      {
+        "comment": "",
+        "key": "·",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 601
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld photo(s)",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 645
+        }
+      },
+      {
+        "comment": "",
+        "key": "Required",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 662
+        }
+      },
+      {
+        "comment": "",
+        "key": "Checklist",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 670
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld%%",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 672
+        }
+      },
+      {
+        "comment": "",
+        "key": "Received",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 702
+        }
+      },
+      {
+        "comment": "",
+        "key": "Diagnosis Started",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 706
+        }
+      },
+      {
+        "comment": "",
+        "key": "Repair Started",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 710
+        }
+      }
+    ]
+  },
+  "version": 1
+}

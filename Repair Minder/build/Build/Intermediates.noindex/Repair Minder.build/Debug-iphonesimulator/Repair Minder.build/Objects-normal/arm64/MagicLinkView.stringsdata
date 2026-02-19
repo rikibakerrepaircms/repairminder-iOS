@@ -1,0 +1,56 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Auth/MagicLinkView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Magic Link Login",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 39
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enter your email and we'll send you\na code to sign in",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 43
+        }
+      },
+      {
+        "comment": "",
+        "key": "Email",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 52
+        }
+      },
+      {
+        "comment": "",
+        "key": "staff@example.com",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 56
+        }
+      },
+      {
+        "comment": "",
+        "key": "Send Code",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 84
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 104
+        }
+      }
+    ]
+  },
+  "version": 1
+}

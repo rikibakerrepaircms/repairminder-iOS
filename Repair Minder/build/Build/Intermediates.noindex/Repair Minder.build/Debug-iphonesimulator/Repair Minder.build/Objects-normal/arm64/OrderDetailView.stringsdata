@@ -1,0 +1,80 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Staff/Orders/OrderDetailView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Email bounced",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 229
+        }
+      },
+      {
+        "comment": "",
+        "key": "x%lld",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 307
+        }
+      },
+      {
+        "comment": "",
+        "key": "Balance Due",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 349
+        }
+      },
+      {
+        "comment": "",
+        "key": "Deposit",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 395
+        }
+      },
+      {
+        "comment": "",
+        "key": "-%@",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 449
+        }
+      },
+      {
+        "comment": "",
+        "key": "• %@",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 559
+        }
+      },
+      {
+        "comment": "",
+        "key": "Loading order...",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 587
+        }
+      },
+      {
+        "comment": "",
+        "key": "Error",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 595
+        }
+      },
+      {
+        "comment": "",
+        "key": "Retry",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 599
+        }
+      }
+    ]
+  },
+  "version": 1
+}

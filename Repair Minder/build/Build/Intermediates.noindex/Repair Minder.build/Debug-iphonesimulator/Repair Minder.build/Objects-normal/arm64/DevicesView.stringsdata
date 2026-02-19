@@ -1,0 +1,288 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Staff/Devices/DevicesView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Devices",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 85
+        }
+      },
+      {
+        "comment": "",
+        "key": "Search serial, IMEI, brand, model...",
+        "location": {
+          "startingColumn": 48,
+          "startingLine": 105
+        }
+      },
+      {
+        "comment": "",
+        "key": "This device is not associated with an order",
+        "location": {
+          "startingColumn": 47,
+          "startingLine": 51
+        }
+      },
+      {
+        "comment": "",
+        "key": "No Order",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 49
+        }
+      },
+      {
+        "comment": "",
+        "key": "Loading devices...",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 228
+        }
+      },
+      {
+        "comment": "",
+        "key": "Try adjusting your filters",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 240
+        }
+      },
+      {
+        "comment": "",
+        "key": "Devices will appear here when added to orders",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 242
+        }
+      },
+      {
+        "comment": "",
+        "key": "Clear Filters",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 246
+        }
+      },
+      {
+        "comment": "",
+        "key": "Error Loading Devices",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 257
+        }
+      },
+      {
+        "comment": "",
+        "key": "Try Again",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 261
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 285
+        }
+      },
+      {
+        "comment": "",
+        "key": "Filters",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 413
+        }
+      },
+      {
+        "comment": "",
+        "key": "Status",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 312
+        }
+      },
+      {
+        "comment": "",
+        "key": "Device Type",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 326
+        }
+      },
+      {
+        "comment": "",
+        "key": "Assigned To",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 341
+        }
+      },
+      {
+        "comment": "",
+        "key": "Location",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 357
+        }
+      },
+      {
+        "comment": "",
+        "key": "Date Range",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 371
+        }
+      },
+      {
+        "comment": "",
+        "key": "Options",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 392
+        }
+      },
+      {
+        "comment": "",
+        "key": "Status",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 313
+        }
+      },
+      {
+        "comment": "",
+        "key": "All",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 317
+        }
+      },
+      {
+        "comment": "",
+        "key": "Device Type",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 327
+        }
+      },
+      {
+        "comment": "",
+        "key": "All",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 331
+        }
+      },
+      {
+        "comment": "",
+        "key": "Engineer",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 342
+        }
+      },
+      {
+        "comment": "",
+        "key": "All",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 346
+        }
+      },
+      {
+        "comment": "",
+        "key": "Unassigned",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 347
+        }
+      },
+      {
+        "comment": "",
+        "key": "Location",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 358
+        }
+      },
+      {
+        "comment": "",
+        "key": "All",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 362
+        }
+      },
+      {
+        "comment": "",
+        "key": "Period",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 372
+        }
+      },
+      {
+        "comment": "",
+        "key": "Filter By",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 383
+        }
+      },
+      {
+        "comment": "",
+        "key": "All Time",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 376
+        }
+      },
+      {
+        "comment": "",
+        "key": "Show Archived",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 393
+        }
+      },
+      {
+        "comment": "",
+        "key": "Awaiting Collection",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 395
+        }
+      },
+      {
+        "comment": "",
+        "key": "Clear All Filters",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 404
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 417
+        }
+      },
+      {
+        "comment": "",
+        "key": "Apply",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 422
+        }
+      }
+    ]
+  },
+  "version": 1
+}

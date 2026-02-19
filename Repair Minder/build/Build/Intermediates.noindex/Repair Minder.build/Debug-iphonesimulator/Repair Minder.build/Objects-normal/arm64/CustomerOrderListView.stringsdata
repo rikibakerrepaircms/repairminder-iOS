@@ -1,0 +1,136 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Customer/CustomerOrderListView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "My Orders",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 50
+        }
+      },
+      {
+        "comment": "",
+        "key": "My Orders",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 78
+        }
+      },
+      {
+        "comment": "",
+        "key": "Action Required",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 114
+        }
+      },
+      {
+        "comment": "",
+        "key": "In Progress",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 132
+        }
+      },
+      {
+        "comment": "",
+        "key": "Completed",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 148
+        }
+      },
+      {
+        "comment": "",
+        "key": "Action Required",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 175
+        }
+      },
+      {
+        "comment": "",
+        "key": "In Progress",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 197
+        }
+      },
+      {
+        "comment": "",
+        "key": "Completed",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 217
+        }
+      },
+      {
+        "comment": "",
+        "key": "Loading orders...",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 232
+        }
+      },
+      {
+        "comment": "",
+        "key": "Something went wrong",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 246
+        }
+      },
+      {
+        "comment": "",
+        "key": "Try Again",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 255
+        }
+      },
+      {
+        "comment": "",
+        "key": "No Orders Yet",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 273
+        }
+      },
+      {
+        "comment": "",
+        "key": "When you have repair or buyback orders, they'll appear here.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 276
+        }
+      },
+      {
+        "comment": "",
+        "key": "Switch Role",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 305
+        }
+      },
+      {
+        "comment": "",
+        "key": "Logout",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 311
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 357
+        }
+      }
+    ]
+  },
+  "version": 1
+}

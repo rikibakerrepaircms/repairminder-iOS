@@ -1,0 +1,88 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Auth/TwoFactorView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Verification Code",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 53
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enter the 6-digit code sent to",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 59
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 76
+        }
+      },
+      {
+        "comment": "",
+        "key": "Demo Account",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 109
+        }
+      },
+      {
+        "comment": "",
+        "key": "Verification code: ",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 111
+        }
+      },
+      {
+        "comment": "",
+        "key": "123456",
+        "location": {
+          "startingColumn": 72,
+          "startingLine": 111
+        }
+      },
+      {
+        "comment": "",
+        "key": "Verify",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 141
+        }
+      },
+      {
+        "comment": "",
+        "key": "Resend code in %llds",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 162
+        }
+      },
+      {
+        "comment": "",
+        "key": "Resend code",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 164
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 182
+        }
+      }
+    ]
+  },
+  "version": 1
+}

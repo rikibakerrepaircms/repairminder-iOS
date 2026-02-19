@@ -1,0 +1,96 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Auth/CustomerLoginView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Back",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 87
+        }
+      },
+      {
+        "comment": "",
+        "key": "Email",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 116
+        }
+      },
+      {
+        "comment": "",
+        "key": "Send Code",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 145
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enter the 6-digit code sent to",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 165
+        }
+      },
+      {
+        "comment": "",
+        "key": "Demo Account",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 182
+        }
+      },
+      {
+        "comment": "",
+        "key": "Verification code: ",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 184
+        }
+      },
+      {
+        "comment": "",
+        "key": "123456",
+        "location": {
+          "startingColumn": 60,
+          "startingLine": 184
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 202
+        }
+      },
+      {
+        "comment": "",
+        "key": "Verify",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 240
+        }
+      },
+      {
+        "comment": "",
+        "key": "Resend code in %llds",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 259
+        }
+      },
+      {
+        "comment": "",
+        "key": "Resend code",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 261
+        }
+      }
+    ]
+  },
+  "version": 1
+}

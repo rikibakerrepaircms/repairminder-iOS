@@ -1,0 +1,256 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Customer/Components/CustomerApprovalSheet.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Error",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 84
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 79
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 85
+        }
+      },
+      {
+        "comment": "",
+        "key": "Offer Summary",
+        "location": {
+          "startingColumn": 41,
+          "startingLine": 115
+        }
+      },
+      {
+        "comment": "",
+        "key": "Quote Summary",
+        "location": {
+          "startingColumn": 59,
+          "startingLine": 115
+        }
+      },
+      {
+        "comment": "",
+        "key": "Total",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 131
+        }
+      },
+      {
+        "comment": "",
+        "key": "Already Paid",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 140
+        }
+      },
+      {
+        "comment": "",
+        "key": "-%@",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 143
+        }
+      },
+      {
+        "comment": "",
+        "key": "Balance Due",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 150
+        }
+      },
+      {
+        "comment": "",
+        "key": "Terms & Conditions",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 169
+        }
+      },
+      {
+        "comment": "",
+        "key": "We need your bank details to send your payment.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 223
+        }
+      },
+      {
+        "comment": "",
+        "key": "Account Holder Name",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 229
+        }
+      },
+      {
+        "comment": "",
+        "key": "Full name on account",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 232
+        }
+      },
+      {
+        "comment": "",
+        "key": "Sort Code",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 238
+        }
+      },
+      {
+        "comment": "",
+        "key": "00-00-00",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 241
+        }
+      },
+      {
+        "comment": "",
+        "key": "Account Number",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 250
+        }
+      },
+      {
+        "comment": "",
+        "key": "8 digits",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 253
+        }
+      },
+      {
+        "comment": "",
+        "key": "Your bank details are encrypted and only used to process your payment.",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 263
+        }
+      },
+      {
+        "comment": "",
+        "key": "Continue",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 276
+        }
+      },
+      {
+        "comment": "",
+        "key": "Back",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 286
+        }
+      },
+      {
+        "comment": "",
+        "key": "Please sign below to confirm your approval.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 320
+        }
+      },
+      {
+        "comment": "",
+        "key": "You are approving:",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 326
+        }
+      },
+      {
+        "comment": "",
+        "key": "Confirm Approval",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 359
+        }
+      },
+      {
+        "comment": "",
+        "key": "Back",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 374
+        }
+      },
+      {
+        "comment": "",
+        "key": "Please sign to confirm your decision",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 445
+        }
+      },
+      {
+        "comment": "",
+        "key": "Are you sure?",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 420
+        }
+      },
+      {
+        "comment": "",
+        "key": "If you decline, you can contact us to discuss alternatives or arrange collection of your device.",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 422
+        }
+      },
+      {
+        "comment": "",
+        "key": "Reason (optional)",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 433
+        }
+      },
+      {
+        "comment": "",
+        "key": "Confirm Decline",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 470
+        }
+      },
+      {
+        "comment": "",
+        "key": "Go Back",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 482
+        }
+      },
+      {
+        "comment": "",
+        "key": "Preview requires CustomerOrderDetail",
+        "location": {
+          "startingColumn": 1,
+          "startingLine": 506
+        }
+      }
+    ]
+  },
+  "version": 1
+}

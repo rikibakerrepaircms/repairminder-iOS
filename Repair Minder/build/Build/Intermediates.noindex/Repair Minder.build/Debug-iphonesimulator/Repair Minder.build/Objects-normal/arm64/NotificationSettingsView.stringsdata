@@ -1,0 +1,152 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Settings/NotificationSettingsView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Push Notifications",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 38
+        }
+      },
+      {
+        "comment": "",
+        "key": "Error",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 46
+        }
+      },
+      {
+        "comment": "",
+        "key": "Push Status (Debug)",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 67
+        }
+      },
+      {
+        "comment": "",
+        "key": "Orders",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 171
+        }
+      },
+      {
+        "comment": "",
+        "key": "Quotes & Payments",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 198
+        }
+      },
+      {
+        "comment": "",
+        "key": "Devices",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 225
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enquiries",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 238
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 47
+        }
+      },
+      {
+        "comment": "",
+        "key": "Re-register Token",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 100
+        }
+      },
+      {
+        "comment": "",
+        "key": "APNs Token",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 69
+        }
+      },
+      {
+        "comment": "",
+        "key": "Not received",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 76
+        }
+      },
+      {
+        "comment": "",
+        "key": "Authorization",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 83
+        }
+      },
+      {
+        "comment": "",
+        "key": "Error",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 92
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enable",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 132
+        }
+      },
+      {
+        "comment": "",
+        "key": "System Permission",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 118
+        }
+      },
+      {
+        "comment": "",
+        "key": "Push notifications are disabled at the system level. Tap Enable to open Settings.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 142
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enable Notifications",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 153
+        }
+      },
+      {
+        "comment": "",
+        "key": "Receive push notifications from Repair Minder",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 155
+        }
+      }
+    ]
+  },
+  "version": 1
+}

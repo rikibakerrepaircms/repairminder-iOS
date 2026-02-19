@@ -1,0 +1,104 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Staff/Dashboard/DashboardView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Dashboard",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 73
+        }
+      },
+      {
+        "comment": "",
+        "key": "In Progress",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 153
+        }
+      },
+      {
+        "comment": "",
+        "key": "Performance",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 176
+        }
+      },
+      {
+        "comment": "",
+        "key": "Turnaround Time",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 222
+        }
+      },
+      {
+        "comment": "",
+        "key": "Your Average",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 228
+        }
+      },
+      {
+        "comment": "",
+        "key": "-",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 236
+        }
+      },
+      {
+        "comment": "",
+        "key": "Company Average",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 247
+        }
+      },
+      {
+        "comment": "",
+        "key": "-",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 255
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enquiries",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 291
+        }
+      },
+      {
+        "comment": "",
+        "key": "Avg Response Time",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 316
+        }
+      },
+      {
+        "comment": "",
+        "key": "Company Avg",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 326
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 430
+        }
+      }
+    ]
+  },
+  "version": 1
+}

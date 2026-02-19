@@ -1,0 +1,216 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Staff/Orders/OrderListView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Search orders...",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 114
+        }
+      },
+      {
+        "comment": "",
+        "key": "Loading orders...",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 238
+        }
+      },
+      {
+        "comment": "",
+        "key": "Error",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 245
+        }
+      },
+      {
+        "comment": "",
+        "key": "Retry",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 249
+        }
+      },
+      {
+        "comment": "",
+        "key": "No Orders",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 260
+        }
+      },
+      {
+        "comment": "",
+        "key": "No orders match your filters",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 263
+        }
+      },
+      {
+        "comment": "",
+        "key": "Orders will appear here",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 265
+        }
+      },
+      {
+        "comment": "",
+        "key": "Clear Filters",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 269
+        }
+      },
+      {
+        "comment": "",
+        "key": " · ",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 345
+        }
+      },
+      {
+        "comment": "",
+        "key": "Filters",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 522
+        }
+      },
+      {
+        "comment": "",
+        "key": "Status",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 462
+        }
+      },
+      {
+        "comment": "",
+        "key": "Payment",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 473
+        }
+      },
+      {
+        "comment": "",
+        "key": "Location",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 485
+        }
+      },
+      {
+        "comment": "",
+        "key": "Assigned To",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 498
+        }
+      },
+      {
+        "comment": "",
+        "key": "Order Status",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 463
+        }
+      },
+      {
+        "comment": "",
+        "key": "All",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 464
+        }
+      },
+      {
+        "comment": "",
+        "key": "Payment Status",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 474
+        }
+      },
+      {
+        "comment": "",
+        "key": "All",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 475
+        }
+      },
+      {
+        "comment": "",
+        "key": "Location",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 486
+        }
+      },
+      {
+        "comment": "",
+        "key": "All Locations",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 487
+        }
+      },
+      {
+        "comment": "",
+        "key": "Technician",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 499
+        }
+      },
+      {
+        "comment": "",
+        "key": "Anyone",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 500
+        }
+      },
+      {
+        "comment": "",
+        "key": "Unassigned",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 501
+        }
+      },
+      {
+        "comment": "",
+        "key": "Clear All Filters",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 513
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 526
+        }
+      },
+      {
+        "comment": "",
+        "key": "Apply",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 532
+        }
+      }
+    ]
+  },
+  "version": 1
+}

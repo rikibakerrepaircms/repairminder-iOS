@@ -1,0 +1,152 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Staff/Enquiries/Components/MacroPickerSheet.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Search macros",
+        "location": {
+          "startingColumn": 52,
+          "startingLine": 75
+        }
+      },
+      {
+        "comment": "",
+        "key": "Select Macro",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 76
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 80
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 159
+        }
+      },
+      {
+        "comment": "",
+        "key": "Email",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 175
+        }
+      },
+      {
+        "comment": "",
+        "key": "Note",
+        "location": {
+          "startingColumn": 56,
+          "startingLine": 175
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancels on reply",
+        "location": {
+          "startingColumn": 52,
+          "startingLine": 184
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pauses on reply",
+        "location": {
+          "startingColumn": 73,
+          "startingLine": 184
+        }
+      },
+      {
+        "comment": "",
+        "key": "Initial Action",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 218
+        }
+      },
+      {
+        "comment": "",
+        "key": "Follow-up Stages",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 242
+        }
+      },
+      {
+        "comment": "",
+        "key": "When Customer Replies",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 253
+        }
+      },
+      {
+        "comment": "",
+        "key": "Subject: %@",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 228
+        }
+      },
+      {
+        "comment": "",
+        "key": "Send Email",
+        "location": {
+          "startingColumn": 59,
+          "startingLine": 223
+        }
+      },
+      {
+        "comment": "",
+        "key": "Add Note",
+        "location": {
+          "startingColumn": 74,
+          "startingLine": 223
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 265
+        }
+      },
+      {
+        "comment": "",
+        "key": "Execute",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 270
+        }
+      },
+      {
+        "comment": "",
+        "key": "Stage %lld",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 288
+        }
+      },
+      {
+        "comment": "",
+        "key": "•",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 291
+        }
+      }
+    ]
+  },
+  "version": 1
+}

@@ -1,0 +1,176 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Repair_MinderApp.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Loading...",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 248
+        }
+      },
+      {
+        "comment": "",
+        "key": "Dashboard",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 276
+        }
+      },
+      {
+        "comment": "",
+        "key": "My Queue",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 282
+        }
+      },
+      {
+        "comment": "",
+        "key": "Orders",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 293
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enquiries",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 304
+        }
+      },
+      {
+        "comment": "",
+        "key": "More",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 310
+        }
+      },
+      {
+        "comment": "",
+        "key": "Use %@?",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 444
+        }
+      },
+      {
+        "comment": "",
+        "key": "Set up later",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 437
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enable",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 445
+        }
+      },
+      {
+        "comment": "",
+        "key": "Not Now",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 449
+        }
+      },
+      {
+        "comment": "",
+        "key": "Unlock Repair Minder with %@ instead of entering your passcode each time.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 453
+        }
+      },
+      {
+        "comment": "",
+        "key": "Account Status",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 501
+        }
+      },
+      {
+        "comment": "",
+        "key": "Limited Access",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 473
+        }
+      },
+      {
+        "comment": "",
+        "key": "Please wait for your account to be verified by our team. You will receive an email once approved.",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 484
+        }
+      },
+      {
+        "comment": "",
+        "key": "Logout",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 491
+        }
+      },
+      {
+        "comment": "",
+        "key": "Terms Required",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 583
+        }
+      },
+      {
+        "comment": "",
+        "key": "Updated Terms",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 524
+        }
+      },
+      {
+        "comment": "",
+        "key": "Our platform terms have been updated. Please review and accept the updated terms on the web app to continue using Repair Minder.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 528
+        }
+      },
+      {
+        "comment": "",
+        "key": "Log Out",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 573
+        }
+      },
+      {
+        "comment": "",
+        "key": "Open Repair Minder Web",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 537
+        }
+      },
+      {
+        "comment": "",
+        "key": "I've Accepted — Continue",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 560
+        }
+      }
+    ]
+  },
+  "version": 1
+}

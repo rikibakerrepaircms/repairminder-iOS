@@ -1,0 +1,128 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Staff/Clients/ClientListView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Clients",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 102
+        }
+      },
+      {
+        "comment": "",
+        "key": "Search clients...",
+        "location": {
+          "startingColumn": 113,
+          "startingLine": 103
+        }
+      },
+      {
+        "comment": "",
+        "key": "Settings",
+        "location": {
+          "startingColumn": 46,
+          "startingLine": 66
+        }
+      },
+      {
+        "comment": "",
+        "key": "Choose a client from the list to view their details.",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 82
+        }
+      },
+      {
+        "comment": "",
+        "key": "Select a Client",
+        "location": {
+          "startingColumn": 21,
+          "startingLine": 80
+        }
+      },
+      {
+        "comment": "",
+        "key": "Loading clients...",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 162
+        }
+      },
+      {
+        "comment": "",
+        "key": "Error",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 169
+        }
+      },
+      {
+        "comment": "",
+        "key": "Retry",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 173
+        }
+      },
+      {
+        "comment": "",
+        "key": "No Clients",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 184
+        }
+      },
+      {
+        "comment": "",
+        "key": "No clients match your search",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 187
+        }
+      },
+      {
+        "comment": "",
+        "key": "Clients will appear here",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 189
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld order%@",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 253
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld device%@",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 254
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 322
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 323
+        }
+      }
+    ]
+  },
+  "version": 1
+}

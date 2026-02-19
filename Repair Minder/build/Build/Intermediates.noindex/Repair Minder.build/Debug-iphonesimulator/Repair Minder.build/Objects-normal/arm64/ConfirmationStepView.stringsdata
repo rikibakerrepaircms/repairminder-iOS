@@ -1,0 +1,40 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Staff/Booking/Steps/ConfirmationStepView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Booking Complete!",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 33
+        }
+      },
+      {
+        "comment": "",
+        "key": "View Order",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 89
+        }
+      },
+      {
+        "comment": "",
+        "key": "New Booking",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 106
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 120
+        }
+      }
+    ]
+  },
+  "version": 1
+}

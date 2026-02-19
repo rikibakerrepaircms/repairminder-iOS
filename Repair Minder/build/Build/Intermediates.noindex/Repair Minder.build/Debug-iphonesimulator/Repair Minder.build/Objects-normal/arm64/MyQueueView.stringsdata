@@ -1,0 +1,32 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Staff/Dashboard/MyQueueView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Search devices...",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 108
+        }
+      },
+      {
+        "comment": "",
+        "key": "Clear Filters",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 215
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 254
+        }
+      }
+    ]
+  },
+  "version": 1
+}

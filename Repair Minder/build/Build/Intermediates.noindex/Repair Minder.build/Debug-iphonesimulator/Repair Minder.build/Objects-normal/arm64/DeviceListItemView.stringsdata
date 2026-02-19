@@ -1,0 +1,16 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Staff/Booking/Components/DeviceListItemView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "%lld accessor%@",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 64
+        }
+      }
+    ]
+  },
+  "version": 1
+}

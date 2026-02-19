@@ -159,7 +159,8 @@ struct EnquiryDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             // Subject
             Text(ticket.subject)
-                .font(.headline)
+                .font(isRegularWidth ? .headline : .subheadline.weight(.semibold))
+                .lineLimit(2)
 
             // Client info
             HStack {
@@ -171,6 +172,7 @@ struct EnquiryDetailView: View {
                     Text(ticket.client?.email ?? "")
                         .font(.caption)
                         .foregroundColor(.secondary)
+                        .lineLimit(1)
                 }
                 Spacer()
 
@@ -244,6 +246,7 @@ struct EnquiryDetailView: View {
             }
         }
         .padding()
+        .padding(.top, isRegularWidth ? 0 : 4)
         .background(Color(.secondarySystemGroupedBackground))
     }
 
@@ -297,11 +300,12 @@ struct EnquiryDetailView: View {
     // MARK: - Reply Composer
 
     /// Text area height based on state: compact → focused → expanded
+    /// Uses fixed values on compact screens to ensure send button stays visible above keyboard
     private var textAreaHeight: CGFloat {
         if isReplyExpanded {
-            return isRegularWidth ? 350 : UIScreen.main.bounds.height * 0.65
+            return isRegularWidth ? 350 : 200
         } else if isReplyFocused {
-            return isRegularWidth ? 200 : UIScreen.main.bounds.height * 0.35
+            return isRegularWidth ? 200 : 120
         } else {
             return 48
         }

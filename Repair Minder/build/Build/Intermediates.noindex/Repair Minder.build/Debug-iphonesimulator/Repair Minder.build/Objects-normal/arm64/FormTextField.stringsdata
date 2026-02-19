@@ -1,0 +1,16 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Staff/Booking/Components/FormTextField.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "*",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 24
+        }
+      }
+    ]
+  },
+  "version": 1
+}

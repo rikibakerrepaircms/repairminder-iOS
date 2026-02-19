@@ -1,0 +1,144 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Settings/SettingsView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Logout",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 41
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 42
+        }
+      },
+      {
+        "comment": "",
+        "key": "Logout",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 43
+        }
+      },
+      {
+        "comment": "",
+        "key": "Are you sure you want to logout?",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 50
+        }
+      },
+      {
+        "comment": "",
+        "key": "More",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 102
+        }
+      },
+      {
+        "comment": "",
+        "key": "Notifications",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 189
+        }
+      },
+      {
+        "comment": "",
+        "key": "Security",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 197
+        }
+      },
+      {
+        "comment": "",
+        "key": "Appearance",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 230
+        }
+      },
+      {
+        "comment": "",
+        "key": "About",
+        "location": {
+          "startingColumn": 17,
+          "startingLine": 248
+        }
+      },
+      {
+        "comment": "",
+        "key": "Company",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 169
+        }
+      },
+      {
+        "comment": "",
+        "key": "Theme",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 240
+        }
+      },
+      {
+        "comment": "",
+        "key": "Version",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 250
+        }
+      },
+      {
+        "comment": "",
+        "key": "Build",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 257
+        }
+      },
+      {
+        "comment": "",
+        "key": "Currency",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 265
+        }
+      },
+      {
+        "comment": "",
+        "key": "Privacy Policy",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 273
+        }
+      },
+      {
+        "comment": "",
+        "key": "Terms of Service",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 277
+        }
+      },
+      {
+        "comment": "",
+        "key": "Logout",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 289
+        }
+      }
+    ]
+  },
+  "version": 1
+}

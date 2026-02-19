@@ -1,0 +1,160 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Staff/Scanner/ScannerView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Scan Device",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 48
+        }
+      },
+      {
+        "comment": "",
+        "key": "Close",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 52
+        }
+      },
+      {
+        "comment": "",
+        "key": "This device is not associated with an order",
+        "location": {
+          "startingColumn": 43,
+          "startingLine": 76
+        }
+      },
+      {
+        "comment": "",
+        "key": "No Order",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 74
+        }
+      },
+      {
+        "comment": "",
+        "key": "Point camera at barcode",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 118
+        }
+      },
+      {
+        "comment": "",
+        "key": "Searching...",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 139
+        }
+      },
+      {
+        "comment": "",
+        "key": "Scan Again",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 197
+        }
+      },
+      {
+        "comment": "",
+        "key": "View Device",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 205
+        }
+      },
+      {
+        "comment": "",
+        "key": "Not Found",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 227
+        }
+      },
+      {
+        "comment": "",
+        "key": "Try Again",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 240
+        }
+      },
+      {
+        "comment": "",
+        "key": "Scanned",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 260
+        }
+      },
+      {
+        "comment": "",
+        "key": "Open Settings",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 293
+        }
+      },
+      {
+        "comment": "",
+        "key": "Camera Access Required",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 285
+        }
+      },
+      {
+        "comment": "",
+        "key": "Please enable camera access in Settings to scan barcodes",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 287
+        }
+      },
+      {
+        "comment": "",
+        "key": "Manual Entry",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 316
+        }
+      },
+      {
+        "comment": "",
+        "key": "Serial number or IMEI",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 309
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enter the device serial number or IMEI to search",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 313
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 320
+        }
+      },
+      {
+        "comment": "",
+        "key": "Search",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 325
+        }
+      }
+    ]
+  },
+  "version": 1
+}

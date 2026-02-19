@@ -1,0 +1,216 @@
+{
+  "source": "/Volumes/Riki Repos/repairminder-iOS/repairminder-iOS/Repair Minder/Repair Minder/Features/Staff/Booking/Components/DeviceEntryFormView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Edit Device",
+        "location": {
+          "startingColumn": 45,
+          "startingLine": 37
+        }
+      },
+      {
+        "comment": "",
+        "key": "Add Device",
+        "location": {
+          "startingColumn": 61,
+          "startingLine": 37
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 40
+        }
+      },
+      {
+        "comment": "",
+        "key": "Device Type",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 63
+        }
+      },
+      {
+        "comment": "",
+        "key": "Identification",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 93
+        }
+      },
+      {
+        "comment": "",
+        "key": "Security",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 130
+        }
+      },
+      {
+        "comment": "",
+        "key": "Passcode Type",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 137
+        }
+      },
+      {
+        "comment": "",
+        "key": "Passcode Type",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 141
+        }
+      },
+      {
+        "comment": "",
+        "key": "Find My Status",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 162
+        }
+      },
+      {
+        "comment": "",
+        "key": "Find My",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 166
+        }
+      },
+      {
+        "comment": "",
+        "key": "Condition",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 177
+        }
+      },
+      {
+        "comment": "",
+        "key": "Condition Grade",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 183
+        }
+      },
+      {
+        "comment": "",
+        "key": "Condition",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 187
+        }
+      },
+      {
+        "comment": "",
+        "key": "Customer Reported Issues",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 199
+        }
+      },
+      {
+        "comment": "",
+        "key": "Accessories Included",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 214
+        }
+      },
+      {
+        "comment": "",
+        "key": "Add",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 222
+        }
+      },
+      {
+        "comment": "",
+        "key": "Type",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 230
+        }
+      },
+      {
+        "comment": "",
+        "key": "Description (optional)",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 240
+        }
+      },
+      {
+        "comment": "",
+        "key": "Charger",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 231
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cable",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 232
+        }
+      },
+      {
+        "comment": "",
+        "key": "Case",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 233
+        }
+      },
+      {
+        "comment": "",
+        "key": "SIM Card",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 234
+        }
+      },
+      {
+        "comment": "",
+        "key": "Box",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 235
+        }
+      },
+      {
+        "comment": "",
+        "key": "Other",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 236
+        }
+      },
+      {
+        "comment": "",
+        "key": "Update Device",
+        "location": {
+          "startingColumn": 45,
+          "startingLine": 258
+        }
+      },
+      {
+        "comment": "",
+        "key": "Add Device",
+        "location": {
+          "startingColumn": 63,
+          "startingLine": 258
+        }
+      }
+    ]
+  },
+  "version": 1
+}

@@ -1,0 +1,27 @@
+//
+//  Base.xcconfig
+//  Repair Minder
+//
+//  Shared build settings for all brands
+//
+
+// Swift and iOS Settings
+SWIFT_VERSION = 5.9
+IPHONEOS_DEPLOYMENT_TARGET = 17.0
+TARGETED_DEVICE_FAMILY = 1,2
+ENABLE_BITCODE = NO
+
+// Swift Compiler Settings
+SWIFT_STRICT_CONCURRENCY = complete
+SWIFT_EMIT_LOC_STRINGS = YES
+
+// Asset Settings
+ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
+
+// Code Signing (to be overridden per configuration)
+CODE_SIGN_STYLE = Automatic
+
+// Build Options
+GCC_TREAT_WARNINGS_AS_ERRORS = NO
+SWIFT_TREAT_WARNINGS_AS_ERRORS = NO
