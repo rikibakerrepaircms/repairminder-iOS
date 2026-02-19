@@ -15,6 +15,9 @@ final class OrderDetailViewModel: ObservableObject {
     @Published private(set) var order: Order?
     @Published private(set) var isLoading = false
     @Published private(set) var error: String?
+    @Published private(set) var isSavingItem = false
+    @Published private(set) var isDeletingItem = false
+    @Published private(set) var itemError: String?
 
     // MARK: - Private
 
@@ -30,6 +33,12 @@ final class OrderDetailViewModel: ObservableObject {
 
     // MARK: - Public Methods
 
+    /// Whether the order can be edited (not collected/despatched)
+    var isOrderEditable: Bool {
+        guard let order else { return false }
+        return order.status != .collectedDespatched
+    }
+
     /// Load order details
     func loadOrder() async {
         guard !isLoading else { return }
@@ -38,8 +47,8 @@ final class OrderDetailViewModel: ObservableObject {
         error = nil
 
         do {
-            let order = try await fetchOrder()
-            self.order = order
+            let fetchedOrder: Order = try await apiClient.request(.order(id: orderId))
+            self.order = fetchedOrder
         } catch {
             self.error = error.localizedDescription
         }
@@ -50,71 +59,78 @@ final class OrderDetailViewModel: ObservableObject {
     /// Refresh order details
     func refresh() async {
         do {
-            let order = try await fetchOrder()
-            self.order = order
+            let fetchedOrder: Order = try await apiClient.request(.order(id: orderId))
+            self.order = fetchedOrder
             error = nil
         } catch {
             self.error = error.localizedDescription
         }
     }
 
-    // MARK: - Private Methods
-
-    private func fetchOrder() async throws -> Order {
-        let url = URL(string: "https://api.repairminder.com/api/orders/\(orderId)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        if let token = apiClient.tokenProvider?.accessToken {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw APIError.httpError(statusCode: (response as? HTTPURLResponse)?.statusCode ?? 500, message: nil)
-        }
-
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-
-        let apiResponse: OrderDetailAPIResponse
+    /// Add a new line item. Returns true on success.
+    func createItem(_ request: OrderItemRequest) async -> Bool {
+        isSavingItem = true
+        itemError = nil
+        defer { isSavingItem = false }
         do {
-            apiResponse = try decoder.decode(OrderDetailAPIResponse.self, from: data)
+            let _: OrderItem = try await apiClient.request(
+                .createOrderItem(orderId: orderId),
+                body: request
+            )
+            await refresh()
+            return true
+        } catch let apiError as APIError {
+            itemError = apiError.localizedDescription
+            return false
         } catch {
-            #if DEBUG
-            if let decodingError = error as? DecodingError {
-                switch decodingError {
-                case .keyNotFound(let key, let context):
-                    print("❌ ORDER DECODE - Key not found: '\(key.stringValue)' at path: \(context.codingPath.map(\.stringValue).joined(separator: "."))")
-                case .typeMismatch(let type, let context):
-                    print("❌ ORDER DECODE - Type mismatch: expected \(type) at path: \(context.codingPath.map(\.stringValue).joined(separator: ".")) - \(context.debugDescription)")
-                case .valueNotFound(let type, let context):
-                    print("❌ ORDER DECODE - Value not found: \(type) at path: \(context.codingPath.map(\.stringValue).joined(separator: ".")) - \(context.debugDescription)")
-                case .dataCorrupted(let context):
-                    print("❌ ORDER DECODE - Data corrupted at path: \(context.codingPath.map(\.stringValue).joined(separator: ".")) - \(context.debugDescription)")
-                @unknown default:
-                    print("❌ ORDER DECODE - Unknown: \(decodingError)")
-                }
-            }
-            #endif
-            throw error
+            itemError = error.localizedDescription
+            return false
         }
-
-        guard apiResponse.success, let order = apiResponse.data else {
-            throw APIError.serverError(message: apiResponse.error ?? "Unknown error", code: nil)
-        }
-
-        return order
     }
-}
 
-// MARK: - API Response Type
+    /// Update an existing line item. Returns true on success.
+    func updateItem(itemId: String, request: OrderItemRequest) async -> Bool {
+        isSavingItem = true
+        itemError = nil
+        defer { isSavingItem = false }
+        do {
+            let _: OrderItem = try await apiClient.request(
+                .updateOrderItem(orderId: orderId, itemId: itemId),
+                body: request
+            )
+            await refresh()
+            return true
+        } catch let apiError as APIError {
+            itemError = apiError.localizedDescription
+            return false
+        } catch {
+            itemError = error.localizedDescription
+            return false
+        }
+    }
 
-private struct OrderDetailAPIResponse: Decodable {
-    let success: Bool
-    let data: Order?
-    let error: String?
+    /// Delete a line item. Returns true on success.
+    func deleteItem(itemId: String) async -> Bool {
+        isDeletingItem = true
+        itemError = nil
+        defer { isDeletingItem = false }
+        do {
+            try await apiClient.requestVoid(
+                .deleteOrderItem(orderId: orderId, itemId: itemId)
+            )
+            await refresh()
+            return true
+        } catch let apiError as APIError {
+            itemError = apiError.localizedDescription
+            return false
+        } catch {
+            itemError = error.localizedDescription
+            return false
+        }
+    }
+
+    /// Clear item error (called from view alert dismiss)
+    func clearItemError() {
+        itemError = nil
+    }
 }

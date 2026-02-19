@@ -10,6 +10,10 @@ import SwiftUI
 struct OrderDetailView: View {
     @StateObject private var viewModel: OrderDetailViewModel
     @State private var selectedClientId: String?
+    @State private var showItemFormSheet = false
+    @State private var editingItem: OrderItem?
+    @State private var itemToDelete: OrderItem?
+    @State private var showDeleteConfirmation = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var isRegularWidth: Bool {
@@ -60,7 +64,9 @@ struct OrderDetailView: View {
 
                 // Items section
                 if let items = order.items, !items.isEmpty {
-                    itemsSection(items)
+                    itemsSection(items, order: order)
+                } else if viewModel.isOrderEditable {
+                    emptyItemsSection()
                 }
 
                 // Totals section
@@ -99,6 +105,42 @@ struct OrderDetailView: View {
         }
         .refreshable {
             await viewModel.refresh()
+        }
+        .sheet(isPresented: $showItemFormSheet) {
+            if let order = viewModel.order {
+                OrderItemFormSheet(
+                    order: order,
+                    editingItem: editingItem
+                ) { request in
+                    if let item = editingItem {
+                        return await viewModel.updateItem(itemId: item.id, request: request)
+                    } else {
+                        return await viewModel.createItem(request)
+                    }
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
+        }
+        .alert("Delete Item", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                if let item = itemToDelete {
+                    Task { _ = await viewModel.deleteItem(itemId: item.id) }
+                }
+            }
+        } message: {
+            if let item = itemToDelete {
+                Text("Are you sure you want to delete \"\(item.description)\"? This cannot be undone.")
+            }
+        }
+        .alert("Error", isPresented: Binding(
+            get: { viewModel.itemError != nil },
+            set: { if !$0 { viewModel.clearItemError() } }
+        )) {
+            Button("OK") { }
+        } message: {
+            Text(viewModel.itemError ?? "")
         }
     }
 
@@ -281,41 +323,130 @@ struct OrderDetailView: View {
 
     // MARK: - Items Section
 
-    private func itemsSection(_ items: [OrderItem]) -> some View {
+    private func itemsSection(_ items: [OrderItem], order: Order) -> some View {
         SectionCard(title: "Items", icon: "list.bullet") {
-            VStack(spacing: 8) {
-                ForEach(items) { item in
+            VStack(spacing: 0) {
+                // "Add Item" button — top right, only when editable
+                if viewModel.isOrderEditable {
                     HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.description)
+                        Spacer()
+                        Button {
+                            editingItem = nil
+                            showItemFormSheet = true
+                        } label: {
+                            Label("Add Item", systemImage: "plus.circle.fill")
                                 .font(.subheadline)
+                                .fontWeight(.medium)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    }
+                    .padding(.bottom, 8)
+                }
 
-                            if let type = item.itemType {
-                                Text(type.label)
+                // Item rows
+                ForEach(items) { item in
+                    VStack(spacing: 0) {
+                        HStack(alignment: .top) {
+                            // Left column: description + type badge + auth status
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.description)
+                                    .font(.subheadline)
+
+                                HStack(spacing: 6) {
+                                    if let type = item.itemType {
+                                        Label(type.label, systemImage: type.icon)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    if let status = item.authorizationStatus {
+                                        Text(status.capitalized)
+                                            .font(.caption2)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(authorizationColor(status).opacity(0.15))
+                                            .foregroundStyle(authorizationColor(status))
+                                            .clipShape(Capsule())
+                                    }
+                                }
+                            }
+
+                            Spacer(minLength: 12)
+
+                            // Right column: total + qty breakdown
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text(item.formattedLineTotal)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Text("x\(item.quantity) @ \(item.formattedUnitPrice)")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
+
+                            // Context menu (edit/delete) — only when editable
+                            if viewModel.isOrderEditable {
+                                Menu {
+                                    Button {
+                                        editingItem = item
+                                        showItemFormSheet = true
+                                    } label: {
+                                        Label("Edit", systemImage: "pencil")
+                                    }
+                                    Button(role: .destructive) {
+                                        itemToDelete = item
+                                        showDeleteConfirmation = true
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                } label: {
+                                    Image(systemName: "ellipsis.circle")
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 32, height: 32)
+                                }
+                            }
                         }
+                        .padding(.vertical, 8)
 
-                        Spacer()
-
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(item.formattedLineTotal)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-
-                            Text("x\(item.quantity)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        if item.id != items.last?.id {
+                            Divider()
                         }
-                    }
-                    .padding(.vertical, 4)
-
-                    if item.id != items.last?.id {
-                        Divider()
                     }
                 }
             }
+        }
+    }
+
+    private func emptyItemsSection() -> some View {
+        SectionCard(title: "Items", icon: "list.bullet") {
+            VStack(spacing: 12) {
+                Image(systemName: "list.bullet.rectangle")
+                    .font(.title2)
+                    .foregroundStyle(.secondary)
+                Text("No items added yet")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Button {
+                    editingItem = nil
+                    showItemFormSheet = true
+                } label: {
+                    Label("Add First Item", systemImage: "plus.circle.fill")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+        }
+    }
+
+    private func authorizationColor(_ status: String) -> Color {
+        switch status.lowercased() {
+        case "approved": .green
+        case "pending": .orange
+        case "declined", "rejected": .red
+        default: .secondary
         }
     }
 

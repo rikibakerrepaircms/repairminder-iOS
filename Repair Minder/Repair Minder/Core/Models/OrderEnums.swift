@@ -11,6 +11,9 @@ import SwiftUI
 
 /// Order status - auto-calculated from device statuses, read-only in iOS
 enum OrderStatus: String, Codable, CaseIterable, Sendable {
+    case pending
+    case onHold = "on_hold"
+    case cancelled
     case awaitingDevice = "awaiting_device"
     case inProgress = "in_progress"
     case serviceComplete = "service_complete"
@@ -19,6 +22,9 @@ enum OrderStatus: String, Codable, CaseIterable, Sendable {
 
     var label: String {
         switch self {
+        case .pending: return "Pending"
+        case .onHold: return "On Hold"
+        case .cancelled: return "Cancelled"
         case .awaitingDevice: return "Awaiting Device"
         case .inProgress: return "In Progress"
         case .serviceComplete: return "Service Complete"
@@ -29,6 +35,9 @@ enum OrderStatus: String, Codable, CaseIterable, Sendable {
 
     var shortLabel: String {
         switch self {
+        case .pending: return "Pending"
+        case .onHold: return "On Hold"
+        case .cancelled: return "Cancelled"
         case .awaitingDevice: return "Awaiting"
         case .inProgress: return "In Progress"
         case .serviceComplete: return "Complete"
@@ -39,6 +48,9 @@ enum OrderStatus: String, Codable, CaseIterable, Sendable {
 
     var color: Color {
         switch self {
+        case .pending: return .yellow
+        case .onHold: return .red
+        case .cancelled: return .gray
         case .awaitingDevice: return .gray
         case .inProgress: return .blue
         case .serviceComplete: return .purple
@@ -53,6 +65,9 @@ enum OrderStatus: String, Codable, CaseIterable, Sendable {
 
     var icon: String {
         switch self {
+        case .pending: return "clock.badge.questionmark"
+        case .onHold: return "exclamationmark.triangle"
+        case .cancelled: return "xmark.circle"
         case .awaitingDevice: return "clock"
         case .inProgress: return "wrench.and.screwdriver"
         case .serviceComplete: return "checkmark.circle"
@@ -110,6 +125,7 @@ enum IntakeMethod: String, Codable, CaseIterable, Sendable {
     case courier
     case counterSale = "counter_sale"
     case accessoriesInStore = "accessories_in_store"
+    case online
 
     var label: String {
         switch self {
@@ -118,6 +134,7 @@ enum IntakeMethod: String, Codable, CaseIterable, Sendable {
         case .courier: return "Courier"
         case .counterSale: return "Counter Sale"
         case .accessoriesInStore: return "Accessories In-Store"
+        case .online: return "Online"
         }
     }
 
@@ -128,6 +145,7 @@ enum IntakeMethod: String, Codable, CaseIterable, Sendable {
         case .courier: return "shippingbox"
         case .counterSale: return "cart"
         case .accessoriesInStore: return "bag"
+        case .online: return "globe"
         }
     }
 }
@@ -206,12 +224,20 @@ enum OrderItemType: String, Codable, CaseIterable, Sendable {
     case part
     case labour
     case labor
+    case repair
+    case deviceSale = "device_sale"
+    case accessory
+    case devicePurchase = "device_purchase"
     case other
 
     var label: String {
         switch self {
         case .part: return "Part"
         case .labour, .labor: return "Labour"
+        case .repair: return "Repair"
+        case .deviceSale: return "Device Sale"
+        case .accessory: return "Accessory"
+        case .devicePurchase: return "Device Purchase"
         case .other: return "Other"
         }
     }
@@ -220,6 +246,10 @@ enum OrderItemType: String, Codable, CaseIterable, Sendable {
         switch self {
         case .part: return "cpu"
         case .labour, .labor: return "wrench.and.screwdriver"
+        case .repair: return "wrench.and.screwdriver"
+        case .deviceSale: return "iphone"
+        case .accessory: return "bag"
+        case .devicePurchase: return "cart"
         case .other: return "ellipsis.circle"
         }
     }

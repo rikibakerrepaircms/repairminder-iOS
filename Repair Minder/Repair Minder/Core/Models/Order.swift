@@ -476,6 +476,23 @@ struct OrderNote: Decodable, Equatable, Sendable {
     let deviceName: String?
 }
 
+// MARK: - Order Item Request
+
+/// Encodable request body for creating or updating an order line item.
+/// Property names are camelCase; APIClient's encoder converts to snake_case.
+struct OrderItemRequest: Encodable {
+    var itemType: String        // "repair", "device_sale", "accessory", "device_purchase"
+    var description: String
+    var quantity: Int
+    var unitPrice: Double       // Net (ex VAT) — calculated from VAT-inclusive input
+    var priceIncVat: Double?    // VAT-inclusive — sent for accurate server-side VAT calc
+    var vatRate: Double?        // Omit to use company default
+    var deviceId: String?
+    var isWarrantyItem: Bool?
+    var warrantyNotes: String?
+    var productTypeId: String?
+}
+
 // MARK: - Currency Formatter
 
 enum CurrencyFormatter {
