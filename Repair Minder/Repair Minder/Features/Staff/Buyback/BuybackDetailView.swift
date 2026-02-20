@@ -9,6 +9,7 @@ import SwiftUI
 
 struct BuybackDetailView: View {
     @StateObject private var viewModel: BuybackDetailViewModel
+    @State private var showPurchasePrice = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var isRegularWidth: Bool {
@@ -30,7 +31,9 @@ struct BuybackDetailView: View {
             }
         }
         .navigationTitle(viewModel.buyback?.deviceDisplayName ?? "Device")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .task { await viewModel.loadDetail() }
     }
 
@@ -91,7 +94,8 @@ struct BuybackDetailView: View {
     private func costSummarySection(_ buyback: BuybackDetail) -> some View {
         SectionCard(title: "Cost Summary", icon: "sterlingsign.circle") {
             VStack(spacing: 8) {
-                costRow("Purchase", value: buyback.formattedPurchaseAmount)
+                costRow("Purchase", value: buyback.formattedPurchaseAmount, blurred: !showPurchasePrice)
+                    .onTapGesture { withAnimation(.easeInOut(duration: 0.2)) { showPurchasePrice.toggle() } }
                 costRow("Refurbishment", value: buyback.totals?.formattedRefurbishmentCost)
 
                 Divider()
@@ -132,7 +136,7 @@ struct BuybackDetailView: View {
         }
     }
 
-    private func costRow(_ label: String, value: String?, bold: Bool = false, negative: Bool = false) -> some View {
+    private func costRow(_ label: String, value: String?, bold: Bool = false, negative: Bool = false, blurred: Bool = false) -> some View {
         HStack {
             Text(label)
                 .fontWeight(bold ? .semibold : .regular)
@@ -141,6 +145,7 @@ struct BuybackDetailView: View {
             Text(value ?? "-")
                 .fontWeight(bold ? .semibold : .regular)
                 .foregroundStyle(negative ? Color.red : (value != nil ? Color.primary : Color.gray))
+                .blur(radius: blurred ? 4 : 0)
         }
         .font(.subheadline)
     }
@@ -197,12 +202,13 @@ struct BuybackDetailView: View {
         }
     }
 
-    private func detailRow(_ label: String, value: String?) -> some View {
+    private func detailRow(_ label: String, value: String?, blurred: Bool = false) -> some View {
         HStack {
             Text(label)
                 .foregroundStyle(.secondary)
                 .frame(width: 80, alignment: .leading)
             Text(value ?? "-")
+                .blur(radius: blurred ? 4 : 0)
             Spacer()
         }
         .font(.subheadline)
@@ -243,7 +249,8 @@ struct BuybackDetailView: View {
                 if let date = buyback.purchaseDate {
                     detailRow("Date", value: DateFormatters.formatRelativeDate(date) ?? date)
                 }
-                detailRow("Amount", value: buyback.formattedPurchaseAmount)
+                detailRow("Amount", value: buyback.formattedPurchaseAmount, blurred: !showPurchasePrice)
+                    .onTapGesture { withAnimation(.easeInOut(duration: 0.2)) { showPurchasePrice.toggle() } }
                 if let method = buyback.purchasePaymentMethod {
                     detailRow("Payment", value: method.replacingOccurrences(of: "_", with: " ").capitalized)
                 }
@@ -384,12 +391,8 @@ struct BuybackDetailView: View {
     // MARK: - Loading & Error
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-            Text("Loading device...")
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        LottieLoadingView(size: 100, message: "Loading device...")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func errorView(_ error: String) -> some View {

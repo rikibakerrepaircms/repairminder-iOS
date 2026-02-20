@@ -210,7 +210,7 @@ struct OrderItemFormSheet: View {
                     .background(
                         selectedItemType == type
                             ? type.color.opacity(0.08)
-                            : Color(.systemGray6)
+                            : Color.platformGray6
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .overlay(
@@ -253,7 +253,7 @@ struct OrderItemFormSheet: View {
             }
             .pickerStyle(.menu)
             .padding()
-            .background(Color(.systemGray6))
+            .background(Color.platformGray6)
             .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }
@@ -296,7 +296,7 @@ struct OrderItemFormSheet: View {
                 }
             }
             .padding()
-            .background(Color(.systemGray6))
+            .background(Color.platformGray6)
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .onChange(of: productSearchText) { _, newValue in
                 searchTask?.cancel()
@@ -331,7 +331,7 @@ struct OrderItemFormSheet: View {
                                                 .monospaced()
                                                 .padding(.horizontal, 4)
                                                 .padding(.vertical, 1)
-                                                .background(Color(.systemGray5))
+                                                .background(Color.platformGray5)
                                                 .clipShape(RoundedRectangle(cornerRadius: 3))
                                         }
                                         if let manufacturer = product.manufacturer {
@@ -360,7 +360,7 @@ struct OrderItemFormSheet: View {
                         }
                     }
                 }
-                .background(Color(.systemBackground))
+                .background(Color.platformBackground)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
             }
@@ -456,7 +456,7 @@ struct OrderItemFormSheet: View {
                     }
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformGray6)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
             }
 
@@ -480,7 +480,7 @@ struct OrderItemFormSheet: View {
             TextField("20", text: vatRateBinding)
                 .keyboardType(.decimalPad)
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformGray6)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
             Text("Default for \(selectedItemType.label): \(defaultVatRate(for: selectedItemType), specifier: "%.0f")%")
                 .font(.caption).foregroundStyle(.secondary)
@@ -514,7 +514,7 @@ struct OrderItemFormSheet: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.platformGray6)
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 

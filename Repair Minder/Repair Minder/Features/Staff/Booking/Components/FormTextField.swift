@@ -30,7 +30,7 @@ struct FormTextField: View {
                 .keyboardType(keyboardType)
                 .textInputAutocapitalization(autocapitalization)
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformGray6)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .disabled(isDisabled)
                 .opacity(isDisabled ? 0.6 : 1)

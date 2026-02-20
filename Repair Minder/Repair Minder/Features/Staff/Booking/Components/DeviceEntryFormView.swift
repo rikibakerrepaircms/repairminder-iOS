@@ -77,7 +77,7 @@ struct DeviceEntryFormView: View {
                                     .font(.caption)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 8)
-                                    .background(device.deviceTypeId == type.id ? Color.accentColor : Color(.systemGray6))
+                                    .background(device.deviceTypeId == type.id ? Color.accentColor : Color.platformGray6)
                                     .foregroundStyle(device.deviceTypeId == type.id ? .white : .primary)
                                     .clipShape(Capsule())
                                 }
@@ -145,7 +145,7 @@ struct DeviceEntryFormView: View {
                         }
                         .pickerStyle(.menu)
                         .padding(12)
-                        .background(Color(.systemGray6))
+                        .background(Color.platformGray6)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
 
@@ -191,7 +191,7 @@ struct DeviceEntryFormView: View {
                     }
                     .pickerStyle(.menu)
                     .padding(12)
-                    .background(Color(.systemGray6))
+                    .background(Color.platformGray6)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
 
@@ -203,7 +203,7 @@ struct DeviceEntryFormView: View {
                     TextEditor(text: $device.customerReportedIssues)
                         .frame(minHeight: 80)
                         .padding(8)
-                        .background(Color(.systemGray6))
+                        .background(Color.platformGray6)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
             }
@@ -266,7 +266,7 @@ struct DeviceEntryFormView: View {
             .disabled(!isValid)
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformBackground)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 2)
     }

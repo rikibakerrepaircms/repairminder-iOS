@@ -61,7 +61,9 @@ struct ResetPasscodeView: View {
             .frame(maxWidth: 350)
             .padding()
             .navigationTitle("Reset Passcode")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

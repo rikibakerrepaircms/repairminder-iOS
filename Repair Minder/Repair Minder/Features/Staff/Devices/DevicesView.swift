@@ -144,7 +144,7 @@ struct DevicesView: View {
             .padding(.horizontal)
             .padding(.vertical, 8)
         }
-        .background(Color(.systemGroupedBackground))
+        .background(Color.platformGroupedBackground)
     }
 
     private func countForCategory(_ category: WorkflowCategory) -> Int {
@@ -223,13 +223,8 @@ struct DevicesView: View {
     }
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-            Text("Loading devices...")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        LottieLoadingView(size: 100, message: "Loading devices...")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var emptyStateView: some View {
@@ -286,12 +281,12 @@ private struct CategoryTab: View {
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(isSelected ? Color.white.opacity(0.3) : Color(.systemGray5))
+                    .background(isSelected ? Color.white.opacity(0.3) : Color.platformGray5)
                     .clipShape(Capsule())
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(isSelected ? Color.accentColor : Color(.systemBackground))
+            .background(isSelected ? Color.accentColor : Color.platformBackground)
             .foregroundStyle(isSelected ? .white : .primary)
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }

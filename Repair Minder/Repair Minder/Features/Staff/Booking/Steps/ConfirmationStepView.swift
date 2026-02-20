@@ -71,7 +71,7 @@ struct ConfirmationStepView: View {
                 )
             }
             .padding()
-            .background(Color(.systemGray6))
+            .background(Color.platformGray6)
             .clipShape(RoundedRectangle(cornerRadius: 16))
 
             Spacer()
@@ -108,7 +108,7 @@ struct ConfirmationStepView: View {
                     .fontWeight(.semibold)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color(.systemGray5))
+                    .background(Color.platformGray5)
                     .foregroundStyle(.primary)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }

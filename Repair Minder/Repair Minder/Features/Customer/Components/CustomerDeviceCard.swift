@@ -78,7 +78,7 @@ struct CustomerDeviceCard: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
@@ -90,7 +90,7 @@ struct CustomerDeviceCard: View {
             // Device Icon
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(.systemGray6))
+                    .fill(Color.platformGray6)
                     .frame(width: 44, height: 44)
 
                 Image(systemName: deviceIcon)
@@ -340,7 +340,7 @@ struct CustomerDeviceCard: View {
             }
         }
         .padding(12)
-        .background(Color(.systemGray6))
+        .background(Color.platformGray6)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
@@ -388,7 +388,7 @@ struct CustomerDeviceCard: View {
                                 switch phase {
                                 case .empty:
                                     RoundedRectangle(cornerRadius: 8)
-                                        .fill(Color(.systemGray5))
+                                        .fill(Color.platformGray5)
                                         .frame(width: 100, height: 100)
                                         .overlay {
                                             ProgressView()
@@ -401,7 +401,7 @@ struct CustomerDeviceCard: View {
                                         .clipShape(RoundedRectangle(cornerRadius: 8))
                                 case .failure:
                                     RoundedRectangle(cornerRadius: 8)
-                                        .fill(Color(.systemGray5))
+                                        .fill(Color.platformGray5)
                                         .frame(width: 100, height: 100)
                                         .overlay {
                                             Image(systemName: "photo")
@@ -417,7 +417,7 @@ struct CustomerDeviceCard: View {
             }
         }
         .padding(12)
-        .background(Color(.systemGray6))
+        .background(Color.platformGray6)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
@@ -471,7 +471,7 @@ struct CustomerDeviceCard: View {
             }
         }
         .padding(12)
-        .background(Color(.systemGray6))
+        .background(Color.platformGray6)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
@@ -518,7 +518,7 @@ struct CustomerDeviceCard: View {
             }
         }
         .padding(12)
-        .background(Color(.systemGray6))
+        .background(Color.platformGray6)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
@@ -536,7 +536,7 @@ struct CustomerDeviceCard: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.systemGray6))
+        .background(Color.platformGray6)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 

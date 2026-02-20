@@ -150,7 +150,7 @@ struct MessageBubble: View {
     private var bubbleBackground: Color {
         switch message.type {
         case .inbound:
-            return Color(.systemGray5)
+            return Color.platformGray5
         case .outbound, .outboundSms:
             return Color.blue.opacity(0.15)
         case .note:
@@ -211,7 +211,7 @@ private struct AttachmentRow: View {
                 .foregroundColor(.blue)
         }
         .padding(8)
-        .background(Color(.systemBackground))
+        .background(Color.platformBackground)
         .cornerRadius(8)
     }
 }

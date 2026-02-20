@@ -11,7 +11,7 @@ import SwiftUI
 struct CustomerSignatureView: View {
     @Binding var signatureType: SignatureType
     @Binding var typedName: String
-    @Binding var drawnSignature: UIImage?
+    @Binding var drawnSignature: PlatformImage?
 
     @State private var showFullscreenCanvas = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -46,9 +46,16 @@ struct CustomerSignatureView: View {
                 drawnSignaturePreview
             }
         }
+        #if os(iOS)
         .fullScreenCover(isPresented: $showFullscreenCanvas) {
             FullscreenSignatureView(drawnSignature: $drawnSignature)
         }
+        #elseif os(macOS)
+        .sheet(isPresented: $showFullscreenCanvas) {
+            FullscreenSignatureView(drawnSignature: $drawnSignature)
+                .frame(minWidth: 600, minHeight: 400)
+        }
+        #endif
     }
 
     // MARK: - Typed Signature
@@ -70,7 +77,7 @@ struct CustomerSignatureView: View {
                     .foregroundStyle(.primary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 20)
-                    .background(Color(.systemGray6))
+                    .background(Color.platformGray6)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
@@ -102,11 +109,11 @@ struct CustomerSignatureView: View {
             } label: {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(.systemGray6))
+                        .fill(Color.platformGray6)
 
                     if let image = drawnSignature {
                         // Show captured signature as preview
-                        Image(uiImage: image)
+                        Image(platformImage: image)
                             .resizable()
                             .scaledToFit()
                             .padding(12)
@@ -166,7 +173,7 @@ struct CustomerSignatureView: View {
     struct PreviewWrapper: View {
         @State var signatureType: CustomerSignatureView.SignatureType = .typed
         @State var typedName: String = ""
-        @State var drawnSignature: UIImage? = nil
+        @State var drawnSignature: PlatformImage? = nil
 
         var body: some View {
             CustomerSignatureView(

@@ -98,7 +98,7 @@ struct SettingsView: View {
             NavigationStack {
                 destinationView(selectedDestination!)
                     .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
+                        ToolbarItem(placement: .cancellationAction) {
                             Button {
                                 withAnimation { selectedDestination = nil }
                             } label: {

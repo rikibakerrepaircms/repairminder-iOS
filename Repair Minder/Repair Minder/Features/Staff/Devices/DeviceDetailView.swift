@@ -91,13 +91,8 @@ struct DeviceDetailView: View {
     // MARK: - Loading View
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-            Text("Loading device...")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        LottieLoadingView(size: 100, message: "Loading device...")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Error View
@@ -176,7 +171,7 @@ struct DeviceDetailView: View {
         .scrollContentBackground(isRegularWidth ? .hidden : .automatic)
         .frame(maxWidth: isRegularWidth ? 700 : .infinity)
         .frame(maxWidth: .infinity)
-        .background(isRegularWidth ? Color(.systemGroupedBackground) : .clear)
+        .background(isRegularWidth ? Color.platformGroupedBackground : .clear)
     }
 
     // MARK: - Status Section

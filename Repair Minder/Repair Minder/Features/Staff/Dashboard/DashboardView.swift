@@ -68,7 +68,7 @@ struct DashboardView: View {
                 .frame(maxWidth: isRegularWidth ? 900 : .infinity)
                 .frame(maxWidth: .infinity)
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color.platformGroupedBackground)
             .hidesBookingFABOnScroll()
             .navigationTitle("Dashboard")
             .toolbar {
@@ -84,7 +84,7 @@ struct DashboardView: View {
             }
             .overlay {
                 if viewModel.isLoading && viewModel.stats == nil {
-                    ProgressView()
+                    LottieLoadingView(size: 100)
                 }
             }
             .navigationDestination(item: $deviceNavigation) { nav in

@@ -10,7 +10,11 @@ import UserNotifications
 
 @main
 struct Repair_MinderApp: App {
-    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    #if os(iOS)
+    @UIApplicationDelegateAdaptor(iOSAppDelegate.self) var appDelegate
+    #elseif os(macOS)
+    @NSApplicationDelegateAdaptor(MacAppDelegate.self) var appDelegate
+    #endif
     @StateObject private var appState = AppState.shared
     @ObservedObject private var passcodeService = PasscodeService.shared
     @ObservedObject private var appearanceManager = AppearanceManager.shared
@@ -26,6 +30,9 @@ struct Repair_MinderApp: App {
                     .onOpenURL { url in
                         _ = DeepLinkHandler.shared.handleURL(url)
                     }
+                    #if os(macOS)
+                    .frame(minWidth: 900, minHeight: 600)
+                    #endif
 
                 if passcodeService.isLocked {
                     PasscodeLockView()
@@ -41,6 +48,9 @@ struct Repair_MinderApp: App {
                 handleScenePhaseChange(newPhase)
             }
         }
+        #if os(macOS)
+        .defaultSize(width: 1200, height: 800)
+        #endif
     }
 
     private func handleScenePhaseChange(_ newPhase: ScenePhase) {
@@ -74,8 +84,9 @@ struct Repair_MinderApp: App {
 
 // MARK: - App Delegate
 
+#if os(iOS)
 /// App delegate for handling push notifications and other system callbacks
-class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+class iOSAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
 
     /// Dynamically controlled orientation lock. Default allows all but upside-down.
     static var orientationLock: UIInterfaceOrientationMask = .portrait
@@ -84,7 +95,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         _ application: UIApplication,
         supportedInterfaceOrientationsFor window: UIWindow?
     ) -> UIInterfaceOrientationMask {
-        return AppDelegate.orientationLock
+        return iOSAppDelegate.orientationLock
     }
 
     func application(
@@ -112,7 +123,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     ) {
         let tokenString = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
         #if DEBUG
-        print("🔔 [AppDelegate] Got APNs token: \(tokenString.prefix(20))...")
+        print("🔔 [iOSAppDelegate] Got APNs token: \(tokenString.prefix(20))...")
         #endif
 
         Task { @MainActor in
@@ -121,26 +132,26 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             // Auto-register token if user is authenticated
             if AuthManager.shared.authState == .authenticated {
                 #if DEBUG
-                print("🔔 [AppDelegate] User authenticated, registering token with backend...")
+                print("🔔 [iOSAppDelegate] User authenticated, registering token with backend...")
                 #endif
                 await PushNotificationService.shared.registerToken(appType: "staff")
 
                 // Show feedback to user
                 #if DEBUG
                 if PushNotificationService.shared.errorMessage == nil {
-                    print("🔔 [AppDelegate] Token registered successfully!")
+                    print("🔔 [iOSAppDelegate] Token registered successfully!")
                 } else {
-                    print("🔔 [AppDelegate] Token registration failed: \(PushNotificationService.shared.errorMessage ?? "unknown")")
+                    print("🔔 [iOSAppDelegate] Token registration failed: \(PushNotificationService.shared.errorMessage ?? "unknown")")
                 }
                 #endif
             } else if CustomerAuthManager.shared.authState == .authenticated {
                 #if DEBUG
-                print("🔔 [AppDelegate] Customer authenticated, registering token with backend...")
+                print("🔔 [iOSAppDelegate] Customer authenticated, registering token with backend...")
                 #endif
                 await PushNotificationService.shared.registerToken(appType: "customer")
             } else {
                 #if DEBUG
-                print("🔔 [AppDelegate] User not authenticated, skipping token registration")
+                print("🔔 [iOSAppDelegate] User not authenticated, skipping token registration")
                 #endif
             }
         }
@@ -151,7 +162,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
         #if DEBUG
-        print("❌ [AppDelegate] Failed to register for push notifications: \(error.localizedDescription)")
+        print("❌ [iOSAppDelegate] Failed to register for push notifications: \(error.localizedDescription)")
         #endif
         Task { @MainActor in
             PushNotificationService.shared.didFailToRegisterForRemoteNotifications(error: error)
@@ -192,6 +203,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         completionHandler()
     }
 }
+#endif
 
 // MARK: - Root View
 
@@ -240,15 +252,7 @@ struct RootView: View {
 
 private struct LoadingView: View {
     var body: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .progressViewStyle(CircularProgressViewStyle())
-                .scaleEffect(1.5)
-
-            Text("Loading...")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
+        LottieLoadingView(size: 140, message: "Loading...")
     }
 }
 
@@ -339,9 +343,16 @@ private struct StaffMainView: View {
                 .padding(.trailing, fabState.isHidden ? -40 : 34)
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.75), value: fabState.isHidden)
+        #if os(iOS)
         .fullScreenCover(isPresented: $showBookingSheet) {
             BookingView()
         }
+        #elseif os(macOS)
+        .sheet(isPresented: $showBookingSheet) {
+            BookingView()
+                .frame(minWidth: 600, minHeight: 700)
+        }
+        #endif
         .onChange(of: deepLinkHandler.pendingDestination) { _, destination in
             handleDeepLink(destination)
         }
@@ -603,7 +614,7 @@ private struct TermsRequiredView: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color(.systemGray6))
+                    .background(Color.platformGray6)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .disabled(isChecking)

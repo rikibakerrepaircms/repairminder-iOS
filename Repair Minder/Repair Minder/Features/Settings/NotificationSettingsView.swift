@@ -32,7 +32,9 @@ struct NotificationSettingsView: View {
             }
         }
         .navigationTitle("Push Notifications")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .task {
             await viewModel.load()
         }

@@ -103,7 +103,7 @@ private struct CompanyRow: View {
                     .foregroundStyle(.secondary)
             }
             .padding()
-            .background(Color(.systemBackground))
+            .background(Color.platformBackground)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
         }

@@ -49,7 +49,7 @@ struct CustomerOrderListView: View {
             }
             .navigationTitle("My Orders")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     profileMenu
                 }
             }
@@ -77,7 +77,7 @@ struct CustomerOrderListView: View {
                 }
                 .navigationTitle("My Orders")
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItem(placement: .automatic) {
                         profileMenu
                     }
                 }
@@ -149,7 +149,9 @@ struct CustomerOrderListView: View {
                 }
             }
         }
+        #if os(iOS)
         .listStyle(.insetGrouped)
+        #endif
     }
 
     // MARK: - iPad Order List
@@ -218,21 +220,15 @@ struct CustomerOrderListView: View {
                 }
             }
         }
+        #if os(iOS)
         .listStyle(.insetGrouped)
+        #endif
     }
 
     // MARK: - Loading View
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .progressViewStyle(CircularProgressViewStyle())
-                .scaleEffect(1.5)
-
-            Text("Loading orders...")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
+        LottieLoadingView(size: 100, message: "Loading orders...")
     }
 
     // MARK: - Error View
@@ -360,7 +356,7 @@ struct CustomerOrderRow: View {
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color(.systemGray5))
+                            .background(Color.platformGray5)
                             .clipShape(Capsule())
                     }
                 }

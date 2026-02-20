@@ -72,7 +72,9 @@ struct SetPasscodeView: View {
             .frame(maxWidth: 350)
             .padding()
             .navigationTitle(mode == .create ? "Set Passcode" : "Change Passcode")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

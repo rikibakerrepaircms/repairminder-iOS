@@ -282,7 +282,7 @@ struct OrderDetailView: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
     }
@@ -1077,12 +1077,8 @@ struct OrderDetailView: View {
     // MARK: - Loading & Error
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-            Text("Loading order...")
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        LottieLoadingView(size: 100, message: "Loading order...")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func errorView(_ error: String) -> some View {
@@ -1117,7 +1113,7 @@ struct SectionCard<Content: View>: View {
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.systemBackground))
+        .background(Color.platformBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
     }

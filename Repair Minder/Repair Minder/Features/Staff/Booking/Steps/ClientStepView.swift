@@ -172,7 +172,7 @@ struct ClientStepView: View {
             }
         }
         .padding()
-        .background(Color(.systemBlue).opacity(0.1))
+        .background(Color.platformBlue.opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
@@ -270,7 +270,7 @@ struct ClientStepView: View {
                         .foregroundStyle(.secondary)
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformGray6)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
             }
         }

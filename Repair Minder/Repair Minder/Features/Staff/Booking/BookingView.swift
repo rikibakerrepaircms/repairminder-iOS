@@ -81,9 +81,11 @@ struct BookingView: View {
                 }
             }
             .navigationTitle("New Booking")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button {
                         dismiss()
                     } label: {
@@ -138,7 +140,7 @@ struct ServiceTypeCard: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, isRegular ? 32 : 24)
             .padding(.horizontal, isRegular ? 16 : 12)
-            .background(Color(.systemBackground))
+            .background(Color.platformBackground)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
         }
@@ -155,5 +157,5 @@ struct ServiceTypeCard: View {
     ServiceTypeCard(serviceType: .repair) {}
         .frame(width: 180)
         .padding()
-        .background(Color(.systemGroupedBackground))
+        .background(Color.platformGroupedBackground)
 }

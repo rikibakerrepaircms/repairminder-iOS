@@ -29,7 +29,9 @@ struct ClientSearchView: View {
                     .foregroundStyle(.secondary)
 
                 TextField("Search by name, email, or phone", text: $query)
+                    #if os(iOS)
                     .textInputAutocapitalization(.never)
+                    #endif
                     .autocorrectionDisabled()
                     .focused($isFocused)
                     .onChange(of: query) { _, newValue in
@@ -55,7 +57,7 @@ struct ClientSearchView: View {
                 }
             }
             .padding()
-            .background(Color(.systemGray6))
+            .background(Color.platformGray6)
             .clipShape(RoundedRectangle(cornerRadius: 10))
 
             // Search Results
@@ -77,7 +79,7 @@ struct ClientSearchView: View {
                         }
                     }
                 }
-                .background(Color(.systemBackground))
+                .background(Color.platformBackground)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
             }

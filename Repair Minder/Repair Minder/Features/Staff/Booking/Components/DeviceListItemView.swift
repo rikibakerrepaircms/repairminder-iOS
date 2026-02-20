@@ -86,7 +86,7 @@ struct DeviceListItemView: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.platformGray6)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 

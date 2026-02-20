@@ -7,7 +7,6 @@
 
 import Foundation
 import SwiftUI
-import UIKit
 
 /// Staff authentication manager
 /// Handles email/password + 2FA login, magic link login, and token management
@@ -335,7 +334,7 @@ final class AuthManager: ObservableObject, TokenProvider {
             }
         } else if pushService.authorizationStatus == .authorized {
             // Already authorized, just register for remote notifications
-            UIApplication.shared.registerForRemoteNotifications()
+            platformRegisterForRemoteNotifications()
         }
     }
 

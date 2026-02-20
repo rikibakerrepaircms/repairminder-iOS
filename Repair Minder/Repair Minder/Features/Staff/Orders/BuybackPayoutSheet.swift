@@ -166,7 +166,7 @@ struct BuybackPayoutSheet: View {
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.systemBackground))
+        .background(Color.platformBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
     }
@@ -193,7 +193,7 @@ struct BuybackPayoutSheet: View {
                         }
                         .frame(maxWidth: .infinity, minHeight: 80)
                         .foregroundStyle(selectedMethod == method ? Color.accentColor : .primary)
-                        .background(selectedMethod == method ? Color.accentColor.opacity(0.1) : Color(.systemGray6))
+                        .background(selectedMethod == method ? Color.accentColor.opacity(0.1) : Color.platformGray6)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
@@ -245,7 +245,7 @@ struct BuybackPayoutSheet: View {
                 }
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.systemGray6))
+                .background(Color.platformGray6)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
             }
         }
@@ -276,7 +276,7 @@ struct BuybackPayoutSheet: View {
             }
         }
         .padding(12)
-        .background(Color(.systemGray6))
+        .background(Color.platformGray6)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
@@ -302,7 +302,7 @@ struct BuybackPayoutSheet: View {
             TextField("Optional notes", text: $additionalNotes, axis: .vertical)
                 .lineLimit(3...6)
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformGray6)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }
@@ -318,7 +318,7 @@ struct BuybackPayoutSheet: View {
             TextField("e.g. Paid in cash at counter", text: $cashNotes, axis: .vertical)
                 .lineLimit(3...6)
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformGray6)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }

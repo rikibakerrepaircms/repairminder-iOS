@@ -12,13 +12,19 @@ struct EnquiryListView: View {
     @StateObject private var viewModel = EnquiryListViewModel()
     @State private var showingFilters = false
     @State private var showingSortOptions = false
+    #if os(iOS)
     @State private var editMode: EditMode = .inactive
+    #endif
     @State private var selectedTicketIds: Set<String> = []
     @State private var showingBulkStatusPicker = false
     @State private var selectedTicketId: String?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
+    #if os(iOS)
     private var isSelectMode: Bool { editMode.isEditing }
+    #else
+    private var isSelectMode: Bool { false }
+    #endif
     private var isRegularWidth: Bool { horizontalSizeClass == .regular }
 
     var body: some View {
@@ -67,11 +73,14 @@ struct EnquiryListView: View {
             // Ticket List
             ticketList(isSidebar: isSidebar)
         }
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
             ToolbarItem(placement: .principal) {
                 EmptyView()
             }
+            #if os(iOS)
             ToolbarItem(placement: .topBarLeading) {
                 Button {
                     withAnimation {
@@ -86,7 +95,8 @@ struct EnquiryListView: View {
                     Text(isSelectMode ? "Done" : "Select")
                 }
             }
-            ToolbarItem(placement: .topBarTrailing) {
+            #endif
+            ToolbarItem(placement: .automatic) {
                 if isSelectMode {
                     Button {
                         if selectedTicketIds.count == viewModel.tickets.count {
@@ -138,7 +148,7 @@ struct EnquiryListView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
-            .background(Color(.systemBackground))
+            .background(Color.platformBackground)
             .cornerRadius(8)
 
             // Row 1: Type Filters (Lead / Order) - multi-select
@@ -179,7 +189,7 @@ struct EnquiryListView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Color(.systemGroupedBackground))
+        .background(Color.platformGroupedBackground)
     }
 
     private func countFor(status: TicketStatus) -> Int {
@@ -280,9 +290,13 @@ struct EnquiryListView: View {
                         .listRowSeparator(.hidden)
                     }
                 }
+                #if os(iOS)
                 .listStyle(.insetGrouped)
+                #endif
                 .hidesBookingFABOnScroll()
+                #if os(iOS)
                 .environment(\.editMode, $editMode)
+                #endif
 
                 // Bulk action bar
                 if isSelectMode && !selectedTicketIds.isEmpty {
@@ -293,11 +307,9 @@ struct EnquiryListView: View {
     }
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
+        VStack {
             Spacer()
-            ProgressView()
-            Text("Loading enquiries...")
-                .foregroundColor(.secondary)
+            LottieLoadingView(size: 100, message: "Loading enquiries...")
             Spacer()
         }
     }
@@ -362,7 +374,9 @@ struct EnquiryListView: View {
                         Task {
                             await viewModel.bulkUpdateStatus(selectedTicketIds, to: status)
                             selectedTicketIds.removeAll()
+                            #if os(iOS)
                             editMode = .inactive
+                            #endif
                         }
                     } label: {
                         VStack(spacing: 2) {
@@ -526,7 +540,7 @@ private struct TypeFilterBox: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity)
-            .background(isSelected ? color.opacity(0.15) : Color(.secondarySystemGroupedBackground))
+            .background(isSelected ? color.opacity(0.15) : Color.platformGray6)
             .foregroundColor(isSelected ? color : .primary)
             .cornerRadius(8)
             .overlay(
@@ -556,7 +570,7 @@ private struct StatusFilterBox: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
-            .background(isSelected ? status.color.opacity(0.15) : Color(.secondarySystemGroupedBackground))
+            .background(isSelected ? status.color.opacity(0.15) : Color.platformGray6)
             .foregroundColor(isSelected ? status.color : .secondary)
             .cornerRadius(8)
             .overlay(

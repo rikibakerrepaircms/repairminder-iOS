@@ -89,8 +89,12 @@ struct ScannerView: View {
     // MARK: - Camera Preview
 
     private var cameraPreview: some View {
+        #if os(iOS)
         CameraPreviewView(session: scannerViewModel.captureSession)
             .ignoresSafeArea()
+        #else
+        Color.black
+        #endif
     }
 
     // MARK: - Scanner Frame
@@ -336,6 +340,7 @@ struct ScannerView: View {
     }
 }
 
+#if os(iOS)
 // MARK: - Camera Preview View
 
 /// UIKit wrapper for camera preview layer
@@ -368,6 +373,7 @@ class CameraPreviewUIView: UIView {
         previewLayer?.frame = bounds
     }
 }
+#endif
 
 // MARK: - Preview
 

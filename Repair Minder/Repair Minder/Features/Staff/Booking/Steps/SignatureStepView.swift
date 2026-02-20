@@ -61,7 +61,7 @@ struct SignatureStepView: View {
                 }
             }
             .padding()
-            .background(Color(.systemGray6))
+            .background(Color.platformGray6)
             .clipShape(RoundedRectangle(cornerRadius: 12))
 
             Divider()
@@ -124,9 +124,11 @@ struct TermsAndConditionsSheet: View {
                 .padding()
             }
             .navigationTitle("Terms & Conditions")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         dismiss()
                     }

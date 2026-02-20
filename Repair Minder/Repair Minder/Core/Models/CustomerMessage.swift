@@ -91,7 +91,7 @@ struct CustomerMessage: Codable, Identifiable, Sendable {
 
     /// Background color for message bubble
     var backgroundColor: Color {
-        isFromCustomer ? .blue : Color(.systemGray6)
+        isFromCustomer ? .blue : Color.platformGray6
     }
 
     /// Text color for message bubble

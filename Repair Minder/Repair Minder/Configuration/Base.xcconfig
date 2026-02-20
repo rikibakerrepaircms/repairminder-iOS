@@ -8,7 +8,6 @@
 // Swift and iOS Settings
 SWIFT_VERSION = 5.9
 IPHONEOS_DEPLOYMENT_TARGET = 17.0
-TARGETED_DEVICE_FAMILY = 1,2
 ENABLE_BITCODE = NO
 
 // Swift Compiler Settings

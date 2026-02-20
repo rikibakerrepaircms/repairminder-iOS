@@ -14,25 +14,25 @@ struct AuthenticatedImageView: View {
     let width: Int
     let height: Int
 
-    @State private var image: UIImage?
+    @State private var image: PlatformImage?
     @State private var isLoading = true
 
     var body: some View {
         Group {
             if let image {
-                Image(uiImage: image)
+                Image(platformImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
             } else if isLoading {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(.systemGray6))
+                    .background(Color.platformGray6)
             } else {
                 Image(systemName: "photo")
                     .font(.title2)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(.systemGray6))
+                    .background(Color.platformGray6)
             }
         }
         .task { await loadImage() }
@@ -55,11 +55,11 @@ struct AuthenticatedImageView: View {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200,
-                  let uiImage = UIImage(data: data) else {
+                  let loadedImage = PlatformImage(data: data) else {
                 isLoading = false
                 return
             }
-            self.image = uiImage
+            self.image = loadedImage
         } catch {
             #if DEBUG
             print("[AuthenticatedImage] Failed to load image \(imageId): \(error)")

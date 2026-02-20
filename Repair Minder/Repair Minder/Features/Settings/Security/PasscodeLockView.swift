@@ -13,7 +13,7 @@ struct PasscodeLockView: View {
 
     var body: some View {
         ZStack {
-            Color(.systemBackground).ignoresSafeArea()
+            Color.platformBackground.ignoresSafeArea()
 
             VStack(spacing: 28) {
                 Spacer()

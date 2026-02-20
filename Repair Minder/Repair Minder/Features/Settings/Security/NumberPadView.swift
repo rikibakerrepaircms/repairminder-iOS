@@ -38,7 +38,7 @@ struct NumberPadView: View {
                 Text(d)
                     .font(.system(size: 28, weight: .medium))
                     .frame(width: 72, height: 72)
-                    .background(Color(.systemGray5))
+                    .background(Color.platformGray5)
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
@@ -87,7 +87,7 @@ struct PINDotsView: View {
         HStack(spacing: 16) {
             ForEach(0..<totalCount, id: \.self) { index in
                 Circle()
-                    .fill(index < enteredCount ? Color.accentColor : Color(.systemGray4))
+                    .fill(index < enteredCount ? Color.accentColor : Color.platformGray4)
                     .frame(width: 14, height: 14)
             }
         }

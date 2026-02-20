@@ -33,7 +33,7 @@ struct BookingWizardView: View {
                 )
                 .padding(.horizontal)
                 .padding(.vertical, 12)
-                .background(Color(.systemBackground))
+                .background(Color.platformBackground)
             }
 
             Divider()
@@ -83,11 +83,13 @@ struct BookingWizardView: View {
             }
         }
         .navigationTitle("New Booking")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .navigationBarBackButtonHidden(viewModel.currentStep != .client)
         .toolbar {
             if viewModel.currentStep != .confirmation {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button {
                         dismiss()
                     } label: {
@@ -189,7 +191,7 @@ struct BookingWizardView: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformBackground)
     }
 }
 
@@ -228,7 +230,7 @@ struct CompletedStepCard: View {
                     .foregroundStyle(Color.accentColor)
             }
             .padding()
-            .background(Color(.systemGray6))
+            .background(Color.platformGray6)
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)

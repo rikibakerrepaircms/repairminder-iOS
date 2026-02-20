@@ -67,7 +67,7 @@ struct WorkflowTypeBadge: View {
             .foregroundStyle(.secondary)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(Color(.systemGray5))
+            .background(Color.platformGray5)
             .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 }

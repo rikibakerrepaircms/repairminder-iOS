@@ -130,7 +130,7 @@ struct OrderListView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
-            .background(Color(.systemBackground))
+            .background(Color.platformBackground)
             .cornerRadius(8)
 
             // Status Filter Boxes
@@ -161,7 +161,7 @@ struct OrderListView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Color(.systemGroupedBackground))
+        .background(Color.platformGroupedBackground)
     }
 
     // MARK: - iPhone Orders List
@@ -233,11 +233,7 @@ struct OrderListView: View {
     // MARK: - Subviews
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-            Text("Loading orders...")
-                .foregroundStyle(.secondary)
-        }
+        LottieLoadingView(size: 100, message: "Loading orders...")
     }
 
     private func errorView(_ error: String) -> some View {

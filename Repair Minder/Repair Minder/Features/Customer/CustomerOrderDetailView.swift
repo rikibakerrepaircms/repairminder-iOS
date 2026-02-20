@@ -31,7 +31,9 @@ struct CustomerOrderDetailView: View {
             }
         }
         .navigationTitle(viewModel.order?.orderReference ?? "Order")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .refreshable {
             await viewModel.refresh()
         }
@@ -143,7 +145,7 @@ struct CustomerOrderDetailView: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
@@ -283,7 +285,7 @@ struct CustomerOrderDetailView: View {
             .font(.subheadline)
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
@@ -318,7 +320,7 @@ struct CustomerOrderDetailView: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
@@ -391,7 +393,11 @@ struct CustomerOrderDetailView: View {
 
                             Button {
                                 if let url = URL(string: "tel:\(phone.replacingOccurrences(of: " ", with: ""))") {
+                                    #if os(iOS)
                                     UIApplication.shared.open(url)
+                                    #elseif os(macOS)
+                                    NSWorkspace.shared.open(url)
+                                    #endif
                                 }
                             } label: {
                                 Text(phone)
@@ -403,11 +409,11 @@ struct CustomerOrderDetailView: View {
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.systemGray6))
+            .background(Color.platformGray6)
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
@@ -429,7 +435,11 @@ struct CustomerOrderDetailView: View {
                         if let url = URL(string: link.url),
                            let scheme = url.scheme?.lowercased(),
                            ["https", "http"].contains(scheme) {
+                            #if os(iOS)
                             UIApplication.shared.open(url)
+                            #elseif os(macOS)
+                            NSWorkspace.shared.open(url)
+                            #endif
                         }
                     } label: {
                         VStack(spacing: 4) {
@@ -440,7 +450,7 @@ struct CustomerOrderDetailView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(Color(.systemGray6))
+                        .background(Color.platformGray6)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .foregroundStyle(.primary)
@@ -448,7 +458,7 @@ struct CustomerOrderDetailView: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
@@ -463,7 +473,7 @@ struct CustomerOrderDetailView: View {
                     TextEditor(text: $viewModel.newMessageText)
                         .frame(minHeight: 120)
                         .padding(12)
-                        .background(Color(.systemGray6))
+                        .background(Color.platformGray6)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
 
                     if let error = viewModel.messageError {
@@ -499,7 +509,9 @@ struct CustomerOrderDetailView: View {
                 .padding(.bottom, 16)
             }
             .navigationTitle("Send Message")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -514,15 +526,7 @@ struct CustomerOrderDetailView: View {
     // MARK: - Loading View
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .progressViewStyle(CircularProgressViewStyle())
-                .scaleEffect(1.5)
-
-            Text("Loading order...")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
+        LottieLoadingView(size: 100, message: "Loading order...")
     }
 
     // MARK: - Error View

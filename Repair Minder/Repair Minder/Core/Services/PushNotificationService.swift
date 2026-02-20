@@ -7,7 +7,11 @@
 
 import Foundation
 import UserNotifications
+#if os(iOS)
 import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 // MARK: - Push Notification Service
 
@@ -62,7 +66,7 @@ final class PushNotificationService: ObservableObject {
             if granted {
                 // Register for remote notifications
                 await MainActor.run {
-                    UIApplication.shared.registerForRemoteNotifications()
+                    platformRegisterForRemoteNotifications()
                 }
             }
 
@@ -77,9 +81,7 @@ final class PushNotificationService: ObservableObject {
 
     /// Open system settings for notifications
     func openSystemSettings() {
-        if let url = URL(string: UIApplication.openSettingsURLString) {
-            UIApplication.shared.open(url)
-        }
+        platformOpenSystemSettings()
     }
 
     // MARK: - Token Management

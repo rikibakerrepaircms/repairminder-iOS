@@ -69,7 +69,9 @@ struct TabBarSettingsView: View {
                     config.moveTab(from: source, to: destination)
                 }
             }
+            #if os(iOS)
             .environment(\.editMode, .constant(.active))
+            #endif
 
             // Section 2: Available (overflow tabs)
             if !config.overflowTabs.isEmpty {
@@ -127,7 +129,9 @@ struct TabBarSettingsView: View {
             }
         }
         .navigationTitle("Customise Tab Bar")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 }
 

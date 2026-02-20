@@ -77,7 +77,7 @@ struct MyQueueView: View {
                 deviceList(wideRows: wideRows)
             }
         }
-        .background(Color(.systemGroupedBackground))
+        .background(Color.platformGroupedBackground)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
@@ -92,7 +92,7 @@ struct MyQueueView: View {
         }
         .overlay {
             if viewModel.isLoading && viewModel.devices.isEmpty {
-                ProgressView()
+                LottieLoadingView(size: 100)
             }
         }
     }
@@ -124,7 +124,7 @@ struct MyQueueView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
-            .background(Color(.systemBackground))
+            .background(Color.platformBackground)
             .cornerRadius(8)
 
             // Category Filter Boxes
@@ -144,7 +144,7 @@ struct MyQueueView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Color(.systemGroupedBackground))
+        .background(Color.platformGroupedBackground)
     }
 
     private func count(for category: QueueCategory) -> Int {

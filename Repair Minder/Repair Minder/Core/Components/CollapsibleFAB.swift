@@ -40,7 +40,7 @@ extension View {
     /// Attach to any ScrollView or List to hide the booking FAB on downward scroll.
     @ViewBuilder
     func hidesBookingFABOnScroll() -> some View {
-        if #available(iOS 18.0, *) {
+        if #available(iOS 18.0, macOS 15.0, *) {
             self.onScrollGeometryChange(for: CGFloat.self) { geo in
                 geo.contentOffset.y
             } action: { old, new in

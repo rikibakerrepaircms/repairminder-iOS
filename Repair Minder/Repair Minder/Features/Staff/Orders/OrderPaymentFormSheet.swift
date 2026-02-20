@@ -149,7 +149,7 @@ struct OrderPaymentFormSheet: View {
                         }
                         .frame(maxWidth: .infinity, minHeight: 70)
                         .foregroundStyle(selectedMethod == method ? Color.accentColor : .primary)
-                        .background(selectedMethod == method ? Color.accentColor.opacity(0.1) : Color(.systemGray6))
+                        .background(selectedMethod == method ? Color.accentColor.opacity(0.1) : Color.platformGray6)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
@@ -210,7 +210,7 @@ struct OrderPaymentFormSheet: View {
                 .datePickerStyle(.compact)
                 .labelsHidden()
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformGray6)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }
@@ -232,7 +232,7 @@ struct OrderPaymentFormSheet: View {
             }
             .pickerStyle(.menu)
             .padding()
-            .background(Color(.systemGray6))
+            .background(Color.platformGray6)
             .clipShape(RoundedRectangle(cornerRadius: 10))
         }
         .onChange(of: selectedDeviceId) { _, _ in
@@ -256,7 +256,7 @@ struct OrderPaymentFormSheet: View {
                 .foregroundStyle(.secondary)
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.platformGray6)
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
@@ -282,7 +282,7 @@ struct OrderPaymentFormSheet: View {
             TextField(notesPlaceholder, text: $notes, axis: .vertical)
                 .lineLimit(3...6)
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformGray6)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }
@@ -321,7 +321,7 @@ struct OrderPaymentFormSheet: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.platformGray6)
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 

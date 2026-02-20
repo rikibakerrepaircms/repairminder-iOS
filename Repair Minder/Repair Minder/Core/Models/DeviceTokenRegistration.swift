@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import UIKit
 
 // MARK: - Device Token Registration
 
@@ -23,10 +22,10 @@ struct DeviceTokenRegistration: Codable {
     static func forStaff(token: String) -> DeviceTokenRegistration {
         DeviceTokenRegistration(
             deviceToken: token,
-            platform: "ios",
+            platform: platformIdentifier,
             appType: "staff",
-            deviceName: UIDevice.current.model,
-            osVersion: UIDevice.current.systemVersion,
+            deviceName: platformDeviceModel(),
+            osVersion: platformOSVersion(),
             appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
         )
     }
@@ -35,10 +34,10 @@ struct DeviceTokenRegistration: Codable {
     static func forCustomer(token: String) -> DeviceTokenRegistration {
         DeviceTokenRegistration(
             deviceToken: token,
-            platform: "ios",
+            platform: platformIdentifier,
             appType: "customer",
-            deviceName: UIDevice.current.model,
-            osVersion: UIDevice.current.systemVersion,
+            deviceName: platformDeviceModel(),
+            osVersion: platformOSVersion(),
             appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
         )
     }

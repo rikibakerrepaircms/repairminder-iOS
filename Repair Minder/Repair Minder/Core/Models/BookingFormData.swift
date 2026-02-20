@@ -183,7 +183,7 @@ struct BookingFormData {
     // Signature (bindings for CustomerSignatureView)
     var signatureType: CustomerSignatureView.SignatureType = .typed
     var typedName: String = ""
-    var drawnSignature: UIImage?  // UIImage from canvas drawing
+    var drawnSignature: PlatformImage?  // Platform image from canvas drawing
     var termsAgreed: Bool = false
     var marketingConsent: Bool = true
 

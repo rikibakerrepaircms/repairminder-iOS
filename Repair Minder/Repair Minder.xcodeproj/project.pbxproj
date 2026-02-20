@@ -23,10 +23,16 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXBuildFile section */
+		DD00DD042F3C0004006D564A /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = DD00DD022F3C0002006D564A /* Lottie */; };
+		DD00DD052F3C0005006D564A /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = DD00DD032F3C0003006D564A /* Lottie */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		3C22E8AA2F32B211006D564A /* Repair Minder.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Repair Minder.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		3C22E8B72F32B213006D564A /* Repair MinderTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Repair MinderTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		3C22E8C12F32B213006D564A /* Repair MinderUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Repair MinderUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA00AA012F32B211006D564A /* Repair Minder Mac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Repair Minder Mac.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -35,9 +41,20 @@
 			membershipExceptions = (
 				Configuration/Base.xcconfig,
 				Configuration/ClientA.xcconfig,
+				Configuration/MacOS.xcconfig,
 				Configuration/RepairMinder.xcconfig,
 			);
 			target = 3C22E8A92F32B211006D564A /* Repair Minder */;
+		};
+		BB00BB012F4785AE006D564A /* Exceptions for "Repair Minder" folder in "Repair Minder Mac" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Configuration/Base.xcconfig,
+				Configuration/ClientA.xcconfig,
+				Configuration/MacOS.xcconfig,
+				Configuration/RepairMinder.xcconfig,
+			);
+			target = AA00AA032F32B211006D564A /* Repair Minder Mac */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -46,6 +63,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				3CD2F6A62F4784CE0020F49E /* Exceptions for "Repair Minder" folder in "Repair Minder" target */,
+				BB00BB012F4785AE006D564A /* Exceptions for "Repair Minder" folder in "Repair Minder Mac" target */,
 			);
 			path = "Repair Minder";
 			sourceTree = "<group>";
@@ -60,6 +78,16 @@
 			path = "Repair MinderUITests";
 			sourceTree = "<group>";
 		};
+		AA00AA022F32B211006D564A /* Repair Minder Mac */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Repair Minder Mac";
+			sourceTree = "<group>";
+		};
+		CC00CC012F32B211006D564A /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -67,6 +95,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DD00DD042F3C0004006D564A /* Lottie in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -84,6 +113,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA00AA052F32B211006D564A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DD00DD052F3C0005006D564A /* Lottie in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -91,6 +128,8 @@
 			isa = PBXGroup;
 			children = (
 				3C22E8AC2F32B211006D564A /* Repair Minder */,
+				AA00AA022F32B211006D564A /* Repair Minder Mac */,
+				CC00CC012F32B211006D564A /* Shared */,
 				3C22E8BA2F32B213006D564A /* Repair MinderTests */,
 				3C22E8C42F32B213006D564A /* Repair MinderUITests */,
 				3C22E8AB2F32B211006D564A /* Products */,
@@ -101,6 +140,7 @@
 			isa = PBXGroup;
 			children = (
 				3C22E8AA2F32B211006D564A /* Repair Minder.app */,
+				AA00AA012F32B211006D564A /* Repair Minder Mac.app */,
 				3C22E8B72F32B213006D564A /* Repair MinderTests.xctest */,
 				3C22E8C12F32B213006D564A /* Repair MinderUITests.xctest */,
 			);
@@ -124,9 +164,11 @@
 			);
 			fileSystemSynchronizedGroups = (
 				3C22E8AC2F32B211006D564A /* Repair Minder */,
+				CC00CC012F32B211006D564A /* Shared */,
 			);
 			name = "Repair Minder";
 			packageProductDependencies = (
+				DD00DD022F3C0002006D564A /* Lottie */,
 			);
 			productName = "Repair Minder";
 			productReference = 3C22E8AA2F32B211006D564A /* Repair Minder.app */;
@@ -178,6 +220,31 @@
 			productReference = 3C22E8C12F32B213006D564A /* Repair MinderUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		AA00AA032F32B211006D564A /* Repair Minder Mac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA00AA092F32B211006D564A /* Build configuration list for PBXNativeTarget "Repair Minder Mac" */;
+			buildPhases = (
+				AA00AA042F32B211006D564A /* Sources */,
+				AA00AA052F32B211006D564A /* Frameworks */,
+				AA00AA062F32B211006D564A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				3C22E8AC2F32B211006D564A /* Repair Minder */,
+				AA00AA022F32B211006D564A /* Repair Minder Mac */,
+				CC00CC012F32B211006D564A /* Shared */,
+			);
+			name = "Repair Minder Mac";
+			packageProductDependencies = (
+				DD00DD032F3C0003006D564A /* Lottie */,
+			);
+			productName = "Repair Minder Mac";
+			productReference = AA00AA012F32B211006D564A /* Repair Minder Mac.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -199,6 +266,9 @@
 						CreatedOnToolsVersion = 26.2;
 						TestTargetID = 3C22E8A92F32B211006D564A;
 					};
+					AA00AA032F32B211006D564A = {
+						CreatedOnToolsVersion = 26.2;
+					};
 				};
 			};
 			buildConfigurationList = 3C22E8A52F32B211006D564A /* Build configuration list for PBXProject "Repair Minder" */;
@@ -212,10 +282,14 @@
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 3C22E8AB2F32B211006D564A /* Products */;
+			packageReferences = (
+				DD00DD012F3C0001006D564A /* XCRemoteSwiftPackageReference "lottie-spm" */,
+			);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				3C22E8A92F32B211006D564A /* Repair Minder */,
+				AA00AA032F32B211006D564A /* Repair Minder Mac */,
 				3C22E8B62F32B213006D564A /* Repair MinderTests */,
 				3C22E8C02F32B213006D564A /* Repair MinderUITests */,
 			);
@@ -244,6 +318,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA00AA062F32B211006D564A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -262,6 +343,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		3C22E8BD2F32B213006D564A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA00AA042F32B211006D564A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -606,6 +694,72 @@
 			};
 			name = Release;
 		};
+		AA00AA072F32B211006D564A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				BRAND_ID = repairminder;
+				CODE_SIGN_ENTITLEMENTS = "Repair Minder Mac/Repair Minder macOS.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = T578MBWLM2;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2025 MendMyi Ltd. All rights reserved.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mendmyi.repairminder.macos;
+				PRODUCT_NAME = "Repair Minder";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) BRAND_REPAIRMINDER";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		AA00AA082F32B211006D564A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				BRAND_ID = repairminder;
+				CODE_SIGN_ENTITLEMENTS = "Repair Minder Mac/Repair Minder macOSRelease.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = T578MBWLM2;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2025 MendMyi Ltd. All rights reserved.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mendmyi.repairminder.macos;
+				PRODUCT_NAME = "Repair Minder";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) BRAND_REPAIRMINDER";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -645,7 +799,40 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		AA00AA092F32B211006D564A /* Build configuration list for PBXNativeTarget "Repair Minder Mac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA00AA072F32B211006D564A /* Debug */,
+				AA00AA082F32B211006D564A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		DD00DD012F3C0001006D564A /* XCRemoteSwiftPackageReference "lottie-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/airbnb/lottie-spm";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 4.6.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		DD00DD022F3C0002006D564A /* Lottie */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DD00DD012F3C0001006D564A /* XCRemoteSwiftPackageReference "lottie-spm" */;
+			productName = Lottie;
+		};
+		DD00DD032F3C0003006D564A /* Lottie */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DD00DD012F3C0001006D564A /* XCRemoteSwiftPackageReference "lottie-spm" */;
+			productName = Lottie;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 3C22E8A22F32B211006D564A /* Project object */;
 }

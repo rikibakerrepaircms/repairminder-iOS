@@ -71,7 +71,9 @@ struct PasscodeSettingsView: View {
             }
         }
         .navigationTitle("Security")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .sheet(isPresented: $viewModel.showChangePasscode) {
             SetPasscodeView(mode: .change) { _ in }
                 .interactiveDismissDisabled()

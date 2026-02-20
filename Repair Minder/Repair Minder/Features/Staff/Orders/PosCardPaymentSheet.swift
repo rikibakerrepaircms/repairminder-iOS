@@ -232,7 +232,7 @@ struct PosCardPaymentSheet: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
     }
@@ -303,7 +303,7 @@ struct PosCardPaymentSheet: View {
             }
         }
         .padding()
-        .background(isSelected ? Color.accentColor.opacity(0.08) : Color(.systemGray6))
+        .background(isSelected ? Color.accentColor.opacity(0.08) : Color.platformGray6)
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(
             RoundedRectangle(cornerRadius: 10)
@@ -385,7 +385,7 @@ struct PosCardPaymentSheet: View {
                         Spacer()
                     }
                     .padding(12)
-                    .background(Color(.systemGray6))
+                    .background(Color.platformGray6)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .opacity(eligible ? 1 : 0.5)
                 }
@@ -745,7 +745,7 @@ struct PosCardPaymentSheet: View {
                         .fontWeight(.medium)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color(.systemGray6))
+                        .background(Color.platformGray6)
                         .foregroundStyle(linkCopied ? .green : Color.accentColor)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }

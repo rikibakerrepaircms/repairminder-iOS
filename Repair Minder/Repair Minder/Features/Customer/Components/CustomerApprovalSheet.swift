@@ -16,7 +16,7 @@ struct CustomerApprovalSheet: View {
     @State private var currentStep: ApprovalStep = .review
     @State private var signatureType: CustomerSignatureView.SignatureType = .typed
     @State private var typedName: String = ""
-    @State private var drawnSignature: UIImage?
+    @State private var drawnSignature: PlatformImage?
     @State private var rejectionReason: String = ""
     @State private var showTerms: Bool = false
 
@@ -157,7 +157,7 @@ struct CustomerApprovalSheet: View {
                     }
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformGray6)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
 
                 // Terms and Conditions
@@ -179,7 +179,7 @@ struct CustomerApprovalSheet: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .padding()
-                            .background(Color(.systemGray6))
+                            .background(Color.platformGray6)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                 }
@@ -332,7 +332,7 @@ struct CustomerApprovalSheet: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformGray6)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
 
                 // Signature View
@@ -437,7 +437,7 @@ struct CustomerApprovalSheet: View {
                     TextEditor(text: $rejectionReason)
                         .frame(minHeight: 100)
                         .padding(8)
-                        .background(Color(.systemGray6))
+                        .background(Color.platformGray6)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
 

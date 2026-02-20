@@ -67,7 +67,7 @@ struct StepProgressView: View {
     @ViewBuilder
     private func stepConnector(isCompleted: Bool) -> some View {
         Rectangle()
-            .fill(isCompleted ? Color.accentColor : Color(.systemGray4))
+            .fill(isCompleted ? Color.accentColor : Color.platformGray4)
             .frame(height: 2)
             .frame(maxWidth: .infinity)
             .padding(.bottom, 20) // Align with circles
@@ -79,7 +79,7 @@ struct StepProgressView: View {
         } else if isCurrent {
             return .accentColor
         } else {
-            return Color(.systemGray5)
+            return Color.platformGray5
         }
     }
 }

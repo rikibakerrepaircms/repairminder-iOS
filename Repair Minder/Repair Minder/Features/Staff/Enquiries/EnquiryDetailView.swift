@@ -38,7 +38,7 @@ struct EnquiryDetailView: View {
         }
         .frame(maxWidth: isRegularWidth ? 700 : .infinity)
         .frame(maxWidth: .infinity)
-        .background(isRegularWidth ? Color(.systemGroupedBackground) : .clear)
+        .background(isRegularWidth ? Color.platformGroupedBackground : .clear)
         .navigationTitle(viewModel.ticket?.displayNumber ?? "Ticket")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -98,11 +98,9 @@ struct EnquiryDetailView: View {
     // MARK: - Loading & Error Views
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
+        VStack {
             Spacer()
-            ProgressView()
-            Text("Loading ticket...")
-                .foregroundColor(.secondary)
+            LottieLoadingView(size: 100, message: "Loading ticket...")
             Spacer()
         }
     }
@@ -270,7 +268,7 @@ struct EnquiryDetailView: View {
             }
         }
         .padding(.vertical, 8)
-        .background(Color(.systemGroupedBackground))
+        .background(Color.platformGroupedBackground)
     }
 
     // MARK: - Messages List
@@ -500,11 +498,11 @@ struct EnquiryDetailView: View {
                     .scrollIndicators(isComposerActive ? .automatic : .never)
                     .scrollDisabled(!isComposerActive)
                     .frame(height: textAreaHeight)
-                    .background(Color(.systemGray6))
+                    .background(Color.platformGray6)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
-                            .stroke(isReplyFocused ? Color.blue.opacity(0.5) : Color(.systemGray4), lineWidth: isReplyFocused ? 1 : 0.5)
+                            .stroke(isReplyFocused ? Color.blue.opacity(0.5) : Color.platformGray4, lineWidth: isReplyFocused ? 1 : 0.5)
                     )
 
                     // Fade gradient when compact and has text
@@ -512,7 +510,7 @@ struct EnquiryDetailView: View {
                         LinearGradient(
                             stops: [
                                 .init(color: .clear, location: 0),
-                                .init(color: Color(.systemGray6), location: 1),
+                                .init(color: Color.platformGray6, location: 1),
                             ],
                             startPoint: .top,
                             endPoint: .bottom
@@ -563,7 +561,7 @@ struct EnquiryDetailView: View {
                         } else {
                             Image(systemName: "arrow.up.circle.fill")
                                 .font(.system(size: 32))
-                                .foregroundStyle(viewModel.canSendReply ? .blue : Color(.systemGray4))
+                                .foregroundStyle(viewModel.canSendReply ? .blue : Color.platformGray4)
                         }
                     }
                     .disabled(!viewModel.canSendReply)
@@ -573,7 +571,7 @@ struct EnquiryDetailView: View {
             .padding(.top, 8)
         }
         .padding(.bottom, 8)
-        .background(Color(.systemBackground))
+        .background(Color.platformBackground)
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isReplyExpanded)
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isReplyFocused)
     }

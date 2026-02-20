@@ -185,7 +185,7 @@ struct CustomerProgressBar: View {
         } else if isCurrent {
             return .blue
         } else {
-            return Color(.systemGray5)
+            return Color.platformGray5
         }
     }
 
@@ -193,7 +193,7 @@ struct CustomerProgressBar: View {
 
     private func connector(isComplete: Bool) -> some View {
         Rectangle()
-            .fill(isComplete ? Color.green : Color(.systemGray5))
+            .fill(isComplete ? Color.green : Color.platformGray5)
             .frame(height: 3)
             .frame(maxWidth: .infinity)
     }

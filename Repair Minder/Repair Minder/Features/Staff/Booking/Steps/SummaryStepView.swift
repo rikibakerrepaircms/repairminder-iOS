@@ -131,11 +131,11 @@ struct SummaryStepView: View {
             TextField("e.g. Customer mentioned they need it back by Friday", text: $viewModel.formData.internalNotes, axis: .vertical)
                 .lineLimit(3...6)
                 .padding()
-                .background(Color(.systemBackground))
+                .background(Color.platformBackground)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.platformGray6)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
@@ -180,7 +180,7 @@ struct SummaryStepView: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.platformGray6)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
@@ -213,7 +213,7 @@ struct SummaryStepView: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.platformGray6)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
@@ -255,7 +255,7 @@ struct BookingSummarySection<Content: View>: View {
             content
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.platformGray6)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
@@ -330,7 +330,7 @@ struct DeviceSummaryCard: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 

@@ -247,5 +247,5 @@ struct StatGrid<Content: View>: View {
         }
         .padding()
     }
-    .background(Color(.systemGroupedBackground))
+    .background(Color.platformGroupedBackground)
 }

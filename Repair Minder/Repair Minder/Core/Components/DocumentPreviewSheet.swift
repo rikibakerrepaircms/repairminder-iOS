@@ -21,6 +21,7 @@ struct DocumentPreviewSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
+                #if os(iOS)
                 if let html = htmlString {
                     WebViewRepresentable(
                         htmlString: html,
@@ -29,6 +30,7 @@ struct DocumentPreviewSheet: View {
                     )
                     .opacity(isWebViewReady ? 1 : 0)
                 }
+                #endif
 
                 if isLoading || (htmlString != nil && !isWebViewReady) {
                     ProgressView("Loading \(documentType.displayName)...")
@@ -46,12 +48,15 @@ struct DocumentPreviewSheet: View {
                 }
             }
             .navigationTitle(documentType.displayName)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
                 }
 
+                #if os(iOS)
                 ToolbarItemGroup(placement: .primaryAction) {
                     Button {
                         printDocument()
@@ -67,6 +72,7 @@ struct DocumentPreviewSheet: View {
                     }
                     .disabled(webView == nil || !isWebViewReady)
                 }
+                #endif
             }
         }
         .task {
@@ -91,6 +97,7 @@ struct DocumentPreviewSheet: View {
         isLoading = false
     }
 
+    #if os(iOS)
     private func printDocument() {
         guard let webView else { return }
 
@@ -141,10 +148,12 @@ struct DocumentPreviewSheet: View {
             }
         }
     }
+    #endif
 }
 
 // MARK: - WKWebView Representable
 
+#if os(iOS)
 private struct WebViewRepresentable: UIViewRepresentable {
     let htmlString: String
     @Binding var webView: WKWebView?
@@ -179,3 +188,4 @@ private struct WebViewRepresentable: UIViewRepresentable {
         }
     }
 }
+#endif

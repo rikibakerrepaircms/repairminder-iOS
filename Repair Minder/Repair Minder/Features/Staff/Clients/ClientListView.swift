@@ -157,11 +157,7 @@ struct ClientListView: View {
     }
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-            Text("Loading clients...")
-                .foregroundStyle(.secondary)
-        }
+        LottieLoadingView(size: 100, message: "Loading clients...")
     }
 
     private func errorView(_ error: String) -> some View {

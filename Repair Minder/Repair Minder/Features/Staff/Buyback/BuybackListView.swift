@@ -13,6 +13,7 @@ struct BuybackListView: View {
 
     @StateObject private var viewModel = BuybackListViewModel()
     @State private var selectedItemId: String?
+    @State private var showPurchasePrice = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var isRegularWidth: Bool {
@@ -42,7 +43,9 @@ struct BuybackListView: View {
             mainContent
         }
         .navigationTitle("Buyback")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .navigationDestination(for: String.self) { itemId in
             BuybackDetailView(buybackId: itemId)
         }
@@ -57,7 +60,9 @@ struct BuybackListView: View {
                 mainContent
             }
             .navigationTitle("Buyback")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .navigationDestination(for: String.self) { itemId in
                 BuybackDetailView(buybackId: itemId)
             }
@@ -74,9 +79,11 @@ struct BuybackListView: View {
                     mainContent
                 }
                 .navigationTitle("Buyback")
+                #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
+                #endif
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
+                    ToolbarItem(placement: .cancellationAction) {
                         if let onBack {
                             Button {
                                 onBack()
@@ -127,7 +134,9 @@ struct BuybackListView: View {
                     .foregroundColor(.secondary)
                 TextField("Search IMEI, serial, brand, model...", text: $viewModel.searchText)
                     .textFieldStyle(.plain)
+                    #if os(iOS)
                     .textInputAutocapitalization(.never)
+                    #endif
                     .autocorrectionDisabled()
                     .onChange(of: viewModel.searchText) { _, _ in
                         viewModel.searchItems()
@@ -144,7 +153,7 @@ struct BuybackListView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
-            .background(Color(.systemBackground))
+            .background(Color.platformBackground)
             .cornerRadius(8)
 
             // Status filter pills
@@ -179,7 +188,7 @@ struct BuybackListView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Color(.systemGroupedBackground))
+        .background(Color.platformGroupedBackground)
     }
 
     // MARK: - iPhone Items List
@@ -239,7 +248,9 @@ struct BuybackListView: View {
                 .listRowSeparator(.hidden)
             }
         }
+        #if os(iOS)
         .listStyle(.insetGrouped)
+        #endif
         .refreshable {
             await viewModel.refresh()
         }
@@ -266,7 +277,12 @@ struct BuybackListView: View {
 
             // Row 2: Financial summary
             HStack(spacing: 16) {
-                financialCell("Purchase", value: item.formattedPurchaseAmount)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { showPurchasePrice.toggle() }
+                } label: {
+                    financialCell("Purchase", value: item.formattedPurchaseAmount, blurred: !showPurchasePrice)
+                }
+                .buttonStyle(.plain)
                 financialCell("Refurb", value: item.formattedRefurbishmentCost)
                 financialCell("Sell", value: item.formattedSellPrice)
                 financialCell("Offer", value: item.formattedSpecialOfferPrice)
@@ -295,7 +311,7 @@ struct BuybackListView: View {
 
     // MARK: - Financial Cell
 
-    private func financialCell(_ label: String, value: String?) -> some View {
+    private func financialCell(_ label: String, value: String?, blurred: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(label)
                 .font(.caption2)
@@ -303,18 +319,15 @@ struct BuybackListView: View {
             Text(value ?? "-")
                 .font(.subheadline.monospacedDigit())
                 .foregroundStyle(value != nil ? .primary : .tertiary)
+                .blur(radius: blurred ? 4 : 0)
         }
     }
 
     // MARK: - States
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-            Text("Loading inventory...")
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        LottieLoadingView(size: 100, message: "Loading inventory...")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func errorView(_ error: String) -> some View {
@@ -376,7 +389,7 @@ private struct BuybackStatusPill: View {
             .fontWeight(.medium)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(isSelected ? color.opacity(0.15) : Color(.secondarySystemGroupedBackground))
+            .background(isSelected ? color.opacity(0.15) : Color.platformGray6)
             .foregroundColor(isSelected ? color : .secondary)
             .cornerRadius(8)
             .overlay(

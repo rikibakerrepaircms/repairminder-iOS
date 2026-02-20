@@ -7,16 +7,18 @@ import SwiftUI
 
 /// Fullscreen signature canvas that forces landscape on iPhone for maximum drawing area.
 struct FullscreenSignatureView: View {
-    @Binding var drawnSignature: UIImage?
+    @Binding var drawnSignature: PlatformImage?
     @Environment(\.dismiss) private var dismiss
 
     @State private var currentPath: Path = Path()
     @State private var paths: [Path] = []
     @State private var canvasSize: CGSize = .zero
 
+    #if os(iOS)
     private var isPhone: Bool {
         UIDevice.current.userInterfaceIdiom == .phone
     }
+    #endif
 
     var body: some View {
         ZStack {
@@ -62,7 +64,7 @@ struct FullscreenSignatureView: View {
 
                         // Signature line
                         Rectangle()
-                            .fill(Color(.systemGray4))
+                            .fill(Color.platformGray4)
                             .frame(height: 1)
                             .padding(.horizontal, 40)
                             .offset(y: geometry.size.height * 0.25)
@@ -125,18 +127,20 @@ struct FullscreenSignatureView: View {
                 .padding(.bottom, 12)
             }
         }
+        #if os(iOS)
         .onAppear {
             if isPhone {
-                AppDelegate.orientationLock = .landscape
+                iOSAppDelegate.orientationLock = .landscape
                 requestOrientationUpdate(.landscape)
             }
         }
         .onDisappear {
             if isPhone {
-                AppDelegate.orientationLock = .portrait
+                iOSAppDelegate.orientationLock = .portrait
                 requestOrientationUpdate(.portrait)
             }
         }
+        #endif
     }
 
     private func captureAndDismiss() {
@@ -154,16 +158,21 @@ struct FullscreenSignatureView: View {
             .background(.white)
         )
         renderer.scale = 3.0
+        #if os(iOS)
         drawnSignature = renderer.uiImage
+        #elseif os(macOS)
+        drawnSignature = renderer.nsImage
+        #endif
         dismiss()
     }
 
+    #if os(iOS)
     private func requestOrientationUpdate(_ orientations: UIInterfaceOrientationMask) {
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
         windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: orientations))
-        // Trigger the system to re-evaluate supported orientations
         windowScene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
     }
+    #endif
 }
 
 #Preview {

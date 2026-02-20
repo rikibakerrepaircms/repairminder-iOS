@@ -151,7 +151,7 @@ struct ClientDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
     }
@@ -248,7 +248,7 @@ struct ClientDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
-        .background(Color(.secondarySystemBackground))
+        .background(Color.platformGray6)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
@@ -342,7 +342,7 @@ struct ClientDetailView: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 2)
-                .background(Color(.tertiarySystemBackground))
+                .background(Color.platformGray5)
                 .clipShape(Capsule())
 
             Text(total)
@@ -516,11 +516,7 @@ struct ClientDetailView: View {
     // MARK: - Loading & Error
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-            Text("Loading client...")
-                .foregroundStyle(.secondary)
-        }
+        LottieLoadingView(size: 100, message: "Loading client...")
     }
 
     private func errorView(_ error: String) -> some View {

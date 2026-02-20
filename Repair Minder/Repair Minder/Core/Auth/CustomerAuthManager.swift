@@ -7,7 +7,6 @@
 
 import Foundation
 import SwiftUI
-import UIKit
 
 /// Customer authentication manager
 /// Handles magic link login with multi-company support
@@ -263,7 +262,7 @@ final class CustomerAuthManager: ObservableObject {
             }
         } else if pushService.authorizationStatus == .authorized {
             // Already authorized, just register for remote notifications
-            UIApplication.shared.registerForRemoteNotifications()
+            platformRegisterForRemoteNotifications()
         }
     }
 

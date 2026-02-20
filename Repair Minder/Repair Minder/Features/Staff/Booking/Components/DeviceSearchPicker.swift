@@ -31,7 +31,9 @@ struct DeviceSearchPicker: View {
                         .foregroundStyle(.secondary)
 
                     TextField("Search brand or model...", text: $searchQuery)
+                        #if os(iOS)
                         .textInputAutocapitalization(.never)
+                        #endif
                         .autocorrectionDisabled()
                         .focused($isSearchFocused)
                         .onChange(of: searchQuery) { _, newValue in
@@ -58,7 +60,7 @@ struct DeviceSearchPicker: View {
                     }
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformGray6)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
             }
 
@@ -128,7 +130,7 @@ struct DeviceSearchPicker: View {
                             .padding(12)
                     }
                 }
-                .background(Color(.systemBackground))
+                .background(Color.platformBackground)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
             }
