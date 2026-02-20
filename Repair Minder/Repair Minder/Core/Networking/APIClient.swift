@@ -146,6 +146,58 @@ final class APIClient {
         }
     }
 
+    /// Perform a request that returns raw Data (e.g. HTML documents)
+    /// - Parameters:
+    ///   - endpoint: The API endpoint to call
+    /// - Returns: The raw response data
+    func requestRawData(
+        _ endpoint: APIEndpoint
+    ) async throws -> Data {
+        let request = try buildRequest(endpoint)
+
+        do {
+            let (data, response) = try await session.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.networkError(URLError(.badServerResponse))
+            }
+
+            switch httpResponse.statusCode {
+            case 200...299:
+                return data
+
+            case 401:
+                if endpoint.requiresAuth {
+                    try await handleTokenRefresh()
+                    // Retry after refresh
+                    let retryRequest = try buildRequest(endpoint)
+                    let (retryData, retryResponse) = try await session.data(for: retryRequest)
+                    guard let retryHttp = retryResponse as? HTTPURLResponse,
+                          (200...299).contains(retryHttp.statusCode) else {
+                        throw APIError.unauthorized
+                    }
+                    return retryData
+                }
+                throw APIError.unauthorized
+
+            case 404:
+                throw APIError.notFound
+
+            default:
+                throw APIError.httpError(
+                    statusCode: httpResponse.statusCode,
+                    message: nil
+                )
+            }
+        } catch let error as APIError {
+            throw error
+        } catch let error as URLError where error.code == .cancelled {
+            throw APIError.cancelled
+        } catch {
+            throw APIError.networkError(error)
+        }
+    }
+
     /// Perform the raw token refresh request
     /// This is used by AuthManager and should not be called directly
     func refreshAccessToken() async throws -> TokenRefreshResponse {

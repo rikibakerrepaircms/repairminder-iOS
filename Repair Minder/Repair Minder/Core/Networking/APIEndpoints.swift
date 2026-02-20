@@ -95,6 +95,7 @@ enum APIEndpoint {
     case authorizeOrder(orderId: String)
     case despatchOrder(orderId: String)
     case collectOrder(orderId: String)
+    case orderDocument(orderId: String, type: DocumentType)
 
     // MARK: - Clients
 
@@ -144,12 +145,35 @@ enum APIEndpoint {
     case pushPreferences
     case updatePushPreferences
 
+    // MARK: - Product Types
+
+    case productTypes(search: String)
+
     // MARK: - Booking / Lookup
 
     case locations
     case deviceSearch(query: String)
     case deviceTypes
     case companyPublicInfo
+
+    // MARK: - POS Integrations & Terminals
+
+    case posIntegrations
+    case posTerminals(locationId: String?)
+
+    // MARK: - POS Terminal Payments
+
+    case initiateTerminalPayment
+    case pollTerminalPayment(transactionId: String)
+    case cancelTerminalPayment(transactionId: String)
+    case refundTerminalPayment(transactionId: String)
+
+    // MARK: - POS Payment Links
+
+    case paymentLinks(orderId: String)
+    case createPaymentLink
+    case cancelPaymentLink(linkId: String)
+    case resendPaymentLinkEmail(linkId: String)
 
     // MARK: - Customer Portal
 
@@ -277,6 +301,8 @@ enum APIEndpoint {
             return "/api/orders/\(orderId)/despatch"
         case .collectOrder(let orderId):
             return "/api/orders/\(orderId)/collect"
+        case .orderDocument(let orderId, let type):
+            return "/api/orders/\(orderId)/documents/\(type.rawValue)"
 
         // Clients
         case .clients, .createClient:
@@ -330,6 +356,10 @@ enum APIEndpoint {
         case .resumeMacroExecution(let id):
             return "/api/macro-executions/\(id)/resume"
 
+        // Product Types
+        case .productTypes:
+            return "/api/product-types"
+
         // Booking / Lookup
         case .locations:
             return "/api/locations"
@@ -347,6 +377,26 @@ enum APIEndpoint {
             return "/api/user/device-tokens"
         case .pushPreferences, .updatePushPreferences:
             return "/api/user/push-preferences"
+
+        // POS
+        case .posIntegrations:
+            return "/api/pos/integrations"
+        case .posTerminals:
+            return "/api/pos/terminals"
+        case .initiateTerminalPayment:
+            return "/api/pos/payments"
+        case .pollTerminalPayment(let id):
+            return "/api/pos/payments/\(id)/status"
+        case .cancelTerminalPayment(let id):
+            return "/api/pos/payments/\(id)/cancel"
+        case .refundTerminalPayment(let id):
+            return "/api/pos/payments/\(id)/refund"
+        case .paymentLinks, .createPaymentLink:
+            return "/api/pos/payment-links"
+        case .cancelPaymentLink(let id):
+            return "/api/pos/payment-links/\(id)/cancel"
+        case .resendPaymentLinkEmail(let id):
+            return "/api/pos/payment-links/\(id)/resend"
 
         // Customer Portal
         case .customerOrders:
@@ -374,12 +424,14 @@ enum APIEndpoint {
              .dashboardStats, .enquiryStats, .lifecycle, .categoryBreakdown, .activityLog,
              .bookingHeatmap, .buybackStats, .bookingsByTime,
              .devices, .myQueue, .myActiveWork, .orderDevices, .orderDevice, .deviceActions,
-             .orders, .order, .orderItems, .orderPayments, .orderSignatures,
+             .orders, .order, .orderItems, .orderPayments, .orderSignatures, .orderDocument,
              .clients, .client, .clientSearch, .clientsExport,
              .tickets, .ticket, .ticketMacroExecutions,
              .macros, .macro, .macroExecutions, .macroExecution,
+             .productTypes,
              .locations, .deviceSearch, .deviceTypes, .companyPublicInfo,
              .deviceTokens, .pushPreferences,
+             .posIntegrations, .posTerminals, .pollTerminalPayment, .paymentLinks,
              .customerOrders, .customerOrder, .customerOrderInvoice, .customerDeviceImage:
             return .get
 
@@ -397,6 +449,8 @@ enum APIEndpoint {
              .createTicket, .ticketReply, .ticketNote, .ticketGenerateResponse, .ticketRewriteResponse, .ticketExecuteMacro,
              .ticketResolve, .ticketReassign, .createEnquiry,
              .registerDeviceToken,
+             .initiateTerminalPayment, .cancelTerminalPayment, .refundTerminalPayment,
+             .createPaymentLink, .cancelPaymentLink, .resendPaymentLinkEmail,
              .customerApproveQuote, .customerOrderReply:
             return .post
 
@@ -529,6 +583,22 @@ enum APIEndpoint {
                 items.append(URLQueryItem(name: "include_stages", value: "true"))
             }
             return items.isEmpty ? nil : items
+
+        case .productTypes(let search):
+            return [
+                URLQueryItem(name: "search", value: search),
+                URLQueryItem(name: "limit", value: "10"),
+                URLQueryItem(name: "is_active", value: "true")
+            ]
+
+        case .posTerminals(let locationId):
+            if let locationId {
+                return [URLQueryItem(name: "location_id", value: locationId)]
+            }
+            return nil
+
+        case .paymentLinks(let orderId):
+            return [URLQueryItem(name: "order_id", value: orderId)]
 
         case .macroExecutions(let status, let ticketId, let page, let perPage):
             var items: [URLQueryItem] = []

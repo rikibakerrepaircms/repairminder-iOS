@@ -14,6 +14,15 @@ struct OrderDetailView: View {
     @State private var editingItem: OrderItem?
     @State private var itemToDelete: OrderItem?
     @State private var showDeleteConfirmation = false
+    @State private var showPaymentSheet = false
+    @State private var showCardPaymentSheet = false
+    @State private var showPayoutSheet = false
+    @State private var payoutDevice: OrderDeviceSummary?
+    @State private var deletingPaymentId: String?
+    @State private var showDeletePaymentAlert = false
+    @State private var selectedDeviceNav: DeviceNavTarget?
+    @State private var selectedDocumentType: DocumentType?
+    @State private var showDocumentSheet = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var isRegularWidth: Bool {
@@ -39,6 +48,9 @@ struct OrderDetailView: View {
         .navigationDestination(item: $selectedClientId) { clientId in
             ClientDetailView(clientId: clientId)
         }
+        .navigationDestination(item: $selectedDeviceNav) { target in
+            DeviceDetailView(orderId: target.orderId, deviceId: target.id)
+        }
         .task {
             await viewModel.loadOrder()
         }
@@ -59,7 +71,7 @@ struct OrderDetailView: View {
 
                 // Devices section
                 if let devices = order.devices, !devices.isEmpty {
-                    devicesSection(devices)
+                    devicesSection(devices, orderId: order.id)
                 }
 
                 // Items section
@@ -72,6 +84,16 @@ struct OrderDetailView: View {
                 // Totals section
                 if let totals = order.totals {
                     totalsSection(totals, paymentStatus: order.effectivePaymentStatus)
+                }
+
+                // Payment actions section
+                if viewModel.isOrderEditable && viewModel.balanceDue > 0 {
+                    paymentActionsSection(order)
+                }
+
+                // Payment links section
+                if !viewModel.paymentLinks.isEmpty {
+                    paymentLinksSection()
                 }
 
                 // Payments section
@@ -98,6 +120,9 @@ struct OrderDetailView: View {
                 if let notes = order.notes, !notes.isEmpty {
                     notesSection(notes)
                 }
+
+                // Documents section
+                documentsSection(order)
             }
             .padding()
             .frame(maxWidth: isRegularWidth ? 700 : .infinity)
@@ -141,6 +166,78 @@ struct OrderDetailView: View {
             Button("OK") { }
         } message: {
             Text(viewModel.itemError ?? "")
+        }
+        // MARK: - Payment Sheets
+        .sheet(isPresented: $showPaymentSheet) {
+            if let order = viewModel.order {
+                OrderPaymentFormSheet(
+                    order: order,
+                    balanceDue: viewModel.balanceDue,
+                    depositsEnabled: viewModel.depositsEnabled,
+                    onSave: { request in
+                        await viewModel.recordPayment(request)
+                    }
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
+        }
+        .sheet(isPresented: $showCardPaymentSheet) {
+            if let order = viewModel.order {
+                PosCardPaymentSheet(
+                    order: order,
+                    balanceDue: viewModel.balanceDue,
+                    depositsEnabled: viewModel.depositsEnabled,
+                    terminals: viewModel.posTerminals,
+                    paymentService: PaymentService(),
+                    onSuccess: {
+                        await viewModel.refresh()
+                        await viewModel.loadPaymentLinks()
+                    }
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
+        }
+        .sheet(isPresented: $showPayoutSheet) {
+            if let order = viewModel.order, let device = payoutDevice {
+                BuybackPayoutSheet(
+                    device: device,
+                    payoutAmount: device.payoutAmount ?? 0,
+                    bankDetails: nil,
+                    orderNumber: order.orderNumber,
+                    onSave: { request in
+                        await viewModel.recordPayment(request)
+                    }
+                )
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+            }
+        }
+        // MARK: - Payment Alerts
+        .alert("Delete Payment", isPresented: $showDeletePaymentAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                if let paymentId = deletingPaymentId {
+                    Task { _ = await viewModel.deletePayment(paymentId: paymentId) }
+                }
+            }
+        } message: {
+            Text("Are you sure you want to delete this payment? This cannot be undone.")
+        }
+        .alert("Payment Error", isPresented: Binding(
+            get: { viewModel.paymentError != nil },
+            set: { if !$0 { viewModel.clearPaymentError() } }
+        )) {
+            Button("OK") { }
+        } message: {
+            Text(viewModel.paymentError ?? "")
+        }
+        // MARK: - Document Sheet
+        .sheet(isPresented: $showDocumentSheet) {
+            if let type = selectedDocumentType, let order = viewModel.order {
+                DocumentPreviewSheet(orderId: order.id, documentType: type)
+            }
         }
     }
 
@@ -278,24 +375,19 @@ struct OrderDetailView: View {
 
     // MARK: - Devices Section
 
-    private func devicesSection(_ devices: [OrderDeviceSummary]) -> some View {
+    private func devicesSection(_ devices: [OrderDeviceSummary], orderId: String) -> some View {
         SectionCard(title: "Devices", icon: "iphone") {
-            if isRegularWidth && devices.count > 1 {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    ForEach(devices) { device in
+            VStack(spacing: 0) {
+                ForEach(devices) { device in
+                    Button {
+                        selectedDeviceNav = DeviceNavTarget(id: device.id, orderId: orderId)
+                    } label: {
                         deviceRow(device)
-                            .padding(.vertical, 4)
                     }
-                }
-            } else {
-                VStack(spacing: 8) {
-                    ForEach(devices) { device in
-                        deviceRow(device)
-                            .padding(.vertical, 4)
+                    .buttonStyle(.plain)
 
-                        if device.id != devices.last?.id {
-                            Divider()
-                        }
+                    if device.id != devices.last?.id {
+                        Divider().padding(.vertical, 4)
                     }
                 }
             }
@@ -303,22 +395,53 @@ struct OrderDetailView: View {
     }
 
     private func deviceRow(_ device: OrderDeviceSummary) -> some View {
-        HStack {
-            Circle()
-                .fill(device.deviceStatus.color)
-                .frame(width: 8, height: 8)
+        HStack(spacing: 12) {
+            Image(systemName: device.workflowType == "buyback" ? "arrow.left.arrow.right" : "wrench.and.screwdriver")
+                .font(.title3)
+                .foregroundStyle(device.deviceStatus.color)
+                .frame(width: 32)
 
-            Text(device.deviceStatus.label)
-                .font(.subheadline)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(device.displayName ?? "Unknown Device")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.primary)
+
+                if let serial = device.serialNumber, !serial.isEmpty {
+                    Text("S/N: \(serial)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack(spacing: 6) {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(device.deviceStatus.color)
+                            .frame(width: 6, height: 6)
+                        Text(device.deviceStatus.label)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let auth = device.authorizationStatus, !auth.isEmpty {
+                        Text("•")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(auth.capitalized)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
 
             Spacer()
 
-            if let auth = device.authorizationStatus {
-                Text(auth.capitalized)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
         }
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
     }
 
     // MARK: - Items Section
@@ -506,52 +629,259 @@ struct OrderDetailView: View {
         .font(.subheadline)
     }
 
+    // MARK: - Payment Actions Section
+
+    private func paymentActionsSection(_ order: Order) -> some View {
+        SectionCard(title: "Payment Actions", icon: "plus.circle") {
+            VStack(spacing: 10) {
+                // Take Card Payment — only if POS terminals available
+                if viewModel.hasActiveTerminals {
+                    Button {
+                        showCardPaymentSheet = true
+                    } label: {
+                        Label("Take Card Payment", systemImage: "creditcard.and.123")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.primary)
+                }
+
+                // Add Payment — always shown
+                Button {
+                    showPaymentSheet = true
+                } label: {
+                    Label("Add Payment", systemImage: "plus.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+
+                // Record Payout — only for first buyback device in ready_to_pay status
+                if let device = order.devices?.first(where: {
+                    $0.workflowType == "buyback" && $0.status == "ready_to_pay"
+                }) {
+                    Button {
+                        payoutDevice = device
+                        showPayoutSheet = true
+                    } label: {
+                        Label("Record Payout", systemImage: "arrow.up.circle.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.green)
+                }
+            }
+        }
+    }
+
+    // MARK: - Payment Links Section
+
+    private func paymentLinksSection() -> some View {
+        SectionCard(title: "Payment Links", icon: "link") {
+            VStack(spacing: 8) {
+                ForEach(viewModel.paymentLinks) { link in
+                    VStack(spacing: 6) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(link.formattedAmount)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+
+                                if let date = link.formattedCreatedAt {
+                                    Text(date)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+
+                            Spacer()
+
+                            paymentLinkStatusBadge(link.status)
+                        }
+
+                        // Actions for pending links
+                        if link.status == .pending {
+                            HStack(spacing: 12) {
+                                Button {
+                                    UIPasteboard.general.string = link.checkoutUrl
+                                } label: {
+                                    Label("Copy Link", systemImage: "doc.on.doc")
+                                        .font(.caption)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+
+                                Button(role: .destructive) {
+                                    Task { await viewModel.cancelPaymentLink(linkId: link.id) }
+                                } label: {
+                                    Label("Cancel", systemImage: "xmark.circle")
+                                        .font(.caption)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+
+                                Spacer()
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+
+                    if link.id != viewModel.paymentLinks.last?.id {
+                        Divider()
+                    }
+                }
+            }
+        }
+    }
+
+    private func paymentLinkStatusBadge(_ status: PaymentLinkStatus) -> some View {
+        let (label, color): (String, Color) = {
+            switch status {
+            case .pending: return ("Pending", .orange)
+            case .completed: return ("Completed", .green)
+            case .failed: return ("Failed", .red)
+            case .cancelled: return ("Cancelled", .gray)
+            case .expired: return ("Expired", .gray)
+            }
+        }()
+
+        return Text(label)
+            .font(.caption2)
+            .fontWeight(.medium)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(color.opacity(0.15))
+            .foregroundStyle(color)
+            .clipShape(Capsule())
+    }
+
     // MARK: - Payments Section
 
     private func paymentsSection(_ payments: [OrderPayment]) -> some View {
         SectionCard(title: "Payments", icon: "creditcard") {
             VStack(spacing: 8) {
                 ForEach(payments) { payment in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 4) {
-                                if let method = payment.paymentMethod {
-                                    Image(systemName: method.icon)
-                                        .font(.caption)
-                                }
-                                Text(payment.paymentMethod?.label ?? "Payment")
-                                    .font(.subheadline)
-
-                                if payment.isDepositPayment {
-                                    Text("Deposit")
-                                        .font(.caption2)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Color.blue.opacity(0.1))
-                                        .foregroundStyle(.blue)
-                                        .clipShape(Capsule())
-                                }
-                            }
-
-                            if let date = payment.formattedDate {
-                                Text(date)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        Spacer()
-
-                        Text(payment.formattedAmount)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundStyle(.green)
-                    }
-                    .padding(.vertical, 4)
+                    paymentRow(payment)
 
                     if payment.id != payments.last?.id {
                         Divider()
                     }
+                }
+            }
+        }
+    }
+
+    private func paymentRow(_ payment: OrderPayment) -> some View {
+        let canDelete = payment.posTransactionId == nil && viewModel.isOrderEditable
+        let amountColor: Color = payment.isFullyRefunded ? .secondary :
+            payment.isPayoutPayment ? .orange :
+            payment.amount < 0 ? .red : .green
+
+        return HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    if let method = payment.paymentMethod {
+                        Image(systemName: method.icon)
+                            .font(.caption)
+                    }
+                    Text(payment.paymentMethod?.label ?? "Payment")
+                        .font(.subheadline)
+
+                    if payment.isDepositPayment {
+                        Text("Deposit")
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.blue.opacity(0.1))
+                            .foregroundStyle(.blue)
+                            .clipShape(Capsule())
+                    }
+
+                    if payment.isPayoutPayment {
+                        Text("Payout")
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.orange.opacity(0.1))
+                            .foregroundStyle(.orange)
+                            .clipShape(Capsule())
+                    }
+
+                    if payment.isFullyRefunded {
+                        Text("REFUNDED")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.orange.opacity(0.15))
+                            .foregroundStyle(.orange)
+                            .clipShape(Capsule())
+                    }
+                }
+
+                // Card brand/last4 + auth code for POS payments
+                if let brand = payment.cardBrand, let last4 = payment.cardLastFour {
+                    HStack(spacing: 4) {
+                        Text("\(brand) •••• \(last4)")
+                        if let authCode = payment.authCode, !authCode.isEmpty {
+                            Text("(Auth: \(authCode))")
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                // Recorded by
+                if let recordedBy = payment.recordedByName, !recordedBy.isEmpty {
+                    Text("by \(recordedBy)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                // Device info
+                if let deviceName = payment.deviceDisplayName {
+                    Label(deviceName, systemImage: "iphone")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let date = payment.formattedDate {
+                    Text(date)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                // Notes (1-line truncated)
+                if let notes = payment.notes, !notes.isEmpty {
+                    Text(notes)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                // Refund info
+                if let refunded = payment.totalRefunded, refunded > 0, !payment.isFullyRefunded {
+                    Text("Refunded: \(CurrencyFormatter.format(refunded))")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            Spacer()
+
+            Text(payment.formattedAmount)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundStyle(amountColor)
+                .strikethrough(payment.isFullyRefunded, color: .secondary)
+        }
+        .padding(.vertical, 4)
+        .contextMenu {
+            if canDelete {
+                Button(role: .destructive) {
+                    deletingPaymentId = payment.id
+                    showDeletePaymentAlert = true
+                } label: {
+                    Label("Delete Payment", systemImage: "trash")
                 }
             }
         }
@@ -710,6 +1040,40 @@ struct OrderDetailView: View {
         }
     }
 
+    // MARK: - Documents Section
+
+    private func documentsSection(_ order: Order) -> some View {
+        SectionCard(title: "Documents", icon: "doc.text") {
+            VStack(spacing: 8) {
+                documentButton(.bookingReceipt)
+                documentButton(.invoice)
+
+                if order.status == .collectedDespatched {
+                    documentButton(.collectionReceipt)
+                }
+            }
+        }
+    }
+
+    private func documentButton(_ type: DocumentType) -> some View {
+        Button {
+            selectedDocumentType = type
+            showDocumentSheet = true
+        } label: {
+            HStack {
+                Label(type.displayName, systemImage: type.icon)
+                    .font(.subheadline)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     // MARK: - Loading & Error
 
     private var loadingView: some View {
@@ -757,6 +1121,13 @@ struct SectionCard<Content: View>: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
     }
+}
+
+// MARK: - Device Navigation Target
+
+struct DeviceNavTarget: Identifiable, Hashable {
+    let id: String      // deviceId
+    let orderId: String
 }
 
 #Preview {

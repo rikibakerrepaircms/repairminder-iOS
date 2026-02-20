@@ -318,8 +318,7 @@ private func initiateTerminalPayment() async {
         terminalId: terminalId,
         amount: paymentAmountPence,
         currency: "GBP",
-        deviceIds: selectedDeviceIds.isEmpty ? nil : Array(selectedDeviceIds),
-        isDeposit: isDepositPayment ? true : nil
+        deviceIds: selectedDeviceIds.isEmpty ? nil : Array(selectedDeviceIds)
     )
 
     do {
@@ -354,9 +353,8 @@ private func createPaymentLink() async {
         amount: paymentAmountPence,
         currency: "GBP",
         customerEmail: customerEmail.isEmpty ? nil : customerEmail,
-        description: "Order #\(order.orderNumber ?? "")",
-        deviceIds: selectedDeviceIds.isEmpty ? nil : Array(selectedDeviceIds),
-        isDeposit: isDepositPayment ? true : nil
+        description: "Order \(order.formattedOrderNumber)",
+        deviceIds: selectedDeviceIds.isEmpty ? nil : Array(selectedDeviceIds)
     )
 
     do {

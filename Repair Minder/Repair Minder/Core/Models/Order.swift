@@ -328,6 +328,10 @@ struct OrderPayment: Decodable, Identifiable, Equatable, Sendable {
     let isRefundable: Bool?
     let totalRefunded: Double?
     let refundableAmount: Double?
+    let deviceBrand: String?
+    let deviceModel: String?
+    let workflowType: String?
+    let isPayout: Bool?
 
     var formattedAmount: String {
         CurrencyFormatter.format(amount)
@@ -340,6 +344,42 @@ struct OrderPayment: Decodable, Identifiable, Equatable, Sendable {
     var formattedDate: String? {
         guard let date = paymentDate else { return nil }
         return DateFormatters.formatRelativeDate(date)
+    }
+
+    var isFullyRefunded: Bool {
+        guard let refunded = totalRefunded, let refundable = refundableAmount else { return false }
+        return refunded > 0 && refundable <= 0
+    }
+
+    var deviceDisplayName: String? {
+        guard deviceBrand != nil || deviceModel != nil else { return nil }
+        return [deviceBrand, deviceModel].compactMap { $0 }.joined(separator: " ")
+    }
+
+    var isPayoutPayment: Bool {
+        isPayout == true || amount < 0
+    }
+}
+
+enum DocumentType: String, Sendable {
+    case bookingReceipt = "booking-receipt"
+    case invoice = "invoice"
+    case collectionReceipt = "collection-receipt"
+
+    var displayName: String {
+        switch self {
+        case .bookingReceipt: return "Booking Receipt"
+        case .invoice: return "Invoice"
+        case .collectionReceipt: return "Collection Receipt"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .bookingReceipt: return "doc.on.clipboard"
+        case .invoice: return "doc.richtext"
+        case .collectionReceipt: return "checkmark.circle"
+        }
     }
 }
 
@@ -388,6 +428,9 @@ struct OrderDeviceSummary: Decodable, Identifiable, Equatable, Sendable {
     let authorizedAt: String?
     let deposits: Double?
     let finalPaid: Double?
+    let displayName: String?
+    let serialNumber: String?
+    let payoutAmount: Double?
 
     var deviceStatus: DeviceStatus {
         DeviceStatus(rawValue: status) ?? .deviceReceived
@@ -491,6 +534,49 @@ struct OrderItemRequest: Encodable {
     var isWarrantyItem: Bool?
     var warrantyNotes: String?
     var productTypeId: String?
+}
+
+// MARK: - Manual Payment Request
+
+/// Request body for recording a manual payment (cash, bank transfer, etc.).
+struct ManualPaymentRequest: Encodable {
+    var amount: Double           // Currency units (pounds)
+    var paymentMethod: String    // "cash", "bank_transfer", "invoice", etc.
+    var paymentDate: String      // ISO date "YYYY-MM-DD"
+    var notes: String?
+    var deviceId: String?
+    var isDeposit: Bool?
+    var isPayout: Bool?
+}
+
+// MARK: - Device Payment Breakdown
+
+struct DevicePaymentBreakdown: Decodable, Equatable, Sendable {
+    let deviceId: String
+    let displayName: String?
+    let lineTotal: Double?
+    let depositsPaid: Double?
+    let finalPaid: Double?
+    let totalPaid: Double?
+    let balanceDue: Double?
+}
+
+// MARK: - Product Type (Search Result)
+
+/// Lightweight product type for search-as-you-type in line item forms.
+struct ProductTypeSearchResult: Decodable, Identifiable, Sendable {
+    let id: String
+    let name: String
+    let sku: String?
+    let category: String?
+    let manufacturer: String?
+    let defaultSellPrice: Double?
+    let vatRate: Double?
+
+    var formattedPrice: String? {
+        guard let price = defaultSellPrice else { return nil }
+        return CurrencyFormatter.format(price)
+    }
 }
 
 // MARK: - Currency Formatter

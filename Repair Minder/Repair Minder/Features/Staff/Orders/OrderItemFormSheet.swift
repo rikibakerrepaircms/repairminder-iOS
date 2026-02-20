@@ -80,6 +80,13 @@ struct OrderItemFormSheet: View {
     @State private var errorMessage: String?
     @State private var showError = false
 
+    // Product search state
+    @State private var productSearchText: String = ""
+    @State private var productSearchResults: [ProductTypeSearchResult] = []
+    @State private var isSearchingProducts = false
+    @State private var searchTask: Task<Void, Never>?
+    @State private var selectedProductId: String?
+
     // MARK: - Computed Properties
 
     private var isEditing: Bool {
@@ -123,6 +130,9 @@ struct OrderItemFormSheet: View {
             ScrollView {
                 VStack(spacing: 20) {
                     itemTypePicker
+                    if !isEditing {
+                        productSearchSection
+                    }
                     if let devices = order.devices, !devices.isEmpty {
                         devicePicker(devices)
                     }
@@ -257,6 +267,150 @@ struct OrderItemFormSheet: View {
         default: workflowLabel = "Device"
         }
         return "\(workflowLabel) — \(device.deviceStatus.label)"
+    }
+
+    // MARK: - Product Search
+
+    private var productSearchSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Search Products")
+                .font(.subheadline).fontWeight(.medium)
+
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("Search by name, SKU, or manufacturer...", text: $productSearchText)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                if isSearchingProducts {
+                    ProgressView()
+                        .controlSize(.small)
+                } else if !productSearchText.isEmpty {
+                    Button {
+                        productSearchText = ""
+                        productSearchResults = []
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding()
+            .background(Color(.systemGray6))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .onChange(of: productSearchText) { _, newValue in
+                searchTask?.cancel()
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard trimmed.count >= 2 else {
+                    productSearchResults = []
+                    return
+                }
+                searchTask = Task {
+                    try? await Task.sleep(for: .milliseconds(300))
+                    guard !Task.isCancelled else { return }
+                    await searchProducts(query: trimmed)
+                }
+            }
+
+            if !productSearchResults.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(productSearchResults) { product in
+                        Button {
+                            selectProduct(product)
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(product.name)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(1)
+                                    HStack(spacing: 6) {
+                                        if let sku = product.sku {
+                                            Text(sku)
+                                                .font(.caption2)
+                                                .monospaced()
+                                                .padding(.horizontal, 4)
+                                                .padding(.vertical, 1)
+                                                .background(Color(.systemGray5))
+                                                .clipShape(RoundedRectangle(cornerRadius: 3))
+                                        }
+                                        if let manufacturer = product.manufacturer {
+                                            Text(manufacturer)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                                Spacer(minLength: 8)
+                                if let price = product.formattedPrice {
+                                    Text(price)
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(.primary)
+                                }
+                            }
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                        if product.id != productSearchResults.last?.id {
+                            Divider().padding(.leading, 12)
+                        }
+                    }
+                }
+                .background(Color(.systemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+            }
+
+            Text("Search your product catalog to auto-fill details")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private func searchProducts(query: String) async {
+        isSearchingProducts = true
+        defer { isSearchingProducts = false }
+        do {
+            let results: [ProductTypeSearchResult] = try await APIClient.shared.request(
+                .productTypes(search: query)
+            )
+            guard !Task.isCancelled else { return }
+            productSearchResults = results
+        } catch {
+            guard !Task.isCancelled else { return }
+            productSearchResults = []
+        }
+    }
+
+    private func selectProduct(_ product: ProductTypeSearchResult) {
+        selectedProductId = product.id
+        descriptionText = product.name
+
+        // Auto-fill price (inc VAT) from default sell price
+        if let sellPrice = product.defaultSellPrice {
+            // defaultSellPrice from API is already inc VAT
+            priceIncVatText = String(format: "%.2f", sellPrice)
+        }
+
+        // Auto-fill VAT rate
+        if let rate = product.vatRate {
+            vatRate = rate
+        }
+
+        // Auto-detect item type from category
+        if let category = product.category?.lowercased() {
+            if category == "accessory" || category == "accessories" {
+                selectedItemType = .accessory
+            }
+            // Leave as-is for other categories (user already picked type)
+        }
+
+        // Clear search
+        productSearchText = ""
+        productSearchResults = []
     }
 
     // MARK: - Description Field
@@ -431,7 +585,8 @@ struct OrderItemFormSheet: View {
             unitPrice: isDevicePurchase ? -abs(netPrice) : netPrice,
             priceIncVat: isDevicePurchase ? -abs(priceIncVat) : priceIncVat,
             vatRate: vatRate,
-            deviceId: selectedDeviceId.isEmpty ? nil : selectedDeviceId
+            deviceId: selectedDeviceId.isEmpty ? nil : selectedDeviceId,
+            productTypeId: selectedProductId
         )
 
         isSaving = true

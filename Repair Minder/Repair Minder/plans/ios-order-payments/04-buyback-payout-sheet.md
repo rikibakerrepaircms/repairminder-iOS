@@ -4,9 +4,10 @@
 
 Create `BuybackPayoutSheet.swift` — a form sheet for recording payments TO customers/suppliers for buyback inventory devices. This matches the web app's `MakePaymentModal` component, which is separate from the standard payment flow.
 
-## Dependencies
+## Prerequisites
 
-Stage 1 (Models, API Endpoints & PaymentService)
+- **Stage 1** (Models, API Endpoints & PaymentService) must be complete.
+- **Backend change required:** The order detail endpoint must be updated to include `display_name`, `serial_number`, and `payout_amount` in the device summary (see Stage 1 spec, "Backend Change Required" section). Without this, the sheet still compiles and renders but shows "Unknown Device" for missing `displayName`, hides serial/IMEI if nil, and shows £0.00 for missing `payoutAmount`.
 
 ## Can Run In Parallel With
 
@@ -190,7 +191,7 @@ struct BuybackPayoutSheet: View {
     let device: OrderDeviceSummary
     let payoutAmount: Double
     let bankDetails: BankDetails?
-    let orderNumber: String
+    let orderNumber: Int          // Use order.formattedOrderNumber for display ("#\(orderNumber)")
     let onSave: (ManualPaymentRequest) async -> Bool
 
     @Environment(\.dismiss) private var dismiss
