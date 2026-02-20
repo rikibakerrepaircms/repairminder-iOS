@@ -702,7 +702,7 @@ struct OrderDetailView: View {
                         if link.status == .pending {
                             HStack(spacing: 12) {
                                 Button {
-                                    UIPasteboard.general.string = link.checkoutUrl
+                                    platformCopyToClipboard(link.checkoutUrl)
                                 } label: {
                                     Label("Copy Link", systemImage: "doc.on.doc")
                                         .font(.caption)

@@ -295,9 +295,7 @@ struct ScannerView: View {
             }
 
             Button("Open Settings") {
-                if let url = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(url)
-                }
+                platformOpenSystemSettings()
             }
             .buttonStyle(.borderedProminent)
         }

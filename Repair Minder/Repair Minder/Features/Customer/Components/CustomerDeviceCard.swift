@@ -230,7 +230,7 @@ struct CustomerDeviceCard: View {
                     if let googleUrl = location.googleMapsUrl, let url = URL(string: googleUrl),
                        let scheme = url.scheme?.lowercased(), ["https", "http", "comgooglemaps"].contains(scheme) {
                         Button {
-                            UIApplication.shared.open(url)
+                            platformOpenURL(url)
                         } label: {
                             Label("Google Maps", systemImage: "map")
                                 .font(.caption)
@@ -241,7 +241,7 @@ struct CustomerDeviceCard: View {
                     if let appleUrl = location.appleMapsUrl, let url = URL(string: appleUrl),
                        let scheme = url.scheme?.lowercased(), ["https", "http", "maps"].contains(scheme) {
                         Button {
-                            UIApplication.shared.open(url)
+                            platformOpenURL(url)
                         } label: {
                             Label("Apple Maps", systemImage: "map.fill")
                                 .font(.caption)

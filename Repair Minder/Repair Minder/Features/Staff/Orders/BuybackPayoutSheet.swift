@@ -263,7 +263,7 @@ struct BuybackPayoutSheet: View {
             }
             Spacer()
             Button {
-                UIPasteboard.general.string = value
+                platformCopyToClipboard(value)
                 copiedField = label
                 Task {
                     try? await Task.sleep(for: .seconds(2))

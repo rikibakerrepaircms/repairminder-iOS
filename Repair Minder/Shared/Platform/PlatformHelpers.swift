@@ -56,6 +56,16 @@ func platformOSVersion() -> String {
     #endif
 }
 
+/// Copy a string to the system clipboard
+func platformCopyToClipboard(_ string: String) {
+    #if os(iOS)
+    UIPasteboard.general.string = string
+    #elseif os(macOS)
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(string, forType: .string)
+    #endif
+}
+
 /// Platform identifier string for API registration
 var platformIdentifier: String {
     #if os(iOS)

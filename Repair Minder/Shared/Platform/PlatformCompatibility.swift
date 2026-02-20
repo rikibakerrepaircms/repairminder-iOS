@@ -94,6 +94,21 @@ extension SearchFieldPlacement {
     enum _DisplayMode { case automatic, always }
 }
 
+// MARK: - UITextAutocapitalizationType shim (deprecated .autocapitalization modifier)
+
+/// Stub so `.autocapitalization(.none)` compiles on macOS.
+/// This is the OLD deprecated modifier (different from textInputAutocapitalization).
+enum UITextAutocapitalizationType: Int {
+    case none, words, sentences, allCharacters
+}
+
+extension View {
+    /// No-op on macOS — autocapitalisation is not configurable.
+    func autocapitalization(_ style: UITextAutocapitalizationType) -> some View {
+        self
+    }
+}
+
 // MARK: - UIKeyboardType shim
 
 /// Stub so `keyboardType: .numberPad` compiles on macOS inside FormTextField.

@@ -734,7 +734,7 @@ struct PosCardPaymentSheet: View {
                     .padding(.horizontal)
 
                 Button {
-                    UIPasteboard.general.string = url
+                    platformCopyToClipboard(url)
                     linkCopied = true
                     Task {
                         try? await Task.sleep(for: .seconds(2))

@@ -174,7 +174,7 @@ struct MessageBubble: View {
     @ViewBuilder
     private var contextMenuItems: some View {
         Button {
-            UIPasteboard.general.string = message.displayContent
+            platformCopyToClipboard(message.displayContent)
         } label: {
             Label("Copy Text", systemImage: "doc.on.doc")
         }
