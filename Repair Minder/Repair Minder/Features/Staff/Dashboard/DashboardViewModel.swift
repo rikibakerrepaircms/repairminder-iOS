@@ -22,7 +22,7 @@ final class DashboardViewModel {
     var isLoading = false
     var error: String?
 
-    var selectedScope: DashboardScope = .user
+    var selectedScope: DashboardScope = AuthManager.shared.currentUser?.role.isAdmin == true ? .company : .user
     var selectedPeriod: StatPeriod = .thisMonth
 
     // MARK: - Computed Properties

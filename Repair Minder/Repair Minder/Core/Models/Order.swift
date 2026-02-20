@@ -381,6 +381,14 @@ enum DocumentType: String, Sendable {
         case .collectionReceipt: return "checkmark.circle"
         }
     }
+
+    var filePrefix: String {
+        switch self {
+        case .bookingReceipt: return "booking_receipt"
+        case .invoice: return "invoice"
+        case .collectionReceipt: return "collection_receipt"
+        }
+    }
 }
 
 struct OrderSignature: Decodable, Identifiable, Equatable, Sendable {

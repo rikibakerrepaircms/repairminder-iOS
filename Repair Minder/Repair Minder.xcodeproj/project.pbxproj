@@ -413,7 +413,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Repair Minder/Repair Minder.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = T578MBWLM2;
 				ENABLE_APP_SANDBOX = YES;
@@ -465,7 +465,7 @@
 				BRAND_ID = repairminder;
 				CODE_SIGN_ENTITLEMENTS = "Repair Minder/Repair MinderRelease.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = T578MBWLM2;
 				ENABLE_APP_SANDBOX = YES;

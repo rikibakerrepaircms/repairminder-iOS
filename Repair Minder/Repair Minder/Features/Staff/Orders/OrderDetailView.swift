@@ -236,7 +236,7 @@ struct OrderDetailView: View {
         // MARK: - Document Sheet
         .sheet(isPresented: $showDocumentSheet) {
             if let type = selectedDocumentType, let order = viewModel.order {
-                DocumentPreviewSheet(orderId: order.id, documentType: type)
+                DocumentPreviewSheet(orderId: order.id, orderNumber: order.orderNumber, documentType: type)
             }
         }
     }
@@ -642,8 +642,8 @@ struct OrderDetailView: View {
                         Label("Take Card Payment", systemImage: "creditcard.and.123")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered)
-                    .tint(.primary)
+                    .buttonStyle(.borderedProminent)
+                    .tint(.blue)
                 }
 
                 // Add Payment — always shown

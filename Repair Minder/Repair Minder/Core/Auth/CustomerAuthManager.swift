@@ -201,8 +201,8 @@ final class CustomerAuthManager: ObservableObject {
             clearPendingLogin()
         }
 
-        // Unregister push token before logout
-        await PushNotificationService.shared.unregisterToken()
+        // Unregister push token before logout (use customer endpoint)
+        await PushNotificationService.shared.unregisterToken(appType: "customer")
 
         // Call logout endpoint (ignore errors - we'll clear local state anyway)
         do {

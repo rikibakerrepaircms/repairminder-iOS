@@ -254,12 +254,19 @@ private struct LoadingView: View {
 
 // MARK: - Staff Main View
 
+/// Staff tab identifiers — wraps FeatureTab for dynamic tabs + the fixed More tab
+private enum StaffTab: Hashable {
+    case feature(FeatureTab)
+    case more
+}
+
 /// Main staff interface with tab navigation
 private struct StaffMainView: View {
     @ObservedObject private var authManager = AuthManager.shared
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var deepLinkHandler = DeepLinkHandler.shared
-    @State private var selectedTab: StaffTab = .dashboard
+    @ObservedObject private var tabConfig = TabBarConfig.shared
+    @State private var selectedTab: StaffTab = .feature(.dashboard)
     @State private var showBookingSheet = false
     @State private var fabDragOffset: CGFloat = 0
     private var fabState = FABState.shared
@@ -267,44 +274,21 @@ private struct StaffMainView: View {
     // Deep link navigation state
     @State private var deepLinkOrderId: String?
     @State private var deepLinkEnquiryId: String?
+    @State private var deepLinkBuybackId: String?
     @State private var deepLinkDeviceId: String?
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            DashboardView()
-                .tabItem {
-                    Label("Dashboard", systemImage: "chart.bar.fill")
-                }
-                .tag(StaffTab.dashboard)
-
-            MyQueueView()
-                .tabItem {
-                    Label("My Queue", systemImage: "tray.full.fill")
-                }
-                .tag(StaffTab.queue)
-
-            NavigationStack {
-                OrderListView()
-                    .navigationDestination(item: $deepLinkOrderId) { orderId in
-                        OrderDetailView(orderId: orderId)
+            // Dynamic feature tabs based on user preferences
+            ForEach(tabConfig.selectedTabs) { tab in
+                tabContent(for: tab)
+                    .tabItem {
+                        Label(tab.label, systemImage: tab.icon)
                     }
+                    .tag(StaffTab.feature(tab))
             }
-            .tabItem {
-                Label("Orders", systemImage: "doc.text.fill")
-            }
-            .tag(StaffTab.orders)
 
-            NavigationStack {
-                EnquiryListView()
-                    .navigationDestination(item: $deepLinkEnquiryId) { ticketId in
-                        EnquiryDetailView(ticketId: ticketId)
-                    }
-            }
-            .tabItem {
-                Label("Enquiries", systemImage: "envelope.fill")
-            }
-            .tag(StaffTab.enquiries)
-
+            // "More" tab — always present as the last tab
             SettingsView()
                 .tabItem {
                     Label("More", systemImage: "ellipsis.circle.fill")
@@ -361,6 +345,12 @@ private struct StaffMainView: View {
         .onChange(of: deepLinkHandler.pendingDestination) { _, destination in
             handleDeepLink(destination)
         }
+        .onChange(of: tabConfig.selectedTabs) { _, _ in
+            // If current tab was removed from tab bar, switch to dashboard
+            if case .feature(let current) = selectedTab, !tabConfig.isSelected(current) {
+                selectedTab = .feature(.dashboard)
+            }
+        }
         .onAppear {
             // Handle any pending deep link when view appears
             if let destination = deepLinkHandler.pendingDestination {
@@ -368,6 +358,45 @@ private struct StaffMainView: View {
             }
         }
     }
+
+    // MARK: - Tab Content
+
+    @ViewBuilder
+    private func tabContent(for tab: FeatureTab) -> some View {
+        switch tab {
+        case .dashboard:
+            DashboardView()
+
+        case .queue:
+            MyQueueView()
+
+        case .orders:
+            NavigationStack {
+                OrderListView()
+                    .navigationDestination(item: $deepLinkOrderId) { orderId in
+                        OrderDetailView(orderId: orderId)
+                    }
+            }
+
+        case .buyback:
+            NavigationStack {
+                BuybackListView()
+                    .navigationDestination(item: $deepLinkBuybackId) { buybackId in
+                        BuybackDetailView(buybackId: buybackId)
+                    }
+            }
+
+        case .enquiries:
+            NavigationStack {
+                EnquiryListView()
+                    .navigationDestination(item: $deepLinkEnquiryId) { ticketId in
+                        EnquiryDetailView(ticketId: ticketId)
+                    }
+            }
+        }
+    }
+
+    // MARK: - Deep Link Handling
 
     private func handleDeepLink(_ destination: DeepLinkDestination?) {
         guard let destination = destination else { return }
@@ -380,36 +409,48 @@ private struct StaffMainView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             switch destination {
             case .order(let id):
-                selectedTab = .orders
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    deepLinkOrderId = id
+                if tabConfig.isSelected(.orders) {
+                    selectedTab = .feature(.orders)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        deepLinkOrderId = id
+                    }
+                } else {
+                    selectedTab = .more
                 }
 
             case .enquiry(let id), .ticket(let id):
-                selectedTab = .enquiries
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    deepLinkEnquiryId = id
+                if tabConfig.isSelected(.enquiries) {
+                    selectedTab = .feature(.enquiries)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        deepLinkEnquiryId = id
+                    }
+                } else {
+                    selectedTab = .more
                 }
 
             case .device(let id):
-                // Devices are typically shown within orders, navigate to queue
-                selectedTab = .queue
+                if tabConfig.isSelected(.queue) {
+                    selectedTab = .feature(.queue)
+                } else {
+                    selectedTab = .more
+                }
                 deepLinkDeviceId = id
+
+            case .buyback(let id):
+                if tabConfig.isSelected(.buyback) {
+                    selectedTab = .feature(.buyback)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        deepLinkBuybackId = id
+                    }
+                } else {
+                    selectedTab = .more
+                }
             }
 
             // Clear the pending destination
             deepLinkHandler.clearPendingDestination()
         }
     }
-}
-
-/// Staff tab identifiers
-private enum StaffTab: Hashable {
-    case dashboard
-    case queue
-    case orders
-    case enquiries
-    case more
 }
 
 // MARK: - Passcode Setup View

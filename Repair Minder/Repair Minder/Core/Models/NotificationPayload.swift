@@ -88,6 +88,7 @@ enum DeepLinkDestination: Equatable {
     case device(id: String)
     case enquiry(id: String)
     case ticket(id: String)
+    case buyback(id: String)
 
     /// Create destination from notification payload
     static func from(payload: NotificationPayload) -> DeepLinkDestination? {

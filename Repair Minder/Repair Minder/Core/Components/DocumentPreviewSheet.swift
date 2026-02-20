@@ -8,18 +8,29 @@ import WebKit
 
 struct DocumentPreviewSheet: View {
     let orderId: String
+    let orderNumber: Int
     let documentType: DocumentType
     @Environment(\.dismiss) private var dismiss
 
-    @State private var htmlData: Data?
+    @State private var htmlString: String?
     @State private var isLoading = true
+    @State private var isWebViewReady = false
     @State private var error: String?
     @State private var webView: WKWebView?
 
     var body: some View {
         NavigationStack {
-            Group {
-                if isLoading {
+            ZStack {
+                if let html = htmlString {
+                    WebViewRepresentable(
+                        htmlString: html,
+                        webView: $webView,
+                        isReady: $isWebViewReady
+                    )
+                    .opacity(isWebViewReady ? 1 : 0)
+                }
+
+                if isLoading || (htmlString != nil && !isWebViewReady) {
                     ProgressView("Loading \(documentType.displayName)...")
                 } else if let error {
                     ContentUnavailableView {
@@ -32,8 +43,6 @@ struct DocumentPreviewSheet: View {
                         }
                         .buttonStyle(.bordered)
                     }
-                } else if let data = htmlData {
-                    WebViewRepresentable(htmlData: data, webView: $webView)
                 }
             }
             .navigationTitle(documentType.displayName)
@@ -49,14 +58,14 @@ struct DocumentPreviewSheet: View {
                     } label: {
                         Image(systemName: "printer")
                     }
-                    .disabled(webView == nil)
+                    .disabled(webView == nil || !isWebViewReady)
 
                     Button {
                         shareDocument()
                     } label: {
                         Image(systemName: "square.and.arrow.up")
                     }
-                    .disabled(webView == nil)
+                    .disabled(webView == nil || !isWebViewReady)
                 }
             }
         }
@@ -68,12 +77,13 @@ struct DocumentPreviewSheet: View {
     private func loadDocument() async {
         isLoading = true
         error = nil
+        isWebViewReady = false
 
         do {
             let data = try await APIClient.shared.requestRawData(
                 .orderDocument(orderId: orderId, type: documentType)
             )
-            htmlData = data
+            htmlString = String(data: data, encoding: .utf8)
         } catch {
             self.error = error.localizedDescription
         }
@@ -86,7 +96,7 @@ struct DocumentPreviewSheet: View {
 
         let printController = UIPrintInteractionController.shared
         let printInfo = UIPrintInfo.printInfo()
-        printInfo.jobName = "\(documentType.displayName)"
+        printInfo.jobName = "\(documentType.filePrefix)_\(orderNumber)"
         printInfo.outputType = .general
         printController.printInfo = printInfo
         printController.printFormatter = webView.viewPrintFormatter()
@@ -96,12 +106,17 @@ struct DocumentPreviewSheet: View {
     private func shareDocument() {
         guard let webView else { return }
 
+        let fileName = "\(documentType.filePrefix)_\(orderNumber).pdf"
+
         webView.createPDF { result in
             switch result {
             case .success(let pdfData):
                 DispatchQueue.main.async {
+                    let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+                    try? pdfData.write(to: tempURL)
+
                     let activityVC = UIActivityViewController(
-                        activityItems: [pdfData],
+                        activityItems: [tempURL],
                         applicationActivities: nil
                     )
                     if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
@@ -131,21 +146,36 @@ struct DocumentPreviewSheet: View {
 // MARK: - WKWebView Representable
 
 private struct WebViewRepresentable: UIViewRepresentable {
-    let htmlData: Data
+    let htmlString: String
     @Binding var webView: WKWebView?
+    @Binding var isReady: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
 
     func makeUIView(context: Context) -> WKWebView {
         let wv = WKWebView()
-        wv.isOpaque = false
         wv.backgroundColor = .systemBackground
-        DispatchQueue.main.async {
-            self.webView = wv
-        }
-        if let htmlString = String(data: htmlData, encoding: .utf8) {
-            wv.loadHTMLString(htmlString, baseURL: nil)
-        }
+        wv.navigationDelegate = context.coordinator
+        wv.loadHTMLString(htmlString, baseURL: nil)
         return wv
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {}
+
+    class Coordinator: NSObject, WKNavigationDelegate {
+        let parent: WebViewRepresentable
+
+        init(parent: WebViewRepresentable) {
+            self.parent = parent
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            DispatchQueue.main.async {
+                self.parent.webView = webView
+                self.parent.isReady = true
+            }
+        }
+    }
 }

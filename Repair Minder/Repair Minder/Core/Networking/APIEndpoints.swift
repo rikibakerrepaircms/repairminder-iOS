@@ -144,6 +144,8 @@ enum APIEndpoint {
     case deviceTokens
     case pushPreferences
     case updatePushPreferences
+    case customerRegisterDeviceToken
+    case customerUnregisterDeviceToken
 
     // MARK: - Product Types
 
@@ -174,6 +176,12 @@ enum APIEndpoint {
     case createPaymentLink
     case cancelPaymentLink(linkId: String)
     case resendPaymentLinkEmail(linkId: String)
+
+    // MARK: - Buyback Inventory
+
+    case buybackList(page: Int, limit: Int, status: String?, search: String?, locationId: String?, engineerId: String?)
+    case buybackDetail(id: String)
+    case buybackImageFile(imageId: String, width: Int?, height: Int?)
 
     // MARK: - Customer Portal
 
@@ -377,6 +385,8 @@ enum APIEndpoint {
             return "/api/user/device-tokens"
         case .pushPreferences, .updatePushPreferences:
             return "/api/user/push-preferences"
+        case .customerRegisterDeviceToken, .customerUnregisterDeviceToken:
+            return "/api/customer/device-token"
 
         // POS
         case .posIntegrations:
@@ -397,6 +407,14 @@ enum APIEndpoint {
             return "/api/pos/payment-links/\(id)/cancel"
         case .resendPaymentLinkEmail(let id):
             return "/api/pos/payment-links/\(id)/resend"
+
+        // Buyback Inventory
+        case .buybackList:
+            return "/api/buyback"
+        case .buybackDetail(let id):
+            return "/api/buyback/\(id)"
+        case .buybackImageFile(let imageId, _, _):
+            return "/api/buyback/images/\(imageId)/file"
 
         // Customer Portal
         case .customerOrders:
@@ -432,6 +450,7 @@ enum APIEndpoint {
              .locations, .deviceSearch, .deviceTypes, .companyPublicInfo,
              .deviceTokens, .pushPreferences,
              .posIntegrations, .posTerminals, .pollTerminalPayment, .paymentLinks,
+             .buybackList, .buybackDetail, .buybackImageFile,
              .customerOrders, .customerOrder, .customerOrderInvoice, .customerDeviceImage:
             return .get
 
@@ -448,7 +467,7 @@ enum APIEndpoint {
              .createClient, .clientsImport,
              .createTicket, .ticketReply, .ticketNote, .ticketGenerateResponse, .ticketRewriteResponse, .ticketExecuteMacro,
              .ticketResolve, .ticketReassign, .createEnquiry,
-             .registerDeviceToken,
+             .registerDeviceToken, .customerRegisterDeviceToken,
              .initiateTerminalPayment, .cancelTerminalPayment, .refundTerminalPayment,
              .createPaymentLink, .cancelPaymentLink, .resendPaymentLinkEmail,
              .customerApproveQuote, .customerOrderReply:
@@ -470,7 +489,7 @@ enum APIEndpoint {
         // DELETE endpoints
         case .deleteOrderDevice, .deleteOrderItem, .deleteOrderPayment,
              .deleteClient,
-             .unregisterDeviceToken,
+             .unregisterDeviceToken, .customerUnregisterDeviceToken,
              .cancelMacroExecution:
             return .delete
         }
@@ -615,6 +634,36 @@ enum APIEndpoint {
                 items.append(URLQueryItem(name: "per_page", value: String(perPage)))
             }
             return items.isEmpty ? nil : items
+
+        case .buybackList(let page, let limit, let status, let search, let locationId, let engineerId):
+            var items = [
+                URLQueryItem(name: "page", value: String(page)),
+                URLQueryItem(name: "limit", value: String(limit))
+            ]
+            if let status = status {
+                items.append(URLQueryItem(name: "status", value: status))
+            }
+            if let search = search, !search.isEmpty {
+                items.append(URLQueryItem(name: "search", value: search))
+            }
+            if let locationId = locationId {
+                items.append(URLQueryItem(name: "location_id", value: locationId))
+            }
+            if let engineerId = engineerId {
+                items.append(URLQueryItem(name: "engineer_id", value: engineerId))
+            }
+            return items
+
+        case .buybackImageFile(_, let width, let height):
+            var items: [URLQueryItem] = []
+            if let width = width {
+                items.append(URLQueryItem(name: "w", value: String(width)))
+            }
+            if let height = height {
+                items.append(URLQueryItem(name: "h", value: String(height)))
+            }
+            items.append(URLQueryItem(name: "format", value: "auto"))
+            return items
 
         default:
             return nil

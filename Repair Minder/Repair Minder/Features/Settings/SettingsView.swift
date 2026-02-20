@@ -10,9 +10,27 @@ import SwiftUI
 // MARK: - Settings Destination
 
 enum SettingsDestination: Hashable {
+    case buyback
     case clients
+    case queue
+    case orders
+    case enquiries
+    case tabBar
     case notifications
     case security
+}
+
+extension SettingsDestination {
+    /// Map a FeatureTab to its SettingsDestination for overflow navigation
+    static func from(_ tab: FeatureTab) -> SettingsDestination? {
+        switch tab {
+        case .dashboard: nil // Dashboard is always in tab bar
+        case .queue: .queue
+        case .orders: .orders
+        case .buyback: .buyback
+        case .enquiries: .enquiries
+        }
+    }
 }
 
 // MARK: - Settings View
@@ -23,6 +41,7 @@ struct SettingsView: View {
     @ObservedObject private var authManager = AuthManager.shared
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @ObservedObject private var tabConfig = TabBarConfig.shared
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selectedDestination: SettingsDestination?
 
@@ -66,10 +85,31 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var iPadLayout: some View {
-        if selectedDestination == .clients {
+        if selectedDestination == .buyback {
+            BuybackListView(onBack: {
+                withAnimation { selectedDestination = nil }
+            })
+        } else if selectedDestination == .clients {
             ClientListView(onBack: {
                 withAnimation { selectedDestination = nil }
             })
+        } else if isFullScreenDestination(selectedDestination) {
+            // Full-screen feature views (queue, orders, enquiries) — use NavigationStack with back button
+            NavigationStack {
+                destinationView(selectedDestination!)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button {
+                                withAnimation { selectedDestination = nil }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "chevron.left")
+                                    Text("More")
+                                }
+                            }
+                        }
+                    }
+            }
         } else {
             AnimatedSplitView(showDetail: selectedDestination != nil) {
                 NavigationStack {
@@ -86,12 +126,18 @@ struct SettingsView: View {
         }
     }
 
+    private func isFullScreenDestination(_ dest: SettingsDestination?) -> Bool {
+        guard let dest else { return false }
+        return dest == .queue || dest == .orders || dest == .enquiries
+    }
+
     // MARK: - Shared Settings List
 
     private var settingsList: some View {
         List {
             profileSection
-            navigationSection
+            featuresSection
+            tabBarSection
             notificationsSection
             securitySection
             appearanceSection
@@ -107,8 +153,21 @@ struct SettingsView: View {
     @ViewBuilder
     private func destinationView(_ dest: SettingsDestination) -> some View {
         switch dest {
+        case .buyback:
+            BuybackListView(isEmbedded: true)
         case .clients:
             ClientListView(isEmbedded: true)
+        case .queue:
+            MyQueueView()
+                .navigationTitle("My Queue")
+        case .orders:
+            OrderListView()
+                .navigationTitle("Orders")
+        case .enquiries:
+            EnquiryListView()
+                .navigationTitle("Enquiries")
+        case .tabBar:
+            TabBarSettingsView()
         case .notifications:
             NotificationSettingsView()
         case .security:
@@ -175,11 +234,26 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Navigation Section
+    // MARK: - Features Section
 
-    private var navigationSection: some View {
-        Section {
+    private var featuresSection: some View {
+        Section("Features") {
+            // Overflow feature tabs (not in main tab bar)
+            ForEach(tabConfig.overflowTabs) { tab in
+                if let dest = SettingsDestination.from(tab) {
+                    settingsLink(dest, label: tab.label, icon: tab.icon)
+                }
+            }
+            // Clients always here (not a tab bar candidate)
             settingsLink(.clients, label: "Clients", icon: "person.2.fill")
+        }
+    }
+
+    // MARK: - Tab Bar Section
+
+    private var tabBarSection: some View {
+        Section {
+            settingsLink(.tabBar, label: "Customise Tab Bar", icon: "square.grid.2x2")
         }
     }
 

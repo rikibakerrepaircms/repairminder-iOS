@@ -105,6 +105,10 @@ final class DeepLinkHandler: ObservableObject {
             pendingDestination = .ticket(id: entityId)
             return true
 
+        case "buyback", "buybacks":
+            pendingDestination = .buyback(id: entityId)
+            return true
+
         default:
             return false
         }
