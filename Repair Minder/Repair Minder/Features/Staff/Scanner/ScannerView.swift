@@ -6,7 +6,9 @@
 //
 
 import SwiftUI
+#if os(iOS)
 import AVFoundation
+#endif
 
 // MARK: - Scanner View
 
@@ -14,87 +16,203 @@ import AVFoundation
 struct ScannerView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var scannerViewModel = ScannerViewModel()
+    @State private var navigateToDevice = false
+
+    #if os(iOS)
     @State private var manualEntryText = ""
     @State private var showingManualEntry = false
-    @State private var navigateToDevice = false
+    #endif
 
     var viewModel: DevicesViewModel?
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                // Camera preview
-                if scannerViewModel.cameraPermissionDenied {
-                    permissionDeniedView
+            #if os(iOS)
+            iOSScannerBody
+            #elseif os(macOS)
+            macOSScannerBody
+            #endif
+        }
+    }
+
+    // MARK: - macOS Scanner (text entry)
+
+    #if os(macOS)
+    private var macOSScannerBody: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            Image(systemName: "barcode.viewfinder")
+                .font(.system(size: 64))
+                .foregroundStyle(.secondary)
+
+            Text("Device Lookup")
+                .font(.title)
+                .fontWeight(.semibold)
+
+            Text("Enter a serial number, IMEI, or barcode value to search")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 12) {
+                TextField("Serial number, IMEI, or barcode...", text: $scannerViewModel.manualEntryText)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { performSearch() }
+                    .frame(maxWidth: 400)
+
+                Button("Search") { performSearch() }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(scannerViewModel.manualEntryText.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .keyboardShortcut(.return, modifiers: [])
+            }
+
+            // Results area
+            if scannerViewModel.isSearching {
+                ProgressView("Searching...")
+                    .padding()
+            } else if let result = scannerViewModel.searchResult {
+                macSearchResultCard(result)
+            } else if let error = scannerViewModel.error {
+                VStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.title2)
+                        .foregroundStyle(.orange)
+                    Text(error)
+                        .foregroundStyle(.secondary)
+                }
+                .padding()
+            }
+
+            Spacer()
+        }
+        .padding(40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationTitle("Device Lookup")
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Close") { dismiss() }
+            }
+        }
+    }
+
+    private func macSearchResultCard(_ result: DeviceListItem) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(result.displayName)
+                        .font(.headline)
+                    if let serial = result.serialNumber {
+                        Text("S/N: \(serial)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                if let orderId = result.orderId {
+                    Button("View Details") {
+                        navigateToDevice = true
+                    }
+                    .buttonStyle(.borderedProminent)
                 } else {
-                    cameraPreview
-                }
-
-                // Overlay
-                VStack {
-                    Spacer()
-
-                    // Scanner frame
-                    if scannerViewModel.isScanning {
-                        scannerFrame
-                    }
-
-                    Spacer()
-
-                    // Results or controls
-                    bottomPanel
+                    Text("No linked order")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Scan Device")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        dismiss()
-                    }
+        }
+        .padding()
+        .background(Color.platformGray6)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .frame(maxWidth: 500)
+        .navigationDestination(isPresented: $navigateToDevice) {
+            if let result = scannerViewModel.searchResult,
+               let orderId = result.orderId {
+                DeviceDetailView(orderId: orderId, deviceId: result.id)
+            }
+        }
+    }
+
+    private func performSearch() {
+        let text = scannerViewModel.manualEntryText.trimmingCharacters(in: .whitespaces)
+        guard !text.isEmpty else { return }
+        Task {
+            await scannerViewModel.manualSearch(text)
+        }
+    }
+    #endif
+
+    // MARK: - iOS Scanner (camera)
+
+    #if os(iOS)
+    private var iOSScannerBody: some View {
+        ZStack {
+            // Camera preview
+            if scannerViewModel.cameraPermissionDenied {
+                permissionDeniedView
+            } else {
+                cameraPreview
+            }
+
+            // Overlay
+            VStack {
+                Spacer()
+
+                // Scanner frame
+                if scannerViewModel.isScanning {
+                    scannerFrame
                 }
 
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingManualEntry = true
-                    } label: {
-                        Image(systemName: "keyboard")
-                    }
+                Spacer()
+
+                // Results or controls
+                bottomPanel
+            }
+        }
+        .navigationTitle("Scan Device")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Close") {
+                    dismiss()
                 }
             }
-            .sheet(isPresented: $showingManualEntry) {
-                manualEntrySheet
-            }
-            .navigationDestination(isPresented: $navigateToDevice) {
-                if let device = scannerViewModel.searchResult,
-                   let orderId = device.orderId {
-                    DeviceDetailView(orderId: orderId, deviceId: device.id)
-                } else {
-                    ContentUnavailableView(
-                        "No Order",
-                        systemImage: "doc.questionmark",
-                        description: Text("This device is not associated with an order")
-                    )
+
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingManualEntry = true
+                } label: {
+                    Image(systemName: "keyboard")
                 }
             }
-            .onAppear {
-                scannerViewModel.setupCamera()
+        }
+        .sheet(isPresented: $showingManualEntry) {
+            manualEntrySheet
+        }
+        .navigationDestination(isPresented: $navigateToDevice) {
+            if let device = scannerViewModel.searchResult,
+               let orderId = device.orderId {
+                DeviceDetailView(orderId: orderId, deviceId: device.id)
+            } else {
+                ContentUnavailableView(
+                    "No Order",
+                    systemImage: "doc.questionmark",
+                    description: Text("This device is not associated with an order")
+                )
             }
-            .onDisappear {
-                scannerViewModel.cleanup()
-            }
+        }
+        .onAppear {
+            scannerViewModel.setupCamera()
+        }
+        .onDisappear {
+            scannerViewModel.cleanup()
         }
     }
 
     // MARK: - Camera Preview
 
     private var cameraPreview: some View {
-        #if os(iOS)
         CameraPreviewView(session: scannerViewModel.captureSession)
             .ignoresSafeArea()
-        #else
-        Color.black
-        #endif
     }
 
     // MARK: - Scanner Frame
@@ -336,6 +454,7 @@ struct ScannerView: View {
         }
         .presentationDetents([.height(200)])
     }
+    #endif
 }
 
 #if os(iOS)

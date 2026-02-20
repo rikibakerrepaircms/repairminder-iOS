@@ -13,14 +13,14 @@ struct TabBarSettingsView: View {
     var body: some View {
         List {
             Section {
-                Text("Choose up to 4 tabs for your main menu and drag to reorder. The rest will be accessible from the More tab.")
+                Text("Choose up to 4 tabs for your main menu. The rest will be accessible from the More tab.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .listRowBackground(Color.clear)
             }
 
             // Section 1: Tab Bar Order
-            Section("Tab Bar Order") {
+            Section {
                 // Dashboard — locked, not draggable
                 HStack(spacing: 12) {
                     Image(systemName: FeatureTab.dashboard.icon)
@@ -33,10 +33,6 @@ struct TabBarSettingsView: View {
 
                     Spacer()
 
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(Color.accentColor)
-
                     Image(systemName: "lock.fill")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -46,6 +42,17 @@ struct TabBarSettingsView: View {
                 // Customisable tabs — draggable, removable
                 ForEach(config.customisableTabs) { tab in
                     HStack(spacing: 12) {
+                        Button {
+                            withAnimation {
+                                config.removeTab(tab)
+                            }
+                        } label: {
+                            Image(systemName: "minus.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(.red)
+                        }
+                        .buttonStyle(.plain)
+
                         Image(systemName: tab.icon)
                             .font(.title3)
                             .foregroundStyle(Color.accentColor)
@@ -57,16 +64,15 @@ struct TabBarSettingsView: View {
                         Spacer()
                     }
                 }
-                .onDelete { indexSet in
-                    for index in indexSet.sorted().reversed() {
-                        let tab = config.customisableTabs[index]
-                        withAnimation {
-                            config.removeTab(tab)
-                        }
-                    }
-                }
                 .onMove { source, destination in
                     config.moveTab(from: source, to: destination)
+                }
+            } header: {
+                Text("Tab Bar Order")
+            } footer: {
+                if !config.customisableTabs.isEmpty {
+                    Text("Drag to reorder · Tap ⊖ to remove")
+                        .font(.caption)
                 }
             }
             #if os(iOS)

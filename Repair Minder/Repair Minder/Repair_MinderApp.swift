@@ -50,6 +50,38 @@ struct Repair_MinderApp: App {
         }
         #if os(macOS)
         .defaultSize(width: 1200, height: 800)
+        .commands {
+            // Replace default Cmd+N (new window) with our booking action
+            CommandGroup(replacing: .newItem) { }
+
+            CommandMenu("Booking") {
+                Button("New Booking") {
+                    NotificationCenter.default.post(name: .openNewBooking, object: nil)
+                }
+                .keyboardShortcut("n", modifiers: [.command])
+
+                Button("Device Lookup") {
+                    NotificationCenter.default.post(name: .openDeviceLookup, object: nil)
+                }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
+            }
+
+            CommandGroup(after: .sidebar) {
+                Button("Toggle Sidebar") {
+                    NSApp.keyWindow?.firstResponder?.tryToPerform(
+                        #selector(NSSplitViewController.toggleSidebar(_:)),
+                        with: nil
+                    )
+                }
+                .keyboardShortcut("s", modifiers: [.command, .control])
+            }
+        }
+        #endif
+
+        #if os(macOS)
+        Settings {
+            MacSettingsView()
+        }
         #endif
     }
 
@@ -230,7 +262,11 @@ struct RootView: View {
                 PasscodeSetupView()
 
             case .staffDashboard:
+                #if os(iOS)
                 StaffMainView()
+                #elseif os(macOS)
+                MacStaffMainView()
+                #endif
 
             case .customerPortal:
                 CustomerOrderListView()
@@ -404,6 +440,9 @@ private struct StaffMainView: View {
                         EnquiryDetailView(ticketId: ticketId)
                     }
             }
+
+        case .clients:
+            ClientListView()
         }
     }
 

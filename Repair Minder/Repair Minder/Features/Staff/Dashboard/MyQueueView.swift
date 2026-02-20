@@ -19,6 +19,9 @@ private struct DeviceNavigation: Hashable {
 
 /// Staff work queue showing devices assigned to the current user
 struct MyQueueView: View {
+    var isEmbedded: Bool = false
+    var onBack: (() -> Void)? = nil
+
     @State private var viewModel = MyQueueViewModel()
     @State private var searchText = ""
     @State private var deviceNavigation: DeviceNavigation?
@@ -29,11 +32,22 @@ struct MyQueueView: View {
     }
 
     var body: some View {
-        if isRegularWidth {
+        if isEmbedded {
+            embeddedBody
+        } else if isRegularWidth {
             iPadBody
         } else {
             iPhoneBody
         }
+    }
+
+    // MARK: - Embedded Layout (inside another NavigationStack)
+
+    private var embeddedBody: some View {
+        queueContent(wideRows: false)
+            .navigationDestination(item: $deviceNavigation) { nav in
+                DeviceDetailView(orderId: nav.orderId, deviceId: nav.deviceId)
+            }
     }
 
     // MARK: - iPhone Layout
@@ -53,6 +67,20 @@ struct MyQueueView: View {
         AnimatedSplitView(showDetail: deviceNavigation != nil) {
             NavigationStack {
                 queueContent(wideRows: false)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            if let onBack {
+                                Button {
+                                    onBack()
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "chevron.left")
+                                        Text("More")
+                                    }
+                                }
+                            }
+                        }
+                    }
             }
         } detail: {
             if let nav = deviceNavigation {

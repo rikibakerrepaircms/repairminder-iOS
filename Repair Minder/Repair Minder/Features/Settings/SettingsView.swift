@@ -29,6 +29,7 @@ extension SettingsDestination {
         case .orders: .orders
         case .buyback: .buyback
         case .enquiries: .enquiries
+        case .clients: .clients
         }
     }
 }
@@ -93,8 +94,12 @@ struct SettingsView: View {
             ClientListView(onBack: {
                 withAnimation { selectedDestination = nil }
             })
+        } else if selectedDestination == .queue {
+            MyQueueView(onBack: {
+                withAnimation { selectedDestination = nil }
+            })
         } else if isFullScreenDestination(selectedDestination) {
-            // Full-screen feature views (queue, orders, enquiries) — use NavigationStack with back button
+            // Full-screen feature views (orders, enquiries) — use NavigationStack with back button
             NavigationStack {
                 destinationView(selectedDestination!)
                     .toolbar {
@@ -128,7 +133,7 @@ struct SettingsView: View {
 
     private func isFullScreenDestination(_ dest: SettingsDestination?) -> Bool {
         guard let dest else { return false }
-        return dest == .queue || dest == .orders || dest == .enquiries
+        return dest == .orders || dest == .enquiries
     }
 
     // MARK: - Shared Settings List
@@ -158,7 +163,7 @@ struct SettingsView: View {
         case .clients:
             ClientListView(isEmbedded: true)
         case .queue:
-            MyQueueView()
+            MyQueueView(isEmbedded: true)
                 .navigationTitle("My Queue")
         case .orders:
             OrderListView()
@@ -236,16 +241,17 @@ struct SettingsView: View {
 
     // MARK: - Features Section
 
+    @ViewBuilder
     private var featuresSection: some View {
-        Section("Features") {
-            // Overflow feature tabs (not in main tab bar)
-            ForEach(tabConfig.overflowTabs) { tab in
-                if let dest = SettingsDestination.from(tab) {
-                    settingsLink(dest, label: tab.label, icon: tab.icon)
+        let overflow = tabConfig.overflowTabs
+        if !overflow.isEmpty {
+            Section("Features") {
+                ForEach(overflow) { tab in
+                    if let dest = SettingsDestination.from(tab) {
+                        settingsLink(dest, label: tab.label, icon: tab.icon)
+                    }
                 }
             }
-            // Clients always here (not a tab bar candidate)
-            settingsLink(.clients, label: "Clients", icon: "person.2.fill")
         }
     }
 

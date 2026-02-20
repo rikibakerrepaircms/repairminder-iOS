@@ -19,6 +19,7 @@ BRAND_API_SUBDOMAIN = api
 
 // Info.plist Display Values
 INFOPLIST_KEY_CFBundleDisplayName = Repair Minder
+INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO
 
 // Device Family (iPhone + iPad)
 TARGETED_DEVICE_FAMILY = 1,2

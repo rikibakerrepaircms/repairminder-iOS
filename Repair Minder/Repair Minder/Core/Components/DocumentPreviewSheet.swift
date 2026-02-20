@@ -5,6 +5,12 @@
 
 import SwiftUI
 import WebKit
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+import UniformTypeIdentifiers
+#endif
 
 struct DocumentPreviewSheet: View {
     let orderId: String
@@ -21,7 +27,6 @@ struct DocumentPreviewSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                #if os(iOS)
                 if let html = htmlString {
                     WebViewRepresentable(
                         htmlString: html,
@@ -30,7 +35,6 @@ struct DocumentPreviewSheet: View {
                     )
                     .opacity(isWebViewReady ? 1 : 0)
                 }
-                #endif
 
                 if isLoading || (htmlString != nil && !isWebViewReady) {
                     ProgressView("Loading \(documentType.displayName)...")
@@ -56,7 +60,6 @@ struct DocumentPreviewSheet: View {
                     Button("Done") { dismiss() }
                 }
 
-                #if os(iOS)
                 ToolbarItemGroup(placement: .primaryAction) {
                     Button {
                         printDocument()
@@ -72,7 +75,6 @@ struct DocumentPreviewSheet: View {
                     }
                     .disabled(webView == nil || !isWebViewReady)
                 }
-                #endif
             }
         }
         .task {
@@ -97,10 +99,10 @@ struct DocumentPreviewSheet: View {
         isLoading = false
     }
 
-    #if os(iOS)
     private func printDocument() {
         guard let webView else { return }
 
+        #if os(iOS)
         let printController = UIPrintInteractionController.shared
         let printInfo = UIPrintInfo.printInfo()
         printInfo.jobName = "\(documentType.filePrefix)_\(orderNumber)"
@@ -108,6 +110,16 @@ struct DocumentPreviewSheet: View {
         printController.printInfo = printInfo
         printController.printFormatter = webView.viewPrintFormatter()
         printController.present(animated: true)
+        #elseif os(macOS)
+        let printInfo = NSPrintInfo.shared.copy() as! NSPrintInfo
+        printInfo.jobDisposition = .spool
+        printInfo.isHorizontallyCentered = true
+        printInfo.isVerticallyCentered = false
+        let printOp = webView.printOperation(with: printInfo)
+        printOp.showsPrintPanel = true
+        printOp.showsProgressPanel = true
+        printOp.run()
+        #endif
     }
 
     private func shareDocument() {
@@ -122,6 +134,7 @@ struct DocumentPreviewSheet: View {
                     let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
                     try? pdfData.write(to: tempURL)
 
+                    #if os(iOS)
                     let activityVC = UIActivityViewController(
                         activityItems: [tempURL],
                         applicationActivities: nil
@@ -142,13 +155,22 @@ struct DocumentPreviewSheet: View {
                         }
                         presenter.present(activityVC, animated: true)
                     }
+                    #elseif os(macOS)
+                    let savePanel = NSSavePanel()
+                    savePanel.nameFieldStringValue = fileName
+                    savePanel.allowedContentTypes = [.pdf]
+                    savePanel.begin { response in
+                        if response == .OK, let url = savePanel.url {
+                            try? pdfData.write(to: url)
+                        }
+                    }
+                    #endif
                 }
             case .failure:
                 break
             }
         }
     }
-    #endif
 }
 
 // MARK: - WKWebView Representable
@@ -172,6 +194,40 @@ private struct WebViewRepresentable: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {}
+
+    class Coordinator: NSObject, WKNavigationDelegate {
+        let parent: WebViewRepresentable
+
+        init(parent: WebViewRepresentable) {
+            self.parent = parent
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            DispatchQueue.main.async {
+                self.parent.webView = webView
+                self.parent.isReady = true
+            }
+        }
+    }
+}
+#elseif os(macOS)
+private struct WebViewRepresentable: NSViewRepresentable {
+    let htmlString: String
+    @Binding var webView: WKWebView?
+    @Binding var isReady: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    func makeNSView(context: Context) -> WKWebView {
+        let wv = WKWebView()
+        wv.navigationDelegate = context.coordinator
+        wv.loadHTMLString(htmlString, baseURL: nil)
+        return wv
+    }
+
+    func updateNSView(_ nsView: WKWebView, context: Context) {}
 
     class Coordinator: NSObject, WKNavigationDelegate {
         let parent: WebViewRepresentable

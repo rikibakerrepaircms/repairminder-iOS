@@ -6,28 +6,34 @@
 //
 
 import SwiftUI
+#if os(iOS)
 @preconcurrency import AVFoundation
+import AudioToolbox
+#endif
 
 // MARK: - Scanner View Model
 
-/// View model for barcode/QR scanner
+/// View model for barcode/QR scanner (iOS) and device lookup (macOS)
 @MainActor
 @Observable
 final class ScannerViewModel: NSObject {
 
-    // MARK: - State
+    // MARK: - Shared State (both platforms)
 
-    var isScanning = false
     var scannedCode: String?
     var searchResult: DeviceListItem?
     var isSearching = false
     var error: String?
+    var manualEntryText = ""
+
+    #if os(iOS)
+    // MARK: - Camera State (iOS only)
+
+    var isScanning = false
     var cameraPermissionDenied = false
-
-    // MARK: - Camera
-
     var captureSession: AVCaptureSession?
     private var previewLayer: AVCaptureVideoPreviewLayer?
+    #endif
 
     // MARK: - Initialization
 
@@ -35,7 +41,8 @@ final class ScannerViewModel: NSObject {
         super.init()
     }
 
-    // MARK: - Camera Setup
+    #if os(iOS)
+    // MARK: - Camera Setup (iOS only)
 
     /// Setup camera for scanning
     func setupCamera() {
@@ -114,7 +121,7 @@ final class ScannerViewModel: NSObject {
         }
     }
 
-    // MARK: - Scanning Control
+    // MARK: - Scanning Control (iOS only)
 
     /// Start scanning
     func startScanning() {
@@ -137,16 +144,20 @@ final class ScannerViewModel: NSObject {
             session?.stopRunning()
         }
     }
+    #endif
+
+    // MARK: - Shared Methods
 
     /// Reset scanner state
     func reset() {
         scannedCode = nil
         searchResult = nil
         error = nil
+        manualEntryText = ""
+        #if os(iOS)
         startScanning()
+        #endif
     }
-
-    // MARK: - Device Search
 
     /// Search for device by scanned code
     func searchDevice(code: String) async {
@@ -177,7 +188,9 @@ final class ScannerViewModel: NSObject {
     /// Manual search with text input
     func manualSearch(_ text: String) async {
         guard !text.isEmpty else { return }
+        #if os(iOS)
         stopScanning()
+        #endif
         scannedCode = text
         await searchDevice(code: text)
     }
@@ -185,13 +198,16 @@ final class ScannerViewModel: NSObject {
     // MARK: - Cleanup
 
     func cleanup() {
+        #if os(iOS)
         stopScanning()
         captureSession = nil
+        #endif
     }
 }
 
-// MARK: - AVCaptureMetadataOutputObjectsDelegate
+// MARK: - AVCaptureMetadataOutputObjectsDelegate (iOS only)
 
+#if os(iOS)
 extension ScannerViewModel: AVCaptureMetadataOutputObjectsDelegate {
     nonisolated func metadataOutput(
         _ output: AVCaptureMetadataOutput,
@@ -215,3 +231,4 @@ extension ScannerViewModel: AVCaptureMetadataOutputObjectsDelegate {
         }
     }
 }
+#endif
