@@ -35,36 +35,9 @@
 		AA00AA012F32B211006D564A /* Repair Minder.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Repair Minder.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		3CD2F6A62F4784CE0020F49E /* Exceptions for "Repair Minder" folder in "Repair Minder" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Configuration/Base.xcconfig,
-				Configuration/ClientA.xcconfig,
-				Configuration/MacOS.xcconfig,
-				Configuration/RepairMinder.xcconfig,
-			);
-			target = 3C22E8A92F32B211006D564A /* Repair Minder */;
-		};
-		BB00BB012F4785AE006D564A /* Exceptions for "Repair Minder" folder in "Repair Minder Mac" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Configuration/Base.xcconfig,
-				Configuration/ClientA.xcconfig,
-				Configuration/MacOS.xcconfig,
-				Configuration/RepairMinder.xcconfig,
-			);
-			target = AA00AA032F32B211006D564A /* Repair Minder Mac */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		3C22E8AC2F32B211006D564A /* Repair Minder */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				3CD2F6A62F4784CE0020F49E /* Exceptions for "Repair Minder" folder in "Repair Minder" target */,
-				BB00BB012F4785AE006D564A /* Exceptions for "Repair Minder" folder in "Repair Minder Mac" target */,
-			);
 			path = "Repair Minder";
 			sourceTree = "<group>";
 		};
