@@ -73,8 +73,8 @@ struct SummaryStepView: View {
                 onEdit: { viewModel.goToStep(.devices) }
             ) {
                 VStack(alignment: .leading, spacing: 12) {
-                    ForEach(viewModel.formData.devices) { device in
-                        DeviceSummaryCard(device: device)
+                    ForEach($viewModel.formData.devices) { $device in
+                        DeviceSummaryCard(device: $device, currencyCode: viewModel.currencyCode)
                     }
                 }
             }
@@ -263,70 +263,86 @@ struct BookingSummarySection<Content: View>: View {
 // MARK: - Device Summary Card
 
 struct DeviceSummaryCard: View {
-    let device: BookingDeviceEntry
+    @Binding var device: BookingDeviceEntry
+    let currencyCode: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: deviceIcon)
-                .foregroundStyle(workflowColor)
-                .frame(width: 24)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: deviceIcon)
+                    .foregroundStyle(workflowColor)
+                    .frame(width: 24)
 
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(device.displayName)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(device.displayName)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
 
-                    Text(device.workflowType.displayName)
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(workflowColor.opacity(0.1))
-                        .foregroundStyle(workflowColor)
-                        .clipShape(Capsule())
-                }
-
-                HStack(spacing: 12) {
-                    if !device.serialNumber.isEmpty {
-                        Text("S/N: \(device.serialNumber)")
+                        Text(device.workflowType.displayName)
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(workflowColor.opacity(0.1))
+                            .foregroundStyle(workflowColor)
+                            .clipShape(Capsule())
                     }
-                    if !device.colour.isEmpty {
-                        Text(device.colour)
-                    }
-                    if !device.storageCapacity.isEmpty {
-                        Text(device.storageCapacity)
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
 
-                if !device.customerReportedIssues.isEmpty {
-                    Text(device.customerReportedIssues)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-
-                HStack(spacing: 12) {
-                    Label(device.conditionGrade.displayName, systemImage: "star")
-                    if device.findMyStatus != .unknown {
-                        Label("Find My: \(device.findMyStatus.displayName)", systemImage: "location.fill")
+                    HStack(spacing: 12) {
+                        if !device.serialNumber.isEmpty {
+                            Text("S/N: \(device.serialNumber)")
+                        }
+                        if !device.colour.isEmpty {
+                            Text(device.colour)
+                        }
+                        if !device.storageCapacity.isEmpty {
+                            Text(device.storageCapacity)
+                        }
                     }
-                    if device.passcodeType != .none {
-                        Label("Passcode", systemImage: "lock.fill")
-                    }
-                }
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
-                if !device.accessories.isEmpty {
-                    HStack(spacing: 4) {
-                        Image(systemName: "bag")
-                        Text("Accessories: \(device.accessories.map(\.accessoryType).joined(separator: ", "))")
+                    if !device.customerReportedIssues.isEmpty {
+                        Text(device.customerReportedIssues)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+
+                    HStack(spacing: 12) {
+                        Label(device.conditionGrade.displayName, systemImage: "star")
+                        if device.findMyStatus != .unknown {
+                            Label("Find My: \(device.findMyStatus.displayName)", systemImage: "location.fill")
+                        }
+                        if device.passcodeType != .none {
+                            Label("Passcode", systemImage: "lock.fill")
+                        }
                     }
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+
+                    if !device.accessories.isEmpty {
+                        HStack(spacing: 4) {
+                            Image(systemName: "bag")
+                            Text("Accessories: \(device.accessories.map(\.accessoryType).joined(separator: ", "))")
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    }
                 }
+            }
+
+            // Line items
+            DeviceLineItemsList(
+                items: $device.lineItems,
+                currencyCode: currencyCode
+            )
+
+            // Aftermarket consent (conditional)
+            if device.hasAftermarketItems {
+                AftermarketConsentToggle(
+                    isConsented: $device.aftermarketConsent
+                )
             }
         }
         .padding()
@@ -340,6 +356,46 @@ struct DeviceSummaryCard: View {
 
     private var deviceIcon: String {
         device.workflowType == .buyback ? "arrow.triangle.2.circlepath" : "wrench.and.screwdriver"
+    }
+}
+
+// MARK: - Aftermarket Consent Toggle
+
+struct AftermarketConsentToggle: View {
+    @Binding var isConsented: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
+                Toggle("", isOn: $isConsented)
+                    .labelsHidden()
+                    .tint(.orange)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Aftermarket Parts Acknowledgement")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+
+                    Text("This repair uses an aftermarket display not designed or manufactured by Apple. It may not perform identically to an original component.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Text("Customer acknowledges and agrees to the use of aftermarket parts for this device.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if !isConsented {
+                Label("Customer must acknowledge aftermarket parts to proceed.", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
+        .padding()
+        .background(Color.orange.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .padding(.top, 4)
     }
 }
 
@@ -370,7 +426,20 @@ struct DeviceSummaryCard: View {
                     customerReportedIssues: "Cracked screen",
                     deviceTypeId: nil,
                     workflowType: .repair,
-                    accessories: []
+                    accessories: [],
+                    lineItems: [
+                        BookingLineItem(
+                            id: UUID(),
+                            productTypeId: "test",
+                            description: "Screen Replacement (Aftermarket)",
+                            quantity: 1,
+                            unitPrice: 49.99,
+                            vatRate: 20,
+                            itemType: "repair",
+                            qualityTier: "Aftermarket"
+                        )
+                    ],
+                    aftermarketConsent: false
                 )
             ]
             return vm

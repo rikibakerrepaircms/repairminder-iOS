@@ -96,7 +96,7 @@ final class BookingViewModel {
         case .devices:
             return formData.hasDevices
         case .summary:
-            return true // Always valid, optional fields
+            return formData.allAftermarketConsented
         case .signature:
             return formData.hasValidSignature
         case .confirmation:
@@ -412,7 +412,8 @@ final class BookingViewModel {
                     workflowType: device.workflowType.rawValue,
                     accessories: device.accessories.isEmpty ? nil : device.accessories.map {
                         AccessoryPayload(accessoryType: $0.accessoryType, description: $0.description)
-                    }
+                    },
+                    aftermarketConsent: device.aftermarketConsent ? 1 : nil
                 )
 
                 // Note: Backend returns { data: { id: "<device-id>" } } but we don't
