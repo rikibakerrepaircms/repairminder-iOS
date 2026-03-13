@@ -24,6 +24,29 @@ struct CustomerDeviceCard: View {
             // Device Header
             deviceHeader
 
+            // Aftermarket parts notice
+            if device.hasAftermarketConsent {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .font(.caption)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Aftermarket Parts")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.orange)
+                        Text("This device uses aftermarket components. Acknowledged at booking.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.orange.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+
             // Progress Timeline
             CustomerProgressBar(status: device.status, workflowType: device.workflowType)
 
@@ -623,6 +646,7 @@ extension CustomerDevice {
         authSignatureType: String?,
         authSignatureData: String?,
         authorizationReason: String?,
+        aftermarketConsent: Int? = nil,
         collectionLocation: CollectionLocation?,
         depositPaid: Decimal?,
         payoutAmount: Decimal?,
@@ -653,6 +677,7 @@ extension CustomerDevice {
         self.authSignatureType = authSignatureType
         self.authSignatureData = authSignatureData
         self.authorizationReason = authorizationReason
+        self.aftermarketConsent = aftermarketConsent
         self.collectionLocation = collectionLocation
         self.depositPaid = depositPaid
         self.payoutAmount = payoutAmount

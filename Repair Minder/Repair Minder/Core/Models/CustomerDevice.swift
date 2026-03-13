@@ -48,6 +48,9 @@ struct CustomerDevice: Codable, Identifiable, Sendable {
     let paidAt: Date?
     let payment: DevicePayment?
 
+    // Aftermarket consent
+    let aftermarketConsent: Int?
+
     // Images and checklist
     let images: [DeviceImage]?
     let preRepairChecklist: PreRepairChecklist?
@@ -59,6 +62,7 @@ struct CustomerDevice: Codable, Identifiable, Sendable {
         case damageMatchesReported, diagnosisConclusion, authorizationStatus
         case authorizationMethod, authorizedAt, authIpAddress, authUserAgent
         case authSignatureType, authSignatureData, authorizationReason
+        case aftermarketConsent
         case collectionLocation, depositPaid, payoutAmount, payoutMethod
         case payoutDate, paidAt, payment, images, preRepairChecklist
     }
@@ -99,6 +103,8 @@ struct CustomerDevice: Codable, Identifiable, Sendable {
         payoutDate = try container.decodeIfPresent(String.self, forKey: .payoutDate)
         paidAt = Self.decodeDate(from: container, forKey: .paidAt)
         payment = try container.decodeIfPresent(DevicePayment.self, forKey: .payment)
+
+        aftermarketConsent = try container.decodeIfPresent(Int.self, forKey: .aftermarketConsent)
 
         images = try container.decodeIfPresent([DeviceImage].self, forKey: .images)
         preRepairChecklist = try container.decodeIfPresent(PreRepairChecklist.self, forKey: .preRepairChecklist)
@@ -179,6 +185,11 @@ struct CustomerDevice: Codable, Identifiable, Sendable {
     /// Whether this is a repair workflow
     var isRepair: Bool {
         workflowType == .repair
+    }
+
+    /// Whether the customer acknowledged aftermarket parts
+    var hasAftermarketConsent: Bool {
+        aftermarketConsent == 1
     }
 
     /// Label for the quote/offer (different for buyback vs repair)
