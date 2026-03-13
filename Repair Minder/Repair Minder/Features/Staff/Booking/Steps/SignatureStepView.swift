@@ -102,6 +102,15 @@ struct SignatureStepView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
 
+                                    Link(destination: URL(string: "https://mendmyi.com/repairs/premium-vs-aftermarket-iphone-screen")!) {
+                                        HStack(spacing: 4) {
+                                            Text("Learn more")
+                                            Image(systemName: "arrow.up.right.square")
+                                        }
+                                        .font(.caption)
+                                        .foregroundStyle(.orange)
+                                    }
+
                                     Text("I agree to the use of aftermarket parts and accept the risks outlined above.")
                                         .font(.caption)
                                         .fontWeight(.medium)
