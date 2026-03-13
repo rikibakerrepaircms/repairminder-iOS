@@ -22,6 +22,97 @@ struct SignatureStepView: View {
                     .foregroundStyle(.secondary)
             }
 
+            // Planned Services Summary (only if any device has line items)
+            let devicesWithItems = viewModel.formData.devices.filter { !$0.lineItems.isEmpty }
+
+            if !devicesWithItems.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Planned Services")
+                        .font(.headline)
+
+                    ForEach(devicesWithItems) { device in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(device.displayName)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+
+                            ForEach(device.lineItems) { item in
+                                HStack {
+                                    Text("• \(item.description)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(CurrencyFormatter.format(item.unitPrice))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(.leading, 8)
+                            }
+
+                            // Subtotal per device
+                            HStack {
+                                Spacer()
+                                Text("Device subtotal:")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text(CurrencyFormatter.format(device.lineItemSubtotal))
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                            }
+                            .padding(.leading, 8)
+                        }
+                        .padding()
+                        .background(Color.platformGray6)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+            }
+
+            // Aftermarket consent (per device with aftermarket items)
+            let aftermarketDeviceIndices = viewModel.formData.devices.indices.filter { i in
+                viewModel.formData.devices[i].hasAftermarketItems
+            }
+
+            if !aftermarketDeviceIndices.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(aftermarketDeviceIndices, id: \.self) { index in
+                        let device = viewModel.formData.devices[index]
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(alignment: .top, spacing: 12) {
+                                Toggle("", isOn: $viewModel.formData.devices[index].aftermarketConsent)
+                                    .labelsHidden()
+                                    .tint(.orange)
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Aftermarket Parts — \(device.displayName)")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+
+                                    Text("This repair uses an aftermarket display not designed or manufactured by Apple. It may not perform identically to an original component.")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+
+                                    Text("Customer acknowledges and agrees to the use of aftermarket parts for this device.")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+
+                            if !device.aftermarketConsent {
+                                Label("Customer must acknowledge aftermarket parts to proceed.",
+                                      systemImage: "exclamationmark.triangle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                        .padding()
+                        .background(Color.orange.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+            }
+
             // Terms Agreement
             VStack(alignment: .leading, spacing: 16) {
                 HStack(spacing: 16) {

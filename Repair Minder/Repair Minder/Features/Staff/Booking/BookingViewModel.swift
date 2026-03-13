@@ -96,9 +96,10 @@ final class BookingViewModel {
         case .devices:
             return formData.hasDevices
         case .summary:
-            return formData.allAftermarketConsented
+            return true
         case .signature:
-            return formData.hasValidSignature
+            guard formData.hasValidSignature else { return false }
+            return formData.allAftermarketConsented
         case .confirmation:
             return true
         }
@@ -392,7 +393,9 @@ final class BookingViewModel {
             let orderId = orderResponse.id
             let orderNumber = orderResponse.orderNumber
 
-            // 7. Add each device
+            // 7. Add each device and capture IDs for line item creation
+            var deviceIdMap: [(device: BookingDeviceEntry, apiId: String)] = []
+
             for device in formData.devices {
                 let deviceRequest = CreateOrderDeviceRequest(
                     brandId: device.brandId,
@@ -413,24 +416,51 @@ final class BookingViewModel {
                     accessories: device.accessories.isEmpty ? nil : device.accessories.map {
                         AccessoryPayload(accessoryType: $0.accessoryType, description: $0.description)
                     },
-                    aftermarketConsent: device.aftermarketConsent ? 1 : nil
+                    aftermarketConsent: device.aftermarketConsent ? 1 : 0
                 )
 
-                // Note: Backend returns { data: { id: "<device-id>" } } but we don't
-                // need it currently. If device IDs are needed later (e.g. for accessories
-                // or image uploads during booking), switch to request<T> instead.
-                try await APIClient.shared.requestVoid(
+                let response: DeviceCreateResponse = try await APIClient.shared.request(
                     .createOrderDevice(orderId: orderId),
                     body: deviceRequest
                 )
+                deviceIdMap.append((device: device, apiId: response.id))
             }
 
-            // 8. Update form data with results
+            // 8. Create line items per device (best-effort — order still valid if items fail)
+            for (device, apiDeviceId) in deviceIdMap {
+                for item in device.lineItems {
+                    do {
+                        let netPrice = item.unitPrice / (1 + item.vatRate / 100)
+                        let itemRequest = OrderItemRequest(
+                            itemType: item.itemType,
+                            description: item.description,
+                            quantity: item.quantity,
+                            unitPrice: netPrice,
+                            priceIncVat: item.unitPrice,
+                            vatRate: item.vatRate,
+                            deviceId: apiDeviceId,
+                            isWarrantyItem: nil,
+                            warrantyNotes: nil,
+                            productTypeId: item.productTypeId,
+                            qualityTier: item.qualityTier.isEmpty ? nil : item.qualityTier
+                        )
+                        try await APIClient.shared.requestVoid(
+                            .createOrderItem(orderId: orderId),
+                            body: itemRequest
+                        )
+                    } catch {
+                        // Non-fatal — log and continue. Staff can add items from Order Detail.
+                        logger.error("Failed to create line item '\(item.description)' for device \(apiDeviceId): \(error)")
+                    }
+                }
+            }
+
+            // 9. Update form data with results
             formData.createdOrderId = orderId
             formData.createdOrderNumber = orderNumber
             formData.createdTicketId = orderResponse.ticketId
 
-            // 9. Move to confirmation
+            // 10. Move to confirmation
             currentStep = .confirmation
 
             logger.info("Booking created successfully: Order #\(orderNumber)")
@@ -468,6 +498,12 @@ final class BookingViewModel {
 }
 
 // MARK: - Response Types
+
+/// Response from POST /api/orders/:orderId/devices
+/// APIClient unwraps the `data` envelope, so we decode the inner object.
+struct DeviceCreateResponse: Decodable {
+    let id: String
+}
 
 struct OrderCreateResponse: Decodable {
     let id: String
