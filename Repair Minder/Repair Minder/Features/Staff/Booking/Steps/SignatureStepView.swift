@@ -89,13 +89,22 @@ struct SignatureStepView: View {
                                         .font(.subheadline)
                                         .fontWeight(.medium)
 
-                                    Text("This repair uses an aftermarket display not designed or manufactured by Apple. It may not perform identically to an original component.")
+                                    Text("This repair will use aftermarket parts not manufactured by Apple. By proceeding, I understand and accept the following risks:")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
 
-                                    Text("Customer acknowledges and agrees to the use of aftermarket parts for this device.")
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("• Battery performance may be reduced compared to an original component")
+                                        Text("• Touchscreen responsiveness may be inconsistent or unreliable at times")
+                                        Text("• Display colours may not appear fully accurate")
+                                        Text("• Apple may restrict certain software features at their discretion in future updates")
+                                    }
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+
+                                    Text("I agree to the use of aftermarket parts and accept the risks outlined above.")
                                         .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .fontWeight(.medium)
                                 }
                             }
 

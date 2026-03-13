@@ -25,6 +25,18 @@ struct BookingDeviceEntry: Identifiable, Equatable {
     var deviceTypeId: String?
     var workflowType: WorkflowType
     var accessories: [BookingAccessoryItem]
+    var lineItems: [BookingLineItem]
+    var aftermarketConsent: Bool
+
+    /// Whether any line item has an aftermarket quality tier
+    var hasAftermarketItems: Bool {
+        lineItems.contains { $0.qualityTier.lowercased().contains("aftermarket") }
+    }
+
+    /// Sum of all line item prices (inc VAT)
+    var lineItemSubtotal: Double {
+        lineItems.reduce(0) { $0 + $1.unitPrice * Double($1.quantity) }
+    }
 
     /// Condition grades matching backend values (A/B/C/D/F)
     enum ConditionGrade: String, CaseIterable, Identifiable {
@@ -120,7 +132,34 @@ struct BookingDeviceEntry: Identifiable, Equatable {
             customerReportedIssues: "",
             deviceTypeId: nil,
             workflowType: workflowType,
-            accessories: []
+            accessories: [],
+            lineItems: [],
+            aftermarketConsent: false
+        )
+    }
+}
+
+/// A service line item added to a device during booking
+struct BookingLineItem: Identifiable, Equatable {
+    let id: UUID
+    var productTypeId: String
+    var description: String
+    var quantity: Int
+    var unitPrice: Double       // VAT-inclusive price (matches web pattern)
+    var vatRate: Double          // e.g. 20.0 for 20%
+    var itemType: String         // "repair", "accessory"
+    var qualityTier: String      // "" = no tier, "Aftermarket", "Premium", etc.
+
+    static func empty() -> BookingLineItem {
+        BookingLineItem(
+            id: UUID(),
+            productTypeId: "",
+            description: "",
+            quantity: 1,
+            unitPrice: 0,
+            vatRate: 20,
+            itemType: "repair",
+            qualityTier: ""
         )
     }
 }
@@ -179,6 +218,12 @@ struct BookingFormData {
     var preAuthEnabled: Bool = false
     var preAuthAmount: String = ""    // String for text field, convert to Double on submit
     var preAuthNotes: String = ""
+    var preAuthManuallyEdited: Bool = false  // Stops auto-calc once staff edits the amount
+
+    /// Total of all line items across all devices (inc VAT)
+    var lineItemTotal: Double {
+        devices.reduce(0) { $0 + $1.lineItemSubtotal }
+    }
 
     // Signature (bindings for CustomerSignatureView)
     var signatureType: CustomerSignatureView.SignatureType = .typed
@@ -215,6 +260,11 @@ struct BookingFormData {
 
     var hasValidClient: Bool {
         (!firstName.isEmpty || !lastName.isEmpty) && (noEmail || isValidEmail(email))
+    }
+
+    /// Whether all devices with aftermarket items have consent
+    var allAftermarketConsented: Bool {
+        devices.allSatisfy { !$0.hasAftermarketItems || $0.aftermarketConsent }
     }
 
     var hasDevices: Bool {
@@ -318,6 +368,7 @@ struct CreateOrderDeviceRequest: Encodable {
     let deviceTypeId: String?
     let workflowType: String
     let accessories: [AccessoryPayload]?
+    let aftermarketConsent: Int?
 }
 
 struct AccessoryPayload: Encodable {

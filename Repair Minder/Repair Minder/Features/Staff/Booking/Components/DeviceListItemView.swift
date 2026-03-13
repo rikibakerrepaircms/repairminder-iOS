@@ -120,7 +120,9 @@ struct DeviceListItemView: View {
                 customerReportedIssues: "Screen cracked, battery drains quickly",
                 deviceTypeId: nil,
                 workflowType: .repair,
-                accessories: []
+                accessories: [],
+                lineItems: [],
+                aftermarketConsent: false
             ),
             defaultWorkflowType: .repair,
             onEdit: {},

@@ -150,6 +150,7 @@ enum APIEndpoint {
     // MARK: - Product Types
 
     case productTypes(search: String)
+    case productComponents(productTypeId: String)
 
     // MARK: - Booking / Lookup
 
@@ -367,6 +368,8 @@ enum APIEndpoint {
         // Product Types
         case .productTypes:
             return "/api/product-types"
+        case .productComponents(let productTypeId):
+            return "/api/product-types/\(productTypeId)/components"
 
         // Booking / Lookup
         case .locations:
@@ -446,7 +449,7 @@ enum APIEndpoint {
              .clients, .client, .clientSearch, .clientsExport,
              .tickets, .ticket, .ticketMacroExecutions,
              .macros, .macro, .macroExecutions, .macroExecution,
-             .productTypes,
+             .productTypes, .productComponents,
              .locations, .deviceSearch, .deviceTypes, .companyPublicInfo,
              .deviceTokens, .pushPreferences,
              .posIntegrations, .posTerminals, .pollTerminalPayment, .paymentLinks,

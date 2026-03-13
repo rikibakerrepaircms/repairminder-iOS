@@ -276,11 +276,12 @@ struct OrderItem: Decodable, Identifiable, Equatable, Sendable {
     let createdAt: String?
     let authorizationStatus: String?
     let authorizationRound: Int?
+    let qualityTier: String?
 
     private enum CodingKeys: String, CodingKey {
         case id, itemType, description, quantity, unitPrice, vatRate
         case lineTotal, vatAmount, lineTotalIncVat, deviceId, createdAt
-        case authorizationStatus, authorizationRound
+        case authorizationStatus, authorizationRound, qualityTier
     }
 
     init(from decoder: Decoder) throws {
@@ -299,6 +300,7 @@ struct OrderItem: Decodable, Identifiable, Equatable, Sendable {
         createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
         authorizationStatus = try container.decodeIfPresent(String.self, forKey: .authorizationStatus)
         authorizationRound = try container.decodeIfPresent(Int.self, forKey: .authorizationRound)
+        qualityTier = try container.decodeIfPresent(String.self, forKey: .qualityTier)
     }
 
     var formattedUnitPrice: String {
@@ -542,6 +544,7 @@ struct OrderItemRequest: Encodable {
     var isWarrantyItem: Bool?
     var warrantyNotes: String?
     var productTypeId: String?
+    var qualityTier: String?
 }
 
 // MARK: - Manual Payment Request

@@ -200,7 +200,13 @@ struct SummaryStepView: View {
             if viewModel.formData.preAuthEnabled {
                 FormTextField(
                     label: "Amount",
-                    text: $viewModel.formData.preAuthAmount,
+                    text: Binding(
+                        get: { viewModel.formData.preAuthAmount },
+                        set: { newValue in
+                            viewModel.formData.preAuthManuallyEdited = true
+                            viewModel.formData.preAuthAmount = newValue
+                        }
+                    ),
                     placeholder: "0.00",
                     keyboardType: .decimalPad
                 )
@@ -215,6 +221,16 @@ struct SummaryStepView: View {
         .padding()
         .background(Color.platformGray6)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .onChange(of: viewModel.formData.lineItemTotal) { _, newTotal in
+            guard !viewModel.formData.preAuthManuallyEdited else { return }
+            if newTotal > 0 {
+                viewModel.formData.preAuthEnabled = true
+                viewModel.formData.preAuthAmount = String(format: "%.2f", newTotal)
+            } else {
+                viewModel.formData.preAuthEnabled = false
+                viewModel.formData.preAuthAmount = ""
+            }
+        }
     }
 
     private var defaultTime: Date {
@@ -338,12 +354,6 @@ struct DeviceSummaryCard: View {
                 currencyCode: currencyCode
             )
 
-            // Aftermarket consent (conditional)
-            if device.hasAftermarketItems {
-                AftermarketConsentToggle(
-                    isConsented: $device.aftermarketConsent
-                )
-            }
         }
         .padding()
         .background(Color.platformBackground)
@@ -356,46 +366,6 @@ struct DeviceSummaryCard: View {
 
     private var deviceIcon: String {
         device.workflowType == .buyback ? "arrow.triangle.2.circlepath" : "wrench.and.screwdriver"
-    }
-}
-
-// MARK: - Aftermarket Consent Toggle
-
-struct AftermarketConsentToggle: View {
-    @Binding var isConsented: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 12) {
-                Toggle("", isOn: $isConsented)
-                    .labelsHidden()
-                    .tint(.orange)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Aftermarket Parts Acknowledgement")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-
-                    Text("This repair uses an aftermarket display not designed or manufactured by Apple. It may not perform identically to an original component.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Text("Customer acknowledges and agrees to the use of aftermarket parts for this device.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if !isConsented {
-                Label("Customer must acknowledge aftermarket parts to proceed.", systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            }
-        }
-        .padding()
-        .background(Color.orange.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .padding(.top, 4)
     }
 }
 

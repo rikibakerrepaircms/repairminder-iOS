@@ -36,7 +36,7 @@ struct CustomerDeviceCard: View {
                             .font(.caption)
                             .fontWeight(.medium)
                             .foregroundStyle(.orange)
-                        Text("This device uses aftermarket components. Acknowledged at booking.")
+                        Text("Customer agreed to aftermarket parts and accepted associated risks at booking.")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
