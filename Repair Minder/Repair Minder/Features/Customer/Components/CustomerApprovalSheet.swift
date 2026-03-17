@@ -346,9 +346,13 @@ struct CustomerApprovalSheet: View {
                 VStack(spacing: 12) {
                     Button {
                         Task {
+                            let bankDetailsParam: (accountHolder: String, sortCode: String, accountNumber: String)? = hasBuybackDevice
+                                ? (accountHolder: accountHolder, sortCode: sortCode, accountNumber: accountNumber)
+                                : nil
                             await viewModel.approveQuote(
                                 signatureType: signatureType.rawValue,
-                                signatureData: signatureData
+                                signatureData: signatureData,
+                                bankDetails: bankDetailsParam
                             )
                         }
                     } label: {

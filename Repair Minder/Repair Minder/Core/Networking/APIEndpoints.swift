@@ -75,6 +75,7 @@ enum APIEndpoint {
     case updateDeviceStatus(orderId: String, deviceId: String)
     case deviceActions(orderId: String, deviceId: String)
     case executeDeviceAction(orderId: String, deviceId: String)
+    case updateDeviceBankDetails(deviceId: String)
 
     // MARK: - Orders
 
@@ -286,6 +287,8 @@ enum APIEndpoint {
             return "/api/orders/\(orderId)/devices/\(deviceId)/actions"
         case .executeDeviceAction(let orderId, let deviceId):
             return "/api/orders/\(orderId)/devices/\(deviceId)/action"
+        case .updateDeviceBankDetails(let deviceId):
+            return "/api/devices/\(deviceId)/bank-details"
 
         // Orders
         case .orders, .createOrder:
@@ -477,7 +480,7 @@ enum APIEndpoint {
             return .post
 
         // PATCH endpoints
-        case .updateOrderDevice, .updateDeviceStatus,
+        case .updateOrderDevice, .updateDeviceStatus, .updateDeviceBankDetails,
              .updateOrder, .updateOrderItem,
              .updateClient,
              .updateTicket,

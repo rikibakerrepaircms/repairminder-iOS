@@ -8,9 +8,9 @@ import SwiftUI
 // MARK: - Bank Details
 
 struct BankDetails {
-    let accountHolder: String?
-    let sortCode: String?
-    let accountNumber: String?
+    var accountHolder: String?
+    var sortCode: String?
+    var accountNumber: String?
 }
 
 // MARK: - Buyback Payout Sheet
@@ -18,7 +18,7 @@ struct BankDetails {
 struct BuybackPayoutSheet: View {
     let device: OrderDeviceSummary
     let payoutAmount: Double
-    let bankDetails: BankDetails?
+    let initialBankDetails: BankDetails?
     let orderNumber: Int
     let onSave: (ManualPaymentRequest) async -> Bool
 
@@ -31,6 +31,15 @@ struct BuybackPayoutSheet: View {
     @State private var copiedField: String?
     @State private var errorMessage: String?
     @State private var showError: Bool = false
+
+    // Bank details editing
+    @State private var currentBankDetails: BankDetails?
+    @State private var isEditingBank: Bool = false
+    @State private var editAccountHolder: String = ""
+    @State private var editSortCode: String = ""
+    @State private var editAccountNumber: String = ""
+    @State private var isSavingBank: Bool = false
+    @State private var bankSaveError: String?
 
     private static let isoDateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -72,6 +81,18 @@ struct BuybackPayoutSheet: View {
         return true
     }
 
+    private var hasBankDetails: Bool {
+        guard let details = currentBankDetails else { return false }
+        return details.accountHolder != nil || details.sortCode != nil || details.accountNumber != nil
+    }
+
+    private var isBankEditValid: Bool {
+        let holder = editAccountHolder.trimmingCharacters(in: .whitespaces)
+        let sortDigits = editSortCode.filter(\.isNumber)
+        let accDigits = editAccountNumber.filter(\.isNumber)
+        return !holder.isEmpty && sortDigits.count == 6 && accDigits.count == 8
+    }
+
     // MARK: - Body
 
     var body: some View {
@@ -108,7 +129,7 @@ struct BuybackPayoutSheet: View {
                         }
                     }
                     .fontWeight(.semibold)
-                    .disabled(isSaving || !isFormValid)
+                    .disabled(isSaving || !isFormValid || isEditingBank)
                 }
             }
             .alert("Error", isPresented: $showError) {
@@ -116,11 +137,12 @@ struct BuybackPayoutSheet: View {
             } message: {
                 Text(errorMessage ?? "An unexpected error occurred.")
             }
-            .interactiveDismissDisabled(isSaving)
+            .interactiveDismissDisabled(isSaving || isSavingBank)
             .onAppear {
+                currentBankDetails = initialBankDetails
                 // If no bank details, default to cash
-                if bankDetails == nil ||
-                    (bankDetails?.accountHolder == nil && bankDetails?.sortCode == nil && bankDetails?.accountNumber == nil) {
+                if initialBankDetails == nil ||
+                    (initialBankDetails?.accountHolder == nil && initialBankDetails?.sortCode == nil && initialBankDetails?.accountNumber == nil) {
                     selectedMethod = .cash
                 }
             }
@@ -218,12 +240,24 @@ struct BuybackPayoutSheet: View {
 
     private var bankDetailsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Bank Details")
-                .font(.subheadline)
-                .fontWeight(.medium)
+            HStack {
+                Text("Bank Details")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Spacer()
+                if !isEditingBank {
+                    Button {
+                        startEditing()
+                    } label: {
+                        Label(hasBankDetails ? "Edit" : "Add", systemImage: hasBankDetails ? "pencil" : "plus")
+                            .font(.caption)
+                    }
+                }
+            }
 
-            if let details = bankDetails,
-               details.accountHolder != nil || details.sortCode != nil || details.accountNumber != nil {
+            if isEditingBank {
+                bankDetailsEditForm
+            } else if hasBankDetails, let details = currentBankDetails {
                 VStack(spacing: 0) {
                     if let holder = details.accountHolder, !holder.isEmpty {
                         copyableField(label: "Account Holder", value: holder)
@@ -249,6 +283,155 @@ struct BuybackPayoutSheet: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
             }
         }
+    }
+
+    // MARK: - Bank Details Edit Form
+
+    private var bankDetailsEditForm: some View {
+        VStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Account Holder")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField("e.g. John Smith", text: $editAccountHolder)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Sort Code")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    TextField("XX-XX-XX", text: $editSortCode)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.body.monospaced())
+                        #if os(iOS)
+                        .keyboardType(.numberPad)
+                        #endif
+                        .onChange(of: editSortCode) { _, newValue in
+                            editSortCode = formatSortCode(newValue)
+                        }
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Account Number")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    TextField("8 digits", text: $editAccountNumber)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.body.monospaced())
+                        #if os(iOS)
+                        .keyboardType(.numberPad)
+                        #endif
+                        .onChange(of: editAccountNumber) { _, newValue in
+                            editAccountNumber = String(newValue.filter(\.isNumber).prefix(8))
+                        }
+                }
+            }
+
+            if let error = bankSaveError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            HStack {
+                Button("Cancel") {
+                    isEditingBank = false
+                    bankSaveError = nil
+                }
+                .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Button {
+                    Task { await saveBankDetails() }
+                } label: {
+                    if isSavingBank {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Label("Save", systemImage: "checkmark")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .disabled(!isBankEditValid || isSavingBank)
+            }
+        }
+        .padding()
+        .background(Color.platformGray6)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    // MARK: - Edit Helpers
+
+    private func startEditing() {
+        if let details = currentBankDetails {
+            editAccountHolder = details.accountHolder ?? ""
+            editSortCode = formatSortCode(details.sortCode ?? "")
+            editAccountNumber = details.accountNumber ?? ""
+        } else {
+            editAccountHolder = ""
+            editSortCode = ""
+            editAccountNumber = ""
+        }
+        bankSaveError = nil
+        isEditingBank = true
+    }
+
+    private func formatSortCode(_ input: String) -> String {
+        let digits = String(input.filter(\.isNumber).prefix(6))
+        if digits.count <= 2 { return digits }
+        if digits.count <= 4 {
+            return "\(digits.prefix(2))-\(digits.dropFirst(2))"
+        }
+        return "\(digits.prefix(2))-\(digits.dropFirst(2).prefix(2))-\(digits.dropFirst(4))"
+    }
+
+    private func saveBankDetails() async {
+        isSavingBank = true
+        bankSaveError = nil
+
+        let sortDigits = editSortCode.filter(\.isNumber)
+        let accDigits = editAccountNumber.filter(\.isNumber)
+
+        struct BankDetailsRequest: Encodable {
+            let bankDetails: BankDetailsBody
+
+            struct BankDetailsBody: Encodable {
+                let accountHolder: String
+                let sortCode: String
+                let accountNumber: String
+            }
+        }
+
+        let requestBody = BankDetailsRequest(
+            bankDetails: .init(
+                accountHolder: editAccountHolder.trimmingCharacters(in: .whitespaces),
+                sortCode: String(sortDigits),
+                accountNumber: String(accDigits)
+            )
+        )
+
+        do {
+            try await APIClient.shared.requestVoid(
+                .updateDeviceBankDetails(deviceId: device.id),
+                body: requestBody
+            )
+            currentBankDetails = BankDetails(
+                accountHolder: editAccountHolder.trimmingCharacters(in: .whitespaces),
+                sortCode: String(sortDigits),
+                accountNumber: String(accDigits)
+            )
+            isEditingBank = false
+            // Switch to bank transfer now that we have details
+            selectedMethod = .bankTransfer
+        } catch {
+            bankSaveError = error.localizedDescription
+        }
+
+        isSavingBank = false
     }
 
     private func copyableField(label: String, value: String) -> some View {

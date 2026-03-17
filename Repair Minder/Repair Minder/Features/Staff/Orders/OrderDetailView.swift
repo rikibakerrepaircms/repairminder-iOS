@@ -204,7 +204,7 @@ struct OrderDetailView: View {
                 BuybackPayoutSheet(
                     device: device,
                     payoutAmount: device.payoutAmount ?? 0,
-                    bankDetails: nil,
+                    initialBankDetails: nil,
                     orderNumber: order.orderNumber,
                     onSave: { request in
                         await viewModel.recordPayment(request)

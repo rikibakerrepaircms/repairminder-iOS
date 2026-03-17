@@ -78,7 +78,7 @@ final class CustomerOrderDetailViewModel: ObservableObject {
     // MARK: - Quote Approval
 
     /// Approve quote for entire order
-    func approveQuote(signatureType: String, signatureData: String) async {
+    func approveQuote(signatureType: String, signatureData: String, bankDetails: (accountHolder: String, sortCode: String, accountNumber: String)? = nil) async {
         guard let order = order else { return }
 
         isSubmittingApproval = true
@@ -89,7 +89,8 @@ final class CustomerOrderDetailViewModel: ObservableObject {
                 action: "approve",
                 signatureType: signatureType,
                 signatureData: signatureData,
-                amountAcknowledged: order.totals.grandTotal
+                amountAcknowledged: order.totals.grandTotal,
+                bankDetails: bankDetails
             )
             approvalSuccess = true
             // Reload order to get updated state
@@ -204,7 +205,7 @@ final class CustomerOrderDetailViewModel: ObservableObject {
         return orderData
     }
 
-    private func submitApproval(action: String, signatureType: String, signatureData: String, amountAcknowledged: Decimal) async throws {
+    private func submitApproval(action: String, signatureType: String, signatureData: String, amountAcknowledged: Decimal, bankDetails: (accountHolder: String, sortCode: String, accountNumber: String)? = nil) async throws {
         guard let token = customerAuth.accessToken else {
             throw APIError.unauthorized
         }
@@ -215,12 +216,20 @@ final class CustomerOrderDetailViewModel: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "action": action,
             "signature_type": signatureType,
             "signature_data": signatureData,
             "amount_acknowledged": (amountAcknowledged as NSDecimalNumber).doubleValue
         ]
+
+        if let bankDetails = bankDetails {
+            body["bank_details"] = [
+                "account_holder": bankDetails.accountHolder,
+                "sort_code": bankDetails.sortCode.replacingOccurrences(of: "-", with: ""),
+                "account_number": bankDetails.accountNumber
+            ]
+        }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
