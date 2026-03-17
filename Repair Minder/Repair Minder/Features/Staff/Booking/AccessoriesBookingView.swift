@@ -88,7 +88,6 @@ struct AccessoriesBookingView: View {
             withAnimation(.easeInOut(duration: 0.2)) {
                 guestCheckout.toggle()
                 if guestCheckout {
-                    // Clear customer fields when enabling guest
                     email = ""
                     firstName = ""
                     lastName = ""
@@ -99,21 +98,28 @@ struct AccessoriesBookingView: View {
                 }
             }
         } label: {
-            HStack(spacing: 16) {
-                Circle()
-                    .fill(guestCheckout ? Color.purple.opacity(0.15) : Color.platformGray6)
-                    .frame(width: sizeClass == .regular ? 56 : 48, height: sizeClass == .regular ? 56 : 48)
+            HStack(spacing: 12) {
+                // Checkbox
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(guestCheckout ? Color.purple : Color.clear)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(guestCheckout ? Color.purple : Color.secondary.opacity(0.4), lineWidth: 2)
+                    )
                     .overlay {
-                        Image(systemName: "person.slash.fill")
-                            .font(.system(size: sizeClass == .regular ? 24 : 20))
-                            .foregroundStyle(guestCheckout ? .purple : .secondary)
+                        if guestCheckout {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: sizeClass == .regular ? 16 : 14, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
                     }
+                    .frame(width: sizeClass == .regular ? 28 : 24, height: sizeClass == .regular ? 28 : 24)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Guest Checkout")
-                        .font(sizeClass == .regular ? .title3 : .headline)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(guestCheckout ? Color.purple : .primary)
+                        .font(sizeClass == .regular ? .title3 : .body)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.primary)
 
                     Text("Skip customer details for quick sales")
                         .font(sizeClass == .regular ? .subheadline : .caption)
@@ -121,19 +127,10 @@ struct AccessoriesBookingView: View {
                 }
 
                 Spacer()
-
-                Toggle("", isOn: .constant(guestCheckout))
-                    .labelsHidden()
-                    .tint(.purple)
-                    .allowsHitTesting(false)
             }
             .padding(sizeClass == .regular ? 20 : 16)
             .background(Color.platformBackground)
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(guestCheckout ? Color.purple.opacity(0.5) : Color.clear, lineWidth: 2)
-            )
         }
         .buttonStyle(.plain)
     }
