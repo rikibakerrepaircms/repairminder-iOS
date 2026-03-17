@@ -180,6 +180,9 @@ struct BookingFormData {
     // Service type
     var serviceType: ServiceType = .repair
 
+    // Guest checkout (accessories only)
+    var guestCheckout: Bool = false
+
     // Client info
     var email: String = ""
     var noEmail: Bool = false
@@ -303,9 +306,10 @@ struct BookingFormData {
 
 /// Request body for creating an order
 struct CreateOrderRequest: Encodable {
+    let guestCheckout: Bool?
     let clientEmail: String?
     let noEmail: Bool?
-    let clientFirstName: String
+    let clientFirstName: String?
     let clientLastName: String?
     let clientPhone: String?
     let clientCountryCode: String?
@@ -321,14 +325,14 @@ struct CreateOrderRequest: Encodable {
     let existingTicketId: String?
     let notes: String?              // Internal note added to ticket (backend: body.notes)
     let preAuthorization: PreAuthPayload?
-    let signature: SignatureData
+    let signature: SignatureData?
 
     // IMPORTANT: addressLine1/addressLine2 need explicit keys because
     // .convertToSnakeCase produces "address_line1" but backend expects "address_line_1"
     private enum CodingKeys: String, CodingKey {
         case addressLine1 = "address_line_1"
         case addressLine2 = "address_line_2"
-        case clientEmail, noEmail, clientFirstName, clientLastName
+        case guestCheckout, clientEmail, noEmail, clientFirstName, clientLastName
         case clientPhone, clientCountryCode, city, county, postcode, country
         case locationId, intakeMethod, readyBy
         case existingTicketId, notes, preAuthorization, signature

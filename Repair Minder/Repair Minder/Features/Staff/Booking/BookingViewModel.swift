@@ -356,6 +356,7 @@ final class BookingViewModel {
 
             // 5. Create order request
             let orderRequest = CreateOrderRequest(
+                guestCheckout: nil,
                 clientEmail: formData.noEmail ? nil : formData.email,
                 noEmail: formData.noEmail ? true : nil,
                 clientFirstName: formData.firstName,

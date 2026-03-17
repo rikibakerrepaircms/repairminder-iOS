@@ -12,6 +12,7 @@ struct BookingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var selectedServiceType: ServiceType?
+    @State private var showAccessoriesBooking = false
     @State private var viewModel = BookingViewModel()
 
     /// Filtered service types: only those with backend support AND enabled by company settings.
@@ -47,7 +48,11 @@ struct BookingView: View {
                     // go straight to wizard
                     Color.clear
                         .onAppear {
-                            selectedServiceType = onlyType
+                            if onlyType == .accessories {
+                                showAccessoriesBooking = true
+                            } else {
+                                selectedServiceType = onlyType
+                            }
                         }
                 } else {
                     Spacer()
@@ -69,7 +74,11 @@ struct BookingView: View {
                                     serviceType: serviceType,
                                     isRegular: sizeClass == .regular
                                 ) {
-                                    selectedServiceType = serviceType
+                                    if serviceType == .accessories {
+                                        showAccessoriesBooking = true
+                                    } else {
+                                        selectedServiceType = serviceType
+                                    }
                                 }
                             }
                         }
@@ -96,6 +105,11 @@ struct BookingView: View {
             }
             .navigationDestination(item: $selectedServiceType) { serviceType in
                 BookingWizardView(viewModel: viewModel, serviceType: serviceType, onComplete: {
+                    dismiss()
+                })
+            }
+            .navigationDestination(isPresented: $showAccessoriesBooking) {
+                AccessoriesBookingView(onComplete: {
                     dismiss()
                 })
             }

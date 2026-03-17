@@ -17,11 +17,11 @@ enum ServiceType: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 
     /// Whether the backend POST /api/orders supports a full booking flow for this type.
-    /// `.accessories` and `.deviceSale` have backend item types but no dedicated booking flow yet.
+    /// `.deviceSale` has a backend item type but no dedicated booking flow yet.
     var isAvailable: Bool {
         switch self {
-        case .repair, .buyback: return true
-        case .accessories, .deviceSale: return false
+        case .repair, .buyback, .accessories: return true
+        case .deviceSale: return false
         }
     }
 
