@@ -22,6 +22,11 @@ struct BoardColumnView: View {
         dragState.hoveredColumnId == columnData.id
     }
 
+    private var columnColor: Color? {
+        guard let hex = columnData.column.color, !hex.isEmpty else { return nil }
+        return Color(hex: hex)
+    }
+
     var body: some View {
         // Timeline/pinned columns are handled separately by TimelineColumn
         if columnData.column.columnType == "pinned" {
@@ -33,6 +38,7 @@ struct BoardColumnView: View {
             columnHeader
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
+                .columnHeaderGlass(columnColor: columnColor)
 
             Divider()
 
@@ -60,15 +66,7 @@ struct BoardColumnView: View {
                 }
             }
         }
-        .background(Color.platformGroupedBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(
-                    isDropTarget ? Color.blue : Color.clear,
-                    lineWidth: isDropTarget ? 2 : 0
-                )
-        )
+        .boardColumnGlass(isDropTarget: isDropTarget, columnColor: columnColor)
         .background(
             GeometryReader { geo in
                 Color.clear

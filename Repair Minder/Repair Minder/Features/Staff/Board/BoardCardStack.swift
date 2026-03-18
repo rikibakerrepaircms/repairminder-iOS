@@ -25,10 +25,10 @@ struct BoardCardStack: View {
     @State private var expandedDeviceId: String?
 
     var body: some View {
+        ConditionalGlassContainer(spacing: 4) {
         VStack(spacing: 0) {
             ForEach(Array(devices.enumerated()), id: \.element.id) { index, device in
                 let isExpanded = expandedDeviceId == device.id
-                let isLast = index == devices.count - 1
                 let isDragged = dragState.draggedDevice?.id == device.id
 
                 if !isDragged {
@@ -60,6 +60,7 @@ struct BoardCardStack: View {
                 }
             }
         }
+        } // ConditionalGlassContainer
     }
 
     /// Collapse any expanded card (called externally, e.g., on background tap)

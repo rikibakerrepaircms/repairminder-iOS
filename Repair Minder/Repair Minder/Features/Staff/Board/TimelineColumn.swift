@@ -104,8 +104,7 @@ struct TimelineColumn: View {
                 }
             }
         }
-        .background(Color.platformGroupedBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .timelineContainerGlass()
     }
 
     // MARK: - Header

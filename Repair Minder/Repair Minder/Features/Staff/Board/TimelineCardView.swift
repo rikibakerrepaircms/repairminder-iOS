@@ -24,6 +24,7 @@ struct TimelineCardView: View {
     @State private var resizeOffset: CGFloat = 0
     @State private var isResizing = false
     @State private var lastHapticDuration = 0
+    @State private var resizeSnapTrigger = false
 
     private var baseHeight: CGFloat {
         CGFloat(scheduleItem.duration) * pixelsPerMinute
@@ -105,16 +106,8 @@ struct TimelineCardView: View {
                 )
         }
         .frame(height: displayHeight)
-        .background(Color.platformBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(
-                    isResizing ? Color.blue : Color.gray.opacity(0.2),
-                    lineWidth: isResizing ? 2 : 0.5
-                )
-        )
-        .shadow(color: .black.opacity(isExpanded ? 0.12 : 0.06), radius: isExpanded ? 6 : 2)
+        .timelineCardGlass(engineerColor: engineerColor, isExpanded: isExpanded, isResizing: isResizing)
+        .sensoryFeedback(.impact(flexibility: .rigid, intensity: 0.4), trigger: resizeSnapTrigger)
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
         .animation(.spring(response: 0.35, dampingFraction: 0.75), value: isExpanded)
@@ -133,12 +126,10 @@ struct TimelineCardView: View {
 
                 // Haptic on snap boundary change
                 let newDuration = max(15, scheduleItem.duration + snapped)
-                #if os(iOS)
                 if newDuration != lastHapticDuration {
                     lastHapticDuration = newDuration
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    resizeSnapTrigger.toggle()
                 }
-                #endif
             }
             .onEnded { _ in
                 isResizing = false

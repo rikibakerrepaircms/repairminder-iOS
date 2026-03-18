@@ -19,6 +19,9 @@ struct BoardView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var dragState = BoardDragState()
     @State private var showListBuilder = false
+    @State private var dropSucceeded = false
+    @State private var dropFailed = false
+    @Namespace private var sheetNamespace
 
     private var isCompact: Bool {
         horizontalSizeClass == .compact
@@ -64,13 +67,7 @@ struct BoardView: View {
                 HStack {
                     EngineerColorLegend(engineers: viewModel.engineers)
                     Spacer()
-                    Button {
-                        showListBuilder = true
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                    }
+                    settingsButton
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
@@ -79,6 +76,7 @@ struct BoardView: View {
             // Board columns (timeline + regular)
             ZStack {
                 ScrollView(.horizontal, showsIndicators: false) {
+                    ConditionalGlassContainer(spacing: 12) {
                     LazyHStack(alignment: .top, spacing: 12) {
                         // Timeline column (first, when enabled)
                         if viewModel.timelineColumn != nil {
@@ -111,6 +109,7 @@ struct BoardView: View {
                     .scrollTargetLayout()
                     .padding(.horizontal, isCompact ? 20 : 16)
                     .padding(.vertical, 12)
+                    } // ConditionalGlassContainer
                 }
                 .scrollTargetBehavior(.viewAligned)
                 .background(Color.platformGroupedBackground)
@@ -127,9 +126,11 @@ struct BoardView: View {
             }
             .coordinateSpace(name: "boardContainer")
             .gesture(dragState.isDragging ? boardDragGesture : nil)
+            .sensoryFeedback(.success, trigger: dropSucceeded)
+            .sensoryFeedback(.error, trigger: dropFailed)
         }
         .sheet(isPresented: $showListBuilder) {
-            ListBuilderSheet(viewModel: viewModel)
+            listBuilderSheetContent
         }
     }
 
@@ -154,6 +155,35 @@ struct BoardView: View {
         } else {
             timeline
                 .frame(width: timelineWidth)
+        }
+    }
+
+    // MARK: - Settings Button (Sheet Morphing on iOS 18+)
+
+    @ViewBuilder
+    private var settingsButton: some View {
+        let button = Button {
+            showListBuilder = true
+        } label: {
+            Image(systemName: "slider.horizontal.3")
+                .font(.body)
+                .foregroundStyle(.secondary)
+        }
+
+        if #available(iOS 18, macOS 15, *) {
+            button.matchedTransitionSource(id: "listBuilder", in: sheetNamespace)
+        } else {
+            button
+        }
+    }
+
+    @ViewBuilder
+    private var listBuilderSheetContent: some View {
+        if #available(iOS 18, macOS 15, *) {
+            ListBuilderSheet(viewModel: viewModel)
+                .navigationTransition(.zoom(sourceID: "listBuilder", in: sheetNamespace))
+        } else {
+            ListBuilderSheet(viewModel: viewModel)
         }
     }
 
@@ -191,15 +221,11 @@ struct BoardView: View {
                             fromColumnId: sourceColumnId,
                             toColumnId: targetColumnId
                         )
-                        #if os(iOS)
                         if success {
-                            let generator = UINotificationFeedbackGenerator()
-                            generator.notificationOccurred(.success)
+                            dropSucceeded.toggle()
                         } else {
-                            let generator = UINotificationFeedbackGenerator()
-                            generator.notificationOccurred(.error)
+                            dropFailed.toggle()
                         }
-                        #endif
                     }
                 } else {
                     // Dropped outside any column — cancel

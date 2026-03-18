@@ -18,6 +18,7 @@ struct EngineerColorLegend: View {
 
     var body: some View {
         if !engineers.isEmpty {
+            ConditionalGlassContainer(spacing: 6) {
             HStack(spacing: 8) {
                 let visible = expanded ? engineers : Array(engineers.prefix(4))
                 ForEach(visible) { eng in
@@ -30,6 +31,9 @@ struct EngineerColorLegend: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .legendChipGlass(color: EngineerColors.color(for: eng.id))
                 }
 
                 if engineers.count > 4 {
@@ -40,6 +44,7 @@ struct EngineerColorLegend: View {
                     .foregroundStyle(.blue)
                 }
             }
+            } // ConditionalGlassContainer
         }
     }
 }

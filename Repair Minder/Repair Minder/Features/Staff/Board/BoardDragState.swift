@@ -11,6 +11,11 @@ import SwiftUI
 
 /// Observable state shared across the board during a drag-and-drop operation.
 /// Uses a custom gesture-based approach (not Transferable) for more animation control.
+///
+/// **iOS 26 Native Drag Decision:** Evaluated `.dragContainer()` + `.draggable(containerItemID:)`.
+/// Keeping custom `DragGesture` for wallet-style 1:1 finger tracking; native drag uses a system
+/// lift preview which doesn't match the board's direct-manipulation UX. The custom approach gives
+/// us full control over the overlay position, column hit detection, and animation timing.
 @MainActor
 @Observable
 final class BoardDragState {

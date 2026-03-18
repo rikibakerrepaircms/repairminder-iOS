@@ -28,9 +28,8 @@ struct CardExpandedContent: View {
                         .font(.caption2.weight(.medium))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color.purple.opacity(0.12))
                         .foregroundStyle(.purple)
-                        .clipShape(Capsule())
+                        .badgeGlass(tint: .purple, fallbackBackground: Color.purple.opacity(0.12))
                 }
             }
 
@@ -84,8 +83,7 @@ struct CardExpandedContent: View {
                     .lineLimit(2)
                     .padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.platformGray6)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .sectionGlass(tint: .gray, fallbackBackground: Color.platformGray6, cornerRadius: 6)
             }
 
             // CTA buttons
@@ -117,8 +115,7 @@ private struct StatusBadge: View {
             .font(.caption2.weight(.medium))
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(status.backgroundColor)
             .foregroundStyle(status.color)
-            .clipShape(Capsule())
+            .badgeGlass(tint: status.color, fallbackBackground: status.backgroundColor)
     }
 }
