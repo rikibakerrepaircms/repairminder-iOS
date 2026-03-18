@@ -583,11 +583,39 @@ struct ProductTypeSearchResult: Decodable, Identifiable, Sendable {
     let manufacturer: String?
     let defaultSellPrice: Double?
     let vatRate: Double?
+    let productKind: String?
 
     var formattedPrice: String? {
         guard let price = defaultSellPrice else { return nil }
         return CurrencyFormatter.format(price)
     }
+}
+
+// MARK: - Quick Create Product
+
+struct ProductTypeCreateRequest: Encodable {
+    var name: String
+    var category: String
+    var productKind: String
+    var defaultSellPrice: Double?
+    var defaultCost: Double?
+    var vatRate: Double?
+    var manufacturer: String?
+    var modelNumber: String?
+    var sku: String?
+    var notes: String?
+}
+
+struct ProductTypeCreateResponse: Decodable {
+    let id: String
+    let name: String
+    let sku: String
+    let category: String
+    let defaultSellPrice: Double?
+    let vatRate: Double?
+    let productKind: String?
+    let manufacturer: String?
+    let modelNumber: String?
 }
 
 // MARK: - Currency Formatter

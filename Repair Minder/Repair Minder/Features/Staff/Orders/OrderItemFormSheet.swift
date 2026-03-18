@@ -86,6 +86,10 @@ struct OrderItemFormSheet: View {
     @State private var isSearchingProducts = false
     @State private var searchTask: Task<Void, Never>?
     @State private var selectedProductId: String?
+    @State private var showQuickCreate = false
+    @State private var quickCreateInitialName = ""
+    @State private var createdProductName: String?
+    @State private var showCreatedBanner = false
 
     // MARK: - Computed Properties
 
@@ -129,6 +133,32 @@ struct OrderItemFormSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
+                    if showCreatedBanner, let productName = createdProductName {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Product created")
+                                    .font(.subheadline.weight(.medium))
+                                Text("\(productName) saved to your catalog")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button {
+                                withAnimation { showCreatedBanner = false }
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .padding()
+                        .background(Color.green.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+
                     itemTypePicker
                     if !isEditing {
                         productSearchSection
@@ -172,6 +202,14 @@ struct OrderItemFormSheet: View {
             .interactiveDismissDisabled(isSaving)
             .onAppear {
                 populateForEditing()
+            }
+            .sheet(isPresented: $showQuickCreate) {
+                QuickCreateProductSheet(
+                    initialName: quickCreateInitialName,
+                    initialPrice: Double(priceIncVatText)
+                ) { createdProduct in
+                    selectCreatedProduct(createdProduct)
+                }
             }
         }
     }
@@ -359,10 +397,38 @@ struct OrderItemFormSheet: View {
                             Divider().padding(.leading, 12)
                         }
                     }
+
+                    Divider()
+
+                    Button {
+                        quickCreateInitialName = productSearchText
+                        showQuickCreate = true
+                    } label: {
+                        Label("Create new product instead", systemImage: "plus.circle")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
                 }
                 .background(Color.platformBackground)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+            } else if !isSearchingProducts && productSearchText.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2 {
+                VStack(spacing: 8) {
+                    Text("No products found")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    Button {
+                        quickCreateInitialName = productSearchText
+                        showQuickCreate = true
+                    } label: {
+                        Label("Create \"\(productSearchText)\" as new product", systemImage: "plus.circle")
+                            .font(.subheadline)
+                    }
+                }
+                .padding()
             }
 
             Text("Search your product catalog to auto-fill details")
@@ -411,6 +477,34 @@ struct OrderItemFormSheet: View {
         // Clear search
         productSearchText = ""
         productSearchResults = []
+    }
+
+    private func selectCreatedProduct(_ product: ProductTypeCreateResponse) {
+        selectedProductId = product.id
+        descriptionText = product.name
+
+        if let price = product.defaultSellPrice {
+            priceIncVatText = String(format: "%.2f", price)
+        }
+        if let vat = product.vatRate {
+            vatRate = vat
+        }
+
+        let category = product.category.lowercased()
+        if category == "accessory" || category == "accessories" {
+            selectedItemType = .accessory
+        }
+
+        productSearchText = ""
+        productSearchResults = []
+
+        // Show creation confirmation banner
+        createdProductName = product.name
+        withAnimation { showCreatedBanner = true }
+        Task {
+            try? await Task.sleep(for: .seconds(4))
+            await MainActor.run { withAnimation { showCreatedBanner = false } }
+        }
     }
 
     // MARK: - Description Field

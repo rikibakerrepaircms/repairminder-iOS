@@ -154,6 +154,7 @@ enum APIEndpoint {
 
     case productTypes(search: String)
     case productComponents(productTypeId: String)
+    case quickCreateProductType
 
     // MARK: - Booking / Lookup
 
@@ -400,6 +401,8 @@ enum APIEndpoint {
             return "/api/product-types"
         case .productComponents(let productTypeId):
             return "/api/product-types/\(productTypeId)/components"
+        case .quickCreateProductType:
+            return "/api/product-types/quick-create"
 
         // Booking / Lookup
         case .locations:
@@ -541,7 +544,8 @@ enum APIEndpoint {
              .boardSeedDefaults, .boardPlaceCard,
              .boardCreateColumn, .boardCreateAction,
              .createPaymentLink, .cancelPaymentLink, .resendPaymentLinkEmail,
-             .customerApproveQuote, .customerOrderReply:
+             .customerApproveQuote, .customerOrderReply,
+             .quickCreateProductType:
             return .post
 
         // PATCH endpoints
