@@ -23,12 +23,16 @@ struct CustomerOrderItem: Codable, Identifiable, Sendable {
     let authorizationStatus: String
     let signatureId: String?
     let authorizedPrice: Decimal?
+    let discountPercent: Double?
+    let discountAmount: Double?
+    let discountReason: String?
 
     // Note: Using automatic snake_case conversion via decoder.keyDecodingStrategy
     enum CodingKeys: String, CodingKey {
         case id, description, quantity, unitPrice, vatRate, lineTotal
         case vatAmount, lineTotalIncVat, deviceId, authorizationStatus
         case signatureId, authorizedPrice
+        case discountPercent, discountAmount, discountReason
     }
 
     /// Custom decoding to handle numeric values
@@ -58,6 +62,9 @@ struct CustomerOrderItem: Codable, Identifiable, Sendable {
         authorizationStatus = try container.decodeIfPresent(String.self, forKey: .authorizationStatus) ?? "pending"
         signatureId = try container.decodeIfPresent(String.self, forKey: .signatureId)
         authorizedPrice = Self.decodeDecimal(from: container, forKey: .authorizedPrice)
+        discountPercent = try container.decodeIfPresent(Double.self, forKey: .discountPercent)
+        discountAmount = try container.decodeIfPresent(Double.self, forKey: .discountAmount)
+        discountReason = try container.decodeIfPresent(String.self, forKey: .discountReason)
     }
 
     private static func decodeDecimal(from container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys) -> Decimal? {

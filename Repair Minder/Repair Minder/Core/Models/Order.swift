@@ -120,6 +120,9 @@ struct Order: Decodable, Identifiable, Equatable, Hashable, Sendable {
     let createdAt: String?
     let updatedAt: String?
     let notes: [OrderNote]?
+    let globalDiscountPercent: Double?
+    let globalDiscountAmount: Double?
+    let globalDiscountReason: String?
 
     // MARK: - Computed Properties
 
@@ -277,11 +280,15 @@ struct OrderItem: Decodable, Identifiable, Equatable, Sendable {
     let authorizationStatus: String?
     let authorizationRound: Int?
     let qualityTier: String?
+    let discountPercent: Double?
+    let discountAmount: Double?
+    let discountReason: String?
 
     private enum CodingKeys: String, CodingKey {
         case id, itemType, description, quantity, unitPrice, vatRate
         case lineTotal, vatAmount, lineTotalIncVat, deviceId, createdAt
         case authorizationStatus, authorizationRound, qualityTier
+        case discountPercent, discountAmount, discountReason
     }
 
     init(from decoder: Decoder) throws {
@@ -301,6 +308,9 @@ struct OrderItem: Decodable, Identifiable, Equatable, Sendable {
         authorizationStatus = try container.decodeIfPresent(String.self, forKey: .authorizationStatus)
         authorizationRound = try container.decodeIfPresent(Int.self, forKey: .authorizationRound)
         qualityTier = try container.decodeIfPresent(String.self, forKey: .qualityTier)
+        discountPercent = try container.decodeIfPresent(Double.self, forKey: .discountPercent)
+        discountAmount = try container.decodeIfPresent(Double.self, forKey: .discountAmount)
+        discountReason = try container.decodeIfPresent(String.self, forKey: .discountReason)
     }
 
     var formattedUnitPrice: String {
@@ -457,6 +467,8 @@ struct OrderTotals: Decodable, Equatable, Sendable {
     let totalRefunded: Double?
     let netPaid: Double?
     let balanceDue: Double
+    let discountTotal: Double?
+    let globalDiscount: Double?
 
     var formattedSubtotal: String { CurrencyFormatter.format(subtotal) }
     var formattedVatTotal: String { CurrencyFormatter.format(vatTotal) }
@@ -545,6 +557,9 @@ struct OrderItemRequest: Encodable {
     var warrantyNotes: String?
     var productTypeId: String?
     var qualityTier: String?
+    var discountPercent: Double?
+    var discountAmount: Double?
+    var discountReason: String?
 }
 
 // MARK: - Manual Payment Request
@@ -584,6 +599,7 @@ struct ProductTypeSearchResult: Decodable, Identifiable, Sendable {
     let defaultSellPrice: Double?
     let vatRate: Double?
     let productKind: String?
+    let primaryImageId: String?
 
     var formattedPrice: String? {
         guard let price = defaultSellPrice else { return nil }
