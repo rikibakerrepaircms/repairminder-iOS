@@ -144,7 +144,11 @@ struct BoardView: View {
             onDeviceTap: onDeviceTap,
             onDurationChange: { itemId, duration in
                 Task { await viewModel.updateScheduleDuration(itemId: itemId, duration: duration) }
-            }
+            },
+            onStartTimeChange: { itemId, newStart, newDuration in
+                Task { await viewModel.updateScheduleStartTime(itemId: itemId, startMinutes: newStart, duration: newDuration) }
+            },
+            newlyScheduledId: viewModel.newlyScheduledId
         )
 
         if isCompact {

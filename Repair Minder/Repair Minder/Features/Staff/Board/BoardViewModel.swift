@@ -253,7 +253,10 @@ final class BoardViewModel {
         }
     }
 
-    /// Update a schedule item's duration (from timeline card resize)
+    /// ID of a newly scheduled item (for auto-expand on timeline)
+    var newlyScheduledId: String?
+
+    /// Update a schedule item's duration (from timeline card bottom resize)
     func updateScheduleDuration(itemId: String, duration: Int) async {
         // Optimistic update
         if let idx = scheduleItems.firstIndex(where: { $0.id == itemId }) {
@@ -263,7 +266,30 @@ final class BoardViewModel {
         do {
             try await BoardService.updateScheduleItem(id: itemId, duration: duration)
         } catch {
-            // Revert on error by reloading
+            await loadSchedule()
+        }
+    }
+
+    /// Update a schedule item's start time and duration (from timeline card top resize)
+    func updateScheduleStartTime(itemId: String, startMinutes: Int, duration: Int) async {
+        // Optimistic update
+        if let idx = scheduleItems.firstIndex(where: { $0.id == itemId }) {
+            scheduleItems[idx] = ScheduleItemModel(
+                id: scheduleItems[idx].id,
+                deviceId: scheduleItems[idx].deviceId,
+                orderId: scheduleItems[idx].orderId,
+                scheduleDate: scheduleItems[idx].scheduleDate,
+                startMinutes: startMinutes,
+                duration: duration,
+                deviceName: scheduleItems[idx].deviceName,
+                orderNumber: scheduleItems[idx].orderNumber,
+                completedAt: scheduleItems[idx].completedAt
+            )
+        }
+
+        do {
+            try await BoardService.updateScheduleItem(id: itemId, startMinutes: startMinutes, duration: duration)
+        } catch {
             await loadSchedule()
         }
     }

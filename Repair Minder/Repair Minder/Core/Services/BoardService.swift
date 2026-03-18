@@ -169,11 +169,14 @@ enum BoardService {
         return data.schedules.flatMap(\.items)
     }
 
-    /// Update a schedule item (e.g., resize duration)
-    static func updateScheduleItem(id: String, duration: Int) async throws {
+    /// Update a schedule item (resize duration and/or start time)
+    static func updateScheduleItem(id: String, startMinutes: Int? = nil, duration: Int? = nil) async throws {
+        var body: [String: AnyEncodable] = [:]
+        if let startMinutes { body["startMinutes"] = AnyEncodable(startMinutes) }
+        if let duration { body["duration"] = AnyEncodable(duration) }
         try await APIClient.shared.requestVoid(
             .updateScheduleItem(id: id),
-            body: ["duration": duration]
+            body: body
         )
     }
 }

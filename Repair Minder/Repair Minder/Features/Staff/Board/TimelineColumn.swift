@@ -12,24 +12,33 @@ import SwiftUI
 /// Vertical timeline pinned column with time scale, hour gridlines,
 /// current-time indicator, and positioned cards.
 /// Work hours default to 8:00 AM – 5:00 PM; pixelsPerMinute = 2.5.
+/// Also acts as a drop target — dropping a board card schedules the device.
 struct TimelineColumn: View {
     let devices: [BoardDeviceItem]
     let scheduleItems: [ScheduleItemModel]
     let onDeviceTap: (BoardDeviceItem) -> Void
     let onDurationChange: (String, Int) -> Void // (itemId, newDuration)
+    var onStartTimeChange: ((String, Int, Int) -> Void)? // (itemId, newStart, newDuration)
+    var newlyScheduledId: String? = nil
 
     @State private var expandedDeviceId: String?
 
     // Timeline constants
-    private let workStartMinutes = 480  // 8:00 AM
-    private let workEndMinutes = 1020   // 5:00 PM
-    private let pixelsPerMinute: CGFloat = 2.5
+    let workStartMinutes = 480  // 8:00 AM
+    let workEndMinutes = 1020   // 5:00 PM
+    let pixelsPerMinute: CGFloat = 2.5
 
-    private var totalMinutes: Int { workEndMinutes - workStartMinutes }
-    private var totalHeight: CGFloat { CGFloat(totalMinutes) * pixelsPerMinute }
+    var totalMinutes: Int { workEndMinutes - workStartMinutes }
+    var totalHeight: CGFloat { CGFloat(totalMinutes) * pixelsPerMinute }
 
-    private func minutesToY(_ minutes: Int) -> CGFloat {
+    func minutesToY(_ minutes: Int) -> CGFloat {
         CGFloat(minutes - workStartMinutes) * pixelsPerMinute
+    }
+
+    func yToMinutes(_ y: CGFloat) -> Int {
+        let raw = Int(y / pixelsPerMinute) + workStartMinutes
+        let snapped = (raw / 15) * 15
+        return max(workStartMinutes, min(snapped, workEndMinutes - 15))
     }
 
     /// Schedule items matched with their devices, sorted by start time
@@ -56,52 +65,69 @@ struct TimelineColumn: View {
             Divider()
 
             // Timeline scroll area
-            if scheduledPairs.isEmpty {
-                emptyState
-            } else {
-                ScrollView(.vertical, showsIndicators: false) {
-                    ZStack(alignment: .topLeading) {
-                        // Hour gridlines
-                        ForEach(hourMarkers, id: \.self) { minutes in
-                            gridLine(at: minutes)
-                        }
+            ScrollView(.vertical, showsIndicators: false) {
+                ZStack(alignment: .topLeading) {
+                    // Hour gridlines
+                    ForEach(hourMarkers, id: \.self) { minutes in
+                        gridLine(at: minutes)
+                    }
 
-                        // Current time indicator
-                        VerticalTimeIndicator(
-                            workStartMinutes: workStartMinutes,
-                            workEndMinutes: workEndMinutes,
-                            pixelsPerMinute: pixelsPerMinute
+                    // Current time indicator
+                    VerticalTimeIndicator(
+                        workStartMinutes: workStartMinutes,
+                        workEndMinutes: workEndMinutes,
+                        pixelsPerMinute: pixelsPerMinute
+                    )
+
+                    // Scheduled cards
+                    ForEach(scheduledPairs, id: \.item.id) { pair in
+                        let isExpanded = expandedDeviceId == pair.device.id || pair.item.id == newlyScheduledId
+
+                        let card = TimelineCardView(
+                            device: pair.device,
+                            scheduleItem: pair.item,
+                            isExpanded: isExpanded,
+                            pixelsPerMinute: pixelsPerMinute,
+                            onTap: {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                    expandedDeviceId = expandedDeviceId == pair.device.id ? nil : pair.device.id
+                                }
+                            },
+                            onViewDetails: { onDeviceTap(pair.device) },
+                            onDurationChange: { newDuration in
+                                onDurationChange(pair.item.id, newDuration)
+                            },
+                            onStartTimeChange: onStartTimeChange.map { callback in
+                                { newStart, newDuration in
+                                    callback(pair.item.id, newStart, newDuration)
+                                }
+                            },
+                            autoExpand: pair.item.id == newlyScheduledId
                         )
 
-                        // Scheduled cards
-                        ForEach(scheduledPairs, id: \.item.id) { pair in
-                            let cardY = minutesToY(pair.item.startMinutes)
-                            let isExpanded = expandedDeviceId == pair.device.id
+                        let cardY = minutesToY(pair.item.startMinutes)
 
-                            TimelineCardView(
-                                device: pair.device,
-                                scheduleItem: pair.item,
-                                isExpanded: isExpanded,
-                                pixelsPerMinute: pixelsPerMinute,
-                                onTap: {
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                                        expandedDeviceId = expandedDeviceId == pair.device.id ? nil : pair.device.id
-                                    }
-                                },
-                                onViewDetails: { onDeviceTap(pair.device) },
-                                onDurationChange: { newDuration in
-                                    onDurationChange(pair.item.id, newDuration)
-                                }
-                            )
+                        card
                             .padding(.leading, 36)
                             .padding(.trailing, 4)
-                            .offset(y: cardY)
+                            .offset(y: cardY + card.topOffset)
                             .zIndex(isExpanded ? 10 : 1)
-                        }
                     }
-                    .frame(height: totalHeight + 16, alignment: .topLeading)
-                    .padding(.top, 8)
+
+                    // Empty state
+                    if scheduledPairs.isEmpty {
+                        VStack {
+                            Spacer()
+                            Text("No devices scheduled today")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 80)
+                    }
                 }
+                .frame(height: totalHeight + 16, alignment: .topLeading)
+                .padding(.top, 8)
             }
         }
         .timelineContainerGlass()
@@ -147,19 +173,6 @@ struct TimelineColumn: View {
                 .frame(height: 0.5)
         }
         .offset(y: y)
-    }
-
-    // MARK: - Empty State
-
-    private var emptyState: some View {
-        VStack {
-            Spacer()
-            Text("No devices scheduled today")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, minHeight: 80)
     }
 
     // MARK: - Helpers
