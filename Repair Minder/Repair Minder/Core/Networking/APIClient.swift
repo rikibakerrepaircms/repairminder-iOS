@@ -475,7 +475,7 @@ final class APIClient {
 // MARK: - AnyEncodable Helper
 
 /// Type-erased Encodable wrapper for encoding request bodies
-private struct AnyEncodable: Encodable {
+struct AnyEncodable: Encodable {
     private let _encode: (Encoder) throws -> Void
 
     init<T: Encodable>(_ value: T) {

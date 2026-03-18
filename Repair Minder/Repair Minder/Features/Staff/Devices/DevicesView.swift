@@ -18,10 +18,12 @@ private struct DeviceDetailNavigation: Hashable {
 /// Main device list view with filtering capabilities
 struct DevicesView: View {
     @State private var viewModel = DevicesViewModel()
+    @State private var boardViewModel = BoardViewModel(scope: "company")
     @State private var showingFilterSheet = false
     @State private var showingScanner = false
     @State private var searchText = ""
     @State private var selectedDeviceNav: DeviceDetailNavigation?
+    @AppStorage("devicesViewMode") private var viewMode: String = "list"
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var isRegularWidth: Bool {
@@ -52,6 +54,9 @@ struct DevicesView: View {
                         )
                     }
                 }
+                .navigationDestination(item: $selectedDeviceNav) { nav in
+                    DeviceDetailView(orderId: nav.orderId, deviceId: nav.deviceId)
+                }
         }
     }
 
@@ -79,13 +84,29 @@ struct DevicesView: View {
             // Category filter tabs
             categoryTabs
 
-            // Device list
-            deviceListContent(wideRows: wideRows)
+            // Board or list view
+            if viewMode == "board" {
+                BoardView(viewModel: boardViewModel) { device in
+                    if let orderId = device.orderId {
+                        selectedDeviceNav = DeviceDetailNavigation(orderId: orderId, deviceId: device.id)
+                    }
+                }
+            } else {
+                deviceListContent(wideRows: wideRows)
+            }
         }
         .navigationTitle("Devices")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 8) {
+                    // View mode toggle
+                    Picker("View", selection: $viewMode) {
+                        Image(systemName: "list.bullet").tag("list")
+                        Image(systemName: "rectangle.3.group").tag("board")
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 80)
+
                     // Scanner button
                     Button {
                         showingScanner = true
@@ -121,7 +142,28 @@ struct DevicesView: View {
             if viewModel.devices.isEmpty {
                 await viewModel.loadDevices()
             }
+            if viewMode == "board" {
+                await loadBoard()
+            }
         }
+        .onChange(of: viewMode) { _, newValue in
+            if newValue == "board" {
+                Task { await loadBoard() }
+            }
+        }
+        .onChange(of: viewModel.devices) { _, _ in
+            if viewMode == "board" {
+                let items = viewModel.devices.map { BoardDeviceItem(from: $0) }
+                boardViewModel.updateDevices(items)
+            }
+        }
+    }
+
+    // MARK: - Board Loading
+
+    private func loadBoard() async {
+        let items = viewModel.devices.map { BoardDeviceItem(from: $0) }
+        await boardViewModel.loadBoard(devices: items)
     }
 
     // MARK: - Category Tabs

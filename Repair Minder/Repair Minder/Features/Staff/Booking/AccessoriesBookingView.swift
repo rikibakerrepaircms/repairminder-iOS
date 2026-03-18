@@ -415,11 +415,7 @@ struct AccessoriesBookingView: View {
     }
 }
 
-// MARK: - Client Search Response
-
-private struct ClientSearchResponse: Decodable {
-    let clients: [Client]
-}
+// ClientSearchResponse is defined in BookingViewModel.swift
 
 #Preview {
     NavigationStack {

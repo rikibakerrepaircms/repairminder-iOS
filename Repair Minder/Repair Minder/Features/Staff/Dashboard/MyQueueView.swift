@@ -23,8 +23,10 @@ struct MyQueueView: View {
     var onBack: (() -> Void)? = nil
 
     @State private var viewModel = MyQueueViewModel()
+    @State private var boardViewModel = BoardViewModel(scope: "user")
     @State private var searchText = ""
     @State private var deviceNavigation: DeviceNavigation?
+    @AppStorage("myQueueViewMode") private var viewMode: String = "list"
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var isRegularWidth: Bool {
@@ -99,7 +101,13 @@ struct MyQueueView: View {
         VStack(spacing: 0) {
             filterHeader
 
-            if viewModel.isEmpty && !viewModel.isLoading {
+            if viewMode == "board" {
+                BoardView(viewModel: boardViewModel) { device in
+                    if let orderId = device.orderId {
+                        deviceNavigation = DeviceNavigation(orderId: orderId, deviceId: device.id)
+                    }
+                }
+            } else if viewModel.isEmpty && !viewModel.isLoading {
                 emptyState
             } else {
                 deviceList(wideRows: wideRows)
@@ -109,20 +117,49 @@ struct MyQueueView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                EmptyView()
+                Picker("View", selection: $viewMode) {
+                    Image(systemName: "list.bullet").tag("list")
+                    Image(systemName: "rectangle.3.group").tag("board")
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 80)
             }
         }
         .refreshable {
             await viewModel.refresh()
+            if viewMode == "board" {
+                await loadQueueBoard()
+            }
         }
         .task {
             await viewModel.loadQueue()
+            if viewMode == "board" {
+                await loadQueueBoard()
+            }
+        }
+        .onChange(of: viewMode) { _, newValue in
+            if newValue == "board" {
+                Task { await loadQueueBoard() }
+            }
+        }
+        .onChange(of: viewModel.devices) { _, _ in
+            if viewMode == "board" {
+                let items = viewModel.devices.map { BoardDeviceItem(from: $0) }
+                boardViewModel.updateDevices(items)
+            }
         }
         .overlay {
-            if viewModel.isLoading && viewModel.devices.isEmpty {
+            if viewModel.isLoading && viewModel.devices.isEmpty && viewMode == "list" {
                 LottieLoadingView(size: 100)
             }
         }
+    }
+
+    // MARK: - Board Loading
+
+    private func loadQueueBoard() async {
+        let items = viewModel.devices.map { BoardDeviceItem(from: $0) }
+        await boardViewModel.loadBoard(devices: items)
     }
 
     // MARK: - Filter Header

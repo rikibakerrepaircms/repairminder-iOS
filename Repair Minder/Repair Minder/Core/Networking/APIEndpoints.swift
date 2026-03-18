@@ -76,6 +76,8 @@ enum APIEndpoint {
     case deviceActions(orderId: String, deviceId: String)
     case executeDeviceAction(orderId: String, deviceId: String)
     case updateDeviceBankDetails(deviceId: String)
+    case updateDeviceEngineer(deviceId: String)
+    case updateDeviceSubLocation(deviceId: String)
 
     // MARK: - Orders
 
@@ -185,6 +187,27 @@ enum APIEndpoint {
     case buybackDetail(id: String)
     case buybackImageFile(imageId: String, width: Int?, height: Int?)
 
+    // MARK: - Board Config
+
+    case boardColumns(scope: String)
+    case boardSeedDefaults
+    case boardCardPositions(scope: String)
+    case boardPlaceCard
+    case boardCreateColumn
+    case boardUpdateColumn(id: String)
+    case boardDeleteColumn(id: String)
+    case boardReorderColumns
+    case boardCreateAction(columnId: String)
+    case boardDeleteAction(columnId: String, actionId: String)
+    case boardPinnedPreferences
+    case boardUpdatePinnedPreference(columnId: String)
+
+    // MARK: - Schedule
+
+    case schedule(date: String)
+    case teamSchedule(date: String)
+    case updateScheduleItem(id: String)
+
     // MARK: - Customer Portal
 
     case customerOrders
@@ -289,6 +312,10 @@ enum APIEndpoint {
             return "/api/orders/\(orderId)/devices/\(deviceId)/action"
         case .updateDeviceBankDetails(let deviceId):
             return "/api/devices/\(deviceId)/bank-details"
+        case .updateDeviceEngineer(let deviceId):
+            return "/api/devices/\(deviceId)/engineer"
+        case .updateDeviceSubLocation(let deviceId):
+            return "/api/devices/\(deviceId)/sub-location"
 
         // Orders
         case .orders, .createOrder:
@@ -422,6 +449,40 @@ enum APIEndpoint {
         case .buybackImageFile(let imageId, _, _):
             return "/api/buyback/images/\(imageId)/file"
 
+        // Board Config
+        case .boardColumns:
+            return "/api/board/columns"
+        case .boardSeedDefaults:
+            return "/api/board/seed-defaults"
+        case .boardCardPositions:
+            return "/api/board/card-positions"
+        case .boardPlaceCard:
+            return "/api/board/card-positions"
+        case .boardCreateColumn:
+            return "/api/board/columns"
+        case .boardUpdateColumn(let id):
+            return "/api/board/columns/\(id)"
+        case .boardDeleteColumn(let id):
+            return "/api/board/columns/\(id)"
+        case .boardReorderColumns:
+            return "/api/board/columns/reorder"
+        case .boardCreateAction(let columnId):
+            return "/api/board/columns/\(columnId)/actions"
+        case .boardDeleteAction(let columnId, let actionId):
+            return "/api/board/columns/\(columnId)/actions/\(actionId)"
+        case .boardPinnedPreferences:
+            return "/api/board/pinned-preferences"
+        case .boardUpdatePinnedPreference(let columnId):
+            return "/api/board/pinned-preferences/\(columnId)"
+
+        // Schedule
+        case .schedule:
+            return "/api/schedule"
+        case .teamSchedule:
+            return "/api/schedule/team"
+        case .updateScheduleItem(let id):
+            return "/api/schedule/items/\(id)"
+
         // Customer Portal
         case .customerOrders:
             return "/api/customer/orders"
@@ -456,6 +517,8 @@ enum APIEndpoint {
              .locations, .deviceSearch, .deviceTypes, .companyPublicInfo,
              .deviceTokens, .pushPreferences,
              .posIntegrations, .posTerminals, .pollTerminalPayment, .paymentLinks,
+             .boardColumns, .boardCardPositions,
+             .schedule, .teamSchedule, .boardPinnedPreferences,
              .buybackList, .buybackDetail, .buybackImageFile,
              .customerOrders, .customerOrder, .customerOrderInvoice, .customerDeviceImage:
             return .get
@@ -475,16 +538,21 @@ enum APIEndpoint {
              .ticketResolve, .ticketReassign, .createEnquiry,
              .registerDeviceToken, .customerRegisterDeviceToken,
              .initiateTerminalPayment, .cancelTerminalPayment, .refundTerminalPayment,
+             .boardSeedDefaults, .boardPlaceCard,
+             .boardCreateColumn, .boardCreateAction,
              .createPaymentLink, .cancelPaymentLink, .resendPaymentLinkEmail,
              .customerApproveQuote, .customerOrderReply:
             return .post
 
         // PATCH endpoints
         case .updateOrderDevice, .updateDeviceStatus, .updateDeviceBankDetails,
+             .updateDeviceEngineer, .updateDeviceSubLocation,
              .updateOrder, .updateOrderItem,
              .updateClient,
              .updateTicket,
-             .pauseMacroExecution, .resumeMacroExecution:
+             .pauseMacroExecution, .resumeMacroExecution,
+             .boardUpdateColumn, .boardReorderColumns,
+             .boardUpdatePinnedPreference, .updateScheduleItem:
             return .patch
 
         // PUT endpoints
@@ -496,7 +564,8 @@ enum APIEndpoint {
         case .deleteOrderDevice, .deleteOrderItem, .deleteOrderPayment,
              .deleteClient,
              .unregisterDeviceToken, .customerUnregisterDeviceToken,
-             .cancelMacroExecution:
+             .cancelMacroExecution,
+             .boardDeleteColumn, .boardDeleteAction:
             return .delete
         }
     }
@@ -640,6 +709,18 @@ enum APIEndpoint {
                 items.append(URLQueryItem(name: "per_page", value: String(perPage)))
             }
             return items.isEmpty ? nil : items
+
+        case .boardColumns(let scope):
+            return [URLQueryItem(name: "scope", value: scope)]
+
+        case .boardCardPositions(let scope):
+            return [URLQueryItem(name: "scope", value: scope)]
+
+        case .schedule(let date):
+            return [URLQueryItem(name: "date", value: date)]
+
+        case .teamSchedule(let date):
+            return [URLQueryItem(name: "date", value: date)]
 
         case .buybackList(let page, let limit, let status, let search, let locationId, let engineerId):
             var items = [
