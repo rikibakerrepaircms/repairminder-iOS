@@ -322,8 +322,10 @@ struct BoardCardView: View {
 // MARK: - Drag Overlay Card
 
 /// Simplified card shown as drag overlay (follows finger/cursor)
+/// Swing angle is driven by `BoardDragState.swingAngle` for physics-based tilt.
 struct BoardDragOverlayCard: View {
     let device: BoardDeviceItem
+    var swingAngle: Double = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -352,6 +354,7 @@ struct BoardDragOverlayCard: View {
         }
         .frame(width: 200)
         .dragOverlayGlass()
-        .rotationEffect(.degrees(2))
+        .rotationEffect(.degrees(swingAngle))
+        .animation(.interactiveSpring(response: 0.25, dampingFraction: 0.6), value: swingAngle)
     }
 }

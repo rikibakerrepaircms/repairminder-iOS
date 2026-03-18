@@ -43,6 +43,20 @@ final class BoardDragState {
     /// Column frames in global coordinate space (populated by geometry readers)
     var columnFrames: [String: CGRect] = [:]
 
+    // MARK: - Swing Physics
+
+    /// Current swing angle in degrees (driven by horizontal velocity)
+    var swingAngle: Double = 0
+
+    /// Previous X position for velocity calculation
+    private var previousX: CGFloat = 0
+    /// Smoothed horizontal velocity
+    private var smoothVelocity: Double = 0
+
+    private let swingSensitivity: Double = 0.012
+    private let maxSwingDegrees: Double = 14
+    private let damping: Double = 0.7
+
     // MARK: - Methods
 
     /// Begin a drag operation
@@ -52,11 +66,24 @@ final class BoardDragState {
         dragStartLocation = startLocation
         dragOffset = .zero
         hoveredColumnId = nil
+        swingAngle = 0
+        smoothVelocity = 0
+        previousX = startLocation.x
     }
 
     /// Update drag position and determine which column is being hovered
     func updateDrag(translation: CGSize, currentLocation: CGPoint) {
         dragOffset = translation
+
+        // Compute horizontal velocity for swing
+        let dx = Double(currentLocation.x - previousX)
+        previousX = currentLocation.x
+
+        // Smooth the velocity (weighted blend)
+        smoothVelocity = smoothVelocity * damping + dx * (1 - damping)
+
+        // Map velocity to rotation angle, clamped
+        swingAngle = max(-maxSwingDegrees, min(maxSwingDegrees, smoothVelocity * swingSensitivity))
 
         // Determine which column the drag is over
         hoveredColumnId = nil
@@ -93,5 +120,8 @@ final class BoardDragState {
         dragOffset = .zero
         dragStartLocation = .zero
         hoveredColumnId = nil
+        swingAngle = 0
+        smoothVelocity = 0
+        previousX = 0
     }
 }

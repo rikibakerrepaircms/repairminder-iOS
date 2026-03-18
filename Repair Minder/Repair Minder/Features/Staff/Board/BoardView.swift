@@ -116,7 +116,7 @@ struct BoardView: View {
 
                 // Drag overlay
                 if dragState.isDragging, let device = dragState.draggedDevice {
-                    BoardDragOverlayCard(device: device)
+                    BoardDragOverlayCard(device: device, swingAngle: dragState.swingAngle)
                         .position(
                             x: dragState.dragStartLocation.x + dragState.dragOffset.width,
                             y: dragState.dragStartLocation.y + dragState.dragOffset.height
