@@ -686,7 +686,8 @@ enum APIEndpoint {
             return [
                 URLQueryItem(name: "search", value: search),
                 URLQueryItem(name: "limit", value: "10"),
-                URLQueryItem(name: "is_active", value: "true")
+                URLQueryItem(name: "is_active", value: "true"),
+                URLQueryItem(name: "product_kind", value: "product,service")
             ]
 
         case .posTerminals(let locationId):
