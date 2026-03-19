@@ -286,14 +286,16 @@ final class EnquiryDetailViewModel: ObservableObject {
     }
 
     /// Execute a macro
-    func executeMacro(_ macro: Macro, overrides: [String: String]? = nil) async {
+    func executeMacro(_ macro: Macro, overrides: [String: String]? = nil, subjectOverride: String? = nil, contentOverride: String? = nil) async {
         error = nil
 
         do {
             let request = ExecuteMacroRequest(
                 macroId: macro.id,
                 variableOverrides: overrides,
-                sendSms: sendSms ? true : nil
+                sendSms: sendSms ? true : nil,
+                subjectOverride: subjectOverride,
+                contentOverride: contentOverride
             )
             let _: ExecuteMacroResponse = try await APIClient.shared.request(
                 .ticketExecuteMacro(id: ticketId),

@@ -149,6 +149,8 @@ struct ExecuteMacroRequest: Encodable {
     let macroId: String
     let variableOverrides: [String: String]?
     let sendSms: Bool?
+    let subjectOverride: String?
+    let contentOverride: String?
 }
 
 // MARK: - Execute Macro Response

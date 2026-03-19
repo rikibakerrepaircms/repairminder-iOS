@@ -88,9 +88,12 @@ struct EnquiryDetailView: View {
                 sendSms: $viewModel.sendSms,
                 smsAlreadySent: viewModel.ticket?.smsAlreadySent == true,
                 smsRemaining: viewModel.ticket?.smsRemaining,
-                clientPhone: viewModel.ticket?.client?.phone
-            ) { overrides in
-                Task { await viewModel.executeMacro(macro, overrides: overrides) }
+                clientPhone: viewModel.ticket?.client?.phone,
+                clientName: viewModel.ticket?.client?.name,
+                ticketNumber: viewModel.ticket.map { String($0.ticketNumber) },
+                ticketSubject: viewModel.ticket?.subject
+            ) { overrides, subjectOverride, contentOverride in
+                Task { await viewModel.executeMacro(macro, overrides: overrides, subjectOverride: subjectOverride, contentOverride: contentOverride) }
             }
         }
     }
@@ -630,7 +633,12 @@ struct EnquiryDetailView: View {
             Menu("Run Macro") {
                 ForEach(viewModel.macros) { macro in
                     Button {
-                        Task { await viewModel.executeMacro(macro) }
+                        // Email macros always show preview sheet; note macros execute directly
+                        if macro.isEmailMacro {
+                            viewModel.selectedWorkflowMacro = macro
+                        } else {
+                            Task { await viewModel.executeMacro(macro) }
+                        }
                     } label: {
                         VStack(alignment: .leading) {
                             Text(macro.name)
@@ -766,11 +774,21 @@ private struct WorkflowExecutionSheet: View {
     let smsAlreadySent: Bool
     let smsRemaining: Int?
     let clientPhone: String?
-    let onExecute: ([String: String]?) -> Void
+    // Ticket context for email preview substitution
+    let clientName: String?
+    let ticketNumber: String?
+    let ticketSubject: String?
+    let onExecute: ([String: String]?, String?, String?) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var variableValues: [String: String] = [:]
     @State private var validationErrors: Set<String> = []
+
+    // Two-step flow for email macros: variables → preview
+    enum Step { case variables, preview }
+    @State private var step: Step = .variables
+    @State private var previewSubject = ""
+    @State private var previewContent = ""
 
     /// Variables that require user input when executing (matches web app PER_USE_VARIABLES)
     private static let perUseVariables = ["device_type", "repair_type", "price", "reply"]
@@ -810,150 +828,249 @@ private struct WorkflowExecutionSheet: View {
         Self.variablePlaceholders[variable] ?? label(for: variable)
     }
 
+    /// Simple variable substitution for preview
+    private func substituteForPreview(_ template: String, variables: [String: String]) -> String {
+        var result = template
+        for (key, value) in variables {
+            result = result.replacingOccurrences(of: "{{\(key)}}", with: value)
+        }
+        return result
+    }
+
+    /// Build preview variables from per-use inputs + ticket context
+    private var previewVariables: [String: String] {
+        var vars = variableValues
+        if let name = clientName { vars["client_name"] = name; vars["client_first_name"] = name.components(separatedBy: " ").first ?? "" }
+        if let num = ticketNumber { vars["ticket_number"] = num }
+        if let subj = ticketSubject { vars["subject"] = subj }
+        return vars
+    }
+
+    /// Build preview content from macro template + variables
+    private func buildPreview() {
+        let vars = previewVariables
+        previewSubject = substituteForPreview(macro.initialSubject ?? ticketSubject ?? "", variables: vars)
+        previewContent = substituteForPreview(macro.initialContent, variables: vars)
+    }
+
     var body: some View {
         NavigationStack {
-            Form {
-                // Macro info
-                Section {
-                    if let description = macro.description, !description.isEmpty {
-                        Text(description)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    HStack {
-                        Image(systemName: macro.isEmailMacro ? "envelope" : "note.text")
-                            .foregroundStyle(.blue)
-                        Text(macro.isEmailMacro ? "Sends Email" : "Adds Note")
-                            .font(.subheadline)
-                    }
-
-                    if macro.hasFollowUps {
-                        HStack {
-                            Image(systemName: "arrow.triangle.branch")
-                                .foregroundStyle(.orange)
-                            Text("\(macro.stageCount ?? 0) follow-up stage\(macro.stageCount == 1 ? "" : "s")")
-                                .font(.subheadline)
-                        }
-                    }
-
-                    if let behavior = macro.replyBehavior, behavior != "continue" {
-                        HStack {
-                            Image(systemName: behavior == "cancel" ? "xmark.circle" : "pause.circle")
-                                .foregroundStyle(.secondary)
-                            Text(macro.replyBehaviorDescription)
-                                .font(.subheadline)
-                        }
-                    }
-                }
-
-                // Per-use variable inputs
-                if !usedPerUseVariables.isEmpty {
-                    Section("Required Information") {
-                        ForEach(usedPerUseVariables, id: \.self) { variable in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(label(for: variable))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                TextField(placeholder(for: variable), text: Binding(
-                                    get: { variableValues[variable] ?? "" },
-                                    set: {
-                                        variableValues[variable] = $0
-                                        validationErrors.remove(variable)
-                                    }
-                                ))
-                                if validationErrors.contains(variable) {
-                                    Text("This field is required")
-                                        .font(.caption2)
-                                        .foregroundStyle(.red)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Preview
-                Section("Preview") {
-                    if let subject = macro.initialSubject, macro.isEmailMacro {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Subject")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text(subject)
-                                .font(.subheadline)
-                        }
-                    }
-
-                    Text(macro.initialContent)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
-                // SMS notification (only for email macros when SMS available)
-                if macro.isEmailMacro && canSendSms {
-                    Section {
-                        Toggle(isOn: $sendSms) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "message")
-                                    .foregroundStyle(.blue)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Also send SMS")
-                                        .font(.subheadline)
-                                    if let phone = clientPhone {
-                                        Text(phone)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                            }
-                        }
-                        .disabled(smsRemaining == 0)
-
-                        if let remaining = smsRemaining, remaining <= 10 {
-                            HStack {
-                                Image(systemName: remaining == 0 ? "exclamationmark.triangle" : "info.circle")
-                                    .foregroundStyle(remaining == 0 ? .red : .orange)
-                                    .font(.caption)
-                                Text(remaining == 0 ? "SMS limit reached" : "\(remaining) SMS remaining")
-                                    .font(.caption)
-                                    .foregroundStyle(remaining == 0 ? .red : .orange)
-                            }
-                        }
-
-                        if smsAlreadySent {
-                            HStack {
-                                Image(systemName: "checkmark.circle")
-                                    .foregroundStyle(.secondary)
-                                    .font(.caption)
-                                Text("SMS already sent to this enquiry")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .italic()
-                            }
-                        }
-                    } header: {
-                        Text("SMS Notification")
-                    }
+            Group {
+                if macro.isEmailMacro && step == .preview {
+                    previewStep
+                } else {
+                    variablesStep
                 }
             }
             .navigationTitle(macro.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    if macro.isEmailMacro && step == .preview && !usedPerUseVariables.isEmpty {
+                        Button {
+                            withAnimation { step = .variables }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "chevron.left")
+                                    .imageScale(.small)
+                                Text("Back")
+                            }
+                        }
+                    } else {
+                        Button("Cancel") { dismiss() }
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(macro.isEmailMacro ? "Send Email" : "Add Note") {
-                        // Validate required per-use variables
-                        let missing = usedPerUseVariables.filter { (variableValues[$0] ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
-                        if !missing.isEmpty {
-                            validationErrors = Set(missing)
-                            return
+                    if macro.isEmailMacro && step == .preview {
+                        Button("Send Email") {
+                            let nonEmpty = variableValues.filter { !$0.value.isEmpty }
+                            onExecute(nonEmpty.isEmpty ? nil : nonEmpty, previewSubject, previewContent)
+                            dismiss()
                         }
-                        let nonEmpty = variableValues.filter { !$0.value.isEmpty }
-                        onExecute(nonEmpty.isEmpty ? nil : nonEmpty)
-                        dismiss()
+                        .fontWeight(.semibold)
+                        .disabled(previewSubject.trimmingCharacters(in: .whitespaces).isEmpty || previewContent.trimmingCharacters(in: .whitespaces).isEmpty)
+                    } else if macro.isEmailMacro {
+                        Button {
+                            // Validate, then go to preview
+                            let missing = usedPerUseVariables.filter { (variableValues[$0] ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
+                            if !missing.isEmpty {
+                                validationErrors = Set(missing)
+                                return
+                            }
+                            buildPreview()
+                            withAnimation { step = .preview }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "eye")
+                                Text("Preview")
+                            }
+                        }
+                        .fontWeight(.semibold)
+                    } else {
+                        Button("Add Note") {
+                            let missing = usedPerUseVariables.filter { (variableValues[$0] ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
+                            if !missing.isEmpty {
+                                validationErrors = Set(missing)
+                                return
+                            }
+                            let nonEmpty = variableValues.filter { !$0.value.isEmpty }
+                            onExecute(nonEmpty.isEmpty ? nil : nonEmpty, nil, nil)
+                            dismiss()
+                        }
+                        .fontWeight(.semibold)
                     }
-                    .fontWeight(.semibold)
+                }
+            }
+            .onAppear {
+                // Skip straight to preview if no per-use variables needed for email macros
+                if macro.isEmailMacro && usedPerUseVariables.isEmpty {
+                    buildPreview()
+                    step = .preview
+                }
+            }
+        }
+    }
+
+    // MARK: - Variables Step
+
+    private var variablesStep: some View {
+        Form {
+            // Macro info
+            Section {
+                if let description = macro.description, !description.isEmpty {
+                    Text(description)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Image(systemName: macro.isEmailMacro ? "envelope" : "note.text")
+                        .foregroundStyle(.blue)
+                    Text(macro.isEmailMacro ? "Sends Email" : "Adds Note")
+                        .font(.subheadline)
+                }
+
+                if macro.hasFollowUps {
+                    HStack {
+                        Image(systemName: "arrow.triangle.branch")
+                            .foregroundStyle(.orange)
+                        Text("\(macro.stageCount ?? 0) follow-up stage\(macro.stageCount == 1 ? "" : "s")")
+                            .font(.subheadline)
+                    }
+                }
+
+                if let behavior = macro.replyBehavior, behavior != "continue" {
+                    HStack {
+                        Image(systemName: behavior == "cancel" ? "xmark.circle" : "pause.circle")
+                            .foregroundStyle(.secondary)
+                        Text(macro.replyBehaviorDescription)
+                            .font(.subheadline)
+                    }
+                }
+            }
+
+            // Per-use variable inputs
+            if !usedPerUseVariables.isEmpty {
+                Section("Required Information") {
+                    ForEach(usedPerUseVariables, id: \.self) { variable in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(label(for: variable))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            TextField(placeholder(for: variable), text: Binding(
+                                get: { variableValues[variable] ?? "" },
+                                set: {
+                                    variableValues[variable] = $0
+                                    validationErrors.remove(variable)
+                                }
+                            ))
+                            if validationErrors.contains(variable) {
+                                Text("This field is required")
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Preview Step
+
+    private var previewStep: some View {
+        Form {
+            Section {
+                Text("Review and edit the email before sending. The conversation history will be appended automatically.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Subject") {
+                TextField("Email subject", text: $previewSubject)
+            }
+
+            Section("Email Body") {
+                TextEditor(text: $previewContent)
+                    .frame(minHeight: 200)
+                    .font(.subheadline)
+            }
+
+            if macro.hasFollowUps {
+                Section {
+                    HStack {
+                        Image(systemName: "arrow.triangle.branch")
+                            .foregroundStyle(.orange)
+                        Text("\(macro.stageCount ?? 0) follow-up stage\(macro.stageCount == 1 ? "" : "s") will be scheduled")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            // SMS notification (only for email macros when SMS available)
+            if canSendSms {
+                Section {
+                    Toggle(isOn: $sendSms) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "message")
+                                .foregroundStyle(.blue)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Also send SMS")
+                                    .font(.subheadline)
+                                if let phone = clientPhone {
+                                    Text(phone)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                    .disabled(smsRemaining == 0)
+
+                    if let remaining = smsRemaining, remaining <= 10 {
+                        HStack {
+                            Image(systemName: remaining == 0 ? "exclamationmark.triangle" : "info.circle")
+                                .foregroundStyle(remaining == 0 ? .red : .orange)
+                                .font(.caption)
+                            Text(remaining == 0 ? "SMS limit reached" : "\(remaining) SMS remaining")
+                                .font(.caption)
+                                .foregroundStyle(remaining == 0 ? .red : .orange)
+                        }
+                    }
+
+                    if smsAlreadySent {
+                        HStack {
+                            Image(systemName: "checkmark.circle")
+                                .foregroundStyle(.secondary)
+                                .font(.caption)
+                            Text("SMS already sent to this enquiry")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .italic()
+                        }
+                    }
+                } header: {
+                    Text("SMS Notification")
                 }
             }
         }
