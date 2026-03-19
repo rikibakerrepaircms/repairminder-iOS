@@ -285,6 +285,24 @@ final class EnquiryDetailViewModel: ObservableObject {
         isRewritingAI = false
     }
 
+    /// Preview a macro — returns fully substituted subject and content
+    func previewMacro(_ macro: Macro, overrides: [String: String]? = nil) async -> PreviewMacroResponse? {
+        do {
+            let request = PreviewMacroRequest(
+                macroId: macro.id,
+                variableOverrides: overrides
+            )
+            let response: PreviewMacroResponse = try await APIClient.shared.request(
+                .ticketPreviewMacro(id: ticketId),
+                body: request
+            )
+            return response
+        } catch {
+            self.error = error.localizedDescription
+            return nil
+        }
+    }
+
     /// Execute a macro
     func executeMacro(_ macro: Macro, overrides: [String: String]? = nil, subjectOverride: String? = nil, contentOverride: String? = nil) async {
         error = nil

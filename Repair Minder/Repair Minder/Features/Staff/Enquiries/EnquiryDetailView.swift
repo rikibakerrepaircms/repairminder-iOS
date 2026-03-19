@@ -84,14 +84,12 @@ struct EnquiryDetailView: View {
         .sheet(item: $viewModel.selectedWorkflowMacro) { macro in
             WorkflowExecutionSheet(
                 macro: macro,
+                viewModel: viewModel,
                 canSendSms: viewModel.canSendSms,
                 sendSms: $viewModel.sendSms,
                 smsAlreadySent: viewModel.ticket?.smsAlreadySent == true,
                 smsRemaining: viewModel.ticket?.smsRemaining,
-                clientPhone: viewModel.ticket?.client?.phone,
-                clientName: viewModel.ticket?.client?.name,
-                ticketNumber: viewModel.ticket.map { String($0.ticketNumber) },
-                ticketSubject: viewModel.ticket?.subject
+                clientPhone: viewModel.ticket?.client?.phone
             ) { overrides, subjectOverride, contentOverride in
                 Task { await viewModel.executeMacro(macro, overrides: overrides, subjectOverride: subjectOverride, contentOverride: contentOverride) }
             }
@@ -769,15 +767,12 @@ private struct WorkflowCard: View {
 
 private struct WorkflowExecutionSheet: View {
     let macro: Macro
+    let viewModel: EnquiryDetailViewModel
     let canSendSms: Bool
     @Binding var sendSms: Bool
     let smsAlreadySent: Bool
     let smsRemaining: Int?
     let clientPhone: String?
-    // Ticket context for email preview substitution
-    let clientName: String?
-    let ticketNumber: String?
-    let ticketSubject: String?
     let onExecute: ([String: String]?, String?, String?) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -789,6 +784,8 @@ private struct WorkflowExecutionSheet: View {
     @State private var step: Step = .variables
     @State private var previewSubject = ""
     @State private var previewContent = ""
+    @State private var previewLoading = false
+    @State private var previewError: String?
 
     /// Variables that require user input when executing (matches web app PER_USE_VARIABLES)
     private static let perUseVariables = ["device_type", "repair_type", "price", "reply"]
@@ -828,29 +825,20 @@ private struct WorkflowExecutionSheet: View {
         Self.variablePlaceholders[variable] ?? label(for: variable)
     }
 
-    /// Simple variable substitution for preview
-    private func substituteForPreview(_ template: String, variables: [String: String]) -> String {
-        var result = template
-        for (key, value) in variables {
-            result = result.replacingOccurrences(of: "{{\(key)}}", with: value)
+    /// Fetch fully substituted preview from the backend
+    private func fetchPreview() {
+        previewLoading = true
+        previewError = nil
+        let overrides = variableValues.filter { !$0.value.isEmpty }
+        Task {
+            if let result = await viewModel.previewMacro(macro, overrides: overrides.isEmpty ? nil : overrides) {
+                previewSubject = result.subject
+                previewContent = result.content
+            } else {
+                previewError = viewModel.error ?? "Failed to load preview"
+            }
+            previewLoading = false
         }
-        return result
-    }
-
-    /// Build preview variables from per-use inputs + ticket context
-    private var previewVariables: [String: String] {
-        var vars = variableValues
-        if let name = clientName { vars["client_name"] = name; vars["client_first_name"] = name.components(separatedBy: " ").first ?? "" }
-        if let num = ticketNumber { vars["ticket_number"] = num }
-        if let subj = ticketSubject { vars["subject"] = subj }
-        return vars
-    }
-
-    /// Build preview content from macro template + variables
-    private func buildPreview() {
-        let vars = previewVariables
-        previewSubject = substituteForPreview(macro.initialSubject ?? ticketSubject ?? "", variables: vars)
-        previewContent = substituteForPreview(macro.initialContent, variables: vars)
     }
 
     var body: some View {
@@ -888,16 +876,14 @@ private struct WorkflowExecutionSheet: View {
                             dismiss()
                         }
                         .fontWeight(.semibold)
-                        .disabled(previewSubject.trimmingCharacters(in: .whitespaces).isEmpty || previewContent.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .disabled(previewLoading || previewError != nil || previewSubject.trimmingCharacters(in: .whitespaces).isEmpty || previewContent.trimmingCharacters(in: .whitespaces).isEmpty)
                     } else if macro.isEmailMacro {
                         Button {
-                            // Validate, then go to preview
                             let missing = usedPerUseVariables.filter { (variableValues[$0] ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
                             if !missing.isEmpty {
                                 validationErrors = Set(missing)
                                 return
                             }
-                            buildPreview()
                             withAnimation { step = .preview }
                         } label: {
                             HStack(spacing: 4) {
@@ -921,11 +907,16 @@ private struct WorkflowExecutionSheet: View {
                     }
                 }
             }
+            .onChange(of: step) { _, newStep in
+                if newStep == .preview && macro.isEmailMacro {
+                    fetchPreview()
+                }
+            }
             .onAppear {
                 // Skip straight to preview if no per-use variables needed for email macros
                 if macro.isEmailMacro && usedPerUseVariables.isEmpty {
-                    buildPreview()
                     step = .preview
+                    fetchPreview()
                 }
             }
         }
@@ -999,78 +990,104 @@ private struct WorkflowExecutionSheet: View {
 
     private var previewStep: some View {
         Form {
-            Section {
-                Text("Review and edit the email before sending. The conversation history will be appended automatically.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Subject") {
-                TextField("Email subject", text: $previewSubject)
-            }
-
-            Section("Email Body") {
-                TextEditor(text: $previewContent)
-                    .frame(minHeight: 200)
-                    .font(.subheadline)
-            }
-
-            if macro.hasFollowUps {
+            if previewLoading {
                 Section {
                     HStack {
-                        Image(systemName: "arrow.triangle.branch")
-                            .foregroundStyle(.orange)
-                        Text("\(macro.stageCount ?? 0) follow-up stage\(macro.stageCount == 1 ? "" : "s") will be scheduled")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                        Spacer()
+                        ProgressView("Loading preview...")
+                        Spacer()
+                    }
+                    .padding(.vertical, 20)
+                }
+            } else if let error = previewError {
+                Section {
+                    VStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.title2)
+                            .foregroundStyle(.red)
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                        Button("Try Again") { fetchPreview() }
+                            .font(.caption)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                }
+            } else {
+                Section {
+                    Text("Review and edit the email before sending. The conversation history will be appended automatically.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("Subject") {
+                    TextField("Email subject", text: $previewSubject)
+                }
+
+                Section("Email Body") {
+                    TextEditor(text: $previewContent)
+                        .frame(minHeight: 200)
+                        .font(.subheadline)
+                }
+
+                if macro.hasFollowUps {
+                    Section {
+                        HStack {
+                            Image(systemName: "arrow.triangle.branch")
+                                .foregroundStyle(.orange)
+                            Text("\(macro.stageCount ?? 0) follow-up stage\(macro.stageCount == 1 ? "" : "s") will be scheduled")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
-            }
 
-            // SMS notification (only for email macros when SMS available)
-            if canSendSms {
-                Section {
-                    Toggle(isOn: $sendSms) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "message")
-                                .foregroundStyle(.blue)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Also send SMS")
-                                    .font(.subheadline)
-                                if let phone = clientPhone {
-                                    Text(phone)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                // SMS notification
+                if canSendSms {
+                    Section {
+                        Toggle(isOn: $sendSms) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "message")
+                                    .foregroundStyle(.blue)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Also send SMS")
+                                        .font(.subheadline)
+                                    if let phone = clientPhone {
+                                        Text(phone)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
                             }
                         }
-                    }
-                    .disabled(smsRemaining == 0)
+                        .disabled(smsRemaining == 0)
 
-                    if let remaining = smsRemaining, remaining <= 10 {
-                        HStack {
-                            Image(systemName: remaining == 0 ? "exclamationmark.triangle" : "info.circle")
-                                .foregroundStyle(remaining == 0 ? .red : .orange)
-                                .font(.caption)
-                            Text(remaining == 0 ? "SMS limit reached" : "\(remaining) SMS remaining")
-                                .font(.caption)
-                                .foregroundStyle(remaining == 0 ? .red : .orange)
+                        if let remaining = smsRemaining, remaining <= 10 {
+                            HStack {
+                                Image(systemName: remaining == 0 ? "exclamationmark.triangle" : "info.circle")
+                                    .foregroundStyle(remaining == 0 ? .red : .orange)
+                                    .font(.caption)
+                                Text(remaining == 0 ? "SMS limit reached" : "\(remaining) SMS remaining")
+                                    .font(.caption)
+                                    .foregroundStyle(remaining == 0 ? .red : .orange)
+                            }
                         }
-                    }
 
-                    if smsAlreadySent {
-                        HStack {
-                            Image(systemName: "checkmark.circle")
-                                .foregroundStyle(.secondary)
-                                .font(.caption)
-                            Text("SMS already sent to this enquiry")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .italic()
+                        if smsAlreadySent {
+                            HStack {
+                                Image(systemName: "checkmark.circle")
+                                    .foregroundStyle(.secondary)
+                                    .font(.caption)
+                                Text("SMS already sent to this enquiry")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .italic()
+                            }
                         }
+                    } header: {
+                        Text("SMS Notification")
                     }
-                } header: {
-                    Text("SMS Notification")
                 }
             }
         }

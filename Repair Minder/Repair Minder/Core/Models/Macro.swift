@@ -153,6 +153,20 @@ struct ExecuteMacroRequest: Encodable {
     let contentOverride: String?
 }
 
+// MARK: - Preview Macro Request
+
+/// Request body for POST /api/tickets/:id/macro/preview
+struct PreviewMacroRequest: Encodable {
+    let macroId: String
+    let variableOverrides: [String: String]?
+}
+
+/// Response from POST /api/tickets/:id/macro/preview
+struct PreviewMacroResponse: Decodable, Sendable {
+    let subject: String
+    let content: String
+}
+
 // MARK: - Execute Macro Response
 
 /// Response from POST /api/tickets/:id/macro
