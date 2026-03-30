@@ -18,6 +18,7 @@ final class DashboardViewModel {
 
     var stats: DashboardStats?
     var enquiryStats: EnquiryStats?
+    var commissionEstimate: CommissionEstimate?
     var activeWork: [ActiveWorkItem] = []
     var isLoading = false
     var error: String?
@@ -59,13 +60,14 @@ final class DashboardViewModel {
         isLoading = true
         error = nil
 
-        // Load stats, enquiry stats, and active work in parallel
+        // Load stats, enquiry stats, commission, and active work in parallel
         async let statsTask: Void = loadStats()
         async let enquiryTask: Void = loadEnquiryStats()
+        async let commissionTask: Void = loadCommissionEstimate()
         async let activeWorkTask: Void = loadActiveWork()
 
         // Await all tasks
-        _ = await (statsTask, enquiryTask, activeWorkTask)
+        _ = await (statsTask, enquiryTask, commissionTask, activeWorkTask)
 
         isLoading = false
     }
@@ -114,6 +116,23 @@ final class DashboardViewModel {
             print("📧 [Enquiry] Failed to load enquiry stats: \(error)")
             #endif
             // Don't set error for enquiry stats - it's supplementary
+        }
+    }
+
+    private func loadCommissionEstimate() async {
+        do {
+            let result: CommissionEstimate = try await APIClient.shared.request(
+                .commissionEstimate(scope: selectedScope.rawValue, period: selectedPeriod.rawValue)
+            )
+            commissionEstimate = result
+            #if DEBUG
+            print("💰 [Commission] Loaded - hasRules: \(result.hasRules), estimated: \(result.estimatedCommission ?? 0), users: \(result.users?.count ?? 0), breakdown: \(result.breakdown?.count ?? 0)")
+            #endif
+        } catch {
+            #if DEBUG
+            print("💰 [Commission] Failed to load: \(error)")
+            #endif
+            // Don't set error — commission is supplementary
         }
     }
 

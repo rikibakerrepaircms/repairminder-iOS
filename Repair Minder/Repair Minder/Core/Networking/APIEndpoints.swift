@@ -54,6 +54,7 @@ enum APIEndpoint {
     // MARK: - Dashboard
 
     case dashboardStats(scope: String?, period: String?)
+    case commissionEstimate(scope: String?, period: String?)
     case enquiryStats(scope: String?, includeBreakdown: Bool?)
     case lifecycle
     case categoryBreakdown
@@ -278,6 +279,8 @@ enum APIEndpoint {
         // Dashboard
         case .dashboardStats:
             return "/api/dashboard/stats"
+        case .commissionEstimate:
+            return "/api/dashboard/commission-estimate"
         case .enquiryStats:
             return "/api/dashboard/enquiry-stats"
         case .lifecycle:
@@ -512,7 +515,7 @@ enum APIEndpoint {
         // GET endpoints
         case .me, .totpStatus,
              .customerMe,
-             .dashboardStats, .enquiryStats, .lifecycle, .categoryBreakdown, .activityLog,
+             .dashboardStats, .commissionEstimate, .enquiryStats, .lifecycle, .categoryBreakdown, .activityLog,
              .bookingHeatmap, .buybackStats, .bookingsByTime,
              .devices, .myQueue, .myActiveWork, .orderDevices, .orderDevice, .deviceActions,
              .orders, .order, .orderItems, .orderPayments, .orderSignatures, .orderDocument,
@@ -583,6 +586,16 @@ enum APIEndpoint {
     var queryItems: [URLQueryItem]? {
         switch self {
         case .dashboardStats(let scope, let period):
+            var items: [URLQueryItem] = []
+            if let scope = scope {
+                items.append(URLQueryItem(name: "scope", value: scope))
+            }
+            if let period = period {
+                items.append(URLQueryItem(name: "period", value: period))
+            }
+            return items.isEmpty ? nil : items
+
+        case .commissionEstimate(let scope, let period):
             var items: [URLQueryItem] = []
             if let scope = scope {
                 items.append(URLQueryItem(name: "scope", value: scope))

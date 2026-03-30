@@ -164,3 +164,79 @@ struct RevenueCategoryBreakdown: Decodable, Equatable, Sendable {
     let other: Double?
     let total: Double
 }
+
+// MARK: - Commission Estimate
+
+/// Response from `GET /api/dashboard/commission-estimate`
+struct CommissionEstimate: Equatable, Sendable {
+    let hasRules: Bool
+    let period: String?
+    let estimatedCommission: Double?
+    let totalSales: Double?
+    let breakdown: [CommissionBreakdownItem]?  // user scope
+    let users: [CommissionUserSummary]?  // company scope
+    let orderCount: Int?
+    let attributionMethod: String?
+}
+
+extension CommissionEstimate: Decodable {
+    private enum CodingKeys: String, CodingKey {
+        case hasRules, period, estimatedCommission, totalSales, breakdown, users, orderCount, attributionMethod
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        hasRules = try container.decode(Bool.self, forKey: .hasRules)
+        period = try container.decodeIfPresent(String.self, forKey: .period)
+        estimatedCommission = try container.decodeIfPresent(Double.self, forKey: .estimatedCommission)
+        totalSales = try container.decodeIfPresent(Double.self, forKey: .totalSales)
+        orderCount = try container.decodeIfPresent(Int.self, forKey: .orderCount)
+        attributionMethod = try container.decodeIfPresent(String.self, forKey: .attributionMethod)
+        // Gracefully decode arrays — don't let one bad entry kill the whole response
+        breakdown = try? container.decodeIfPresent([CommissionBreakdownItem].self, forKey: .breakdown)
+        users = try? container.decodeIfPresent([CommissionUserSummary].self, forKey: .users)
+        #if DEBUG
+        if container.contains(.users), users == nil {
+            print("Commission: users array present but failed to decode")
+        }
+        #endif
+    }
+}
+
+/// Per-employee commission summary (company scope)
+struct CommissionUserSummary: Decodable, Equatable, Sendable, Identifiable {
+    let userId: String
+    let firstName: String?
+    let lastName: String?
+    let estimatedCommission: Double
+    let totalSales: Double
+    let breakdown: [CommissionBreakdownItem]?
+
+    var id: String { userId }
+
+    var fullName: String {
+        [firstName, lastName].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
+    }
+}
+
+/// Individual item type breakdown within commission estimate
+struct CommissionBreakdownItem: Decodable, Equatable, Sendable, Identifiable {
+    let itemType: String
+    let sales: Double
+    let commission: Double
+    let rate: Double
+    let basis: String
+    let count: Int
+
+    var id: String { itemType }
+
+    var formattedItemType: String {
+        switch itemType {
+        case "repair": return "Repairs"
+        case "device_sale": return "Device Sales"
+        case "accessory": return "Accessories"
+        case "device_purchase": return "Buyback"
+        default: return itemType.capitalized
+        }
+    }
+}

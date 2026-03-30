@@ -43,6 +43,12 @@ struct DashboardView: View {
                     // Main stats grid
                     statsSection
 
+                    // Commission estimate (if user has rules)
+                    if let commission = viewModel.commissionEstimate,
+                       commission.hasRules {
+                        commissionSection(commission)
+                    }
+
                     // Lifecycle + Enquiries: side by side on iPad
                     if isRegularWidth {
                         HStack(alignment: .top, spacing: 20) {
@@ -335,6 +341,91 @@ struct DashboardView: View {
                 .background(Color(.secondarySystemGroupedBackground))
                 .cornerRadius(12)
             }
+        }
+    }
+
+    // MARK: - Commission Section
+
+    @ViewBuilder
+    private func commissionSection(_ commission: CommissionEstimate) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Commission")
+                .font(.headline)
+
+            VStack(spacing: 12) {
+                // Total commission
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Estimated Commission")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(CurrencyFormatter.format(commission.estimatedCommission ?? 0))
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(.green)
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Total Sales")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(CurrencyFormatter.format(commission.totalSales ?? 0))
+                            .font(.subheadline.weight(.medium))
+                    }
+                }
+
+                // Company scope: per-employee breakdown
+                if let users = commission.users, !users.isEmpty {
+                    Divider()
+
+                    ForEach(users) { user in
+                        HStack {
+                            Text(user.fullName)
+                                .font(.subheadline)
+                            Spacer()
+                            Text(CurrencyFormatter.format(user.totalSales))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(CurrencyFormatter.format(user.estimatedCommission))
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(.green)
+                        }
+                    }
+                }
+
+                // User scope: item type breakdown
+                if let breakdown = commission.breakdown, !breakdown.isEmpty {
+                    Divider()
+
+                    ForEach(breakdown) { item in
+                        HStack {
+                            Text(item.formattedItemType)
+                                .font(.subheadline)
+                            Spacer()
+                            Text("\(item.count) orders")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(CurrencyFormatter.format(item.commission))
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(.green)
+                        }
+                    }
+                }
+
+                // Order count
+                if let orderCount = commission.orderCount, orderCount > 0 {
+                    HStack {
+                        Text("Based on \(orderCount) paid & collected order\(orderCount == 1 ? "" : "s")")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        Spacer()
+                    }
+                }
+            }
+            .padding()
+            .background(Color(.secondarySystemGroupedBackground))
+            .cornerRadius(12)
         }
     }
 

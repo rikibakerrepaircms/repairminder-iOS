@@ -10,7 +10,7 @@ import Foundation
 // MARK: - Board Column Model
 
 /// Column configuration from `GET /api/board/columns`
-struct BoardColumnModel: Decodable, Identifiable, Sendable, Equatable {
+struct BoardColumnModel: Identifiable, Sendable, Equatable {
     let id: String
     let companyId: String
     let title: String
@@ -23,13 +23,56 @@ struct BoardColumnModel: Decodable, Identifiable, Sendable, Equatable {
     let actions: [BoardColumnAction]
 }
 
+extension BoardColumnModel: Decodable {
+    private enum CodingKeys: String, CodingKey {
+        case id, companyId, title, columnType, sortOrder, isVisible, icon, color, scope, actions
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        companyId = try container.decode(String.self, forKey: .companyId)
+        title = try container.decode(String.self, forKey: .title)
+        columnType = try container.decodeIfPresent(String.self, forKey: .columnType) ?? "custom"
+        sortOrder = try container.decodeIfPresent(Int.self, forKey: .sortOrder) ?? 0
+        isVisible = try container.decodeIfPresent(FlexibleBool.self, forKey: .isVisible) ?? FlexibleBool(true)
+        icon = try container.decodeIfPresent(String.self, forKey: .icon)
+        color = try container.decodeIfPresent(String.self, forKey: .color)
+        scope = try container.decodeIfPresent(String.self, forKey: .scope) ?? "company"
+        // Gracefully handle actions decode failure — return empty array instead of crashing
+        actions = (try? container.decode([BoardColumnAction].self, forKey: .actions)) ?? []
+    }
+}
+
 /// Action associated with a board column (maps statuses to columns)
-struct BoardColumnAction: Decodable, Identifiable, Sendable, Equatable {
+struct BoardColumnAction: Identifiable, Sendable, Equatable {
     let id: String
-    let columnId: String
+    let columnId: String?
     let actionType: String
-    let actionValue: String
+    let actionValue: String?
     let sortOrder: Int
+}
+
+extension BoardColumnAction: Decodable {
+    private enum CodingKeys: String, CodingKey {
+        case id, columnId, actionType, actionValue, sortOrder
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        // Handle id as String or Int (SQLite json_group_array may return integer)
+        if let stringId = try? container.decode(String.self, forKey: .id) {
+            id = stringId
+        } else if let intId = try? container.decode(Int.self, forKey: .id) {
+            id = String(intId)
+        } else {
+            id = UUID().uuidString
+        }
+        columnId = try container.decodeIfPresent(String.self, forKey: .columnId)
+        actionType = try container.decodeIfPresent(String.self, forKey: .actionType) ?? ""
+        actionValue = try container.decodeIfPresent(String.self, forKey: .actionValue)
+        sortOrder = try container.decodeIfPresent(Int.self, forKey: .sortOrder) ?? 0
+    }
 }
 
 /// Card position mapping a device to a specific column
@@ -37,7 +80,7 @@ struct BoardCardPosition: Decodable, Identifiable, Sendable, Equatable {
     let id: String
     let deviceId: String
     let columnId: String
-    let sortOrder: Int
+    let sortOrder: Int?
 }
 
 // MARK: - API Response Wrappers

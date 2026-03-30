@@ -175,7 +175,7 @@ final class BoardViewModel {
             groupDevices(devices)
             extractEngineers(from: devices)
         } catch {
-            self.error = "Failed to load board"
+            self.error = "Failed to load board: \(error.localizedDescription)"
             #if DEBUG
             print("Board load error: \(error)")
             #endif
@@ -357,11 +357,11 @@ final class BoardViewModel {
             if device.isBuyback {
                 // Buyback status uses a different endpoint — not implemented in iOS yet
                 // Skip silently for now
-            } else if let orderId = device.orderId {
+            } else if let orderId = device.orderId, let value = action.actionValue {
                 try await BoardService.updateDeviceStatus(
                     orderId: orderId,
                     deviceId: device.id,
-                    status: action.actionValue
+                    status: value
                 )
             }
 
@@ -406,7 +406,9 @@ final class BoardViewModel {
         var statusToColumnId: [String: String] = [:]
         for column in columns {
             for action in column.actions where action.actionType == "set_status" {
-                statusToColumnId[action.actionValue] = column.id
+                if let value = action.actionValue {
+                    statusToColumnId[value] = column.id
+                }
             }
         }
 

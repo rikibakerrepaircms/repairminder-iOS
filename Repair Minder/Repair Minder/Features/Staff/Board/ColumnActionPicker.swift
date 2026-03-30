@@ -246,12 +246,12 @@ struct ColumnEditorSheet: View {
     private func labelForAction(_ action: BoardColumnAction) -> String {
         switch action.actionType {
         case "set_status":
-            return "Set status → \(action.actionValue.replacingOccurrences(of: "_", with: " ").capitalized)"
+            return "Set status → \((action.actionValue ?? "").replacingOccurrences(of: "_", with: " ").capitalized)"
         case "set_engineer": return "Assign engineer"
         case "clear_engineer": return "Clear engineer"
         case "set_sub_location": return "Set sub-location"
         case "clear_sub_location": return "Clear sub-location"
-        default: return "\(action.actionType): \(action.actionValue)"
+        default: return "\(action.actionType): \(action.actionValue ?? "")"
         }
     }
 

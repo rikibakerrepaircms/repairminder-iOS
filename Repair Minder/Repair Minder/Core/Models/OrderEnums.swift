@@ -125,6 +125,7 @@ enum IntakeMethod: String, Codable, CaseIterable, Sendable {
     case courier
     case counterSale = "counter_sale"
     case accessoriesInStore = "accessories_in_store"
+    case kioskSale = "kiosk_sale"
     case online
 
     var label: String {
@@ -134,6 +135,7 @@ enum IntakeMethod: String, Codable, CaseIterable, Sendable {
         case .courier: return "Courier"
         case .counterSale: return "Counter Sale"
         case .accessoriesInStore: return "Accessories In-Store"
+        case .kioskSale: return "Kiosk Sale"
         case .online: return "Online"
         }
     }
@@ -145,6 +147,7 @@ enum IntakeMethod: String, Codable, CaseIterable, Sendable {
         case .courier: return "shippingbox"
         case .counterSale: return "cart"
         case .accessoriesInStore: return "bag"
+        case .kioskSale: return "cart"
         case .online: return "globe"
         }
     }

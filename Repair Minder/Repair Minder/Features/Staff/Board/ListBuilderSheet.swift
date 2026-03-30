@@ -175,7 +175,7 @@ struct ListBuilderSheet: View {
         actions.map { action in
             switch action.actionType {
             case "set_status":
-                return "→ \(action.actionValue.replacingOccurrences(of: "_", with: " ").capitalized)"
+                return "→ \((action.actionValue ?? "").replacingOccurrences(of: "_", with: " ").capitalized)"
             case "clear_engineer": return "Clear engineer"
             case "set_engineer": return "Assign engineer"
             case "set_sub_location": return "Set location"
