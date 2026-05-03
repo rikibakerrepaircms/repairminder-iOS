@@ -1,2 +1,0 @@
-Target dependency graph (1 target)
-Target 'Repair Minder' in project 'Repair Minder' (no dependencies)
