@@ -18,7 +18,12 @@ struct BookingWizardView: View {
     }
 
     private var completedSteps: [BookingStep] {
-        BookingStep.allCases.filter { $0.rawValue < viewModel.currentStep.rawValue && $0 != .confirmation }
+        // Use the view model's visible list so mail_in / courier flows don't
+        // surface a "completed" Devices/Signature summary card that the flow
+        // never actually walked through.
+        let visible = viewModel.visibleSteps
+        guard let currentIndex = visible.firstIndex(of: viewModel.currentStep) else { return [] }
+        return Array(visible.prefix(currentIndex)).filter { $0 != .confirmation }
     }
 
     var body: some View {
@@ -27,6 +32,7 @@ struct BookingWizardView: View {
             if sizeClass != .regular && viewModel.currentStep != .confirmation {
                 StepProgressView(
                     currentStep: viewModel.currentStep,
+                    steps: viewModel.visibleSteps,
                     onStepTap: { step in
                         viewModel.goToStep(step)
                     }
@@ -147,8 +153,10 @@ struct BookingWizardView: View {
 
             Spacer()
 
-            // Next/Submit Button
-            if viewModel.currentStep == .signature {
+            // Next/Submit Button. "Submit" sits on the last data-collection
+            // step for the current intake method — .signature for walk-in,
+            // .summary for mail-in / courier (devices + signature are skipped).
+            if viewModel.currentStep == viewModel.submitStepKey {
                 Button {
                     Task {
                         await viewModel.submit()

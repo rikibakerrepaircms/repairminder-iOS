@@ -14,6 +14,9 @@ struct CustomerOrderDetail: Codable, Identifiable, Sendable {
     let id: String
     let ticketNumber: Int
     let status: String
+    /// "walk_in", "mail_in", "courier", "counter_sale", "accessories_in_store"
+    /// — used to surface the mail-in shipping banner.
+    let intakeMethod: String?
     let createdAt: Date
     let collectedAt: Date?
     let quoteSentAt: Date?
@@ -30,7 +33,7 @@ struct CustomerOrderDetail: Codable, Identifiable, Sendable {
 
     // Note: Using automatic snake_case conversion via decoder.keyDecodingStrategy
     enum CodingKeys: String, CodingKey {
-        case id, ticketNumber, status, createdAt, collectedAt
+        case id, ticketNumber, status, intakeMethod, createdAt, collectedAt
         case quoteSentAt, quoteApprovedAt, quoteApprovedMethod
         case rejectedAt, preAuthorization, reviewLinks
         case devices, items, totals, messages, company
@@ -43,6 +46,7 @@ struct CustomerOrderDetail: Codable, Identifiable, Sendable {
         id = try container.decode(String.self, forKey: .id)
         ticketNumber = try container.decode(Int.self, forKey: .ticketNumber)
         status = try container.decode(String.self, forKey: .status)
+        intakeMethod = try container.decodeIfPresent(String.self, forKey: .intakeMethod)
         quoteApprovedMethod = try container.decodeIfPresent(String.self, forKey: .quoteApprovedMethod)
         preAuthorization = try container.decodeIfPresent(PreAuthorization.self, forKey: .preAuthorization)
         reviewLinks = try container.decodeIfPresent(ReviewLinks.self, forKey: .reviewLinks)
@@ -284,6 +288,9 @@ struct CustomerCompanyInfo: Codable, Sendable {
     let addressLine1: String?
     let addressLine2: String?
     let city: String?
+    /// UK county — added to the API alongside the mail-in shipping banner so
+    /// the address renders correctly (e.g. "Haverhill, Suffolk").
+    let county: String?
     let postcode: String?
     let logoUrl: String?
     let currencyCode: String?
@@ -292,13 +299,17 @@ struct CustomerCompanyInfo: Codable, Sendable {
     let collectionRecyclingEnabled: Bool?
     let collectionStorageFeeDaily: Decimal?
     let collectionStorageFeeCap: Decimal?
+    /// Optional per-tenant URL for shipping instructions. Currently NULL for
+    /// every tenant; reserved for future use if a customer KB exists.
+    let mailInHelpUrl: String?
 
     // Note: Using automatic snake_case conversion via decoder.keyDecodingStrategy
     enum CodingKeys: String, CodingKey {
-        case name, phone, email, locationName, addressLine1, addressLine2, city, postcode
+        case name, phone, email, locationName, addressLine1, addressLine2, city, county, postcode
         case logoUrl, currencyCode, termsConditions
         case collectionStorageFeeEnabled, collectionRecyclingEnabled
         case collectionStorageFeeDaily, collectionStorageFeeCap
+        case mailInHelpUrl
     }
 
     /// Custom decoding to handle boolean and numeric fields
@@ -312,10 +323,12 @@ struct CustomerCompanyInfo: Codable, Sendable {
         addressLine1 = try container.decodeIfPresent(String.self, forKey: .addressLine1)
         addressLine2 = try container.decodeIfPresent(String.self, forKey: .addressLine2)
         city = try container.decodeIfPresent(String.self, forKey: .city)
+        county = try container.decodeIfPresent(String.self, forKey: .county)
         postcode = try container.decodeIfPresent(String.self, forKey: .postcode)
         logoUrl = try container.decodeIfPresent(String.self, forKey: .logoUrl)
         currencyCode = try container.decodeIfPresent(String.self, forKey: .currencyCode)
         termsConditions = try container.decodeIfPresent(String.self, forKey: .termsConditions)
+        mailInHelpUrl = try container.decodeIfPresent(String.self, forKey: .mailInHelpUrl)
 
         // Handle booleans that may come as Int
         if let boolValue = try? container.decode(Bool.self, forKey: .collectionStorageFeeEnabled) {

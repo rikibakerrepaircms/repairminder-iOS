@@ -7,11 +7,18 @@ import SwiftUI
 
 struct StepProgressView: View {
     let currentStep: BookingStep
+    /// Steps to render in the progress bar. Caller supplies the filtered list
+    /// so mail_in / courier flows skip Devices + Signature.
+    let steps: [BookingStep]
     let onStepTap: (BookingStep) -> Void
 
-    // Only show first 4 steps (exclude confirmation)
+    /// Drop the confirmation step from the progress bar (it's the end state).
     private var visibleSteps: [BookingStep] {
-        BookingStep.allCases.filter { $0 != .confirmation }
+        steps.filter { $0 != .confirmation }
+    }
+
+    private var currentVisibleIndex: Int {
+        visibleSteps.firstIndex(of: currentStep) ?? 0
     }
 
     var body: some View {
@@ -20,7 +27,7 @@ struct StepProgressView: View {
                 stepItem(step: step, index: index)
 
                 if index < visibleSteps.count - 1 {
-                    stepConnector(isCompleted: step.rawValue < currentStep.rawValue)
+                    stepConnector(isCompleted: index < currentVisibleIndex)
                 }
             }
         }
@@ -28,9 +35,10 @@ struct StepProgressView: View {
 
     @ViewBuilder
     private func stepItem(step: BookingStep, index: Int) -> some View {
-        let isCompleted = step.rawValue < currentStep.rawValue
+        // index-based now that the visible list may skip steps.
+        let isCompleted = index < currentVisibleIndex
         let isCurrent = step == currentStep
-        let isAccessible = step.rawValue <= currentStep.rawValue
+        let isAccessible = index <= currentVisibleIndex
 
         Button {
             if isAccessible {
@@ -48,7 +56,7 @@ struct StepProgressView: View {
                             .font(.caption.bold())
                             .foregroundStyle(.white)
                     } else {
-                        Text("\(step.number)")
+                        Text("\(index + 1)")
                             .font(.caption.bold())
                             .foregroundStyle(isCurrent ? .white : .secondary)
                     }
@@ -84,12 +92,20 @@ struct StepProgressView: View {
     }
 }
 
-#Preview("Step 1") {
-    StepProgressView(currentStep: .client) { _ in }
+#Preview("Walk-in · Step 1") {
+    StepProgressView(currentStep: .client, steps: BookingStep.allCases) { _ in }
         .padding()
 }
 
-#Preview("Step 3") {
-    StepProgressView(currentStep: .summary) { _ in }
+#Preview("Walk-in · Step 3") {
+    StepProgressView(currentStep: .summary, steps: BookingStep.allCases) { _ in }
         .padding()
+}
+
+#Preview("Mail-in · Summary") {
+    StepProgressView(
+        currentStep: .summary,
+        steps: [.client, .summary, .confirmation]
+    ) { _ in }
+    .padding()
 }

@@ -175,10 +175,50 @@ struct BookingAccessoryItem: Identifiable, Equatable {
     }
 }
 
+/// Drop-off vs mail-in vs courier collection, matching the same options as
+/// the web booking wizard and the ticket→order conversion modal. Drives
+/// whether the wizard collects devices + a drop-off signature or creates the
+/// order in awaiting_device with neither.
+enum IntakeMethod: String, CaseIterable, Identifiable, Sendable {
+    case walkIn = "walk_in"
+    case mailIn = "mail_in"
+    case courier = "courier"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .walkIn: return "Walk-in"
+        case .mailIn: return "Mail-in"
+        case .courier: return "Courier"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .walkIn: return "Customer is present"
+        case .mailIn: return "Device will be posted"
+        case .courier: return "Courier will collect"
+        }
+    }
+
+    /// Whether the wizard should collect devices + a drop-off signature.
+    /// walk_in does; mail_in / courier skip both — the order is created in
+    /// awaiting_device status with no devices yet.
+    var collectsDevicesAndSignature: Bool {
+        self == .walkIn
+    }
+}
+
 /// Complete form data for a booking
 struct BookingFormData {
     // Service type
     var serviceType: ServiceType = .repair
+
+    // Intake method (drop-off vs mail-in vs courier). Only meaningful for
+    // repair/buyback; accessories and device-sale always map to their own
+    // backend intake methods regardless of this value.
+    var intakeMethod: IntakeMethod = .walkIn
 
     // Guest checkout (accessories only)
     var guestCheckout: Bool = false

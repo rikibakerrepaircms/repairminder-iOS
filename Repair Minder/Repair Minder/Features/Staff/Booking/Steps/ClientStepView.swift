@@ -22,6 +22,14 @@ struct ClientStepView: View {
                     .foregroundStyle(.secondary)
             }
 
+            // Intake Method picker — only shown for repair / buyback. Accessories
+            // and device-sale always map to fixed backend intake methods, so the
+            // choice doesn't apply there. Picking mail_in / courier collapses the
+            // wizard down to Customer → Summary → Confirmation.
+            if viewModel.formData.serviceType == .repair || viewModel.formData.serviceType == .buyback {
+                intakeMethodPicker
+            }
+
             // Client Search
             ClientSearchView(
                 query: $viewModel.clientSearchQuery,
@@ -98,6 +106,62 @@ struct ClientStepView: View {
     }
 
     // MARK: - Extracted Fields
+
+    @ViewBuilder
+    private var intakeMethodPicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Intake Method")
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundStyle(.primary)
+
+            // Three radio-style cards — mirrors the web's three-card picker
+            // and matches the ticket→order conversion modal's options.
+            VStack(spacing: 8) {
+                ForEach(IntakeMethod.allCases) { method in
+                    intakeOptionRow(method)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func intakeOptionRow(_ method: IntakeMethod) -> some View {
+        let isSelected = viewModel.formData.intakeMethod == method
+        Button {
+            guard viewModel.formData.intakeMethod != method else { return }
+            viewModel.formData.intakeMethod = method
+            viewModel.onIntakeMethodChanged()
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                    .padding(.top, 1)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(method.label)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(isSelected ? Color.accentColor : .primary)
+                    Text(method.description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(isSelected ? Color.accentColor.opacity(0.08) : Color.platformGray6)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(isSelected ? Color.accentColor : Color.platformGray4, lineWidth: 2)
+            )
+        }
+        .buttonStyle(.plain)
+    }
 
     @ViewBuilder
     private var emailField: some View {

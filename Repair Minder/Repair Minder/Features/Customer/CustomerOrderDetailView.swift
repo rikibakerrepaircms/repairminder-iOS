@@ -61,6 +61,13 @@ struct CustomerOrderDetailView: View {
                 // Order Header
                 orderHeader(order)
 
+                // Mail-in Shipping Banner: shown only when the order is
+                // awaiting its first device and was booked as mail-in. Same
+                // visibility rule + content as the web customer portal.
+                if shouldShowMailInBanner(order) {
+                    MailInShippingBanner(order: order)
+                }
+
                 // Pre-Authorization Banner (if applicable)
                 if let preAuth = order.preAuthorization {
                     preAuthBanner(preAuth, order: order)
@@ -591,6 +598,17 @@ struct CustomerOrderDetailView: View {
 
     private func formatDate(_ date: Date) -> String {
         DateFormatters.formatHumanDate(date)
+    }
+
+    /// True when the order is freshly-booked mail-in and we should prompt the
+    /// customer to ship the device. Mirrors the web's gating exactly.
+    private func shouldShowMailInBanner(_ order: CustomerOrderDetail) -> Bool {
+        guard order.status == "awaiting_device" else { return false }
+        guard order.devices.isEmpty else { return false }
+        guard order.intakeMethod == "mail_in" else { return false }
+        guard let company = order.company else { return false }
+        // Need at least a location name or address line to show the banner.
+        return (company.locationName?.isEmpty == false) || (company.addressLine1?.isEmpty == false)
     }
 }
 

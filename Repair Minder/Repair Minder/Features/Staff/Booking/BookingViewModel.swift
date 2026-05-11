@@ -79,12 +79,33 @@ final class BookingViewModel {
 
     // MARK: - Navigation
 
+    /// Steps the wizard actually walks through given the current intake method.
+    /// walk_in keeps the full 5-step flow; mail_in / courier drop Devices and
+    /// Signature since the order is created in awaiting_device with neither.
+    var visibleSteps: [BookingStep] {
+        if formData.intakeMethod.collectsDevicesAndSignature {
+            return BookingStep.allCases
+        }
+        return BookingStep.allCases.filter { $0 != .devices && $0 != .signature }
+    }
+
+    /// Key of the last data-collection step (i.e. the step whose primary
+    /// button submits the booking). For walk_in this is .signature; for
+    /// mail_in / courier this collapses to .summary.
+    var submitStepKey: BookingStep {
+        visibleSteps.dropLast().last ?? .client
+    }
+
+    private var currentVisibleIndex: Int {
+        visibleSteps.firstIndex(of: currentStep) ?? 0
+    }
+
     var canGoBack: Bool {
-        currentStep.rawValue > 0 && currentStep != .confirmation
+        currentVisibleIndex > 0 && currentStep != .confirmation
     }
 
     var canGoNext: Bool {
-        currentStep.rawValue < BookingStep.allCases.count - 1
+        currentVisibleIndex < visibleSteps.count - 1
     }
 
     var isCurrentStepValid: Bool {
@@ -107,18 +128,28 @@ final class BookingViewModel {
 
     func goBack() {
         guard canGoBack else { return }
-        currentStep = BookingStep(rawValue: currentStep.rawValue - 1) ?? .client
+        currentStep = visibleSteps[currentVisibleIndex - 1]
     }
 
     func goNext() {
         guard canGoNext && isCurrentStepValid else { return }
-        currentStep = BookingStep(rawValue: currentStep.rawValue + 1) ?? .confirmation
+        currentStep = visibleSteps[currentVisibleIndex + 1]
     }
 
     func goToStep(_ step: BookingStep) {
-        // Can only go to previous steps or current
-        if step.rawValue <= currentStep.rawValue {
+        // Can only go to previous visible steps or current
+        guard let targetIndex = visibleSteps.firstIndex(of: step) else { return }
+        if targetIndex <= currentVisibleIndex {
             currentStep = step
+        }
+    }
+
+    /// Called when the staff flips intake method on the Customer step.
+    /// If we'd accidentally been on a step that just got filtered out
+    /// (shouldn't be possible from the UI, but guard anyway), bounce to client.
+    func onIntakeMethodChanged() {
+        if !visibleSteps.contains(currentStep) {
+            currentStep = .client
         }
     }
 
@@ -342,8 +373,11 @@ final class BookingViewModel {
                 )
             }
 
-            // 4. Map service type to backend intake method
-            // Backend INTAKE_METHODS: walk_in, mail_in, courier, counter_sale, accessories_in_store
+            // 4. Map service type + intake method to backend intake_method.
+            // Backend INTAKE_METHODS: walk_in, mail_in, courier, counter_sale,
+            // accessories_in_store. Accessories and device-sale always have
+            // fixed backend values; repair/buyback honour the staff's pick of
+            // walk_in / mail_in / courier on the Customer step.
             let intakeMethod: String
             switch formData.serviceType {
             case .accessories:
@@ -351,8 +385,23 @@ final class BookingViewModel {
             case .deviceSale:
                 intakeMethod = "counter_sale"
             case .repair, .buyback:
-                intakeMethod = "walk_in"
+                intakeMethod = formData.intakeMethod.rawValue
             }
+
+            // Drop-off signature only applies when the customer is physically
+            // present. mail_in / courier orders sign on collection later.
+            let signaturePayload: CreateOrderRequest.SignatureData? =
+                formData.intakeMethod.collectsDevicesAndSignature
+                ? CreateOrderRequest.SignatureData(
+                    signatureData: formData.signatureType == .drawn ? formData.signatureData : nil,
+                    typedName: formData.signatureType == .typed && !formData.typedName.isEmpty ? formData.typedName : nil,
+                    signatureMethod: formData.signatureType.rawValue,
+                    termsAgreed: formData.termsAgreed,
+                    marketingConsent: formData.marketingConsent,
+                    userAgent: userAgent,
+                    geolocation: nil
+                )
+                : nil
 
             // 5. Create order request
             let orderRequest = CreateOrderRequest(
@@ -375,15 +424,7 @@ final class BookingViewModel {
                 existingTicketId: formData.existingTicketId,
                 notes: formData.internalNotes.isEmpty ? nil : formData.internalNotes,
                 preAuthorization: preAuth,
-                signature: CreateOrderRequest.SignatureData(
-                    signatureData: formData.signatureType == .drawn ? formData.signatureData : nil,
-                    typedName: formData.signatureType == .typed && !formData.typedName.isEmpty ? formData.typedName : nil,
-                    signatureMethod: formData.signatureType.rawValue,
-                    termsAgreed: formData.termsAgreed,
-                    marketingConsent: formData.marketingConsent,
-                    userAgent: userAgent,
-                    geolocation: nil  // TODO: Add CoreLocation support in future
-                )
+                signature: signaturePayload
             )
 
             // 6. Create order
