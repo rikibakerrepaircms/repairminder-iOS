@@ -183,12 +183,18 @@ struct BoardView: View {
 
     @ViewBuilder
     private var listBuilderSheetContent: some View {
-        if #available(iOS 18, macOS 15, *) {
+        // The `.zoom` navigation transition is unavailable on macOS, so it's
+        // guarded to iOS; macOS gets a plain sheet (same content, no zoom).
+        #if os(iOS)
+        if #available(iOS 18, *) {
             ListBuilderSheet(viewModel: viewModel)
                 .navigationTransition(.zoom(sourceID: "listBuilder", in: sheetNamespace))
         } else {
             ListBuilderSheet(viewModel: viewModel)
         }
+        #else
+        ListBuilderSheet(viewModel: viewModel)
+        #endif
     }
 
     // MARK: - Drag Handling

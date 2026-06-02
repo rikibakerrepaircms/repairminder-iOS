@@ -426,7 +426,7 @@ struct EnquiryDetailView: View {
                             .font(.title3)
                     }
                 }
-                .disabled(viewModel.isGeneratingAI)
+                .disabled(viewModel.isGeneratingAI || viewModel.aiRepliesUnavailable)
 
                 // AI rewrite button
                 Button {
@@ -440,10 +440,24 @@ struct EnquiryDetailView: View {
                             .font(.title3)
                     }
                 }
-                .disabled(viewModel.isRewritingAI || viewModel.hasRewrittenAI || viewModel.replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(viewModel.isRewritingAI || viewModel.hasRewrittenAI || viewModel.replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.aiRepliesUnavailable)
             }
             .padding(.horizontal)
             .padding(.top, 8)
+
+            // Provider-key hint when AI replies aren't set up for this company
+            if viewModel.aiRepliesUnavailable {
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle")
+                        .font(.caption2)
+                    Text(viewModel.providerKeyHint)
+                        .font(.caption2)
+                    Spacer()
+                }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal)
+                .padding(.top, 4)
+            }
 
             // SMS toggle (only in reply mode when SMS is available)
             if viewModel.replyMode == .reply && viewModel.canSendSms {

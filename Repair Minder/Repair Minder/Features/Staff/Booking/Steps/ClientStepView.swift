@@ -118,7 +118,7 @@ struct ClientStepView: View {
             // Three radio-style cards — mirrors the web's three-card picker
             // and matches the ticket→order conversion modal's options.
             VStack(spacing: 8) {
-                ForEach(IntakeMethod.allCases) { method in
+                ForEach(BookingIntakeMethod.allCases) { method in
                     intakeOptionRow(method)
                 }
             }
@@ -126,7 +126,7 @@ struct ClientStepView: View {
     }
 
     @ViewBuilder
-    private func intakeOptionRow(_ method: IntakeMethod) -> some View {
+    private func intakeOptionRow(_ method: BookingIntakeMethod) -> some View {
         let isSelected = viewModel.formData.intakeMethod == method
         Button {
             guard viewModel.formData.intakeMethod != method else { return }

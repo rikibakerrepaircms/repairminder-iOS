@@ -179,7 +179,7 @@ struct BookingAccessoryItem: Identifiable, Equatable {
 /// the web booking wizard and the ticket→order conversion modal. Drives
 /// whether the wizard collects devices + a drop-off signature or creates the
 /// order in awaiting_device with neither.
-enum IntakeMethod: String, CaseIterable, Identifiable, Sendable {
+enum BookingIntakeMethod: String, CaseIterable, Identifiable, Sendable {
     case walkIn = "walk_in"
     case mailIn = "mail_in"
     case courier = "courier"
@@ -218,7 +218,7 @@ struct BookingFormData {
     // Intake method (drop-off vs mail-in vs courier). Only meaningful for
     // repair/buyback; accessories and device-sale always map to their own
     // backend intake methods regardless of this value.
-    var intakeMethod: IntakeMethod = .walkIn
+    var intakeMethod: BookingIntakeMethod = .walkIn
 
     // Guest checkout (accessories only)
     var guestCheckout: Bool = false
