@@ -164,6 +164,7 @@ enum APIEndpoint {
     case deviceSearch(query: String)
     case deviceTypes
     case companyPublicInfo
+    case aiReadiness
 
     // MARK: - POS Integrations & Terminals
 
@@ -419,6 +420,8 @@ enum APIEndpoint {
             return "/api/device-types"
         case .companyPublicInfo:
             return "/api/company/public-info"
+        case .aiReadiness:
+            return "/api/company/ai-readiness"
 
         // Push Notifications
         case .registerDeviceToken, .unregisterDeviceToken:
@@ -523,7 +526,7 @@ enum APIEndpoint {
              .tickets, .ticket, .ticketMacroExecutions,
              .macros, .macro, .macroExecutions, .macroExecution,
              .productTypes, .productComponents,
-             .locations, .deviceSearch, .deviceTypes, .companyPublicInfo,
+             .locations, .deviceSearch, .deviceTypes, .companyPublicInfo, .aiReadiness,
              .deviceTokens, .pushPreferences,
              .posIntegrations, .posTerminals, .pollTerminalPayment, .paymentLinks,
              .boardColumns, .boardCardPositions,

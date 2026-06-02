@@ -22,6 +22,9 @@ final class EnquiryDetailViewModel: ObservableObject {
     @Published private(set) var isGeneratingAI = false
     @Published private(set) var isRewritingAI = false
     @Published private(set) var hasRewrittenAI = false
+    /// Per-feature AI readiness. `nil` while loading/unknown — gating stays off
+    /// until we have a definitive answer (the backend still fails safely).
+    @Published private(set) var aiReadiness: AiReadiness?
     @Published private(set) var error: String?
     @Published var showingMacroPicker = false
     @Published var showingStatusPicker = false
@@ -97,6 +100,13 @@ final class EnquiryDetailViewModel: ObservableObject {
         return ticket.smsAvailable == true && ticket.client?.phone != nil
     }
 
+    /// Whether AI replies are known to be unavailable (ticket AI disabled or no
+    /// provider key). Only true once readiness has loaded and `tickets.ready` is
+    /// false — stays false while readiness is unknown so we don't block on it.
+    var aiRepliesUnavailable: Bool {
+        aiReadiness?.tickets.ready == false
+    }
+
     /// Whether client needs SMS (no valid email)
     private var clientNeedsSms: Bool {
         guard let client = ticket?.client else { return false }
@@ -135,6 +145,7 @@ final class EnquiryDetailViewModel: ObservableObject {
 
             await loadMacros()
             await loadExecutions()
+            await loadAiReadiness()
         } catch is CancellationError {
             // Task was cancelled (e.g. view lifecycle), ignore
         } catch let urlError as URLError where urlError.code == .cancelled {
@@ -176,6 +187,21 @@ final class EnquiryDetailViewModel: ObservableObject {
         catch {
             #if DEBUG
             print("Failed to load executions: \(error)")
+            #endif
+        }
+    }
+
+    /// Load per-feature AI readiness so we can proactively gate the AI buttons.
+    /// Failures are swallowed — readiness stays `nil` (unknown) and the buttons
+    /// remain enabled; the backend still fails safely on the actual call.
+    func loadAiReadiness() async {
+        do {
+            aiReadiness = try await APIClient.shared.request(.aiReadiness)
+        } catch is CancellationError { }
+        catch let urlError as URLError where urlError.code == .cancelled { }
+        catch {
+            #if DEBUG
+            print("Failed to load AI readiness: \(error)")
             #endif
         }
     }
@@ -250,7 +276,7 @@ final class EnquiryDetailViewModel: ObservableObject {
             replyMode = .reply
 
         } catch let apiError as APIError {
-            error = apiError.localizedDescription
+            error = friendlyAIError(apiError)
         } catch {
             self.error = error.localizedDescription
         }
@@ -277,12 +303,32 @@ final class EnquiryDetailViewModel: ObservableObject {
             hasRewrittenAI = true
 
         } catch let apiError as APIError {
-            error = apiError.localizedDescription
+            error = friendlyAIError(apiError)
         } catch {
             self.error = error.localizedDescription
         }
 
         isRewritingAI = false
+    }
+
+    /// Map an AI-endpoint error to a friendly, non-scary message when it's the
+    /// "no provider key" case. The two ticket AI endpoints return HTTP 400 with
+    /// an error mentioning Provider Keys when the company hasn't configured a
+    /// key. The response contains no secrets, so nothing sensitive is shown.
+    private func friendlyAIError(_ apiError: APIError) -> String {
+        if case .httpError(let statusCode, let message) = apiError,
+           statusCode == 400,
+           let message,
+           message.localizedCaseInsensitiveContains("provider key")
+            || message.localizedCaseInsensitiveContains("api key") {
+            return providerKeyHint
+        }
+        return apiError.localizedDescription
+    }
+
+    /// User-facing hint shown when ticket AI has no provider key configured.
+    var providerKeyHint: String {
+        "AI replies aren't set up for your company yet. An admin can add a provider key in the web dashboard → Settings → Provider Keys."
     }
 
     /// Preview a macro — returns fully substituted subject and content
