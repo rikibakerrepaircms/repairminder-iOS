@@ -7,6 +7,15 @@
 
 import Foundation
 import SwiftUI
+#if canImport(AppKit)
+import AppKit
+#endif
+
+/// Identifiable wrapper for a locally-cached file URL — drives `.sheet(item:)` for QuickLook
+struct PoPreviewItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
 
 /// ViewModel for customer order detail
 @MainActor
@@ -30,6 +39,10 @@ final class CustomerOrderDetailViewModel: ObservableObject {
     @Published var newMessageText: String = ""
     @Published var isSendingMessage: Bool = false
     @Published var messageError: String?
+
+    // PO Documents state
+    @Published private(set) var poDocuments: [PoDocument] = []
+    @Published var poPreviewItem: PoPreviewItem?
 
     // MARK: - Properties
 
@@ -56,6 +69,7 @@ final class CustomerOrderDetailViewModel: ObservableObject {
 
         do {
             order = try await fetchOrderDetail()
+            await fetchPoDocuments()
         } catch let error as APIError {
             errorMessage = error.localizedDescription
         } catch let decodingError as DecodingError {
@@ -203,6 +217,53 @@ final class CustomerOrderDetailViewModel: ObservableObject {
         }
 
         return orderData
+    }
+
+    private func fetchPoDocuments() async {
+        // Reset first so a removed-server-side doc can't linger if this fetch fails.
+        poDocuments = []
+        guard let token = customerAuth.accessToken else { return }
+        let url = URL(string: "https://api.repairminder.com/api/customer/orders/\(orderId)/po-documents")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            let apiResponse = try decoder.decode(APIResponse<[PoDocument]>.self, from: data)
+            if let docs = apiResponse.data { self.poDocuments = docs }
+        } catch {
+            #if DEBUG
+            print("[CustomerOrderDetailVM] fetchPoDocuments error: \(error)")
+            #endif
+        }
+    }
+
+    func openPoDocument(_ doc: PoDocument) async {
+        guard let token = customerAuth.accessToken else { return }
+        let url = URL(string: "https://api.repairminder.com/api/customer/orders/\(orderId)/po-documents/\(doc.id)/download")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
+            // Prefix with the doc id so distinct documents never collide in temp.
+            let tmpURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(doc.id)-\(doc.filename)")
+            try data.write(to: tmpURL, options: .atomic)
+            #if os(iOS)
+            poPreviewItem = PoPreviewItem(url: tmpURL)
+            #elseif os(macOS)
+            NSWorkspace.shared.open(tmpURL)
+            #endif
+        } catch {
+            #if DEBUG
+            print("[CustomerOrderDetailVM] openPoDocument error: \(error)")
+            #endif
+        }
     }
 
     private func submitApproval(action: String, signatureType: String, signatureData: String, amountAcknowledged: Decimal, bankDetails: (accountHolder: String, sortCode: String, accountNumber: String)? = nil) async throws {

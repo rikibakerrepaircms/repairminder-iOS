@@ -48,6 +48,11 @@ struct CustomerOrderDetailView: View {
         .sheet(isPresented: $viewModel.showMessageCompose) {
             messageComposeSheet
         }
+        #if os(iOS)
+        .sheet(item: $viewModel.poPreviewItem) { item in
+            QuickLookPreview(url: item.url)
+        }
+        #endif
         .task {
             await viewModel.loadOrder()
         }
@@ -104,6 +109,11 @@ struct CustomerOrderDetailView: View {
                 // Messages Section
                 if !order.messages.isEmpty {
                     messagesSection(order.messages)
+                }
+
+                // Purchase Order Documents Section
+                if !viewModel.poDocuments.isEmpty {
+                    poDocumentsSection(viewModel.poDocuments)
                 }
 
                 // Contact Section
@@ -324,6 +334,52 @@ struct CustomerOrderDetailView: View {
 
             ForEach(messages) { message in
                 CustomerMessageBubble(message: message)
+            }
+        }
+        .padding()
+        .background(Color.platformBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+    }
+
+    // MARK: - Purchase Order Documents Section
+
+    @ViewBuilder
+    private func poDocumentsSection(_ docs: [PoDocument]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Purchase Order Documents")
+                .font(.headline)
+
+            ForEach(docs) { doc in
+                HStack(spacing: 12) {
+                    Image(systemName: "doc.fill")
+                        .foregroundStyle(.secondary)
+                        .font(.subheadline)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(doc.filename)
+                            .font(.subheadline)
+                            .lineLimit(1)
+                        Text(doc.formattedSize)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        Task { await viewModel.openPoDocument(doc) }
+                    } label: {
+                        Image(systemName: "arrow.down.circle")
+                            .font(.title3)
+                    }
+                    .buttonStyle(.borderless)
+                }
+                .padding(.vertical, 4)
+
+                if doc.id != docs.last?.id {
+                    Divider()
+                }
             }
         }
         .padding()
