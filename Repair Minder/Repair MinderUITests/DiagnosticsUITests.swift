@@ -39,7 +39,13 @@ final class DiagnosticsUITests: XCTestCase {
         XCTAssertTrue(start.waitForExistence(timeout: 5))
         start.tap()
 
-        XCTAssertTrue(app.staticTexts["runner-root"].waitForExistence(timeout: 8),
-                      "Runner screen should appear after Start")
+        // Tests run (host-side device-info is instant) → summary appears with an overall result.
+        let overall = app.staticTexts["summary-overall"]
+        XCTAssertTrue(overall.waitForExistence(timeout: 15),
+                      "Summary should appear after running the selected tests")
+        XCTAssertEqual(overall.label, "Pass", "device_info should pass → overall Pass")
+
+        // The Send-results action is available on the summary.
+        XCTAssertTrue(app.buttons["send-results"].waitForExistence(timeout: 5))
     }
 }

@@ -65,9 +65,7 @@ struct TestSelectionView: View {
             .accessibilityIdentifier("start-tests")
         }
         .navigationDestination(isPresented: $showRunner) {
-            // Placeholder runner root — replaced by TestRunnerView in Task 7.
-            Text("Running…")
-                .accessibilityIdentifier("runner-root")
+            TestRunnerView(runner: runner)
         }
     }
 }
