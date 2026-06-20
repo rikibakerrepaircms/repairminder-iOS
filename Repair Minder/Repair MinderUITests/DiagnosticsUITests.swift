@@ -16,9 +16,30 @@ final class DiagnosticsUITests: XCTestCase {
         XCTAssertTrue(entry.waitForExistence(timeout: 15), "Diagnostics entry button should appear on the landing page")
         entry.tap()
 
-        let root = app.otherElements["diagnostics-root"]
-        let title = app.staticTexts["Device Diagnostics"]
-        XCTAssertTrue(root.waitForExistence(timeout: 8) || title.waitForExistence(timeout: 8),
-                      "Diagnostics flow root should appear after tapping the entry")
+        let selectAll = app.buttons["select-all"]
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 8),
+                      "Test-selection screen should appear after tapping the entry")
+    }
+
+    /// Select all tests and start → the runner screen appears.
+    func testSelectAllAndStart() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTestResetToRoleSelection"]
+        app.launch()
+
+        let entry = app.buttons["diagnostics-entry"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 15))
+        entry.tap()
+
+        let selectAll = app.buttons["select-all"]
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 8))
+        selectAll.tap()
+
+        let start = app.buttons["start-tests"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
+
+        XCTAssertTrue(app.staticTexts["runner-root"].waitForExistence(timeout: 8),
+                      "Runner screen should appear after Start")
     }
 }
