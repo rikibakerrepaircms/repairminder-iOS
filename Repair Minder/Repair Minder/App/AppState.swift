@@ -56,6 +56,8 @@ final class AppState: ObservableObject {
         case quarantine(reason: String)
         /// User must accept updated platform terms on the web app
         case termsRequired
+        /// No-login device diagnostics flow (decoupled from auth/persistence)
+        case diagnosticsFlow
     }
 
     // MARK: - Initialization
@@ -88,6 +90,14 @@ final class AppState: ObservableObject {
     /// Called on app launch to determine initial state
     func initialize() async {
         currentState = .loading
+
+        #if DEBUG
+        // UI-test hook: force the landing page regardless of any persisted role/session.
+        if ProcessInfo.processInfo.arguments.contains("-uiTestResetToRoleSelection") {
+            currentState = .roleSelection
+            return
+        }
+        #endif
 
         // Check for saved role
         if let role = selectedRole {
@@ -162,6 +172,14 @@ final class AppState: ObservableObject {
             }
         }
     }
+
+    // MARK: - Diagnostics (no-login)
+
+    /// Enter the no-login device-diagnostics flow. Does not touch auth or persist a role.
+    func enterDiagnostics() { currentState = .diagnosticsFlow }
+
+    /// Leave diagnostics and return to role selection.
+    func exitDiagnostics() { currentState = .roleSelection }
 
     // MARK: - Auth State Changes
 

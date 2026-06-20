@@ -51,6 +51,11 @@ struct RoleSelectionView: View {
                             selectRole(role)
                         }
                     }
+
+                    DiagnosticsEntryButton {
+                        appState.enterDiagnostics()
+                    }
+                    .accessibilityIdentifier("diagnostics-entry")
                 }
                 .padding(.horizontal, 24)
                 .opacity(isDimming ? 0 : 1)
@@ -93,6 +98,45 @@ private struct RoleButton: View {
                         .font(.headline)
 
                     Text(role.description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(.secondary)
+            }
+            .padding()
+            .background(Color.platformBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Diagnostics Entry Button
+
+/// No-login entry into the device-diagnostics flow. Mirrors RoleButton's look but
+/// is not an AppUserRole (so it never persists a role or touches auth).
+private struct DiagnosticsEntryButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 16) {
+                Image(systemName: "stethoscope")
+                    .font(.title2)
+                    .frame(width: 44, height: 44)
+                    .background(Color.blue.opacity(0.1))
+                    .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Diagnostics")
+                        .font(.headline)
+
+                    Text("Run a device health check (no login)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

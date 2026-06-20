@@ -276,6 +276,9 @@ struct RootView: View {
 
             case .termsRequired:
                 TermsRequiredView()
+
+            case .diagnosticsFlow:
+                DiagnosticsFlowView()
             }
         }
         .task {
