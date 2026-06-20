@@ -35,7 +35,11 @@ enum TestRegistry {
         t.append(TrueDepthTest())
         t.append(LiDARTest())
         t.append(BiometricTest())
-        // Audio, Connectivity appended in subsequent batches.
+        // Audio
+        t.append(SpeakerTest())
+        t.append(MicrophoneTest())
+        t.append(HeadphonesTest())
+        // Connectivity appended in the next batch.
         return t
     }
 }
