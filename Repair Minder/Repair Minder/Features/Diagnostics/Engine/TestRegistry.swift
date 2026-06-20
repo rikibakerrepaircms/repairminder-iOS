@@ -7,7 +7,13 @@ enum TestRegistry {
     @MainActor static func allTests() -> [DiagnosticTest] {
         var t: [DiagnosticTest] = []
         t.append(DeviceInfoTest())
-        // Later tasks append: TouchTest(), DisplayTest(), CameraTest(.rear), ... etc.
+        // Screen
+        t.append(TouchscreenTest())
+        t.append(MultitouchTest())
+        t.append(ThreeDTouchTest())
+        t.append(DeadPixelTest())
+        t.append(StylusTest())
+        // Sensors / Hardware / Audio / Connectivity appended in subsequent batches.
         return t
     }
 }
