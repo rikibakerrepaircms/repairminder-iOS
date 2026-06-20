@@ -1,16 +1,14 @@
 // Features/Diagnostics/Engine/DiagnosticTest.swift
 import Foundation
 
+/// Matches M360's five diagnostic categories, plus a host-side Device Info group.
 enum TestCategory: String, CaseIterable, Sendable {
-    case displayTouch = "Display & Touch"
-    case cameras = "Cameras"
+    case screen = "Screen"
+    case hardware = "Hardware"
     case audio = "Audio"
-    case biometrics = "Biometrics"
-    case sensors = "Sensors"
     case connectivity = "Connectivity"
-    case buttonsHaptics = "Buttons & Haptics"
-    case power = "Power"
-    case hostInfo = "Device Info"
+    case sensors = "Sensors"
+    case deviceInfo = "Device Info"
 }
 
 /// One diagnostic test. Implementations live in Features/Diagnostics/Tests/.

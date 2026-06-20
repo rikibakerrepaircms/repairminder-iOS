@@ -8,7 +8,7 @@ import UIKit
 struct DeviceInfoTest: DiagnosticTest {
     let id = "device_info"
     let name = "Device Info"
-    let category: TestCategory = .hostInfo
+    let category: TestCategory = .deviceInfo
     let requiresInteraction = false
     var isSupported: Bool { true }
 

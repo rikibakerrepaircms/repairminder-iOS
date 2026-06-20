@@ -27,8 +27,8 @@ struct DiagnosticRunnerTests {
     }
 
     @Test func overallResultReflectsWorstOutcome() async {
-        let pass = FakeTest(id: "p", name: "P", category: .power, isSupported: true, result: .pass)
-        let fail = FakeTest(id: "f", name: "F", category: .power, isSupported: true, result: .fail)
+        let pass = FakeTest(id: "p", name: "P", category: .hardware, isSupported: true, result: .pass)
+        let fail = FakeTest(id: "f", name: "F", category: .hardware, isSupported: true, result: .fail)
         let runner = DiagnosticRunner(tests: [pass, fail])
         runner.selectAll()
         await runner.runSelected()
@@ -36,7 +36,7 @@ struct DiagnosticRunnerTests {
     }
 
     @Test func overallResultPassWhenAllPass() async {
-        let pass = FakeTest(id: "p", name: "P", category: .power, isSupported: true, result: .pass)
+        let pass = FakeTest(id: "p", name: "P", category: .hardware, isSupported: true, result: .pass)
         let runner = DiagnosticRunner(tests: [pass])
         runner.selectAll()
         await runner.runSelected()
