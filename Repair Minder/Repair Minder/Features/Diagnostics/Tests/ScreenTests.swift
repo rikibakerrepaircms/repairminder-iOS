@@ -149,6 +149,7 @@ private struct DeadPixelTestView: View {
             title: "Dead Pixel",
             instruction: "Tap the swatch to cycle solid colours. Look for any pixels stuck a different colour or black spots.",
             hints: ["Tap the colour to change it", "Inspect the whole screen on each colour"],
+            allowManualPass: true,   // subjective: user judges for dead pixels
             onPass: { complete(diagnosticOutcome("color", "Dead Pixel", .pass)) },
             onFail: { complete(diagnosticOutcome("color", "Dead Pixel", .fail)) },
             onSkip: { complete(diagnosticOutcome("color", "Dead Pixel", .skip)) }

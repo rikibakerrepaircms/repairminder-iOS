@@ -8,6 +8,9 @@ struct TestScaffold<Content: View>: View {
     let title: String
     let instruction: String
     var hints: [String] = []
+    /// Automation-first: most tests auto-pass on a real signal, so the manual Pass button is
+    /// hidden (only Fail/Skip remain as a fallback). Subjective tests (dead pixel, light) set true.
+    var allowManualPass: Bool = false
     let onPass: () -> Void
     let onFail: () -> Void
     let onSkip: () -> Void
@@ -35,7 +38,9 @@ struct TestScaffold<Content: View>: View {
             HStack(spacing: 12) {
                 action("Skip", color: .gray, id: "test-skip", action: onSkip)
                 action("Fail", color: .red, id: "test-fail", action: onFail)
-                action("Pass", color: .green, id: "test-pass", action: onPass)
+                if allowManualPass {
+                    action("Pass", color: .green, id: "test-pass", action: onPass)
+                }
             }
             .padding()
         }

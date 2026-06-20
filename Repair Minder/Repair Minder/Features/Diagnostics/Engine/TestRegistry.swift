@@ -13,7 +13,14 @@ enum TestRegistry {
         t.append(ThreeDTouchTest())
         t.append(DeadPixelTest())
         t.append(StylusTest())
-        // Sensors / Hardware / Audio / Connectivity appended in subsequent batches.
+        // Sensors
+        t.append(AccelerometerTest())
+        t.append(GyroscopeTest())
+        t.append(MagneticTest())
+        t.append(ProximityTest())
+        t.append(LightSensorTest())
+        t.append(GPSTest())
+        // Hardware / Audio / Connectivity appended in subsequent batches.
         return t
     }
 }

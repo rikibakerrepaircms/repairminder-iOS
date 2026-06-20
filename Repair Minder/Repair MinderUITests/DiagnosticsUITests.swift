@@ -46,12 +46,13 @@ final class DiagnosticsUITests: XCTestCase {
         XCTAssertTrue(app.buttons["send-results"].waitForExistence(timeout: 5))
     }
 
-    /// An interactive test renders its scaffold; tapping Pass records a pass and reaches the summary.
+    /// A subjective interactive test (dead pixel) shows a manual Pass; tapping it reaches the summary.
+    /// (Auto-detect tests like touchscreen have no manual Pass — they pass on a real signal.)
     func testInteractiveTestPassReachesSummary() throws {
         let app = launch()
-        openSelectStart(app, testRowId: "test-row-touchscreen")
+        openSelectStart(app, testRowId: "test-row-color")
         let pass = app.buttons["test-pass"]
-        XCTAssertTrue(pass.waitForExistence(timeout: 15), "Interactive test scaffold (Pass button) should appear")
+        XCTAssertTrue(pass.waitForExistence(timeout: 15), "Manual Pass should appear for the subjective dead-pixel test")
         pass.tap()
         let overall = app.staticTexts["summary-overall"]
         XCTAssertTrue(overall.waitForExistence(timeout: 10), "Summary should appear after passing the interactive test")
