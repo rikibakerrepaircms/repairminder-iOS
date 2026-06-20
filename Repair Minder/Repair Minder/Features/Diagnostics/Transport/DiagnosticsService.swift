@@ -1,0 +1,46 @@
+// Features/Diagnostics/Transport/DiagnosticsService.swift
+import Foundation
+
+/// Abstraction over the Worker diagnostics endpoints (lets tests stub the network).
+protocol DiagnosticsAPI: Sendable {
+    func createSession(_ req: CreateSessionRequest) async throws -> DiagnosticSessionResponse
+    func submitResult(_ p: DiagnosticResultPayload) async throws
+    func complete(sessionId: String, token: String) async throws
+}
+
+/// Live implementation backed by APIClient. Endpoints are the ones shipped + verified
+/// in the Worker (Plan 1): /api/public/diagnostics/session, /api/diagnostics/results,
+/// /api/diagnostics/session/:id/complete. All snake_case; no JWT (session-token/shop-code).
+struct LiveDiagnosticsAPI: DiagnosticsAPI {
+    func createSession(_ req: CreateSessionRequest) async throws -> DiagnosticSessionResponse {
+        try await APIClient.shared.request(.diagnosticsPublicCreate, body: req)
+    }
+    func submitResult(_ p: DiagnosticResultPayload) async throws {
+        let _: EmptyResponse = try await APIClient.shared.request(.diagnosticsSubmitResult, body: p)
+    }
+    func complete(sessionId: String, token: String) async throws {
+        let _: EmptyResponse = try await APIClient.shared.request(.diagnosticsComplete(sessionId: sessionId), body: CompleteBody(token: token))
+    }
+    private struct CompleteBody: Encodable { let token: String }
+}
+
+/// Orchestrates create → submit each → complete. Hybrid C: this is the POST path.
+/// If transmit fails for connectivity reasons, callers persist the payloads to the app
+/// container so the Bridge can pull them over USB/AFC later (see TransmitView buffering).
+struct DiagnosticsService: Sendable {
+    let api: DiagnosticsAPI
+    init(api: DiagnosticsAPI = LiveDiagnosticsAPI()) { self.api = api }
+
+    func transmit(shopCode: String?, platform: String, imei: String?, serial: String?,
+                  deviceDescription: String?, outcomes: [TestOutcome]) async throws {
+        let session = try await api.createSession(CreateSessionRequest(
+            shopCode: shopCode, platform: platform, deviceIdentifier: nil,
+            deviceDescription: deviceDescription, imei: imei, serial: serial))
+        for o in outcomes {
+            try await api.submitResult(DiagnosticResultPayload(
+                sessionId: session.sessionId, token: session.sessionToken,
+                testName: o.id, status: o.status, details: o.details))
+        }
+        try await api.complete(sessionId: session.sessionId, token: session.sessionToken)
+    }
+}

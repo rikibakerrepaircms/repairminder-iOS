@@ -221,10 +221,23 @@ enum APIEndpoint {
     case customerOrderInvoice(orderId: String)
     case customerDeviceImage(deviceId: String, imageId: String)
 
+    // MARK: - Diagnostics
+
+    case diagnosticsPublicCreate
+    case diagnosticsSubmitResult
+    case diagnosticsComplete(sessionId: String)
+
     // MARK: - Path
 
     var path: String {
         switch self {
+        // Diagnostics
+        case .diagnosticsPublicCreate:
+            return "/api/public/diagnostics/session"
+        case .diagnosticsSubmitResult:
+            return "/api/diagnostics/results"
+        case .diagnosticsComplete(let sessionId):
+            return "/api/diagnostics/session/\(sessionId)/complete"
         // Auth
         case .login:
             return "/api/auth/login"
@@ -554,7 +567,8 @@ enum APIEndpoint {
              .boardCreateColumn, .boardCreateAction,
              .createPaymentLink, .cancelPaymentLink, .resendPaymentLinkEmail,
              .customerApproveQuote, .customerOrderReply,
-             .quickCreateProductType:
+             .quickCreateProductType,
+             .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete:
             return .post
 
         // PATCH endpoints
@@ -790,7 +804,8 @@ enum APIEndpoint {
         case .login, .twoFactorRequest, .twoFactorVerify,
              .magicLinkRequest, .magicLinkVerifyCode, .refreshToken,
              .customerMagicLinkRequest, .customerVerifyCode,
-             .createEnquiry:
+             .createEnquiry,
+             .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete:
             return false
         default:
             return true
