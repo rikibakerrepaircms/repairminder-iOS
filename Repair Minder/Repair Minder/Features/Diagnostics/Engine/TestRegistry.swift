@@ -20,7 +20,13 @@ enum TestRegistry {
         t.append(ProximityTest())
         t.append(LightSensorTest())
         t.append(GPSTest())
-        // Hardware / Audio / Connectivity appended in subsequent batches.
+        // Hardware (part 1)
+        t.append(StorageTest())
+        t.append(BatteryTest())
+        t.append(ChargeTest())
+        t.append(HardwareButtonsTest())
+        t.append(VibrationTest())
+        // Hardware cameras/depth/biometric, Audio, Connectivity appended in subsequent batches.
         return t
     }
 }
