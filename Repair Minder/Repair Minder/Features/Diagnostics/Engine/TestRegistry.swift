@@ -31,7 +31,11 @@ enum TestRegistry {
         t.append(FrontCameraTest())
         t.append(AutofocusTest())
         t.append(FlashTest())
-        // Hardware depth/biometric, Audio, Connectivity appended in subsequent batches.
+        // Hardware (depth + biometric)
+        t.append(TrueDepthTest())
+        t.append(LiDARTest())
+        t.append(BiometricTest())
+        // Audio, Connectivity appended in subsequent batches.
         return t
     }
 }
