@@ -39,7 +39,11 @@ enum TestRegistry {
         t.append(SpeakerTest())
         t.append(MicrophoneTest())
         t.append(HeadphonesTest())
-        // Connectivity appended in the next batch.
+        // Connectivity
+        t.append(WiFiTest())
+        t.append(BluetoothTest())
+        t.append(NFCTest())
+        t.append(CallTest())
         return t
     }
 }
