@@ -27,7 +27,7 @@ struct TransmitView: View {
     }
 
     private var deviceDescription: String? {
-        guard let d = runner.outcomes.first(where: { $0.id == "device_info" })?.details else { return nil }
+        guard let d = runner.outcome(for: "device_info")?.details else { return nil }
         let parts = [d["model"], d["os_version"]].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " ")
     }
@@ -89,11 +89,11 @@ struct TransmitView: View {
         Task {
             do {
                 try await service.transmit(shopCode: shopCode, platform: "ios", imei: nil, serial: nil,
-                                           deviceDescription: deviceDescription, outcomes: runner.outcomes)
+                                           deviceDescription: deviceDescription, outcomes: runner.orderedOutcomes)
                 phase = .success
             } catch {
                 DiagnosticsBuffer.save(shopCode: shopCode, deviceDescription: deviceDescription,
-                                       imei: nil, serial: nil, outcomes: runner.outcomes)
+                                       imei: nil, serial: nil, outcomes: runner.orderedOutcomes)
                 phase = .failed
             }
         }

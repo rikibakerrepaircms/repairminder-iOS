@@ -1,38 +1,64 @@
 // Features/Diagnostics/Engine/DiagnosticRunner.swift
 import Foundation
 
+/// Owns selection + results for a diagnostic session. Automatic tests run via `runAuto()`;
+/// interactive tests are driven by the runner UI which calls `record(_:)` per test.
+/// Results are keyed by test id (latest wins) so retesting overwrites cleanly.
 @MainActor
 final class DiagnosticRunner: ObservableObject {
     let tests: [DiagnosticTest]
     @Published private(set) var selectedIds: Set<String> = []
-    @Published private(set) var outcomes: [TestOutcome] = []
-    @Published private(set) var currentIndex: Int = 0
-    @Published private(set) var isRunning = false
+    @Published private(set) var outcomes: [String: TestOutcome] = [:]
+    @Published private(set) var autoRan = false
 
     init(tests: [DiagnosticTest]) { self.tests = tests }
 
+    // MARK: Selection
     var selectedTests: [DiagnosticTest] { tests.filter { selectedIds.contains($0.id) } }
-
+    var selectedInteractiveTests: [DiagnosticTest] {
+        selectedTests.filter { $0.requiresInteraction && $0.isSupported }
+    }
     func select(ids: [String]) { selectedIds = Set(ids) }
     func selectAll() { selectedIds = Set(tests.map(\.id)) }
-    func toggle(_ id: String) { if selectedIds.contains(id) { selectedIds.remove(id) } else { selectedIds.insert(id) } }
+    func toggle(_ id: String) {
+        if selectedIds.contains(id) { selectedIds.remove(id) } else { selectedIds.insert(id) }
+    }
+    func isSelected(_ id: String) -> Bool { selectedIds.contains(id) }
 
-    func runSelected() async {
-        isRunning = true
-        outcomes = []
+    // MARK: Results
+    func record(_ outcome: TestOutcome) { outcomes[outcome.id] = outcome }
+    func outcome(for id: String) -> TestOutcome? { outcomes[id] }
+
+    /// Run all selected automatic tests; mark unsupported selected tests as skipped.
+    func runAuto() async {
         for test in selectedTests {
-            guard test.isSupported else {
-                outcomes.append(TestOutcome(id: test.id, name: test.name, status: .skip, details: ["reason": "unsupported"]))
-                continue
+            if !test.isSupported {
+                record(TestOutcome(id: test.id, name: test.name, status: .skip, details: ["reason": "unsupported"]))
+            } else if !test.requiresInteraction {
+                record(await test.run())
             }
-            outcomes.append(await test.run())
         }
-        isRunning = false
+        autoRan = true
     }
 
+    /// Re-run a single automatic test (interactive retest is handled by the UI).
+    func retestAuto(_ test: DiagnosticTest) async {
+        guard test.isSupported, !test.requiresInteraction else { return }
+        record(await test.run())
+    }
+
+    // MARK: Derived
+    var orderedOutcomes: [TestOutcome] { selectedTests.compactMap { outcomes[$0.id] } }
+    var passed: [TestOutcome] { orderedOutcomes.filter { $0.status == .pass } }
+    var failedOrSkipped: [TestOutcome] {
+        orderedOutcomes.filter { $0.status == .fail || $0.status == .skip || $0.status == .error }
+    }
+    var allSelectedHaveOutcome: Bool { selectedTests.allSatisfy { outcomes[$0.id] != nil } }
+
     var overallResult: String {
-        if outcomes.contains(where: { $0.status == .fail }) { return "fail" }
-        if outcomes.contains(where: { $0.status == .partial || $0.status == .error }) { return "partial" }
+        let o = orderedOutcomes
+        if o.contains(where: { $0.status == .fail }) { return "fail" }
+        if o.contains(where: { $0.status == .partial || $0.status == .error }) { return "partial" }
         return "pass"
     }
 }
