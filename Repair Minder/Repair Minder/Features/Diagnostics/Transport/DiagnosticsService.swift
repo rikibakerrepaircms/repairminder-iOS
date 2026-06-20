@@ -24,6 +24,17 @@ struct LiveDiagnosticsAPI: DiagnosticsAPI {
     private struct CompleteBody: Encodable { let token: String }
 }
 
+#if DEBUG
+/// UI-test stub: succeeds without touching the network (enabled via launch arg).
+struct StubDiagnosticsAPI: DiagnosticsAPI {
+    func createSession(_ req: CreateSessionRequest) async throws -> DiagnosticSessionResponse {
+        DiagnosticSessionResponse(sessionId: "stub", sessionToken: "stub", expiresAt: nil)
+    }
+    func submitResult(_ p: DiagnosticResultPayload) async throws {}
+    func complete(sessionId: String, token: String) async throws {}
+}
+#endif
+
 /// Orchestrates create → submit each → complete. Hybrid C: this is the POST path.
 /// If transmit fails for connectivity reasons, callers persist the payloads to the app
 /// container so the Bridge can pull them over USB/AFC later (see TransmitView buffering).

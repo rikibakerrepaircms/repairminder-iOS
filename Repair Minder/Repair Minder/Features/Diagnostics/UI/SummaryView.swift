@@ -50,9 +50,7 @@ struct SummaryView: View {
             .accessibilityIdentifier("send-results")
         }
         .navigationDestination(isPresented: $showTransmit) {
-            // Placeholder transmit root — replaced by TransmitView in the next task.
-            Text("Send results")
-                .accessibilityIdentifier("transmit-root")
+            TransmitView(runner: runner)
         }
     }
 

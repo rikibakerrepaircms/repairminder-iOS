@@ -1,0 +1,101 @@
+// Features/Diagnostics/UI/TransmitView.swift
+import SwiftUI
+
+/// Final step: enter the shop's 6-digit code and send results to the Worker.
+/// Hybrid C: POST when online; on failure the results are buffered on-device for the
+/// Bridge to pull later. (iOS apps cannot read IMEI/serial, so the self-service path
+/// sends device_description only; device matching happens server-side when possible.)
+struct TransmitView: View {
+    @ObservedObject private var runner: DiagnosticRunner
+    private let service: DiagnosticsService
+    @State private var shopCode = ""
+    @State private var phase: Phase = .idle
+
+    enum Phase: Equatable { case idle, sending, success, failed }
+
+    init(runner: DiagnosticRunner) {
+        _runner = ObservedObject(wrappedValue: runner)
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-uiTestStubTransmit") {
+            service = DiagnosticsService(api: StubDiagnosticsAPI())
+        } else {
+            service = DiagnosticsService()
+        }
+        #else
+        service = DiagnosticsService()
+        #endif
+    }
+
+    private var deviceDescription: String? {
+        guard let d = runner.outcomes.first(where: { $0.id == "device_info" })?.details else { return nil }
+        let parts = [d["model"], d["os_version"]].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+
+    private var codeIsValid: Bool { shopCode.count == 6 && shopCode.allSatisfy(\.isNumber) }
+
+    var body: some View {
+        Form {
+            Section("Send to your shop") {
+                TextField("6-digit shop code", text: $shopCode)
+                    #if os(iOS)
+                    .keyboardType(.numberPad)
+                    #endif
+                    .accessibilityIdentifier("shop-code-field")
+            }
+
+            switch phase {
+            case .idle, .sending:
+                EmptyView()
+            case .success:
+                Label("Results sent. Thank you!", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .accessibilityIdentifier("transmit-success")
+            case .failed:
+                Label("Couldn't send — saved on this device and will sync when connected.",
+                      systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .accessibilityIdentifier("transmit-buffered")
+            }
+        }
+        .navigationTitle("Send Results")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .safeAreaInset(edge: .bottom) {
+            Button(action: submit) {
+                Group {
+                    if phase == .sending {
+                        ProgressView()
+                    } else {
+                        Text("Submit")
+                            .font(.headline)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(codeIsValid ? Color.accentColor : Color.gray)
+                .foregroundStyle(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .disabled(!codeIsValid || phase == .sending || phase == .success)
+            .padding()
+            .accessibilityIdentifier("submit-results")
+        }
+    }
+
+    private func submit() {
+        phase = .sending
+        Task {
+            do {
+                try await service.transmit(shopCode: shopCode, platform: "ios", imei: nil, serial: nil,
+                                           deviceDescription: deviceDescription, outcomes: runner.outcomes)
+                phase = .success
+            } catch {
+                DiagnosticsBuffer.save(shopCode: shopCode, deviceDescription: deviceDescription,
+                                       imei: nil, serial: nil, outcomes: runner.outcomes)
+                phase = .failed
+            }
+        }
+    }
+}

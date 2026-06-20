@@ -48,4 +48,33 @@ final class DiagnosticsUITests: XCTestCase {
         // The Send-results action is available on the summary.
         XCTAssertTrue(app.buttons["send-results"].waitForExistence(timeout: 5))
     }
+
+    /// Full flow through transmit: summary → Send results → enter shop code → submit → success.
+    /// Uses a stubbed transport (launch arg) so no network is required.
+    func testSubmitWithShopCode() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTestResetToRoleSelection", "-uiTestStubTransmit"]
+        app.launch()
+
+        app.buttons["diagnostics-entry"].tap()
+        XCTAssertTrue(app.buttons["select-all"].waitForExistence(timeout: 10))
+        app.buttons["select-all"].tap()
+        app.buttons["start-tests"].tap()
+
+        let send = app.buttons["send-results"]
+        XCTAssertTrue(send.waitForExistence(timeout: 15))
+        send.tap()
+
+        let field = app.textFields["shop-code-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 8))
+        field.tap()
+        field.typeText("123456")
+
+        let submit = app.buttons["submit-results"]
+        XCTAssertTrue(submit.waitForExistence(timeout: 5))
+        submit.tap()
+
+        XCTAssertTrue(app.staticTexts["transmit-success"].waitForExistence(timeout: 10),
+                      "Submitting with a shop code should report success")
+    }
 }
