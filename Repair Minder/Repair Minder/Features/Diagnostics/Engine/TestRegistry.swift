@@ -26,7 +26,12 @@ enum TestRegistry {
         t.append(ChargeTest())
         t.append(HardwareButtonsTest())
         t.append(VibrationTest())
-        // Hardware cameras/depth/biometric, Audio, Connectivity appended in subsequent batches.
+        // Hardware (cameras)
+        t.append(RearCameraTest())
+        t.append(FrontCameraTest())
+        t.append(AutofocusTest())
+        t.append(FlashTest())
+        // Hardware depth/biometric, Audio, Connectivity appended in subsequent batches.
         return t
     }
 }
