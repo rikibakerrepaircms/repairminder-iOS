@@ -19,8 +19,9 @@ private func hasTorch() -> Bool {
 // MARK: - Camera target constant
 
 /// Page that displays a large QR focus target; the technician opens it on a SECOND device,
-/// then points the device-under-test's camera at it. (Served by the RepairMinder web app.)
-let cameraTargetURL = "https://repairminder.com/camera-test"
+/// then points the device-under-test's camera at it. (Served by the RepairMinder Worker,
+/// Turnstile-gated + rate-limited.) Any QR/barcode works as a fallback if this page is unreachable.
+let cameraTargetURL = "https://api.repairminder.com/camera-test"
 
 // MARK: - Camera target help overlay
 
