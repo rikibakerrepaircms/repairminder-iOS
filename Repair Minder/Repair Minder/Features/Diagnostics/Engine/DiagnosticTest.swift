@@ -2,7 +2,7 @@
 import Foundation
 import SwiftUI
 
-/// Matches M360's five diagnostic categories, plus a host-side Device Info group.
+/// The five diagnostic categories, plus a host-side Device Info group.
 enum TestCategory: String, CaseIterable, Sendable {
     case deviceInfo = "Device Info"
     case screen = "Screen"

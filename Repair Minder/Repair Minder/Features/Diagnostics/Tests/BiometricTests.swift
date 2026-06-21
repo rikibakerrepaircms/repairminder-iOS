@@ -1,5 +1,5 @@
 // Features/Diagnostics/Tests/BiometricTests.swift
-// M360-parity "Hardware": Biometric (Face ID/Touch ID, auto), TrueDepth Camera, LiDAR Scanner.
+// Hardware: Biometric (Face ID/Touch ID, auto), TrueDepth Camera, LiDAR Scanner.
 import SwiftUI
 #if os(iOS)
 import LocalAuthentication

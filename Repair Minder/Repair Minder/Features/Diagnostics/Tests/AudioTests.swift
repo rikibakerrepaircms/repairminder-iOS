@@ -1,5 +1,5 @@
 // Features/Diagnostics/Tests/AudioTests.swift
-// M360-parity "Audio": Speaker, Microphone (auto level), Headphones (auto route), Audio loopback (auto).
+// Audio: Speaker (mic-loopback gated), Microphone (per-source level), Headphones (auto route).
 import SwiftUI
 #if os(iOS)
 import AVFoundation

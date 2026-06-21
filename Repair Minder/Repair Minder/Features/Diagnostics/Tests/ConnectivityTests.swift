@@ -1,5 +1,5 @@
 // Features/Diagnostics/Tests/ConnectivityTests.swift
-// M360-parity "Connectivity": WiFi (auto), Bluetooth (auto), NFC (auto-detect), Call (manual).
+// Connectivity: WiFi (auto), Bluetooth (auto), NFC (auto-detect), Call (manual).
 import SwiftUI
 import Network
 #if os(iOS)

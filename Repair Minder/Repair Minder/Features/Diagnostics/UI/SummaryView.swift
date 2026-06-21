@@ -1,7 +1,7 @@
 // Features/Diagnostics/UI/SummaryView.swift
 import SwiftUI
 
-/// M360-style results: overall grade, a Passed section, and a "Failed & Skipped – tap to retest"
+/// Results: overall grade, a Passed section, and a "Failed & Skipped – tap to retest"
 /// section. Tapping a failed/skipped test reruns it (auto) or re-presents it (interactive).
 struct SummaryView: View {
     @ObservedObject var runner: DiagnosticRunner

@@ -2,7 +2,7 @@
 import SwiftUI
 
 /// First screen of the diagnostics flow: pick which tests to run (individually or all),
-/// then Start. Mirrors M360's selection step. Hosted by DiagnosticsFlowView.
+/// then Start. Branded category selection step. Hosted by DiagnosticsFlowView.
 struct TestSelectionView: View {
     @ObservedObject private var appState = AppState.shared
     @StateObject private var runner = DiagnosticRunner(tests: TestRegistry.allTests())

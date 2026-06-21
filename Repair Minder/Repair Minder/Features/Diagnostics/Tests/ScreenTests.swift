@@ -1,5 +1,5 @@
 // Features/Diagnostics/Tests/ScreenTests.swift
-// M360-parity "Screen" category: Touchscreen, Dead Pixel, Multitouch, 3D Touch, Stylus.
+// Screen category: Touchscreen, Dead Pixel, Multitouch, 3D Touch, Stylus.
 // Interactive; iOS-only hardware (guarded so the Mac target still compiles → reported unsupported).
 import SwiftUI
 

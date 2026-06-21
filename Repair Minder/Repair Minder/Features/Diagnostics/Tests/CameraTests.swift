@@ -1,5 +1,5 @@
 // Features/Diagnostics/Tests/CameraTests.swift
-// M360-parity "Hardware" cameras: Rear Camera, Front Camera, Autofocus (QR auto-pass), Flash.
+// Hardware cameras: Rear Camera, Front Camera, Autofocus (QR auto-pass), Flash.
 // Camera hardware is absent on the simulator → these report unsupported there; device-verified.
 import SwiftUI
 #if os(iOS)

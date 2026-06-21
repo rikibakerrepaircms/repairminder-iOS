@@ -1,5 +1,5 @@
 // Features/Diagnostics/Tests/HardwareTests.swift
-// M360-parity "Hardware" category (part 1): Storage, Battery (auto), Charge, Hardware Buttons, Vibration.
+// Hardware category (part 1): Storage, Battery (auto), Charge, Hardware Buttons, Vibration.
 // Cameras / TrueDepth / LiDAR / Biometric live in CameraTests.swift + BiometricTests.swift.
 import SwiftUI
 

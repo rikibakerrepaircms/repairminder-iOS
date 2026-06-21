@@ -1,5 +1,5 @@
 // Features/Diagnostics/Tests/SensorsTests.swift
-// M360-parity "Sensors" category: Accelerometer, Gyroscope, Magnetic (compass), Proximity, Light, GPS.
+// Sensors category: Accelerometer, Gyroscope, Magnetic (compass), Proximity, Light, GPS.
 import SwiftUI
 
 struct AccelerometerTest: DiagnosticTest {
