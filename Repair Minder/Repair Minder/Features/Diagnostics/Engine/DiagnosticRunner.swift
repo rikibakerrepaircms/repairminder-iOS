@@ -64,7 +64,10 @@ final class DiagnosticRunner: ObservableObject {
         return interactiveIndex < list.count ? list[interactiveIndex] : nil
     }
     func select(ids: [String]) { selectedIds = Set(ids) }
-    func selectAll() { selectedIds = Set(tests.map(\.id)) }
+    /// Select every test the current device actually supports. Unsupported tests are never
+    /// offered in the picker, so they must not be selected here either (they'd only add
+    /// "skipped — unsupported" rows to the report for hardware the device doesn't have).
+    func selectAll() { selectedIds = Set(tests.filter { $0.isSupported }.map(\.id)) }
     func toggle(_ id: String) {
         if selectedIds.contains(id) { selectedIds.remove(id) } else { selectedIds.insert(id) }
     }

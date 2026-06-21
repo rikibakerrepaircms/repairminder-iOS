@@ -3,6 +3,7 @@
 // Cameras / TrueDepth / LiDAR / Biometric live in CameraTests.swift + BiometricTests.swift.
 import SwiftUI
 import CoreMotion
+import os
 #if os(iOS)
 import CoreHaptics
 #endif
@@ -198,11 +199,19 @@ private struct HardwareButtonsTestView: View {
     @Published var outcome: TestOutcome?
     @Published var peak: Double = 0
     @Published var measuring = false
+    /// Last accelerometer reading from a measuring cycle, shown on screen and logged so the
+    /// auto-detect threshold (`minDelta`) can be re-tuned against real hardware. On some devices a
+    /// continuous Taptic pulse on a resting surface doesn't clear 0.15 g, so auto-detect never fires
+    /// and the tech must confirm the buzz by feel via the manual Pass button.
+    @Published var lastResting: Double = 0
+    @Published var detected = false
     private var hapticEngine: CHHapticEngine?
+    private let log = Logger(subsystem: "com.repairminder.diagnostics", category: "vibration")
     init(probe: AccelProbe) { self.probe = probe }
 
     func run() async {
         measuring = true
+        detected = false
         let maxCycles = 3
         for cycle in 0..<maxCycles {
             // Insert a 2s OFF gap between cycles (not before the first one)
@@ -218,14 +227,20 @@ private struct HardwareButtonsTestView: View {
                 }
             }
             self.peak = peakVal
-            if VibrationGate.spiked(restingNoise: resting, peak: peakVal, minDelta: 0.15) {
+            self.lastResting = resting
+            let spiked = VibrationGate.spiked(restingNoise: resting, peak: peakVal, minDelta: 0.15)
+            // Logged so we can re-tune the 0.15 g threshold against real devices (Console.app /
+            // `log stream --predicate 'subsystem == "com.repairminder.diagnostics"'`).
+            log.info("cycle \(cycle, privacy: .public) resting=\(resting, format: .fixed(precision: 3), privacy: .public)g peak=\(peakVal, format: .fixed(precision: 3), privacy: .public)g delta=\(peakVal - resting, format: .fixed(precision: 3), privacy: .public)g spiked=\(spiked, privacy: .public)")
+            if spiked {
+                self.detected = true
                 self.outcome = diagnosticOutcome("vibration", "Vibration", .pass,
                                                  ["accel_peak_g": String(format: "%.2f", peakVal)])
                 self.measuring = false
                 return
             }
         }
-        // No spike detected after all cycles — leave for user to Fail/Skip
+        // No spike detected after all cycles — leave for user to Pass (by feel) / Fail / Skip
         self.measuring = false
     }
 
@@ -267,16 +282,31 @@ private struct VibrationTestView: View {
     var body: some View {
         TestScaffold(
             title: "Vibration",
-            instruction: "Hold the device still. It pulses for ~2 seconds and auto-detects the motor via the accelerometer.",
-            hints: ["Keep the device resting on a surface or held still"],
-            allowManualPass: false,
-            onPass: {},
+            instruction: "Hold the device still. It pulses for ~2 seconds and tries to auto-detect the motor. If you feel it buzz but it isn’t detected, tap Pass.",
+            hints: ["Keep the device resting on a surface or held still", "If you feel the buzz, you can Pass it manually"],
+            // Auto-detection can miss on devices where a continuous Taptic pulse doesn't register
+            // strongly on the accelerometer, so allow a tech to confirm the buzz by feel.
+            allowManualPass: true,
+            onPass: { complete(diagnosticOutcome("vibration", "Vibration", .pass, ["confirmed": "manual"])) },
             onFail: { complete(diagnosticOutcome("vibration", "Vibration", .fail)) },
             onSkip: { complete(diagnosticOutcome("vibration", "Vibration", .skip)) }
         ) {
             VStack(spacing: 12) {
                 Image(systemName: "iphone.radiowaves.left.and.right").font(.system(size: 44)).foregroundStyle(Color.accentColor)
-                if model.measuring { ProgressView("Measuring…") }
+                if model.measuring {
+                    ProgressView("Measuring…")
+                } else if !model.detected {
+                    Text("No motor spike detected automatically. If you felt it buzz, tap Pass — otherwise Vibrate again or Fail.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                if model.peak > 0 {
+                    Text(String(format: "Accel peak %.2f g · resting %.2f g", model.peak, model.lastResting))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
                 Button("Vibrate again") { Task { await model.run() } }.buttonStyle(.bordered)
             }
             .task { await model.run() }

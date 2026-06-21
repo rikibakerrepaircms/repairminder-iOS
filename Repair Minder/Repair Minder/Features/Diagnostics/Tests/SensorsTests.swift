@@ -412,6 +412,11 @@ private struct LightSensorActiveView: View {
     private let probe: CameraProbe
     @StateObject private var model: LightViewModel
     @State private var savedBrightness: CGFloat = UIScreen.main.brightness
+    /// The test runs in two phases: an intro shown at normal brightness (so the tech can read the
+    /// instructions and get a torch ready), then the measuring phase which dims the screen so the
+    /// front camera has a dark baseline to detect a light increase against. Without this, the screen
+    /// dimmed to black the instant the page opened, which read as the test being broken.
+    @State private var started = false
 
     init(probe: CameraProbe, complete: @escaping (TestOutcome) -> Void) {
         self.complete = complete
@@ -422,8 +427,12 @@ private struct LightSensorActiveView: View {
     var body: some View {
         TestScaffold(
             title: "Light Sensor",
-            instruction: "Screen dimmed. Shine a torch or bright light at the top-front of the device — it passes automatically when the front sensor sees the light increase.",
-            hints: ["Point a torch at the top of the screen (front side)", "Keep it steady until the bar jumps"],
+            instruction: started
+                ? "Screen dimmed. Shine a torch at the top-front of the device — it passes automatically when the front sensor sees the light increase."
+                : "Get a torch ready. When you tap Start, the screen dims and the front sensor watches for a light increase.",
+            hints: started
+                ? ["Point a torch at the top of the screen (front side)", "Keep it steady until the bar jumps"]
+                : ["The screen will go dark on purpose — that's expected", "Shine a torch at the top-front to make the bar move"],
             allowManualPass: false,
             onPass: {},
             onFail: { model.fail() },
@@ -434,8 +443,18 @@ private struct LightSensorActiveView: View {
                     .font(.system(size: 44))
                     .foregroundStyle(model.outcome?.status == .pass ? .green : .yellow)
 
-                // Live luminance bar relative to baseline
-                if model.baseline > 0 {
+                if !started {
+                    // Intro — normal brightness, explain what's about to happen.
+                    Text("The screen will dim while the front camera measures light. Shine a torch at the top-front of the device to pass.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    Button("Start") { beginMeasuring() }
+                        .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier("light-start")
+                } else if model.baseline > 0 {
+                    // Live luminance bar relative to baseline
                     let ratio = min(model.current / (model.baseline * 2), 1.0)
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
@@ -448,9 +467,7 @@ private struct LightSensorActiveView: View {
                     .frame(height: 20)
                     .padding(.horizontal)
 
-                    Text(model.baseline > 0
-                         ? String(format: "Baseline %.0f  ·  Current %.0f", model.baseline, model.current)
-                         : "Measuring baseline…")
+                    Text(String(format: "Baseline %.0f  ·  Current %.0f", model.baseline, model.current))
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
                 } else {
@@ -462,8 +479,6 @@ private struct LightSensorActiveView: View {
         }
         .onAppear {
             savedBrightness = UIScreen.main.brightness
-            UIScreen.main.brightness = 0
-            model.start()
         }
         .onDisappear {
             UIScreen.main.brightness = savedBrightness
@@ -475,6 +490,13 @@ private struct LightSensorActiveView: View {
                 complete(o)
             }
         }
+    }
+
+    private func beginMeasuring() {
+        started = true
+        savedBrightness = UIScreen.main.brightness
+        UIScreen.main.brightness = 0
+        model.start()
     }
 }
 #endif

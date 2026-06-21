@@ -8,20 +8,32 @@ struct TestSelectionView: View {
     @StateObject private var runner = DiagnosticRunner(tests: TestRegistry.allTests())
     @State private var showRunner = false
 
+    /// Ids of tests the current device actually supports. Computed once on appear because some
+    /// `isSupported` checks do real work (front-camera discovery, haptics capability query) that we
+    /// don't want to repeat on every body re-render. Unsupported tests (e.g. 3D Touch on a phone
+    /// with only Haptic Touch) are hidden from the picker entirely rather than shown and then
+    /// silently skipped at run time.
+    @State private var supportedIds: Set<String> = []
+
     private let columns = [
         GridItem(.flexible(), spacing: 12),
         GridItem(.flexible(), spacing: 12),
         GridItem(.flexible(), spacing: 12)
     ]
 
-    /// Categories that actually have tests, in declaration order.
-    private var categories: [TestCategory] {
-        TestCategory.allCases.filter { cat in runner.tests.contains { $0.category == cat } }
+    /// Tests offered to the user: only those supported on this device.
+    private var visibleTests: [DiagnosticTest] {
+        runner.tests.filter { supportedIds.contains($0.id) }
     }
 
-    /// Tests belonging to a category.
+    /// Categories that actually have supported tests, in declaration order.
+    private var categories: [TestCategory] {
+        TestCategory.allCases.filter { cat in visibleTests.contains { $0.category == cat } }
+    }
+
+    /// Supported tests belonging to a category.
     private func tests(for category: TestCategory) -> [DiagnosticTest] {
-        runner.tests.filter { $0.category == category }
+        visibleTests.filter { $0.category == category }
     }
 
     /// Number of selected tests in a category.
@@ -59,6 +71,11 @@ struct TestSelectionView: View {
             .padding(.vertical, 12)
         }
         .background(Color(.systemGroupedBackground))
+        .onAppear {
+            if supportedIds.isEmpty {
+                supportedIds = Set(runner.tests.filter { $0.isSupported }.map(\.id))
+            }
+        }
         .navigationTitle("Device Diagnostics")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)

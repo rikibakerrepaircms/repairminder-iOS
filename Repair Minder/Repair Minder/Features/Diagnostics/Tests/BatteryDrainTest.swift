@@ -100,6 +100,12 @@ private struct BatteryDrainTestView: View {
     @State private var timer: Timer? = nil
     @State private var completed = false   // guard: complete() must fire exactly once
 
+    /// Set when a pre-condition (charger unplugged, ≥40 %) isn't met. Drives a visible explanation
+    /// instead of the test silently skipping itself and advancing — the tech needs to know *why*.
+    /// `reasonCode` is recorded in the outcome details if they choose to Skip from here.
+    @State private var blockMessage: String? = nil
+    @State private var blockReasonCode: String = ""
+
     var body: some View {
         TestScaffold(
             title: "Battery Drain",
@@ -112,10 +118,37 @@ private struct BatteryDrainTestView: View {
             allowManualPass: false,
             onPass: {},
             onFail: { finishOnce(outcome(status: .fail)) },
-            onSkip: { finishOnce(outcome(status: .skip)) }
+            onSkip: {
+                // If we're blocked on a pre-condition, carry that reason into the report so the
+                // skip is self-explanatory (e.g. "battery_below_40") rather than a bare skip.
+                if let _ = blockMessage {
+                    finishOnce(diagnosticOutcome("battery_drain", "Battery Drain", .skip,
+                                                 ["reason": blockReasonCode]))
+                } else {
+                    finishOnce(outcome(status: .skip))
+                }
+            }
         ) {
             VStack(spacing: 16) {
-                if running {
+                if let message = blockMessage {
+                    // Pre-condition not met — explain plainly and let the tech fix it and retry.
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 44))
+                        .foregroundStyle(.orange)
+                    Text("Can’t start the drain test")
+                        .font(.headline)
+                    Text(message)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    Button("Check again") {
+                        blockMessage = nil
+                        checkPreconditionsAndStart()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .padding(.top, 8)
+                } else if running {
                     ProgressView(value: Double(elapsedS), total: Double(targetDurationS))
                         .progressViewStyle(.linear)
                         .padding(.horizontal)
@@ -153,13 +186,18 @@ private struct BatteryDrainTestView: View {
         let snap = BatteryProbeUIKit().snapshot()
 
         guard snap.state == "unplugged" else {
-            finishOnce(diagnosticOutcome("battery_drain", "Battery Drain", .skip,
-                                      ["reason": "charger_connected"]))
+            currentPct = snap.levelPct
+            blockReasonCode = "charger_connected"
+            blockMessage = "The charger is still connected. Unplug the device, then tap Check again. "
+                + "(Battery drain can only be measured while running on battery.)"
             return
         }
         guard snap.levelPct >= 40 else {
-            finishOnce(diagnosticOutcome("battery_drain", "Battery Drain", .skip,
-                                      ["reason": "battery_below_40"]))
+            currentPct = snap.levelPct
+            blockReasonCode = "battery_below_40"
+            let level = snap.levelPct >= 0 ? "\(snap.levelPct)%" : "an unknown level"
+            blockMessage = "Battery is at \(level). This test needs 40% or more. "
+                + "Charge the device above 40%, then tap Check again."
             return
         }
 
