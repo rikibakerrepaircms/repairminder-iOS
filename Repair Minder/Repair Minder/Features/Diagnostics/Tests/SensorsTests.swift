@@ -1,6 +1,9 @@
 // Features/Diagnostics/Tests/SensorsTests.swift
 // Sensors category: Accelerometer, Gyroscope, Magnetic (compass), Proximity, Light, GPS.
 import SwiftUI
+#if os(iOS)
+import AVFoundation
+#endif
 
 struct AccelerometerTest: DiagnosticTest {
     let id = "accelerometer"; let name = "Accelerometer"; let category: TestCategory = .sensors
@@ -50,7 +53,9 @@ struct LightSensorTest: DiagnosticTest {
     let id = "light"; let name = "Light Sensor"; let category: TestCategory = .sensors
     let requiresInteraction = true
     #if os(iOS)
-    var isSupported: Bool { true }
+    var isSupported: Bool {
+        AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera], mediaType: .video, position: .front).devices.first != nil
+    }
     @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { AnyView(LightSensorTestView(complete: complete)) }
     #else
     var isSupported: Bool { false }
@@ -285,21 +290,114 @@ private struct ProximityTestView: View {
     }
 }
 
-// MARK: Light (no public ALS API → guided manual check via auto-brightness)
+// MARK: Light — front-camera luminance proxy (no public ALS API)
+
+/// Drives auto-pass logic for the light sensor test using a LuminanceProbe.
+/// Collects 10 samples as a baseline, then passes automatically on a ≥25% luminance jump.
+@MainActor final class LightViewModel: ObservableObject {
+    private let probe: LuminanceProbe
+    @Published var baseline: Double = 0
+    @Published var current: Double = 0
+    @Published var outcome: TestOutcome?
+    private var samples: [Double] = []
+    private var baselineSet = false
+
+    init(probe: LuminanceProbe) { self.probe = probe }
+
+    func start() {
+        probe.start(onSample: { [weak self] v in
+            guard let self else { return }
+            self.current = v
+            if !self.baselineSet {
+                self.samples.append(v)
+                if self.samples.count >= 10 {
+                    self.baseline = self.samples.reduce(0, +) / Double(self.samples.count)
+                    self.baselineSet = true
+                }
+            } else if self.outcome == nil, LightGate.passes(baseline: self.baseline, peak: v, thresholdPct: 25) {
+                let delta = (v - self.baseline) / self.baseline * 100
+                self.outcome = diagnosticOutcome("light", "Light Sensor", .pass, [
+                    "lux_baseline": String(format: "%.0f", self.baseline),
+                    "lux_peak": String(format: "%.0f", v),
+                    "delta_pct": String(format: "%.0f", delta),
+                ])
+                self.probe.stop()
+            }
+        })
+    }
+
+    func fail() { probe.stop(); outcome = diagnosticOutcome("light", "Light Sensor", .fail, nil) }
+    func skip() { probe.stop(); outcome = diagnosticOutcome("light", "Light Sensor", .skip, nil) }
+}
 
 private struct LightSensorTestView: View {
     let complete: (TestOutcome) -> Void
+    private let probe: CameraProbe
+    @StateObject private var model: LightViewModel
+    @State private var savedBrightness: CGFloat = UIScreen.main.brightness
+
+    init(complete: @escaping (TestOutcome) -> Void) {
+        self.complete = complete
+        let p = CameraProbe(device: CameraProbe.front()!)
+        self.probe = p
+        _model = StateObject(wrappedValue: LightViewModel(probe: p))
+    }
+
     var body: some View {
         TestScaffold(
             title: "Light Sensor",
-            instruction: "Enable Auto-Brightness in Settings, then cover/uncover the top-front. The screen brightness should change. Mark Pass if it responds.",
-            hints: ["Turn on Automatic Brightness", "Cover then uncover the ambient-light area"],
-            allowManualPass: true,   // no public ALS API → guided manual check
-            onPass: { complete(diagnosticOutcome("light", "Light Sensor", .pass)) },
-            onFail: { complete(diagnosticOutcome("light", "Light Sensor", .fail)) },
-            onSkip: { complete(diagnosticOutcome("light", "Light Sensor", .skip)) }
+            instruction: "Screen dimmed. Shine a torch or bright light at the top-front of the device — it passes automatically when the front sensor sees the light increase.",
+            hints: ["Point a torch at the top of the screen (front side)", "Keep it steady until the bar jumps"],
+            allowManualPass: false,
+            onPass: {},
+            onFail: { model.fail() },
+            onSkip: { model.skip() }
         ) {
-            Image(systemName: "sun.max.fill").font(.system(size: 44)).foregroundStyle(.yellow)
+            VStack(spacing: 16) {
+                Image(systemName: "sun.max.fill")
+                    .font(.system(size: 44))
+                    .foregroundStyle(model.outcome?.status == .pass ? .green : .yellow)
+
+                // Live luminance bar relative to baseline
+                if model.baseline > 0 {
+                    let ratio = min(model.current / (model.baseline * 2), 1.0)
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 6).fill(Color.platformGray6)
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(ratio >= 0.625 ? Color.green : Color.accentColor)
+                                .frame(width: geo.size.width * ratio)
+                        }
+                    }
+                    .frame(height: 20)
+                    .padding(.horizontal)
+
+                    Text(model.baseline > 0
+                         ? String(format: "Baseline %.0f  ·  Current %.0f", model.baseline, model.current)
+                         : "Measuring baseline…")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Measuring baseline…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .onAppear {
+            savedBrightness = UIScreen.main.brightness
+            UIScreen.main.brightness = 0
+            model.start()
+        }
+        .onDisappear {
+            UIScreen.main.brightness = savedBrightness
+            probe.stop()
+        }
+        .onChange(of: model.outcome?.status) { _, _ in
+            if let o = model.outcome {
+                UIScreen.main.brightness = savedBrightness
+                complete(o)
+            }
         }
     }
 }
