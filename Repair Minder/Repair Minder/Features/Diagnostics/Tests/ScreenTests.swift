@@ -3,6 +3,16 @@
 // Interactive; iOS-only hardware (guarded so the Mac target still compiles → reported unsupported).
 import SwiftUI
 
+/// Pure 3D-Touch decision: a press is "firm" when the measured force exceeds half of the touch's
+/// maximum possible force. Ratio-based so it works across hardware; `maxPossible <= 0` (no
+/// force-touch) can never pass.
+enum ForceTouchGate {
+    static func firm(force: Double, maxPossible: Double) -> Bool {
+        guard maxPossible > 0 else { return false }
+        return force / maxPossible > 0.5
+    }
+}
+
 // MARK: - Touchscreen
 
 struct TouchscreenTest: DiagnosticTest {
@@ -242,12 +252,12 @@ private struct DeadPixelTestView: View {
 // MARK: UIKit touch capture (multitouch / force / stylus)
 
 private struct TouchCaptureView: UIViewRepresentable {
-    var onUpdate: (_ activeTouches: Int, _ maxForce: CGFloat, _ pencil: Bool, _ locations: [CGPoint]) -> Void
+    var onUpdate: (_ activeTouches: Int, _ maxForce: CGFloat, _ maxPossibleForce: CGFloat, _ pencil: Bool, _ locations: [CGPoint]) -> Void
     func makeUIView(context: Context) -> CaptureView { let v = CaptureView(); v.onUpdate = onUpdate; return v }
     func updateUIView(_ uiView: CaptureView, context: Context) {}
 
     final class CaptureView: UIView {
-        var onUpdate: ((Int, CGFloat, Bool, [CGPoint]) -> Void)?
+        var onUpdate: ((Int, CGFloat, CGFloat, Bool, [CGPoint]) -> Void)?
         override init(frame: CGRect) {
             super.init(frame: frame)
             isMultipleTouchEnabled = true
@@ -258,9 +268,10 @@ private struct TouchCaptureView: UIViewRepresentable {
         private func report(_ event: UIEvent?) {
             let touches = (event?.allTouches ?? []).filter { $0.phase != .ended && $0.phase != .cancelled }
             let force = touches.map { $0.force }.max() ?? 0
+            let maxPossible = touches.map { $0.maximumPossibleForce }.max() ?? 0
             let pencil = touches.contains { $0.type == .pencil }
             let locations = touches.map { $0.location(in: self) }
-            onUpdate?(touches.count, force, pencil, locations)
+            onUpdate?(touches.count, force, maxPossible, pencil, locations)
         }
         override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) { report(event) }
         override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) { report(event) }
@@ -291,7 +302,7 @@ private struct MultitouchTestView: View {
             GeometryReader { geo in
                 ZStack {
                     // Touch capture fills the full area
-                    TouchCaptureView { count, _, _, locs in
+                    TouchCaptureView { count, _, _, _, locs in
                         points = locs
                         if count > maxTouches { maxTouches = count }
                         if maxTouches >= 2 && !passed {
@@ -344,9 +355,9 @@ private struct ForceTouchTestView: View {
             onSkip: { complete(diagnosticOutcome("touch3d", "3D Touch", .skip)) }
         ) {
             ZStack(alignment: .top) {
-                TouchCaptureView { _, force, _, _ in
+                TouchCaptureView { _, force, maxPossible, _, _ in
                     if force > maxForce { maxForce = force }
-                    if maxForce > 1.5 {
+                    if ForceTouchGate.firm(force: Double(force), maxPossible: Double(maxPossible)) {
                         complete(diagnosticOutcome("touch3d", "3D Touch", .pass, ["max_force": String(format: "%.2f", maxForce)]))
                     }
                 }
@@ -378,7 +389,7 @@ private struct StylusTestView: View {
             onSkip: { complete(diagnosticOutcome("pen", "Stylus Pen", .skip)) }
         ) {
             ZStack(alignment: .top) {
-                TouchCaptureView { _, _, pencil, _ in
+                TouchCaptureView { _, _, _, pencil, _ in
                     if pencil {
                         pencilSeen = true
                         complete(diagnosticOutcome("pen", "Stylus Pen", .pass))
