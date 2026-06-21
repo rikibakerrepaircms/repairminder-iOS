@@ -1,10 +1,11 @@
 // Repair MinderTests/DiagnosticsShopPairingTests.swift
 import Testing
+import Foundation
 @testable import Repair_Minder
 
 struct DiagnosticsShopPairingTests {
     // One test method (not several) so the shared UserDefaults key isn't raced by parallel tests.
-    @Test func pairingLifecycleAndValidation() {
+    @MainActor @Test func pairingLifecycleAndValidation() {
         DiagnosticsShopPairing.unpair()
         #expect(!DiagnosticsShopPairing.isPaired)
         #expect(DiagnosticsShopPairing.shopCode == nil)
@@ -27,5 +28,17 @@ struct DiagnosticsShopPairingTests {
         #expect(DiagnosticsShopPairing.shopCode == "123456")
         DiagnosticsShopPairing.unpair()
         #expect(DiagnosticsShopPairing.shopCode == nil)
+
+        // Deep-link pairing intake (Bridge / QR / universal link can provision via a URL)
+        #expect(DeepLinkHandler.shared.handleURL(URL(string: "repairminder://diagnostics/pair?shop=246802")!))
+        #expect(DiagnosticsShopPairing.shopCode == "246802")
+        DiagnosticsShopPairing.unpair()
+        #expect(DeepLinkHandler.shared.handleURL(URL(string: "repairminder://pair?shop=357913")!))
+        #expect(DiagnosticsShopPairing.shopCode == "357913")
+        // Bad code is rejected
+        DiagnosticsShopPairing.unpair()
+        #expect(!DeepLinkHandler.shared.handleURL(URL(string: "repairminder://diagnostics/pair?shop=abc")!))
+        #expect(!DiagnosticsShopPairing.isPaired)
+        DiagnosticsShopPairing.unpair()
     }
 }

@@ -79,6 +79,21 @@ final class DeepLinkHandler: ObservableObject {
             return false
         }
 
+        // Shop pairing (mechanism-agnostic — QR, universal link, or Bridge USB-launch):
+        //   repairminder://diagnostics/pair?shop=NNNNNN   (or repairminder://pair?shop=NNNNNN,
+        //   or .../pair/NNNNNN). Marks this device as belonging to the shop so diagnostic runs
+        //   auto-send to it. See DiagnosticsShopPairing.
+        let host = (components.host ?? "").lowercased()
+        let rawPath = components.path.split(separator: "/").map(String.init)
+        if host == "pair" || (host == "diagnostics" && rawPath.first?.lowercased() == "pair") {
+            let shop = components.queryItems?.first(where: { $0.name == "shop" })?.value ?? rawPath.last
+            if let shop, DiagnosticsShopPairing.isValidCode(shop) {
+                DiagnosticsShopPairing.pair(shop)
+                return true
+            }
+            return false
+        }
+
         let pathComponents = components.path.split(separator: "/").map(String.init)
 
         guard pathComponents.count >= 2 else {
