@@ -2,6 +2,7 @@
 // Hardware category (part 1): Storage, Battery (auto), Charge, Hardware Buttons, Vibration.
 // Cameras / TrueDepth / LiDAR / Biometric live in CameraTests.swift + BiometricTests.swift.
 import SwiftUI
+import CoreMotion
 
 // MARK: - Storage (automatic)
 
@@ -72,13 +73,14 @@ struct HardwareButtonsTest: DiagnosticTest {
     #endif
 }
 
-// MARK: - Vibration (trigger + manual confirm)
+// MARK: - Vibration (accelerometer-gated; auto-pass on detected motor spike)
 
 struct VibrationTest: DiagnosticTest {
     let id = "vibration"; let name = "Vibration"; let category: TestCategory = .hardware
     let requiresInteraction = true
     #if os(iOS)
-    var isSupported: Bool { true }
+    // Skip cleanly where there's no accelerometer (e.g. Simulator) so we never false-fail.
+    var isSupported: Bool { CMMotionManager().isAccelerometerAvailable }
     @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { AnyView(VibrationTestView(complete: complete)) }
     #else
     var isSupported: Bool { false }
@@ -184,32 +186,60 @@ private struct HardwareButtonsTestView: View {
     private func finish(_ s: TestStatus, _ d: [String: String]? = nil) { watcher.stop(); complete(diagnosticOutcome("hardwarebutton", "Hardware Buttons", s, d)) }
 }
 
-// Vibration: trigger haptics; user confirms they felt it (subjective).
+// Vibration: trigger haptics; auto-pass when the accelerometer detects the motor spike.
+
+@MainActor final class VibrationViewModel: ObservableObject {
+    private let probe: AccelProbe
+    @Published var outcome: TestOutcome?
+    @Published var peak: Double = 0
+    @Published var measuring = false
+    init(probe: AccelProbe) { self.probe = probe }
+
+    func run() async {
+        measuring = true
+        buzz()
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            probe.samplePeak(windowMs: 1500) { resting, peak in
+                Task { @MainActor in
+                    self.peak = peak
+                    let pass = VibrationGate.spiked(restingNoise: resting, peak: peak, minDelta: 0.15)
+                    self.outcome = diagnosticOutcome("vibration", "Vibration", pass ? .pass : .fail,
+                                                     ["accel_peak_g": String(format: "%.2f", peak)])
+                    self.measuring = false
+                    cont.resume()
+                }
+            }
+        }
+    }
+
+    private func buzz() {
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+    }
+}
 
 private struct VibrationTestView: View {
     let complete: (TestOutcome) -> Void
+    @StateObject private var model = VibrationViewModel(probe: AccelProbeCM())
 
     var body: some View {
         TestScaffold(
             title: "Vibration",
-            instruction: "The device should vibrate. If you feel it, tap Pass. (Ensure vibration isn't disabled in Settings.)",
-            hints: ["Hold the device to feel the vibration"],
-            allowManualPass: true,   // whether the user felt it is subjective
-            onPass: { complete(diagnosticOutcome("vibration", "Vibration", .pass)) },
+            instruction: "Hold the device still. It will vibrate and we'll auto-detect the motor via the accelerometer.",
+            hints: ["Keep the device resting on a surface or held still"],
+            allowManualPass: false,
+            onPass: {},
             onFail: { complete(diagnosticOutcome("vibration", "Vibration", .fail)) },
             onSkip: { complete(diagnosticOutcome("vibration", "Vibration", .skip)) }
         ) {
             VStack(spacing: 12) {
                 Image(systemName: "iphone.radiowaves.left.and.right").font(.system(size: 44)).foregroundStyle(Color.accentColor)
-                Button("Vibrate again") { buzz() }
-                    .buttonStyle(.bordered)
+                if model.measuring { ProgressView("Measuring…") }
+                Button("Vibrate again") { Task { await model.run() } }.buttonStyle(.bordered)
             }
-            .onAppear { buzz() }
+            .task { await model.run() }
+            .onChange(of: model.outcome?.status) { _, _ in if let o = model.outcome { complete(o) } }
         }
-    }
-    private func buzz() {
-        let gen = UINotificationFeedbackGenerator(); gen.notificationOccurred(.success)
-        let impact = UIImpactFeedbackGenerator(style: .heavy); impact.impactOccurred()
     }
 }
 #endif
