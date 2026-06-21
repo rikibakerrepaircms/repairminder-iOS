@@ -386,7 +386,8 @@ private struct ProximityTestView: View {
                     self.baseline = self.samples.reduce(0, +) / Double(self.samples.count)
                     self.baselineSet = true
                 }
-            } else if self.outcome == nil, LightGate.passes(baseline: self.baseline, peak: v, thresholdPct: 25) {
+            } else if self.outcome == nil,
+                      LightGate.passes(baseline: self.baseline, peak: v, thresholdPct: 25, minAbsoluteDelta: 30) {
                 let delta = (v - self.baseline) / self.baseline * 100
                 self.outcome = diagnosticOutcome("light", "Light Sensor", .pass, [
                     "lux_baseline": String(format: "%.0f", self.baseline),

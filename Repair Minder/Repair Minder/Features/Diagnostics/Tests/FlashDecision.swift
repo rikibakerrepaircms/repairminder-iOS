@@ -5,6 +5,6 @@ import Foundation
 
 enum FlashDecision {
     static func shouldAutoPass(baseline: Double, peak: Double) -> Bool {
-        LightGate.passes(baseline: baseline, peak: peak, thresholdPct: 25)
+        LightGate.passes(baseline: baseline, peak: peak, thresholdPct: 25, minAbsoluteDelta: 30)
     }
 }
