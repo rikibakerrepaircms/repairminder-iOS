@@ -58,6 +58,15 @@ protocol AccelProbe: Sendable {
     @MainActor func samplePeak(windowMs: Int, completion: @escaping (_ resting: Double, _ peak: Double) -> Void)
 }
 
+/// Brief liveness check for the motion sensors used by pre-flight (no user gesture). Returns nil
+/// when the sensor is unavailable (e.g. on the Simulator) so the test falls back to interactive.
+protocol MotionAliveProbe: Sendable {
+    /// Average total acceleration magnitude (g) and sample count over the window; nil if unavailable.
+    func accelerometerAlive(windowMs: Int) async -> (magnitude: Double, samples: Int)?
+    /// Gyro sample count over the window; nil if unavailable.
+    func gyroAlive(windowMs: Int) async -> Int?
+}
+
 /// Emits a tick per valid depth frame captured (TrueDepth or LiDAR).
 protocol DepthProbe: Sendable {
     @MainActor func start(onDepthFrame: @escaping () -> Void)
