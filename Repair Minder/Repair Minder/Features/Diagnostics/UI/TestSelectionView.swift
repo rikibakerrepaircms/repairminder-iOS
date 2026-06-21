@@ -13,28 +13,69 @@ struct TestSelectionView: View {
         TestCategory.allCases.filter { cat in runner.tests.contains { $0.category == cat } }
     }
 
+    /// Tests belonging to a category.
+    private func tests(for category: TestCategory) -> [DiagnosticTest] {
+        runner.tests.filter { $0.category == category }
+    }
+
+    /// Number of selected tests in a category.
+    private func selectedCount(for category: TestCategory) -> Int {
+        tests(for: category).filter { runner.selectedIds.contains($0.id) }.count
+    }
+
     var body: some View {
-        List {
-            ForEach(categories, id: \.self) { category in
-                Section(category.rawValue) {
-                    ForEach(runner.tests.filter { $0.category == category }, id: \.id) { test in
-                        Button {
-                            runner.toggle(test.id)
-                        } label: {
-                            HStack {
-                                Text(test.name)
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                                Image(systemName: runner.selectedIds.contains(test.id) ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(runner.selectedIds.contains(test.id) ? Color.accentColor : Color.secondary)
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 20) {
+                ForEach(categories, id: \.self) { category in
+                    VStack(alignment: .leading, spacing: 8) {
+                        // Category header
+                        categoryHeader(category)
+
+                        // Test rows
+                        VStack(spacing: 0) {
+                            let categoryTests = tests(for: category)
+                            ForEach(Array(categoryTests.enumerated()), id: \.element.id) { index, test in
+                                Button {
+                                    runner.toggle(test.id)
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: runner.selectedIds.contains(test.id)
+                                              ? "checkmark.circle.fill"
+                                              : "circle")
+                                            .font(.system(size: 20))
+                                            .foregroundStyle(runner.selectedIds.contains(test.id)
+                                                             ? Color.accentColor
+                                                             : Color.secondary)
+
+                                        Text(test.name)
+                                            .font(.body)
+                                            .foregroundStyle(.primary)
+
+                                        Spacer()
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .background(Color(.systemBackground))
+                                }
+                                .accessibilityIdentifier("test-row-\(test.id)")
+
+                                if index < categoryTests.count - 1 {
+                                    Divider()
+                                        .padding(.leading, 48)
+                                }
                             }
                         }
-                        .accessibilityIdentifier("test-row-\(test.id)")
+                        .background(Color(.systemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
                     }
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
-        .navigationTitle("Select Tests")
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle("Device Diagnostics")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -62,11 +103,43 @@ struct TestSelectionView: View {
             }
             .disabled(runner.selectedIds.isEmpty)
             .padding()
+            .background(.ultraThinMaterial)
             .accessibilityIdentifier("start-tests")
         }
         .navigationDestination(isPresented: $showRunner) {
             TestRunnerView(runner: runner)
         }
+    }
+
+    @ViewBuilder
+    private func categoryHeader(_ category: TestCategory) -> some View {
+        let total = tests(for: category).count
+        let selected = selectedCount(for: category)
+
+        HStack(alignment: .center) {
+            Text(category.rawValue)
+                .font(.headline)
+                .foregroundStyle(.primary)
+
+            Spacer()
+
+            if selected > 0 {
+                Text("\(selected)/\(total)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule()
+                            .fill(Color.accentColor.opacity(0.12))
+                    )
+            } else {
+                Text("\(total)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 4)
     }
 }
 
