@@ -161,18 +161,23 @@ private struct ChargeTestView: View {
     @Published var down = false
     private var last: Float = AVAudioSession.sharedInstance().outputVolume
     private var observation: NSKeyValueObservation?
+    /// Gate: ignore volume changes until the self-induced mid-rail seed has settled.
+    /// Setting the slider fires the KVO observer asynchronously, which would otherwise
+    /// register a phantom up/down delta before the user presses anything.
+    private var armed = false
 
     func start() {
         try? AVAudioSession.sharedInstance().setActive(true)
-        setSystemVolume(0.5)
-        last = AVAudioSession.sharedInstance().outputVolume
+        armed = false
         observation = AVAudioSession.sharedInstance().observe(\.outputVolume, options: [.new]) { [weak self] _, change in
             guard let self, let v = change.newValue else { return }
             Task { @MainActor in
+                guard self.armed else { return }
                 if v > self.last + 0.001 { self.up = true } else if v < self.last - 0.001 { self.down = true }
                 self.last = v
             }
         }
+        setSystemVolume(0.5)
     }
 
     /// Seed the system volume mid-range so both Volume Up and Volume Down have headroom to move
@@ -180,7 +185,16 @@ private struct ChargeTestView: View {
     private func setSystemVolume(_ value: Float) {
         let mpVolume = MPVolumeView()
         if let slider = mpVolume.subviews.compactMap({ $0 as? UISlider }).first {
-            DispatchQueue.main.async { slider.value = value }
+            DispatchQueue.main.async { [weak self] in
+                slider.value = value
+                // Arm only once the self-induced change has propagated, then seed `last`
+                // from the settled volume so deltas are measured from the mid-rail value.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                    guard let self else { return }
+                    self.last = AVAudioSession.sharedInstance().outputVolume
+                    self.armed = true
+                }
+            }
         }
     }
     func stop() { observation?.invalidate(); observation = nil }
