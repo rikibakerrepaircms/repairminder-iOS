@@ -1,6 +1,20 @@
 // Features/Diagnostics/Transport/DiagnosticsService.swift
 import Foundation
 
+/// The Worker `/api/diagnostics/session/:id/complete` route matches the id against
+/// `[a-f0-9]{32}` (see worker index.js). The public session-create handler emits exactly
+/// that (randomUUID with dashes stripped). If id generation ever changes, `/complete`
+/// would 404 silently after all results were posted — so we validate before calling it.
+enum DiagnosticsSessionID {
+    static func isValid(_ id: String) -> Bool {
+        id.range(of: "^[a-f0-9]{32}$", options: .regularExpression) != nil
+    }
+}
+
+enum DiagnosticsError: Error, Equatable {
+    case malformedSessionId(String)
+}
+
 /// Abstraction over the Worker diagnostics endpoints (lets tests stub the network).
 protocol DiagnosticsAPI: Sendable {
     func createSession(_ req: CreateSessionRequest) async throws -> DiagnosticSessionResponse
@@ -19,6 +33,9 @@ struct LiveDiagnosticsAPI: DiagnosticsAPI {
         let _: EmptyResponse = try await APIClient.shared.request(.diagnosticsSubmitResult, body: p)
     }
     func complete(sessionId: String, token: String) async throws {
+        guard DiagnosticsSessionID.isValid(sessionId) else {
+            throw DiagnosticsError.malformedSessionId(sessionId)
+        }
         let _: EmptyResponse = try await APIClient.shared.request(.diagnosticsComplete(sessionId: sessionId), body: CompleteBody(token: token))
     }
     private struct CompleteBody: Encodable { let token: String }
