@@ -8,7 +8,9 @@ import AVFoundation
 struct SpeakerTest: DiagnosticTest {
     let id = "speaker"; let name = "Speaker"; let category: TestCategory = .audio
     let requiresInteraction = true
-    #if os(iOS)
+    #if targetEnvironment(simulator)
+    var isSupported: Bool { false }
+    #elseif os(iOS)
     var isSupported: Bool { true }
     @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { AnyView(SpeakerTestView(complete: complete)) }
     #else
@@ -40,37 +42,56 @@ struct HeadphonesTest: DiagnosticTest {
 
 #if os(iOS)
 
-private func speak(_ text: String) {
-    let u = AVSpeechUtterance(string: text)
-    u.rate = AVSpeechUtteranceDefaultSpeechRate
-    AVSpeechSynthesizer.shared.speak(u)
+// MARK: Speaker (mic-loopback gated; earpiece best-effort)
+
+@MainActor final class SpeakerViewModel: ObservableObject {
+    private let probe: LoopbackProbe
+    @Published var outcome: TestOutcome?
+    @Published var phase = ""
+    init(probe: LoopbackProbe) { self.probe = probe }
+
+    func run() async {
+        phase = "Testing loudspeaker…"
+        let loud = await measure(.speaker)
+        phase = "Testing earpiece…"
+        let ear = await measure(.receiver)
+        let loudPass = LoopbackGate.heard(levelDb: loud, thresholdDb: -20)
+        let earPass = LoopbackGate.heard(levelDb: ear, thresholdDb: -20)
+        let details = ["loud": loudPass ? "pass" : "fail", "ear": earPass ? "pass" : "n/a"]
+        outcome = diagnosticOutcome("speaker", "Speaker", loudPass ? .pass : .fail, details)
+    }
+
+    private func measure(_ route: AudioRoute) async -> Double {
+        await withCheckedContinuation { (cont: CheckedContinuation<Double, Never>) in
+            probe.run(route: route, durationMs: 800) { level in cont.resume(returning: level) }
+        }
+    }
 }
-
-// AVSpeechSynthesizer must outlive the call → keep a singleton.
-extension AVSpeechSynthesizer { static let shared = AVSpeechSynthesizer() }
-
-// MARK: Speaker (speak a phrase; user confirms)
 
 private struct SpeakerTestView: View {
     let complete: (TestOutcome) -> Void
+    @StateObject private var model = SpeakerViewModel(probe: LoopbackProbeAV())
+
     var body: some View {
         TestScaffold(
             title: "Speaker",
-            instruction: "You should hear a spoken phrase from the loudspeaker. Tap Pass if it's clear.",
-            hints: ["Turn the volume up"],
-            allowManualPass: true,
-            onPass: { complete(diagnosticOutcome("speaker", "Speaker", .pass)) },
+            instruction: "Hold the device still and keep quiet. The loudspeaker and earpiece are tested automatically via the microphone.",
+            hints: ["Ensure the volume is not muted"],
+            allowManualPass: false,
+            onPass: {},
             onFail: { complete(diagnosticOutcome("speaker", "Speaker", .fail)) },
             onSkip: { complete(diagnosticOutcome("speaker", "Speaker", .skip)) }
         ) {
             VStack(spacing: 12) {
                 Image(systemName: "speaker.wave.3.fill").font(.system(size: 44)).foregroundStyle(Color.accentColor)
-                Button("Play sound") { play() }.buttonStyle(.bordered)
+                if !model.phase.isEmpty { ProgressView(model.phase) }
             }
-            .onAppear { try? AVAudioSession.sharedInstance().setCategory(.playback, options: [.defaultToSpeaker]); try? AVAudioSession.sharedInstance().setActive(true); play() }
+            .task { await model.run() }
+            .onChange(of: model.outcome?.status) { _, _ in
+                if let o = model.outcome { complete(o) }
+            }
         }
     }
-    private func play() { speak("Repair Minder speaker test. One. Two. Three.") }
 }
 
 // MARK: Microphone (live input level → auto-pass when sound detected)
