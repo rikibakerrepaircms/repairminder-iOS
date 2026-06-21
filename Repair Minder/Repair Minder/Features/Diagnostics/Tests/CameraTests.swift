@@ -154,6 +154,8 @@ struct CameraPreview: UIViewRepresentable {
     @Published var activeIndex: Int = 0
     @Published var outcome: TestOutcome?
     @Published var denied = false
+    /// Published so the view re-renders when the active lens's probe (and its session) changes.
+    @Published private(set) var activeProbeSession: AVCaptureSession?
 
     private var probe: CameraProbe?
     private let testId: String
@@ -171,9 +173,6 @@ struct CameraPreview: UIViewRepresentable {
         return lenses[activeIndex]
     }
 
-    /// The live preview session for the currently active lens probe.
-    var activeProbeSession: AVCaptureSession? { probe?.previewSession }
-
     func startCurrentLens() {
         guard activeIndex < lenses.count else { return }
         let lens = lenses[activeIndex]
@@ -183,6 +182,9 @@ struct CameraPreview: UIViewRepresentable {
                 guard granted else { self.denied = true; return }
                 let p = CameraProbe(device: lens.device)
                 self.probe = p
+                // Publish the session BEFORE starting the probe so the preview layer
+                // is attached to the session by the time startRunning() fires.
+                self.activeProbeSession = p.previewSession
                 p.start(onCode: { [weak self] _ in
                     Task { @MainActor in self?.markCurrentPassed() }
                 })
@@ -194,6 +196,7 @@ struct CameraPreview: UIViewRepresentable {
         guard activeIndex < lenses.count, lenses[activeIndex].passed == nil else { return }
         probe?.stop()
         probe = nil
+        activeProbeSession = nil
         lenses[activeIndex].passed = true
         advance()
     }
@@ -203,6 +206,7 @@ struct CameraPreview: UIViewRepresentable {
         guard activeIndex < lenses.count, lenses[activeIndex].passed == nil else { return }
         probe?.stop()
         probe = nil
+        activeProbeSession = nil
         lenses[activeIndex].passed = false
         advance()
     }
@@ -226,12 +230,14 @@ struct CameraPreview: UIViewRepresentable {
     func skipAll() {
         probe?.stop()
         probe = nil
+        activeProbeSession = nil
         outcome = diagnosticOutcome(testId, testName, .skip, nil)
     }
 
     func failAll() {
         probe?.stop()
         probe = nil
+        activeProbeSession = nil
         outcome = diagnosticOutcome(testId, testName, .fail, ["reason": "user_failed"])
     }
 }
@@ -380,36 +386,54 @@ private struct FlashTestView: View {
             }
             let p = CameraProbe(device: dev)
             probe = p
-            var sampleCount = 0
+
+            // Phase timing (wall-clock, so actual frame rate doesn't matter):
+            //  0.0 – 0.8s  → collect baseline
+            //  0.8s         → torch ON
+            //  0.8 – 1.4s  → settle delay (auto-exposure stabilises — do NOT sample)
+            //  1.4 – 4.4s  → sample window: auto-pass if ≥25% luminance jump
+            //  4.4s         → reveal manual-pass button
+            let baselineDuration:  Double = 0.8
+            let settleDuration:    Double = 0.6   // after torch on
+            let sampleDuration:    Double = 3.0   // sample window length
+
+            let startTime = Date()
             var baselineAccum: Double = 0
             var baselineSamples = 0
-            var torchOn = false
-            var peakAfterTorch: Double = 0
+            var torchLit = false
+            var torchOnTime: Date? = nil
+            var peakAfterSettle: Double = 0
 
             p.start(onSample: { luma in
-                sampleCount += 1
-                // Collect baseline over first ~20 samples (roughly 0.67s at 30fps)
-                if sampleCount <= 20 {
+                let elapsed = Date().timeIntervalSince(startTime)
+
+                if elapsed < baselineDuration {
+                    // Phase 1: collect baseline
                     baselineAccum += luma
                     baselineSamples += 1
-                } else if sampleCount == 21 {
-                    // Switch torch on after baseline
-                    let base = baselineAccum / Double(max(1, baselineSamples))
+                } else if !torchLit {
+                    // Phase 2: turn torch on once
                     p.setTorch(true)
-                    torchOn = true
-                    _ = base  // captured below via closure
-                } else if torchOn {
-                    peakAfterTorch = max(peakAfterTorch, luma)
-                    let base = baselineAccum / Double(max(1, baselineSamples))
-                    if FlashDecision.shouldAutoPass(baseline: base, peak: peakAfterTorch) {
-                        finish(.pass, ["auto_detected": "1"])
+                    torchLit = true
+                    torchOnTime = Date()
+                } else if let lit = torchOnTime {
+                    let sinceOn = Date().timeIntervalSince(lit)
+                    if sinceOn >= settleDuration {
+                        // Phase 3: sample window — compare against baseline
+                        peakAfterSettle = max(peakAfterSettle, luma)
+                        let base = baselineAccum / Double(max(1, baselineSamples))
+                        if FlashDecision.shouldAutoPass(baseline: base, peak: peakAfterSettle) {
+                            finish(.pass, ["auto_detected": "1"])
+                        }
                     }
+                    // else: still in settle window — skip sample
                 }
             })
 
-            // After ~4s, if no auto-pass, reveal manual pass
+            // After full window (baseline + torch-on + sample), reveal manual pass
+            let totalWindow = baselineDuration + settleDuration + sampleDuration
             Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                try? await Task.sleep(nanoseconds: UInt64(totalWindow * 1_000_000_000))
                 guard !completed else { return }
                 showManualPass = true
             }
