@@ -31,7 +31,7 @@ enum BatteryDrain {
         return Result(
             drainPct: drop,
             drainPctPerHour: perHour,
-            confidence: drop > granularityPct ? "high" : "low"
+            confidence: drop >= granularityPct * 2 ? "high" : "low"
         )
     }
 }
@@ -105,6 +105,7 @@ private struct BatteryDrainTestView: View {
     /// `reasonCode` is recorded in the outcome details if they choose to Skip from here.
     @State private var blockMessage: String? = nil
     @State private var blockReasonCode: String = ""
+    @State private var chargerReconnected = false
 
     var body: some View {
         TestScaffold(
@@ -213,6 +214,14 @@ private struct BatteryDrainTestView: View {
                 elapsedS = min(elapsedS + 30, targetDurationS)
                 let snap = BatteryProbeUIKit().snapshot()
                 currentPct = snap.levelPct
+                // Re-check charger state each tick: a mid-run reconnect makes the drain figure
+                // meaningless and would otherwise mask a bad battery as a healthy pass.
+                if snap.state != "unplugged" {
+                    chargerReconnected = true
+                    finishOnce(diagnosticOutcome("battery_drain", "Battery Drain", .partial,
+                                                 partialDetails(reason: "charger_reconnected")))
+                    return
+                }
                 if elapsedS >= targetDurationS {
                     finishOnce(outcome(status: .pass))
                 }
@@ -251,9 +260,20 @@ private struct BatteryDrainTestView: View {
         details["drain_end"]             = finalPct >= 0 ? "\(finalPct)%" : "n/a"
         details["drain_elapsed_s"]       = "\(elapsedS)"
         details["drain_percent"]         = "\(drain.drainPct)"
-        details["drain_percent_per_hour"] = "\(drain.drainPctPerHour)"
+        details["drain_percent_per_hour"] = "~\(drain.drainPctPerHour) (est.)"
         details["drain_confidence"]      = drain.confidence
         return diagnosticOutcome("battery_drain", "Battery Drain", status, details)
+    }
+
+    /// Details for an invalidated run (e.g. charger reconnected) — carry what we measured plus the
+    /// reason so the report is self-explanatory rather than a bare partial.
+    private func partialDetails(reason: String) -> [String: String] {
+        let snap = BatteryProbeUIKit().snapshot()
+        var details = BatteryTestDetails.from(snap)
+        details["reason"] = reason
+        details["drain_start"] = startPct >= 0 ? "\(startPct)%" : "n/a"
+        details["drain_elapsed_s"] = "\(elapsedS)"
+        return details
     }
 }
 #endif
