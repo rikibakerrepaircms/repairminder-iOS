@@ -2,11 +2,17 @@
 import SwiftUI
 
 /// First screen of the diagnostics flow: pick which tests to run (individually or all),
-/// then Start. Branded category selection step. Hosted by DiagnosticsFlowView.
+/// then Start. Branded icon-grid category selection step. Hosted by DiagnosticsFlowView.
 struct TestSelectionView: View {
     @ObservedObject private var appState = AppState.shared
     @StateObject private var runner = DiagnosticRunner(tests: TestRegistry.allTests())
     @State private var showRunner = false
+
+    private let columns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
+    ]
 
     /// Categories that actually have tests, in declaration order.
     private var categories: [TestCategory] {
@@ -25,49 +31,18 @@ struct TestSelectionView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 20) {
+            LazyVStack(alignment: .leading, spacing: 24) {
                 ForEach(categories, id: \.self) { category in
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 10) {
                         // Category header
                         categoryHeader(category)
 
-                        // Test rows
-                        VStack(spacing: 0) {
-                            let categoryTests = tests(for: category)
-                            ForEach(Array(categoryTests.enumerated()), id: \.element.id) { index, test in
-                                Button {
-                                    runner.toggle(test.id)
-                                } label: {
-                                    HStack(spacing: 12) {
-                                        Image(systemName: runner.selectedIds.contains(test.id)
-                                              ? "checkmark.circle.fill"
-                                              : "circle")
-                                            .font(.system(size: 20))
-                                            .foregroundStyle(runner.selectedIds.contains(test.id)
-                                                             ? Color.accentColor
-                                                             : Color.secondary)
-
-                                        Text(test.name)
-                                            .font(.body)
-                                            .foregroundStyle(.primary)
-
-                                        Spacer()
-                                    }
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 12)
-                                    .background(Color(.systemBackground))
-                                }
-                                .accessibilityIdentifier("test-row-\(test.id)")
-
-                                if index < categoryTests.count - 1 {
-                                    Divider()
-                                        .padding(.leading, 48)
-                                }
+                        // Icon grid of test tiles
+                        LazyVGrid(columns: columns, spacing: 12) {
+                            ForEach(tests(for: category), id: \.id) { test in
+                                testTile(test)
                             }
                         }
-                        .background(Color(.systemBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
                     }
                 }
             }
@@ -140,6 +115,44 @@ struct TestSelectionView: View {
             }
         }
         .padding(.horizontal, 4)
+    }
+
+    @ViewBuilder
+    private func testTile(_ test: DiagnosticTest) -> some View {
+        let isSelected = runner.selectedIds.contains(test.id)
+
+        Button {
+            runner.toggle(test.id)
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 8) {
+                    Image(systemName: DiagnosticIcons.symbol(for: test.id))
+                        .font(.system(size: 28, weight: .regular))
+                        .foregroundStyle(isSelected ? .white : Color.accentColor)
+
+                    Text(test.name)
+                        .font(.caption)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .foregroundStyle(isSelected ? .white : .primary)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 96)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(isSelected ? Color.accentColor : Color(.systemGray6))
+                )
+
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(6)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("test-row-\(test.id)")
     }
 }
 
