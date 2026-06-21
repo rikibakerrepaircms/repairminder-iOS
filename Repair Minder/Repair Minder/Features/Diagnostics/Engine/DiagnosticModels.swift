@@ -21,15 +21,20 @@ struct CreateSessionRequest: Codable, Sendable {
     let deviceDescription: String?
     let imei: String?
     let serial: String?
+    /// Client-generated run reference (also printed on the customer's PDF) so the results we
+    /// log can be matched to the report. Sent as `report_id`; ignored by older Workers.
+    let reportID: String?
 
     init(shopCode: String? = nil, platform: String = "ios", deviceIdentifier: String? = nil,
-         deviceDescription: String? = nil, imei: String? = nil, serial: String? = nil) {
+         deviceDescription: String? = nil, imei: String? = nil, serial: String? = nil,
+         reportID: String? = nil) {
         self.shopCode = shopCode
         self.platform = platform
         self.deviceIdentifier = deviceIdentifier
         self.deviceDescription = deviceDescription
         self.imei = imei
         self.serial = serial
+        self.reportID = reportID
     }
 }
 

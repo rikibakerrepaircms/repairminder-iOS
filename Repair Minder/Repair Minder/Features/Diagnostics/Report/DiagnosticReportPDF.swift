@@ -87,12 +87,10 @@ enum DiagnosticReportShare {
     @MainActor
     static func presentShareSheet(for runner: DiagnosticRunner,
                                   onComplete: @escaping (Bool) -> Void) {
-        let now = Date()
         let data = DiagnosticReportData.from(runner: runner,
-                                             deviceName: DeviceModelName.marketingName,
-                                             generatedAt: now)
+                                             deviceName: DeviceModelName.marketingName)
         let html = DiagnosticReportHTML.render(data, assets: assets())
-        let fileName = DiagnosticReportHTML.fileName(for: now)
+        let fileName = DiagnosticReportHTML.fileName(reportID: data.reportID)
 
         let renderer = DiagnosticReportPDFRenderer()
         renderer.render(html: html, fileName: fileName) { result in

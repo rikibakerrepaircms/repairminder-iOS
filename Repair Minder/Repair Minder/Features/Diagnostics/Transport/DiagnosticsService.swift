@@ -60,10 +60,11 @@ struct DiagnosticsService: Sendable {
     init(api: DiagnosticsAPI = LiveDiagnosticsAPI()) { self.api = api }
 
     func transmit(shopCode: String?, platform: String, imei: String?, serial: String?,
-                  deviceDescription: String?, outcomes: [TestOutcome]) async throws {
+                  deviceDescription: String?, reportID: String? = nil,
+                  outcomes: [TestOutcome]) async throws {
         let session = try await api.createSession(CreateSessionRequest(
             shopCode: shopCode, platform: platform, deviceIdentifier: nil,
-            deviceDescription: deviceDescription, imei: imei, serial: serial))
+            deviceDescription: deviceDescription, imei: imei, serial: serial, reportID: reportID))
         for o in outcomes {
             try await api.submitResult(DiagnosticResultPayload(
                 sessionId: session.sessionId, token: session.sessionToken,

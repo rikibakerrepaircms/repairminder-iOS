@@ -19,6 +19,22 @@ final class DiagnosticRunner: ObservableObject {
 
     init(tests: [DiagnosticTest]) { self.tests = tests }
 
+    // MARK: Report identity
+    /// Unique reference for this run, generated lazily on first use (when the report is shared
+    /// or results transmitted) and stable thereafter. Shared by the PDF report and the transmit
+    /// payload so the customer's report and the results we log carry the same id. Cleared by reset().
+    private var _reportID: String?
+    private var _reportDate: Date?
+    private func reportIdentity() -> (id: String, date: Date) {
+        if let id = _reportID, let date = _reportDate { return (id, date) }
+        let date = Date()
+        let id = DiagnosticReportID.generate(date: date)
+        _reportID = id; _reportDate = date
+        return (id, date)
+    }
+    var reportID: String { reportIdentity().id }
+    var reportDate: Date { reportIdentity().date }
+
     /// True once a run is underway but not yet finished — drives the "Resume" affordance.
     var isInProgress: Bool { phase != .finished && (autoRan || interactiveIndex > 0) }
 
@@ -29,6 +45,8 @@ final class DiagnosticRunner: ObservableObject {
         autoRan = false
         interactiveIndex = 0
         phase = .runningAuto
+        _reportID = nil          // a fresh run gets a fresh report reference
+        _reportDate = nil
     }
 
     // MARK: Selection

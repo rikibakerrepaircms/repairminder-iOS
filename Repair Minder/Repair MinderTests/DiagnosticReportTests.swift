@@ -13,8 +13,11 @@ struct DiagnosticReportTests {
                                   details: details.map { (label: $0.0, value: $0.1) })
     }
 
+    private let sampleID = "RM-20260621-1342-7F3A9C"
+
     private func sampleData(overall: String = "fail", grade: DiagnosticGrade = .bad) -> DiagnosticReportData {
         DiagnosticReportData(
+            reportID: sampleID,
             deviceName: "iPhone 15 Pro",
             osName: "iOS", osVersion: "17.5",
             batteryLevel: "87", batteryState: "unplugged",
@@ -30,14 +33,20 @@ struct DiagnosticReportTests {
 
     // MARK: - File name
 
-    @Test func fileNameMatchesExpectedPattern() {
-        let date = Date(timeIntervalSince1970: 1_770_000_000) // fixed
-        let name = DiagnosticReportHTML.fileName(for: date)
-        #expect(name.hasPrefix("RepairMinder-Diagnostics-"))
-        #expect(name.hasSuffix(".pdf"))
-        let regex = try! NSRegularExpression(pattern: #"^RepairMinder-Diagnostics-\d{8}-\d{4}\.pdf$"#)
-        let range = NSRange(name.startIndex..., in: name)
-        #expect(regex.firstMatch(in: name, range: range) != nil, "got \(name)")
+    @Test func fileNameIsKeyedByReportID() {
+        let name = DiagnosticReportHTML.fileName(reportID: sampleID)
+        #expect(name == "RepairMinder-Diagnostics-RM-20260621-1342-7F3A9C.pdf")
+    }
+
+    @Test func reportIDFormatIsValid() {
+        let date = Date(timeIntervalSince1970: 1_770_000_000)
+        let a = DiagnosticReportID.generate(date: date)
+        let b = DiagnosticReportID.generate(date: date)
+        #expect(DiagnosticReportID.isValid(a), "got \(a)")
+        #expect(DiagnosticReportID.isValid(b), "got \(b)")
+        // Same date/time prefix (timezone-independent comparison), random 6-hex suffix.
+        #expect(String(a.prefix(17)) == String(b.prefix(17)))   // "RM-yyyyMMdd-HHmm-"
+        #expect(!DiagnosticReportID.isValid("RM-20260621-1342-XYZ"))  // bad suffix rejected
     }
 
     // MARK: - HTML content
@@ -80,6 +89,12 @@ struct DiagnosticReportTests {
         #expect(html.contains("Device Diagnostic Report"))
     }
 
+    @Test func htmlShowsReportID() {
+        let html = DiagnosticReportHTML.render(sampleData())
+        #expect(html.contains(sampleID))
+        #expect(html.contains("Report ID"))
+    }
+
     /// Trademark guard: the competitor marks must never appear in our output.
     @Test func htmlContainsNoCompetitorMarks() {
         let html = DiagnosticReportHTML.render(sampleData()).lowercased()
@@ -89,6 +104,7 @@ struct DiagnosticReportTests {
 
     @Test func htmlEscapesDynamicStrings() {
         let data = DiagnosticReportData(
+            reportID: sampleID,
             deviceName: "Evil <script> & \"co\"", osName: "iOS", osVersion: "17",
             batteryLevel: nil, batteryState: nil,
             generatedAt: Date(timeIntervalSince1970: 1_770_000_000),
@@ -158,8 +174,10 @@ struct DiagnosticReportTests {
                                   details: ["total": "127.5 GB", "free": "100 GB"]))
         runner.record(TestOutcome(id: "speaker", name: "Loud Speaker", status: .fail, details: nil))
 
-        let data = DiagnosticReportData.from(runner: runner, deviceName: "iPhone 15 Pro",
-                                             generatedAt: Date(timeIntervalSince1970: 1_770_000_000))
+        let data = DiagnosticReportData.from(runner: runner, deviceName: "iPhone 15 Pro")
+        // Report id comes from the runner and is stable across reads (same id the transmit sends).
+        #expect(DiagnosticReportID.isValid(data.reportID))
+        #expect(data.reportID == runner.reportID)
         #expect(data.deviceName == "iPhone 15 Pro")
         #expect(data.batteryLevel == "64")
         #expect(data.osVersion == "17.5")
@@ -170,5 +188,15 @@ struct DiagnosticReportTests {
         let labels = data.deviceInfoRows.map(\.label)
         #expect(labels.contains("Device"))
         #expect(labels.contains("Storage Capacity"))
+    }
+
+    @MainActor @Test func runnerReportIDIsStableAndResetsWithRun() {
+        let runner = DiagnosticRunner(tests: [])
+        let first = runner.reportID
+        #expect(runner.reportID == first)        // stable across reads within a run
+        #expect(DiagnosticReportID.isValid(first))
+        runner.reset()
+        let second = runner.reportID
+        #expect(second != first)                 // a fresh run gets a fresh reference
     }
 }

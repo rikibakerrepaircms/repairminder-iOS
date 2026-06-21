@@ -14,6 +14,7 @@ struct DiagnosticReportData: Sendable {
         let details: [(label: String, value: String)]
     }
 
+    let reportID: String              // unique run reference, e.g. "RM-20260621-1342-7F3A9C"
     let deviceName: String            // marketing name (e.g. "iPhone 15 Pro") or generic "iPhone"
     let osName: String?               // "iOS"
     let osVersion: String?            // "17.5"
@@ -37,8 +38,10 @@ struct DiagnosticReportData: Sendable {
 extension DiagnosticReportData {
     /// Build report data from a finished runner. `deviceName` should be the best available
     /// marketing name (see DeviceModelName); falls back to the device_info model if empty.
+    /// The report id + timestamp come from the runner so the PDF and the transmit payload match.
     @MainActor
-    static func from(runner: DiagnosticRunner, deviceName: String, generatedAt: Date) -> DiagnosticReportData {
+    static func from(runner: DiagnosticRunner, deviceName: String) -> DiagnosticReportData {
+        let generatedAt = runner.reportDate
         let outcomes = runner.orderedOutcomes
         let info = runner.outcome(for: "device_info")?.details ?? [:]
 
@@ -71,6 +74,7 @@ extension DiagnosticReportData {
         }
 
         return DiagnosticReportData(
+            reportID: runner.reportID,
             deviceName: resolvedName,
             osName: info["name"].flatMap { $0.isEmpty ? nil : $0 },
             osVersion: info["os_version"].flatMap { $0.isEmpty ? nil : $0 },
@@ -304,6 +308,8 @@ enum DiagnosticReportHTML {
           .header-meta { text-align:right; }
           .header-title { font-size:18px; font-weight:800; color:\(Palette.brandDark); letter-spacing:-.2px; }
           .header-sub { font-size:11px; color:\(Palette.grey); }
+          .header-id { font-size:11px; color:\(Palette.brandDark); margin-top:2px; }
+          .header-id strong { font-variant-numeric:tabular-nums; letter-spacing:.3px; }
 
           .verdict { display:flex; align-items:stretch; gap:14px; margin-bottom:14px; }
           .verdict-badge { flex:0 0 auto; min-width:150px; border-radius:12px; padding:14px 18px;
@@ -364,6 +370,7 @@ enum DiagnosticReportHTML {
             <div class="header-meta">
               <div class="header-title">Device Diagnostic Report</div>
               <div class="header-sub">Generated \(esc(dateString(data.generatedAt)))</div>
+              <div class="header-id">Report ID&nbsp; <strong>\(esc(data.reportID))</strong></div>
             </div>
           </div>
 
@@ -392,17 +399,15 @@ enum DiagnosticReportHTML {
 
           <div class="footer">
             <div class="footer-tag">\(mendmyiLogo) &nbsp;Repair Minder is a mendmyi Platform</div>
-            <div class="footer-date">\(esc(dateString(data.generatedAt)))</div>
+            <div class="footer-date">\(esc(data.reportID)) · \(esc(dateString(data.generatedAt)))</div>
           </div>
         </body></html>
         """
     }
 
-    /// Suggested PDF file name, e.g. `RepairMinder-Diagnostics-20260621-1342.pdf`.
-    static func fileName(for date: Date) -> String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyyMMdd-HHmm"
-        return "RepairMinder-Diagnostics-\(f.string(from: date)).pdf"
+    /// Suggested PDF file/document name, keyed by the run's report id, e.g.
+    /// `RepairMinder-Diagnostics-RM-20260621-1342-7F3A9C.pdf`.
+    static func fileName(reportID: String) -> String {
+        "RepairMinder-Diagnostics-\(reportID).pdf"
     }
 }

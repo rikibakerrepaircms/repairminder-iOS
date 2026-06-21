@@ -10,6 +10,7 @@ struct TransmitView: View {
     private let service: DiagnosticsService
     @State private var shopCode = ""
     @State private var phase: Phase = .idle
+    @State private var isGeneratingPDF = false
 
     enum Phase: Equatable { case idle, sending, success, failed }
 
@@ -61,6 +62,19 @@ struct TransmitView: View {
         .navigationTitle("Send Results")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: sharePDF) {
+                    if isGeneratingPDF {
+                        ProgressView()
+                    } else {
+                        Label("Share PDF", systemImage: "square.and.arrow.up")
+                    }
+                }
+                .disabled(isGeneratingPDF || runner.orderedOutcomes.isEmpty)
+                .accessibilityIdentifier("share-pdf-transmit")
+            }
+        }
         #endif
         .safeAreaInset(edge: .bottom) {
             Button(action: submit) {
@@ -89,13 +103,26 @@ struct TransmitView: View {
         Task {
             do {
                 try await service.transmit(shopCode: shopCode, platform: "ios", imei: nil, serial: nil,
-                                           deviceDescription: deviceDescription, outcomes: runner.orderedOutcomes)
+                                           deviceDescription: deviceDescription, reportID: runner.reportID,
+                                           outcomes: runner.orderedOutcomes)
                 phase = .success
             } catch {
                 DiagnosticsBuffer.save(shopCode: shopCode, deviceDescription: deviceDescription,
-                                       imei: nil, serial: nil, outcomes: runner.orderedOutcomes)
+                                       imei: nil, serial: nil, reportID: runner.reportID,
+                                       outcomes: runner.orderedOutcomes)
                 phase = .failed
             }
         }
     }
+
+    #if os(iOS)
+    /// Build the branded PDF report and present a share sheet (see DiagnosticReportShare).
+    private func sharePDF() {
+        guard !isGeneratingPDF else { return }
+        isGeneratingPDF = true
+        DiagnosticReportShare.presentShareSheet(for: runner) { _ in
+            isGeneratingPDF = false
+        }
+    }
+    #endif
 }

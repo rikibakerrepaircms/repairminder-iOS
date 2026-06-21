@@ -59,6 +59,23 @@ final class DiagnosticsUITests: XCTestCase {
         XCTAssertEqual(overall.label, "Pass")
     }
 
+    /// The Summary screen exposes a "Share PDF" control that produces a share sheet.
+    func testSharePdfFromSummary() throws {
+        let app = launch()
+        openSelectStart(app, testRowId: "test-row-device_info")
+
+        XCTAssertTrue(app.staticTexts["summary-overall"].waitForExistence(timeout: 15))
+        let share = app.buttons["share-pdf"]
+        XCTAssertTrue(share.waitForExistence(timeout: 5), "Share PDF control should be on the Summary")
+        XCTAssertTrue(share.isHittable)
+        share.tap()
+
+        // The system share sheet (UIActivityViewController) presents the generated PDF.
+        let activitySheet = app.otherElements["ActivityListView"]
+        XCTAssertTrue(activitySheet.waitForExistence(timeout: 15),
+                      "Tapping Share PDF should present the share sheet with the report")
+    }
+
     /// Full transmit flow with a stubbed network: summary → Send results → shop code → submit → success.
     func testSubmitWithShopCode() throws {
         let app = launch(["-uiTestStubTransmit"])

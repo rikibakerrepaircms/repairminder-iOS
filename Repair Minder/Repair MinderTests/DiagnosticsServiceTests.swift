@@ -6,9 +6,11 @@ actor StubAPI: DiagnosticsAPI {
     private(set) var created = 0
     private(set) var results: [DiagnosticResultPayload] = []
     private(set) var completed = 0
+    private(set) var lastReportID: String?
 
     func createSession(_ req: CreateSessionRequest) async throws -> DiagnosticSessionResponse {
         created += 1
+        lastReportID = req.reportID
         return DiagnosticSessionResponse(sessionId: "sid", sessionToken: "tok", expiresAt: nil)
     }
     func submitResult(_ p: DiagnosticResultPayload) async throws { results.append(p) }
@@ -24,10 +26,13 @@ struct DiagnosticsServiceTests {
             TestOutcome(id: "b", name: "B", status: .fail, details: ["x": "y"]),
         ]
         try await svc.transmit(shopCode: "123456", platform: "ios", imei: "350069708103628",
-                               serial: nil, deviceDescription: "iPhone", outcomes: outcomes)
+                               serial: nil, deviceDescription: "iPhone",
+                               reportID: "RM-20260621-1342-7F3A9C", outcomes: outcomes)
         #expect(await api.created == 1)
         #expect(await api.results.count == 2)
         #expect(await api.completed == 1)
         #expect(await api.results.first?.token == "tok")
+        // The report id is logged to us with the session so report ↔ results can be matched.
+        #expect(await api.lastReportID == "RM-20260621-1342-7F3A9C")
     }
 }

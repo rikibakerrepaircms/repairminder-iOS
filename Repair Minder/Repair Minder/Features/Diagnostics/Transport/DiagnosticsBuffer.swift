@@ -16,6 +16,7 @@ enum DiagnosticsBuffer {
         let deviceDescription: String?
         let imei: String?
         let serial: String?
+        let reportID: String?
         let results: [PendingResult]
     }
 
@@ -27,10 +28,11 @@ enum DiagnosticsBuffer {
     /// Persist a session that failed to transmit. Returns the file URL, or nil on failure.
     @discardableResult
     static func save(shopCode: String?, platform: String = "ios", deviceDescription: String?,
-                     imei: String?, serial: String?, outcomes: [TestOutcome]) -> URL? {
+                     imei: String?, serial: String?, reportID: String? = nil,
+                     outcomes: [TestOutcome]) -> URL? {
         let session = PendingSession(
             shopCode: shopCode, platform: platform, deviceDescription: deviceDescription,
-            imei: imei, serial: serial,
+            imei: imei, serial: serial, reportID: reportID,
             results: outcomes.map { PendingResult(testName: $0.id, status: $0.status.rawValue, details: $0.details) })
         do {
             try FileManager.default.createDirectory(at: pendingDirectory, withIntermediateDirectories: true)
