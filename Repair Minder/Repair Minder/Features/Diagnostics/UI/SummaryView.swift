@@ -1,8 +1,8 @@
 // Features/Diagnostics/UI/SummaryView.swift
 import SwiftUI
 
-/// Results: overall grade, a Passed section, and a "Failed & Skipped – tap to retest"
-/// section. Tapping a failed/skipped test reruns it (auto) or re-presents it (interactive).
+/// Results: colour-coded icon grid with failed tiles grouped at top.
+/// Every tile is tappable to retest — pass, fail, or skip alike.
 struct SummaryView: View {
     @ObservedObject var runner: DiagnosticRunner
     @State private var showTransmit = false
@@ -11,29 +11,50 @@ struct SummaryView: View {
     /// Identifiable wrapper so we can drive a sheet with the chosen interactive test.
     struct RetestBox: Identifiable { let id: String; let test: any DiagnosticTest }
 
+    // MARK: - Filtered outcome lists
+
+    private var failedOutcomes: [TestOutcome] {
+        runner.orderedOutcomes.filter { $0.status == .fail || $0.status == .error }
+    }
+    private var skippedOutcomes: [TestOutcome] {
+        runner.orderedOutcomes.filter { $0.status == .skip }
+    }
+    private var passedOutcomes: [TestOutcome] {
+        runner.orderedOutcomes.filter { $0.status == .pass }
+    }
+
+    // MARK: - Body
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Branded grade header card
+                // Header card — grade + overall label + counts
                 gradeHeaderCard
 
-                // Failed & Skipped section
-                if !runner.failedOrSkipped.isEmpty {
-                    outcomeSection(
-                        title: "Failed & Skipped",
-                        subtitle: "Tap any row to retest",
-                        outcomes: runner.failedOrSkipped,
-                        isRetest: true
+                // Failed / error section (red) — always first
+                if !failedOutcomes.isEmpty {
+                    gridSection(
+                        title: "Failed",
+                        titleColor: .red,
+                        outcomes: failedOutcomes
                     )
                 }
 
-                // Passed section
-                if !runner.passed.isEmpty {
-                    outcomeSection(
+                // Skipped section (grey)
+                if !skippedOutcomes.isEmpty {
+                    gridSection(
+                        title: "Skipped",
+                        titleColor: .secondary,
+                        outcomes: skippedOutcomes
+                    )
+                }
+
+                // Passed section (green)
+                if !passedOutcomes.isEmpty {
+                    gridSection(
                         title: "Passed",
-                        subtitle: nil,
-                        outcomes: runner.passed,
-                        isRetest: false
+                        titleColor: .green,
+                        outcomes: passedOutcomes
                     )
                 }
             }
@@ -74,22 +95,20 @@ struct SummaryView: View {
     @ViewBuilder
     private var gradeHeaderCard: some View {
         VStack(spacing: 12) {
-            // GradeChip displayed prominently
             GradeChip(grade: runner.grade)
                 .scaleEffect(1.3)
                 .padding(.top, 4)
 
-            // summary-overall: staticText label must be the capitalised result word
             // XCUITest asserts: app.staticTexts["summary-overall"].label == "Pass"
             Text(runner.overallResult.capitalized)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("summary-overall")
 
-            // Stats row
-            HStack(spacing: 24) {
-                statItem(count: runner.passed.count, label: "Passed", color: .green)
-                statItem(count: runner.failedOrSkipped.count, label: "Issues", color: .red)
+            HStack(spacing: 20) {
+                statItem(count: passedOutcomes.count, label: "Passed", color: .green)
+                statItem(count: failedOutcomes.count, label: "Failed", color: .red)
+                statItem(count: skippedOutcomes.count, label: "Skipped", color: Color(.systemGray))
             }
             .padding(.top, 4)
         }
@@ -113,69 +132,90 @@ struct SummaryView: View {
         }
     }
 
-    // MARK: - Outcome Sections
+    // MARK: - Grid Section
+
+    private let columns = [
+        GridItem(.flexible()),
+        GridItem(.flexible()),
+        GridItem(.flexible())
+    ]
 
     @ViewBuilder
-    private func outcomeSection(title: String, subtitle: String?, outcomes: [TestOutcome], isRetest: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Section header
-            HStack(alignment: .firstTextBaseline) {
-                Text(title)
-                    .font(.headline)
-                if let subtitle {
-                    Text("— \(subtitle)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+    private func gridSection(title: String, titleColor: Color, outcomes: [TestOutcome]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(titleColor)
+                .padding(.horizontal, 4)
+
+            LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(outcomes) { outcome in
+                    resultTile(outcome)
                 }
-                Spacer()
             }
-            .padding(.horizontal, 4)
+        }
+    }
 
-            // Rows card
-            VStack(spacing: 0) {
-                ForEach(Array(outcomes.enumerated()), id: \.element.id) { index, outcome in
-                    outcomeRow(outcome, isRetest: isRetest)
+    // MARK: - Result Tile
 
-                    if index < outcomes.count - 1 {
-                        Divider()
-                            .padding(.leading, 16)
+    @ViewBuilder
+    private func resultTile(_ outcome: TestOutcome) -> some View {
+        let (tileColor, badgeIcon) = tileAppearance(for: outcome.status)
+
+        Button {
+            retest(outcome)
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 6) {
+                    ZStack(alignment: .bottomTrailing) {
+                        Image(systemName: DiagnosticIcons.symbol(for: outcome.id))
+                            .font(.system(size: 28, weight: .medium))
+                            .foregroundStyle(tileColor)
+
+                        Image(systemName: badgeIcon)
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(tileColor)
+                            .offset(x: 6, y: 6)
                     }
+                    .padding(.top, 6)
+
+                    Text(outcome.name)
+                        .font(.caption)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 8)
+                .padding(.bottom, 10)
+                .padding(.top, 14)
+
+                // Retest affordance — small clockwise arrow in top-right corner
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(tileColor.opacity(0.6))
+                    .padding(6)
             }
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
+            .frame(minHeight: 96)
+            .background(tileColor.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .strokeBorder(tileColor.opacity(0.25), lineWidth: 1)
+            )
         }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("retest-\(outcome.id)")
     }
 
-    @ViewBuilder
-    private func outcomeRow(_ outcome: TestOutcome, isRetest: Bool) -> some View {
-        Group {
-            if isRetest {
-                Button {
-                    retest(outcome)
-                } label: {
-                    rowContent(outcome)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("retest-\(outcome.id)")
-            } else {
-                rowContent(outcome)
-            }
+    /// Returns (tint colour, badge SF symbol) for a given status.
+    private func tileAppearance(for status: TestStatus) -> (Color, String) {
+        switch status {
+        case .pass:           return (.green,  "checkmark.circle.fill")
+        case .fail, .error:   return (.red,    "xmark.circle.fill")
+        case .skip, .partial: return (Color(.systemGray), "minus.circle.fill")
         }
-    }
-
-    @ViewBuilder
-    private func rowContent(_ outcome: TestOutcome) -> some View {
-        HStack(spacing: 12) {
-            Text(outcome.name)
-                .font(.body)
-                .foregroundStyle(.primary)
-            Spacer()
-            StatusPill(status: outcome.status)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
     }
 
     // MARK: - Retest
