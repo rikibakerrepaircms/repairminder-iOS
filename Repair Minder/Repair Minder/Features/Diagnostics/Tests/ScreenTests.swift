@@ -62,7 +62,14 @@ struct ThreeDTouchTest: DiagnosticTest {
     let category: TestCategory = .screen
     let requiresInteraction = true
     #if os(iOS)
-    var isSupported: Bool { true }   // 3D-Touch availability is surfaced in-view (force reading)
+    @MainActor var isSupported: Bool {
+        #if os(iOS)
+        // Force Touch removed since iPhone XR; absent → engine records skip.
+        return UIScreen.main.traitCollection.forceTouchCapability == .available
+        #else
+        return false
+        #endif
+    }
     @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? {
         AnyView(ForceTouchTestView(complete: complete))
     }
