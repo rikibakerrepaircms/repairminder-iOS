@@ -41,6 +41,7 @@ struct WiFiTest: DiagnosticTest {
 
 struct BluetoothTest: DiagnosticTest {
     let id = "bluetooth"; let name = "Bluetooth"; let category: TestCategory = .connectivity
+    var requiredPermissions: [DiagnosticPermission] { [.bluetooth] }
     let requiresInteraction = true
     #if os(iOS)
     var isSupported: Bool { true }

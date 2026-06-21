@@ -41,6 +41,7 @@ struct GyroscopeTest: DiagnosticTest {
 
 struct MagneticTest: DiagnosticTest {
     let id = "magnetic"; let name = "Magnetic Sensor"; let category: TestCategory = .sensors
+    var requiredPermissions: [DiagnosticPermission] { [.location] }
     let requiresInteraction = true
     #if os(iOS)
     var isSupported: Bool { true }
@@ -63,6 +64,7 @@ struct ProximityTest: DiagnosticTest {
 
 struct LightSensorTest: DiagnosticTest {
     let id = "light"; let name = "Light Sensor"; let category: TestCategory = .sensors
+    var requiredPermissions: [DiagnosticPermission] { [.camera] }
     let requiresInteraction = true
     #if os(iOS)
     var isSupported: Bool {
@@ -76,6 +78,7 @@ struct LightSensorTest: DiagnosticTest {
 
 struct GPSTest: DiagnosticTest {
     let id = "gps"; let name = "GPS"; let category: TestCategory = .sensors
+    var requiredPermissions: [DiagnosticPermission] { [.location] }
     let requiresInteraction = true
     #if os(iOS)
     var isSupported: Bool { true }

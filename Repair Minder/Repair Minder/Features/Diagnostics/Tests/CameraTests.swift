@@ -77,6 +77,7 @@ private struct CameraTargetHelpSheet: View {
 
 struct RearCameraTest: DiagnosticTest {
     let id = "rearcamera"; let name = "Rear Camera"; let category: TestCategory = .hardware
+    var requiredPermissions: [DiagnosticPermission] { [.camera] }
     let requiresInteraction = true
     #if os(iOS)
     /// Supported only when at least one physical rear lens is present — false on simulator.
@@ -100,6 +101,7 @@ struct RearCameraTest: DiagnosticTest {
 
 struct FrontCameraTest: DiagnosticTest {
     let id = "frontcamera"; let name = "Front Camera"; let category: TestCategory = .hardware
+    var requiredPermissions: [DiagnosticPermission] { [.camera] }
     let requiresInteraction = true
     #if os(iOS)
     var isSupported: Bool {
@@ -115,6 +117,7 @@ struct FrontCameraTest: DiagnosticTest {
 
 struct FlashTest: DiagnosticTest {
     let id = "flash"; let name = "Flash"; let category: TestCategory = .hardware
+    var requiredPermissions: [DiagnosticPermission] { [.camera] }
     let requiresInteraction = true
     #if os(iOS)
     var isSupported: Bool {

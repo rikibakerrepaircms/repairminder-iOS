@@ -26,6 +26,7 @@ struct BiometricTest: DiagnosticTest {
 
 struct TrueDepthTest: DiagnosticTest {
     let id = "truedepth"; let name = "TrueDepth Camera"; let category: TestCategory = .hardware
+    var requiredPermissions: [DiagnosticPermission] { [.camera] }
     let requiresInteraction = true
     #if os(iOS)
     var isSupported: Bool { AVCaptureDevice.default(.builtInTrueDepthCamera, for: .video, position: .front) != nil }
@@ -39,6 +40,7 @@ struct TrueDepthTest: DiagnosticTest {
 
 struct LiDARTest: DiagnosticTest {
     let id = "lidar"; let name = "LiDAR Scanner"; let category: TestCategory = .hardware
+    var requiredPermissions: [DiagnosticPermission] { [.camera] }
     let requiresInteraction = true
     #if os(iOS)
     var isSupported: Bool { ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) }

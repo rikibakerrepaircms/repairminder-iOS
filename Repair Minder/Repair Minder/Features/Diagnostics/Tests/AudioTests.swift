@@ -7,6 +7,7 @@ import AVFoundation
 
 struct SpeakerTest: DiagnosticTest {
     let id = "speaker"; let name = "Speaker"; let category: TestCategory = .audio
+    var requiredPermissions: [DiagnosticPermission] { [.microphone] }
     let requiresInteraction = true
     #if targetEnvironment(simulator)
     var isSupported: Bool { false }
@@ -20,6 +21,7 @@ struct SpeakerTest: DiagnosticTest {
 
 struct MicrophoneTest: DiagnosticTest {
     let id = "microphone"; let name = "Microphone"; let category: TestCategory = .audio
+    var requiredPermissions: [DiagnosticPermission] { [.microphone] }
     let requiresInteraction = true
     #if os(iOS)
     var isSupported: Bool { true }
