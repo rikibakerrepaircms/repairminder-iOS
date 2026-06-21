@@ -64,19 +64,17 @@ final class DiagnosticRunner: ObservableObject {
     var selectedInteractiveTests: [DiagnosticTest] {
         selectedTests.filter { $0.requiresInteraction && $0.isSupported && !preflightResolvedIds.contains($0.id) }
     }
-    /// Tests resolved during the automatic phase: background auto tests + any unsupported selections
-    /// (recorded as skips). Shown as a live checklist so their results aren't invisible.
+    /// Supported automatic tests resolved during the preparing phase, shown as a live checklist.
+    /// Unsupported tests are excluded (capability exclusion).
     var autoChecklistTests: [DiagnosticTest] {
-        selectedTests.filter { !$0.requiresInteraction || !$0.isSupported }
+        selectedTests.filter { !$0.requiresInteraction && $0.isSupported }
     }
     var currentInteractiveTest: DiagnosticTest? {
         let list = selectedInteractiveTests
         return interactiveIndex < list.count ? list[interactiveIndex] : nil
     }
     func select(ids: [String]) { selectedIds = Set(ids) }
-    /// Select every test the current device actually supports. Unsupported tests are never
-    /// offered in the picker, so they must not be selected here either (they'd only add
-    /// "skipped — unsupported" rows to the report for hardware the device doesn't have).
+    /// Select every test the current device actually supports. Unsupported tests are never selected.
     func selectAll() { selectedIds = Set(tests.filter { $0.isSupported }.map(\.id)) }
     func toggle(_ id: String) {
         if selectedIds.contains(id) { selectedIds.remove(id) } else { selectedIds.insert(id) }
@@ -87,14 +85,11 @@ final class DiagnosticRunner: ObservableObject {
     func record(_ outcome: TestOutcome) { outcomes[outcome.id] = outcome }
     func outcome(for id: String) -> TestOutcome? { outcomes[id] }
 
-    /// Run all selected automatic tests; mark unsupported selected tests as skipped.
+    /// Run all selected automatic, supported tests. Unsupported selections are dropped entirely
+    /// (capability exclusion: never run, graded, or reported).
     func runAuto() async {
-        for test in selectedTests {
-            if !test.isSupported {
-                record(TestOutcome(id: test.id, name: test.name, status: .skip, details: ["reason": "unsupported"]))
-            } else if !test.requiresInteraction {
-                record(await test.run())
-            }
+        for test in selectedTests where test.isSupported && !test.requiresInteraction {
+            record(await test.run())
         }
         autoRan = true
     }
