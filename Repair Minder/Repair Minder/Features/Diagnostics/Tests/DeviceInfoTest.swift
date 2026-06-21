@@ -13,20 +13,21 @@ struct DeviceInfoTest: DiagnosticTest {
     var isSupported: Bool { true }
 
     func run() async -> TestOutcome {
-        var details: [String: String] = [:]
         #if canImport(UIKit)
-        await MainActor.run {
-            let d = UIDevice.current
-            d.isBatteryMonitoringEnabled = true
-            details["model"] = d.model
-            details["name"] = d.systemName
-            details["os_version"] = d.systemVersion
-            let level = d.batteryLevel
-            if level >= 0 { details["battery_level"] = String(Int(level * 100)) }
-            details["battery_state"] = batteryStateLabelLocal(d.batteryState)
+        let details: [String: String] = await MainActor.run {
+            var d2: [String: String] = [:]
+            let dev = UIDevice.current
+            dev.isBatteryMonitoringEnabled = true
+            d2["model"] = dev.model
+            d2["name"] = dev.systemName
+            d2["os_version"] = dev.systemVersion
+            let level = dev.batteryLevel
+            if level >= 0 { d2["battery_level"] = String(Int(level * 100)) }
+            d2["battery_state"] = batteryStateLabelLocal(dev.batteryState)
+            return d2
         }
         #else
-        details["model"] = "Unknown"; details["os_version"] = "Unknown"
+        let details: [String: String] = ["model": "Unknown", "os_version": "Unknown"]
         #endif
         return TestOutcome(id: id, name: name, status: .pass, details: details)
     }

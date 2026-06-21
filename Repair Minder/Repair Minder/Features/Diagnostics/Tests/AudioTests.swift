@@ -129,10 +129,10 @@ private struct SpeakerTestView: View {
         recorder?.isMeteringEnabled = true
         recorder?.record()
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            guard let self, let r = self.recorder else { return }
-            r.updateMeters()
-            let peak = r.peakPower(forChannel: 0)   // dBFS, -160…0
             Task { @MainActor in
+                guard let self, let r = self.recorder else { return }
+                r.updateMeters()
+                let peak = r.peakPower(forChannel: 0)   // dBFS, -160…0
                 self.level = max(0, (peak + 60) / 60)   // 0…1 normalised for UI
                 if peak > -20 { onDetect() }
             }

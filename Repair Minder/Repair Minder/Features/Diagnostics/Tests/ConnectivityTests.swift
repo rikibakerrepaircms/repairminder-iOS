@@ -1,7 +1,7 @@
 // Features/Diagnostics/Tests/ConnectivityTests.swift
 // Connectivity: WiFi (auto), Bluetooth (auto), NFC (auto-detect), Call (manual).
 import SwiftUI
-import Network
+@preconcurrency import Network
 #if os(iOS)
 import CoreBluetooth
 import CoreNFC
@@ -18,8 +18,10 @@ struct WiFiTest: DiagnosticTest {
         await withCheckedContinuation { (cont: CheckedContinuation<TestOutcome, Never>) in
             let monitor = NWPathMonitor()
             let q = DispatchQueue(label: "diagnostics.wifi")
-            var done = false
-            func finish(_ o: TestOutcome) { if !done { done = true; monitor.cancel(); cont.resume(returning: o) } }
+            nonisolated(unsafe) var done = false
+            let finish: @Sendable (TestOutcome) -> Void = { o in
+                if !done { done = true; monitor.cancel(); cont.resume(returning: o) }
+            }
             monitor.pathUpdateHandler = { path in
                 let wifi = path.usesInterfaceType(.wifi)
                 if wifi && path.status == .satisfied {

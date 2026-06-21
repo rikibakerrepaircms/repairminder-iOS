@@ -13,7 +13,7 @@ final class LoopbackProbeAV: LoopbackProbe {
         #else
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, options: [.defaultToSpeaker, .allowBluetooth])
+            try session.setCategory(.playAndRecord, options: [.defaultToSpeaker, .allowBluetoothHFP])
             try session.setActive(true)
             try? session.overrideOutputAudioPort(route == .speaker ? .speaker : .none)
 
