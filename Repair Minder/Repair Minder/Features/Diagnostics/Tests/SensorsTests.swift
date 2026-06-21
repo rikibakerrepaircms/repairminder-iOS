@@ -11,12 +11,8 @@ struct AccelerometerTest: DiagnosticTest {
     #if os(iOS)
     var isSupported: Bool { true }
     @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { AnyView(AccelerometerTestView(complete: complete)) }
-    func preflight() async -> TestOutcome? {
-        guard let r = await MotionAliveProbeCM().accelerometerAlive(windowMs: 600),
-              MotionAliveGate.accelerometerAlive(magnitude: r.magnitude, samples: r.samples) else { return nil }
-        return diagnosticOutcome("accelerometer", "Accelerometer", .pass,
-                                 ["accel_g": String(format: "%.2f", r.magnitude), "source": "preflight"])
-    }
+    // No preflight auto-pass (I1): a brief liveness sample is too weak to certify the sensor, so it
+    // must run the interactive tilt test. The protocol default preflight() returns nil.
     #else
     var isSupported: Bool { false }
     #endif
@@ -28,12 +24,8 @@ struct GyroscopeTest: DiagnosticTest {
     #if os(iOS)
     var isSupported: Bool { true }
     @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { AnyView(GyroscopeTestView(complete: complete)) }
-    func preflight() async -> TestOutcome? {
-        guard let samples = await MotionAliveProbeCM().gyroAlive(windowMs: 600),
-              MotionAliveGate.gyroAlive(samples: samples) else { return nil }
-        return diagnosticOutcome("gyroscope", "Gyroscope", .pass,
-                                 ["gyro_samples": "\(samples)", "source": "preflight"])
-    }
+    // No preflight auto-pass (I1): a brief liveness sample is too weak to certify the sensor, so it
+    // must run the interactive axis-rotation test. The protocol default preflight() returns nil.
     #else
     var isSupported: Bool { false }
     #endif

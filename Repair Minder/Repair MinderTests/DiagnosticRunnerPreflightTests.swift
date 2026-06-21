@@ -46,4 +46,15 @@ struct DiagnosticRunnerPreflightTests {
         await runner.runPreflight()   // second call is a no-op
         #expect(runner.preflightResolvedIds.count == 1)
     }
+
+    // Regression guard (I1): motion sensors must NOT auto-pass via preflight — a brief liveness
+    // sample is too weak to certify them, so they must fall through to the interactive tilt/axis
+    // test. On the simulator MotionAliveProbeCM returns nil anyway, so this may already pass before
+    // the override is removed; after removal preflight() is unconditionally nil (protocol default).
+    #if os(iOS)
+    @Test func motionSensorsHaveNoPreflightAutoPass() async {
+        #expect(await AccelerometerTest().preflight() == nil)
+        #expect(await GyroscopeTest().preflight() == nil)
+    }
+    #endif
 }
