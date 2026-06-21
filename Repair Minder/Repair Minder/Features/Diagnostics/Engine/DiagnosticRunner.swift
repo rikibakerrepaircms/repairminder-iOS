@@ -6,17 +6,44 @@ import Foundation
 /// Results are keyed by test id (latest wins) so retesting overwrites cleanly.
 @MainActor
 final class DiagnosticRunner: ObservableObject {
+    /// Where a session is in its lifecycle. Lives on the runner (not the runner *view*) so backing
+    /// out of a test and re-entering resumes where the user left off instead of restarting.
+    enum RunPhase { case runningAuto, interactive, finished }
+
     let tests: [DiagnosticTest]
     @Published private(set) var selectedIds: Set<String> = []
     @Published private(set) var outcomes: [String: TestOutcome] = [:]
     @Published private(set) var autoRan = false
+    @Published var phase: RunPhase = .runningAuto
+    @Published var interactiveIndex = 0
 
     init(tests: [DiagnosticTest]) { self.tests = tests }
+
+    /// True once a run is underway but not yet finished — drives the "Resume" affordance.
+    var isInProgress: Bool { phase != .finished && (autoRan || interactiveIndex > 0) }
+
+    /// Clear results and rewind to the start so the next Start is a fresh run (e.g. after the user
+    /// completed a session and came back to change their selection).
+    func reset() {
+        outcomes = [:]
+        autoRan = false
+        interactiveIndex = 0
+        phase = .runningAuto
+    }
 
     // MARK: Selection
     var selectedTests: [DiagnosticTest] { tests.filter { selectedIds.contains($0.id) } }
     var selectedInteractiveTests: [DiagnosticTest] {
         selectedTests.filter { $0.requiresInteraction && $0.isSupported }
+    }
+    /// Tests resolved during the automatic phase: background auto tests + any unsupported selections
+    /// (recorded as skips). Shown as a live checklist so their results aren't invisible.
+    var autoChecklistTests: [DiagnosticTest] {
+        selectedTests.filter { !$0.requiresInteraction || !$0.isSupported }
+    }
+    var currentInteractiveTest: DiagnosticTest? {
+        let list = selectedInteractiveTests
+        return interactiveIndex < list.count ? list[interactiveIndex] : nil
     }
     func select(ids: [String]) { selectedIds = Set(ids) }
     func selectAll() { selectedIds = Set(tests.map(\.id)) }

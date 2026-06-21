@@ -29,6 +29,11 @@ struct TestSelectionView: View {
         tests(for: category).filter { runner.selectedIds.contains($0.id) }.count
     }
 
+    private var startLabel: String {
+        if runner.isInProgress { return "Resume" }
+        return runner.selectedIds.isEmpty ? "Start" : "Start (\(runner.selectedIds.count))"
+    }
+
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {
@@ -66,9 +71,12 @@ struct TestSelectionView: View {
         }
         .safeAreaInset(edge: .bottom) {
             Button {
+                // Resume an in-progress session; otherwise (re)start fresh so a completed run's
+                // results don't leak into a new selection.
+                if !runner.isInProgress { runner.reset() }
                 showRunner = true
             } label: {
-                Text(runner.selectedIds.isEmpty ? "Start" : "Start (\(runner.selectedIds.count))")
+                Text(startLabel)
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding()

@@ -110,7 +110,7 @@ private struct TouchscreenTestView: View {
     @State private var dragging = false
     @State private var lastLocation: CGPoint?
 
-    private let target: CGFloat = 16   // cell size — ~¼ of the old grid
+    private let target: CGFloat = 21   // cell size (bumped ~30% from 16 for easier sweeping)
 
     var body: some View {
         GeometryReader { geo in
@@ -152,14 +152,17 @@ private struct TouchscreenTestView: View {
             }
             .overlay(alignment: .bottom) {
                 if !dragging {
-                    HStack(spacing: 12) {
-                        Button("Skip") { complete(diagnosticOutcome("touchscreen", "Touchscreen", .skip)) }
-                            .buttonStyle(.bordered).accessibilityIdentifier("test-skip")
-                        Button("Fail") { complete(diagnosticOutcome("touchscreen", "Touchscreen", .fail)) }
-                            .buttonStyle(.borderedProminent).tint(.red).accessibilityIdentifier("test-fail")
-                        Spacer()
-                        Text("\(Int((total > 0 ? Double(touched.count) / Double(total) : 0) * 100))%")
+                    VStack(spacing: 10) {
+                        Text("\(Int((total > 0 ? Double(touched.count) / Double(total) : 0) * 100))% covered")
                             .font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
+                        HStack(spacing: 12) {
+                            DiagnosticActionButton("Skip", color: .gray, id: "test-skip") {
+                                complete(diagnosticOutcome("touchscreen", "Touchscreen", .skip))
+                            }
+                            DiagnosticActionButton("Fail", color: .red, id: "test-fail") {
+                                complete(diagnosticOutcome("touchscreen", "Touchscreen", .fail))
+                            }
+                        }
                     }
                     .padding(.horizontal, 16).padding(.vertical, 12).background(.ultraThinMaterial)
                     .transition(.opacity)
@@ -193,6 +196,9 @@ private struct TouchscreenTestView: View {
 
 // MARK: Dead Pixel view (colour cycle)
 
+/// True full-screen colour cycle: the solid colour fills the entire display edge-to-edge (under the
+/// status bar and home indicator) so the whole panel can be inspected. Tap the colour to advance;
+/// a translucent control strip floats over the bottom with the colour name + Pass/Fail/Skip.
 private struct DeadPixelTestView: View {
     let complete: (TestOutcome) -> Void
     private let colors: [(String, Color)] = [("Red", .red), ("Green", .green), ("Blue", .blue),
@@ -200,26 +206,36 @@ private struct DeadPixelTestView: View {
     @State private var index = 0
 
     var body: some View {
-        TestScaffold(
-            title: "Dead Pixel",
-            instruction: "Tap the swatch to cycle solid colours. Look for any pixels stuck a different colour or black spots.",
-            hints: ["Tap the colour to change it", "Inspect the whole screen on each colour"],
-            allowManualPass: true,   // subjective: user judges for dead pixels
-            fullBleed: true,
-            onPass: { complete(diagnosticOutcome("color", "Dead Pixel", .pass)) },
-            onFail: { complete(diagnosticOutcome("color", "Dead Pixel", .fail)) },
-            onSkip: { complete(diagnosticOutcome("color", "Dead Pixel", .skip)) }
-        ) {
-            ZStack(alignment: .top) {
-                colors[index].1
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .contentShape(Rectangle())
-                    .onTapGesture { index = (index + 1) % colors.count }
-                Text(colors[index].0)
-                    .font(.caption).padding(8).background(.ultraThinMaterial)
-                    .clipShape(Capsule()).padding(.top, 12)
+        ZStack(alignment: .bottom) {
+            colors[index].1
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture { index = (index + 1) % colors.count }
+
+            VStack(spacing: 10) {
+                Text("\(colors[index].0)  ·  \(index + 1)/\(colors.count)")
+                    .font(.subheadline.bold())
+                Text("Tap anywhere to change colour. Look for stuck or dead pixels on each.")
+                    .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                HStack(spacing: 12) {
+                    DiagnosticActionButton("Skip", color: .gray, id: "test-skip") {
+                        complete(diagnosticOutcome("color", "Dead Pixel", .skip))
+                    }
+                    DiagnosticActionButton("Fail", color: .red, id: "test-fail") {
+                        complete(diagnosticOutcome("color", "Dead Pixel", .fail))
+                    }
+                    DiagnosticActionButton("Pass", color: .green, id: "test-pass") {
+                        complete(diagnosticOutcome("color", "Dead Pixel", .pass))
+                    }
+                }
             }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+            .background(.ultraThinMaterial)
         }
+        .ignoresSafeArea(edges: .top)
+        #if os(iOS)
+        .toolbar(.hidden, for: .navigationBar)
+        #endif
     }
 }
 
@@ -259,6 +275,7 @@ private struct MultitouchTestView: View {
     let complete: (TestOutcome) -> Void
     @State private var maxTouches = 0
     @State private var points: [CGPoint] = []
+    @State private var passed = false   // guard: TouchCaptureView fires continuously while fingers are down
 
     var body: some View {
         TestScaffold(
@@ -277,7 +294,8 @@ private struct MultitouchTestView: View {
                     TouchCaptureView { count, _, _, locs in
                         points = locs
                         if count > maxTouches { maxTouches = count }
-                        if maxTouches >= 2 {
+                        if maxTouches >= 2 && !passed {
+                            passed = true
                             complete(diagnosticOutcome("multitouch", "Multitouch", .pass, ["max_touches": "\(maxTouches)"]))
                         }
                     }

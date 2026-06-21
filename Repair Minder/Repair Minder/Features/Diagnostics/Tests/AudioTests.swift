@@ -111,15 +111,15 @@ private struct SpeakerTestView: View {
     private var recorder: AVAudioRecorder?
     private var timer: Timer?
 
-    func start(onDetect: @escaping () -> Void) {
+    func start(onLevel: @escaping (Float) -> Void, onDetect: @escaping () -> Void) {
         AVAudioApplication.requestRecordPermission { granted in
             Task { @MainActor in
                 guard granted else { self.denied = true; return }
-                self.begin(onDetect: onDetect)
+                self.begin(onLevel: onLevel, onDetect: onDetect)
             }
         }
     }
-    private func begin(onDetect: @escaping () -> Void) {
+    private func begin(onLevel: @escaping (Float) -> Void, onDetect: @escaping () -> Void) {
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.playAndRecord, options: [.defaultToSpeaker])
         try? session.setActive(true)
@@ -134,7 +134,8 @@ private struct SpeakerTestView: View {
                 r.updateMeters()
                 let peak = r.peakPower(forChannel: 0)   // dBFS, -160…0
                 self.level = max(0, (peak + 60) / 60)   // 0…1 normalised for UI
-                if peak > -20 { onDetect() }
+                onLevel(self.level)
+                if peak > -20 { onDetect() }            // ~0.667 normalised — quiet sounds won't pass
             }
         }
     }
@@ -199,10 +200,10 @@ private struct MicSource: Identifiable {
         level = 0
         timeoutTask?.cancel()
 
-        meter.start { [weak self] in
+        meter.start(onLevel: { [weak self] lvl in self?.level = lvl }, onDetect: { [weak self] in
             guard let self else { return }
             self.markCurrent(pass: true)
-        }
+        })
         // Observe denied via binding on next runloop
         Task { @MainActor in
             // Poll denial once (requestRecordPermission is async)
@@ -274,8 +275,12 @@ private struct MicrophoneTestView: View {
                     }
                     if model.currentIndex < model.sources.count {
                         VStack(spacing: 6) {
-                            ProgressView(value: Double(model.level)).tint(.green)
-                            Text("Listening…").font(.caption).foregroundStyle(.secondary)
+                            // Live input level. Fills as sound is picked up and turns green once it
+                            // crosses the pass threshold (~ -20 dBFS → 0.667 normalised); quiet
+                            // background noise stays below it and won't pass the test.
+                            SignalMeterView(value: Double(model.level), threshold: 0.667, label: "Input level")
+                            Text("Make a sound near the mic until the bar fills past the line")
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                         .padding(.top, 4)
                     }

@@ -35,10 +35,10 @@ struct TestScaffold<Content: View>: View {
 
             // Action bar — pinned, always visible.
             HStack(spacing: 12) {
-                actionButton("Skip", color: .gray, id: "test-skip", action: onSkip)
-                actionButton("Fail", color: .red, id: "test-fail", action: onFail)
+                DiagnosticActionButton("Skip", color: .gray, id: "test-skip", action: onSkip)
+                DiagnosticActionButton("Fail", color: .red, id: "test-fail", action: onFail)
                 if allowManualPass {
-                    actionButton("Pass", color: .green, id: "test-pass", action: onPass)
+                    DiagnosticActionButton("Pass", color: .green, id: "test-pass", action: onPass)
                 }
             }
             .padding(.horizontal, 16).padding(.vertical, 12)
@@ -50,8 +50,22 @@ struct TestScaffold<Content: View>: View {
         #endif
         .background(Color(.systemGroupedBackground))
     }
+}
 
-    private func actionButton(_ label: String, color: Color, id: String, action: @escaping () -> Void) -> some View {
+/// The single, canonical full-width action button used for every test's Pass/Fail/Skip control,
+/// so the controls look identical whether they live in TestScaffold's pinned bar or in a
+/// custom full-bleed overlay (e.g. the touchscreen test).
+struct DiagnosticActionButton: View {
+    let label: String
+    let color: Color
+    let id: String
+    let action: () -> Void
+
+    init(_ label: String, color: Color, id: String, action: @escaping () -> Void) {
+        self.label = label; self.color = color; self.id = id; self.action = action
+    }
+
+    var body: some View {
         Button(action: action) {
             Text(label).font(.headline).frame(maxWidth: .infinity).padding(.vertical, 14)
                 .background(color).foregroundStyle(.white).clipShape(RoundedRectangle(cornerRadius: 12))

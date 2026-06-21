@@ -118,11 +118,23 @@ private struct AccelerometerTestView: View {
             hints: ["Hold the device and tilt it in all 4 directions"],
             onPass: { finish(.pass) }, onFail: { finish(.fail) }, onSkip: { finish(.skip) }
         ) {
-            ZStack {
-                edge("up", aligned: .top); edge("down", aligned: .bottom)
-                edge("left", aligned: .leading); edge("right", aligned: .trailing)
-                Circle().fill(Color.accentColor).frame(width: 28, height: 28)
-                    .offset(x: motion.gravity.dx * 90, y: motion.gravity.dy * 90)
+            GeometryReader { geo in
+                // Map gravity (≈0 flat → ±1 on edge) to the full play area so the ball reaches every
+                // wall. At |g| ≈ 0.7 (well below the 0.6 mark threshold isn't quite reached) the ball
+                // touches the wall; clamp so it pins to the edge rather than overshooting.
+                let ballR: CGFloat = 14
+                let pad: CGFloat = 6
+                let travelX = max(0, geo.size.width / 2 - ballR - pad)
+                let travelY = max(0, geo.size.height / 2 - ballR - pad)
+                let dx = clampOffset(motion.gravity.dx, travel: travelX)
+                let dy = clampOffset(motion.gravity.dy, travel: travelY)
+                ZStack {
+                    edge("up", aligned: .top); edge("down", aligned: .bottom)
+                    edge("left", aligned: .leading); edge("right", aligned: .trailing)
+                    Circle().fill(Color.accentColor).frame(width: ballR * 2, height: ballR * 2)
+                        .offset(x: dx, y: dy)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                }
             }
             .frame(height: 260)
             .background(Color.platformGray6)
@@ -143,6 +155,13 @@ private struct AccelerometerTestView: View {
         if hit.count == 4 { finish(.pass, ["edges": "4"]) }
     }
     private func finish(_ s: TestStatus, _ d: [String: String]? = nil) { motion.stop(); complete(diagnosticOutcome("accelerometer", "Accelerometer", s, d)) }
+}
+
+/// Maps a gravity component to a pixel offset that reaches `travel` (the wall) by the time the
+/// tilt hits the 0.6 mark threshold, clamped so the ball pins to the edge instead of overshooting.
+private func clampOffset(_ g: CGFloat, travel: CGFloat) -> CGFloat {
+    let scaled = g / 0.6 * travel
+    return max(-travel, min(travel, scaled))
 }
 
 private struct GyroscopeTestView: View {
@@ -182,7 +201,8 @@ private struct GyroscopeTestView: View {
     @Published var heading: Double = 0
     @Published var coordinate: CLLocationCoordinate2D?
     @Published var denied = false
-    var sweptSectors = Set<Int>()
+    /// 10°-wide buckets (0…35) seen so far during the sweep.
+    @Published var sweptSectors = Set<Int>()
 
     override init() { super.init(); lm.delegate = self }
     func startHeading() { lm.startUpdatingHeading() }
@@ -190,7 +210,11 @@ private struct GyroscopeTestView: View {
     func stop() { lm.stopUpdatingHeading(); lm.stopUpdatingLocation() }
 
     nonisolated func locationManager(_ m: CLLocationManager, didUpdateHeading h: CLHeading) {
-        Task { @MainActor in self.heading = h.magneticHeading; self.sweptSectors.insert(Int(h.magneticHeading / 30)) }
+        guard h.magneticHeading >= 0 else { return }   // <0 == invalid/uncalibrated
+        Task { @MainActor in
+            self.heading = h.magneticHeading
+            self.sweptSectors.insert(Int(h.magneticHeading / 10) % 36)
+        }
     }
     nonisolated func locationManager(_ m: CLLocationManager, didUpdateLocations locs: [CLLocation]) {
         guard let c = locs.last?.coordinate else { return }
@@ -209,18 +233,36 @@ private struct MagneticTestView: View {
     var body: some View {
         TestScaffold(
             title: "Magnetic Sensor",
-            instruction: "Hold the device flat and rotate slowly in a full circle. It passes once the compass sweeps all directions.",
+            instruction: "Hold the device flat and rotate slowly through a full circle. Each 10° segment turns green as the compass passes through it — all 36 green = pass.",
             hints: ["Rotate slowly in a circle while horizontal"],
             onPass: { finish(.pass) }, onFail: { finish(.fail) }, onSkip: { finish(.skip) }
         ) {
-            VStack(spacing: 10) {
-                Image(systemName: "location.north.fill").font(.system(size: 44))
-                    .rotationEffect(.degrees(loc.heading)).foregroundStyle(Color.accentColor)
-                Text("\(Int(loc.heading))°").font(.title3.monospacedDigit())
-                Text("\(loc.sweptSectors.count)/12 directions").font(.caption).foregroundStyle(.secondary)
+            VStack(spacing: 14) {
+                ZStack {
+                    // 36 segments, one per 10°. Grey until the heading sweeps through that angle.
+                    ForEach(0..<36, id: \.self) { i in
+                        Capsule()
+                            .fill(loc.sweptSectors.contains(i) ? Color.green : Color.platformGray4)
+                            .frame(width: 6, height: 20)
+                            .offset(y: -96)
+                            .rotationEffect(.degrees(Double(i) * 10))
+                    }
+                    // Live heading needle.
+                    Image(systemName: "location.north.fill")
+                        .font(.system(size: 40))
+                        .foregroundStyle(Color.accentColor)
+                        .rotationEffect(.degrees(loc.heading))
+                    Text("\(Int(loc.heading))°")
+                        .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                        .offset(y: 40)
+                }
+                .frame(width: 220, height: 220)
+                Text("\(loc.sweptSectors.count)/36 segments")
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(loc.sweptSectors.count >= 36 ? .green : .secondary)
             }
             .onAppear { loc.startHeading() }
-            .onChange(of: loc.sweptSectors.count) { _, n in if n >= 11 { finish(.pass, ["sectors": "\(n)"]) } }
+            .onChange(of: loc.sweptSectors.count) { _, n in if n >= 36 { finish(.pass, ["sectors": "\(n)"]) } }
         }
     }
     private func finish(_ s: TestStatus, _ d: [String: String]? = nil) { loc.stop(); complete(diagnosticOutcome("magnetic", "Magnetic Sensor", s, d)) }
