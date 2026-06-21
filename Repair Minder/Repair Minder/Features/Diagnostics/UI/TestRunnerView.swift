@@ -197,9 +197,3 @@ private struct ResultFlashView: View {
         }
     }
 }
-
-// TEMP stub — replaced in Task 10.
-private struct PermissionPhaseView: View {
-    @ObservedObject var runner: DiagnosticRunner
-    var body: some View { Color.clear.onAppear { runner.phase = .preparing } }
-}
