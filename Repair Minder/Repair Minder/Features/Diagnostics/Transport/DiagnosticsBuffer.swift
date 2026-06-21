@@ -12,6 +12,7 @@ enum DiagnosticsBuffer {
     }
     struct PendingSession: Codable, Sendable {
         let shopCode: String?
+        let pairingToken: String?
         let platform: String
         let deviceDescription: String?
         let imei: String?
@@ -27,12 +28,12 @@ enum DiagnosticsBuffer {
 
     /// Persist a session that failed to transmit. Returns the file URL, or nil on failure.
     @discardableResult
-    static func save(shopCode: String?, platform: String = "ios", deviceDescription: String?,
-                     imei: String?, serial: String?, reportID: String? = nil,
+    static func save(shopCode: String?, pairingToken: String? = nil, platform: String = "ios",
+                     deviceDescription: String?, imei: String?, serial: String?, reportID: String? = nil,
                      outcomes: [TestOutcome]) -> URL? {
         let session = PendingSession(
-            shopCode: shopCode, platform: platform, deviceDescription: deviceDescription,
-            imei: imei, serial: serial, reportID: reportID,
+            shopCode: shopCode, pairingToken: pairingToken, platform: platform,
+            deviceDescription: deviceDescription, imei: imei, serial: serial, reportID: reportID,
             results: outcomes.map { PendingResult(testName: $0.id, status: $0.status.rawValue, details: $0.details) })
         do {
             try FileManager.default.createDirectory(at: pendingDirectory, withIntermediateDirectories: true)

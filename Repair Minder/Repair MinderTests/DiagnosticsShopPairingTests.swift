@@ -49,6 +49,23 @@ struct DiagnosticsShopPairingTests {
         DiagnosticsShopPairing.unpair()
         #expect(!DeepLinkHandler.shared.handleURL(URL(string: "repairminder://diagnostics/pair?shop=abc")!))
         #expect(!DiagnosticsShopPairing.isPaired)
+
+        // Server token pairing (preferred credential) via deep link — supersedes any shop code.
         DiagnosticsShopPairing.unpair()
+        #expect(DeepLinkHandler.shared.handleURL(URL(string: "repairminder://diagnostics/pair?token=abc123deftoken")!))
+        #expect(DiagnosticsShopPairing.token == "abc123deftoken")
+        #expect(DiagnosticsShopPairing.isPaired)
+        #expect(DiagnosticsShopPairing.shopCode == nil)
+
+        // Last pairing wins both ways (code clears token; token clears code).
+        DiagnosticsShopPairing.pair("123456")
+        #expect(DiagnosticsShopPairing.token == nil)
+        #expect(DiagnosticsShopPairing.shopCode == "123456")
+        DiagnosticsShopPairing.pairWithToken("tok999")
+        #expect(DiagnosticsShopPairing.shopCode == nil)
+        #expect(DiagnosticsShopPairing.token == "tok999")
+
+        DiagnosticsShopPairing.unpair()
+        #expect(!DiagnosticsShopPairing.isPaired)
     }
 }

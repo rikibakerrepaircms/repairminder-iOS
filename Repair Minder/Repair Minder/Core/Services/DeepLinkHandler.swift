@@ -86,6 +86,12 @@ final class DeepLinkHandler: ObservableObject {
         let host = (components.host ?? "").lowercased()
         let rawPath = components.path.split(separator: "/").map(String.init)
         if host == "pair" || (host == "diagnostics" && rawPath.first?.lowercased() == "pair") {
+            // Preferred: a server-issued pairing token (revocable server-side).
+            if let token = components.queryItems?.first(where: { $0.name == "token" })?.value, !token.isEmpty {
+                DiagnosticsShopPairing.pairWithToken(token)
+                return true
+            }
+            // Fallback: a raw shop code.
             let shop = components.queryItems?.first(where: { $0.name == "shop" })?.value ?? rawPath.last
             if let shop, DiagnosticsShopPairing.isValidCode(shop) {
                 DiagnosticsShopPairing.pair(shop)

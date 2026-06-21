@@ -16,6 +16,8 @@ enum TestStatus: String, Codable, Sendable {
 /// Request body for POST /api/public/diagnostics/session (shop-code path).
 struct CreateSessionRequest: Codable, Sendable {
     let shopCode: String?
+    /// Server-issued pairing credential (preferred over shopCode); sent as `pairing_token`.
+    let pairingToken: String?
     let platform: String
     let deviceIdentifier: String?
     let deviceDescription: String?
@@ -25,10 +27,11 @@ struct CreateSessionRequest: Codable, Sendable {
     /// log can be matched to the report. Sent as `report_id`; ignored by older Workers.
     let reportID: String?
 
-    init(shopCode: String? = nil, platform: String = "ios", deviceIdentifier: String? = nil,
-         deviceDescription: String? = nil, imei: String? = nil, serial: String? = nil,
-         reportID: String? = nil) {
+    init(shopCode: String? = nil, pairingToken: String? = nil, platform: String = "ios",
+         deviceIdentifier: String? = nil, deviceDescription: String? = nil,
+         imei: String? = nil, serial: String? = nil, reportID: String? = nil) {
         self.shopCode = shopCode
+        self.pairingToken = pairingToken
         self.platform = platform
         self.deviceIdentifier = deviceIdentifier
         self.deviceDescription = deviceDescription

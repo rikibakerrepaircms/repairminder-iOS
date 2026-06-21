@@ -62,11 +62,12 @@ struct DiagnosticsService: Sendable {
     /// Returns the shop's company name from the server (for "Welcome back …"), or nil if the
     /// Worker didn't supply one. Never a hard-coded value — always the create-session response.
     @discardableResult
-    func transmit(shopCode: String?, platform: String, imei: String?, serial: String?,
+    func transmit(shopCode: String?, pairingToken: String? = nil, platform: String,
+                  imei: String?, serial: String?,
                   deviceDescription: String?, reportID: String? = nil,
                   outcomes: [TestOutcome]) async throws -> String? {
         let session = try await api.createSession(CreateSessionRequest(
-            shopCode: shopCode, platform: platform, deviceIdentifier: nil,
+            shopCode: shopCode, pairingToken: pairingToken, platform: platform, deviceIdentifier: nil,
             deviceDescription: deviceDescription, imei: imei, serial: serial, reportID: reportID))
         for o in outcomes {
             try await api.submitResult(DiagnosticResultPayload(

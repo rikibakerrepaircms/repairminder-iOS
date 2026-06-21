@@ -11,6 +11,7 @@ import Foundation
 /// path can seed it automatically (see docs/plans/device-diagnostics/31-...).
 enum DiagnosticsShopPairing {
     private static let key = "diagnostics.pairedShopCode"
+    private static let tokenKey = "diagnostics.pairedToken"
     private static let nameKey = "diagnostics.pairedShopName"
     private static var store: UserDefaults { .standard }
 
@@ -18,7 +19,12 @@ enum DiagnosticsShopPairing {
         code.count == 6 && code.allSatisfy(\.isNumber)
     }
 
-    /// The paired shop code, or nil if this device isn't paired to a shop.
+    /// A server-issued pairing token (preferred credential — revocable server-side), or nil.
+    static var token: String? {
+        guard let t = store.string(forKey: tokenKey), !t.isEmpty else { return nil }
+        return t
+    }
+    /// The manually-entered shop code, or nil.
     static var shopCode: String? {
         guard let c = store.string(forKey: key), isValidCode(c) else { return nil }
         return c
@@ -28,13 +34,21 @@ enum DiagnosticsShopPairing {
         guard isPaired, let n = store.string(forKey: nameKey), !n.isEmpty else { return nil }
         return n
     }
-    static var isPaired: Bool { shopCode != nil }
+    static var isPaired: Bool { token != nil || shopCode != nil }
 
-    /// Pair to a shop. A nil/empty `name` leaves any previously-known name intact (e.g. a
-    /// deep-link without a name, or a transmit that didn't return one).
+    /// Pair manually via shop code (last pairing wins — supersedes any server token).
     static func pair(_ code: String, name: String? = nil) {
         guard isValidCode(code) else { return }
         store.set(code, forKey: key)
+        store.removeObject(forKey: tokenKey)
+        if let name, !name.isEmpty { store.set(name, forKey: nameKey) }
+    }
+
+    /// Pair via a server-issued token (preferred — supersedes any manual shop code).
+    static func pairWithToken(_ token: String, name: String? = nil) {
+        guard !token.isEmpty else { return }
+        store.set(token, forKey: tokenKey)
+        store.removeObject(forKey: key)
         if let name, !name.isEmpty { store.set(name, forKey: nameKey) }
     }
 
@@ -46,6 +60,7 @@ enum DiagnosticsShopPairing {
 
     static func unpair() {
         store.removeObject(forKey: key)
+        store.removeObject(forKey: tokenKey)
         store.removeObject(forKey: nameKey)
     }
 }

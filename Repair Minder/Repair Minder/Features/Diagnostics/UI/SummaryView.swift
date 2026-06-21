@@ -167,22 +167,24 @@ struct SummaryView: View {
     /// On a shop-paired device, send (or re-send) the run to the paired shop. Safe to call
     /// repeatedly — the Worker reuses one session per run (report_id) and upserts each test.
     private func autoSendIfPaired() {
-        guard let code = DiagnosticsShopPairing.shopCode, !runner.orderedOutcomes.isEmpty else { return }
+        guard DiagnosticsShopPairing.isPaired, !runner.orderedOutcomes.isEmpty else { return }
         autoSend = .sending
         let service = makeService()
         let outcomes = runner.orderedOutcomes
         let reportID = runner.reportID
         let desc = deviceDescription
+        let code = DiagnosticsShopPairing.shopCode       // one of these is set (token preferred)
+        let token = DiagnosticsShopPairing.token
         Task {
             do {
                 let companyName = try await service.transmit(
-                    shopCode: code, platform: "ios", imei: nil, serial: nil,
+                    shopCode: code, pairingToken: token, platform: "ios", imei: nil, serial: nil,
                     deviceDescription: desc, reportID: reportID, outcomes: outcomes)
                 DiagnosticsShopPairing.setName(companyName)   // refresh "Welcome back …" name from server
                 autoSend = .sent
             } catch {
-                DiagnosticsBuffer.save(shopCode: code, deviceDescription: desc, imei: nil, serial: nil,
-                                       reportID: reportID, outcomes: outcomes)
+                DiagnosticsBuffer.save(shopCode: code, pairingToken: token, deviceDescription: desc,
+                                       imei: nil, serial: nil, reportID: reportID, outcomes: outcomes)
                 autoSend = .failed
             }
         }
