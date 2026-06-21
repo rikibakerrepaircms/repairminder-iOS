@@ -98,6 +98,8 @@ func batteryStateLabel(_ s: UIDevice.BatteryState) -> String {
 private struct ChargeTestView: View {
     let complete: (TestOutcome) -> Void
     @State private var state: UIDevice.BatteryState = .unknown
+    @State private var observer: NSObjectProtocol?
+    @State private var done = false
 
     var body: some View {
         TestScaffold(
@@ -114,15 +116,21 @@ private struct ChargeTestView: View {
             .onAppear {
                 UIDevice.current.isBatteryMonitoringEnabled = true
                 state = UIDevice.current.batteryState
-                NotificationCenter.default.addObserver(forName: UIDevice.batteryStateDidChangeNotification, object: nil, queue: .main) { _ in
+                observer = NotificationCenter.default.addObserver(forName: UIDevice.batteryStateDidChangeNotification, object: nil, queue: .main) { _ in
                     state = UIDevice.current.batteryState
                     if state == .charging || state == .full { finish(.pass, ["state": batteryStateLabel(state), "ac": "n/a", "dock": "n/a", "usb": "n/a", "wireless": "n/a"]) }
                 }
             }
+            .onDisappear { removeObserver() }
         }
     }
+    private func removeObserver() {
+        if let obs = observer { NotificationCenter.default.removeObserver(obs); observer = nil }
+    }
     private func finish(_ s: TestStatus, _ d: [String: String]? = nil) {
-        NotificationCenter.default.removeObserver(self)
+        guard !done else { return }
+        done = true
+        removeObserver()
         complete(diagnosticOutcome("charge", "Charge", s, d))
     }
 }

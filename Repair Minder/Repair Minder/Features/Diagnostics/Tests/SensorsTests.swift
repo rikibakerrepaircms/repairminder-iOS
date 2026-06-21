@@ -262,6 +262,8 @@ private struct GPSTestView: View {
 private struct ProximityTestView: View {
     let complete: (TestOutcome) -> Void
     @State private var covered = false
+    @State private var observer: NSObjectProtocol?
+    @State private var done = false
 
     var body: some View {
         TestScaffold(
@@ -277,15 +279,21 @@ private struct ProximityTestView: View {
             }
             .onAppear {
                 UIDevice.current.isProximityMonitoringEnabled = true
-                NotificationCenter.default.addObserver(forName: UIDevice.proximityStateDidChangeNotification, object: nil, queue: .main) { _ in
+                observer = NotificationCenter.default.addObserver(forName: UIDevice.proximityStateDidChangeNotification, object: nil, queue: .main) { _ in
                     if UIDevice.current.proximityState { covered = true; finish(.pass) }
                 }
             }
+            .onDisappear { removeObserver() }
         }
     }
+    private func removeObserver() {
+        if let obs = observer { NotificationCenter.default.removeObserver(obs); observer = nil }
+    }
     private func finish(_ s: TestStatus, _ d: [String: String]? = nil) {
+        guard !done else { return }
+        done = true
         UIDevice.current.isProximityMonitoringEnabled = false
-        NotificationCenter.default.removeObserver(self)
+        removeObserver()
         complete(diagnosticOutcome("proximity", "Proximity Sensor", s, d))
     }
 }
@@ -332,15 +340,34 @@ private struct ProximityTestView: View {
 
 private struct LightSensorTestView: View {
     let complete: (TestOutcome) -> Void
+    private let probe: CameraProbe?
+
+    init(complete: @escaping (TestOutcome) -> Void) {
+        self.complete = complete
+        self.probe = CameraProbe.front().map { CameraProbe(device: $0) }
+    }
+
+    var body: some View {
+        if let probe {
+            LightSensorActiveView(probe: probe, complete: complete)
+        } else {
+            Color.clear.onAppear {
+                complete(diagnosticOutcome("light", "Light Sensor", .skip, ["reason": "no_front_camera"]))
+            }
+        }
+    }
+}
+
+private struct LightSensorActiveView: View {
+    let complete: (TestOutcome) -> Void
     private let probe: CameraProbe
     @StateObject private var model: LightViewModel
     @State private var savedBrightness: CGFloat = UIScreen.main.brightness
 
-    init(complete: @escaping (TestOutcome) -> Void) {
+    init(probe: CameraProbe, complete: @escaping (TestOutcome) -> Void) {
         self.complete = complete
-        let p = CameraProbe(device: CameraProbe.front()!)
-        self.probe = p
-        _model = StateObject(wrappedValue: LightViewModel(probe: p))
+        self.probe = probe
+        _model = StateObject(wrappedValue: LightViewModel(probe: probe))
     }
 
     var body: some View {

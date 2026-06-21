@@ -27,10 +27,12 @@ final class LoopbackProbeAV: LoopbackProbe {
                 let db = peak > 0 ? Double(20 * log10(peak)) : -120
                 Task { @MainActor in self.peakDb = max(self.peakDb, db) }
             }
+            guard let toneBuffer = LoopbackProbeAV.makeTone(format: format, hz: 1000, seconds: Double(durationMs)/1000.0) else {
+                onLevel(-120); return
+            }
             let tone = AVAudioPlayerNode(); self.player = tone
             engine.attach(tone)
             engine.connect(tone, to: engine.mainMixerNode, format: format)
-            let toneBuffer = LoopbackProbeAV.makeTone(format: format, hz: 1000, seconds: Double(durationMs)/1000.0)
             try engine.start()
             tone.scheduleBuffer(toneBuffer, at: nil, options: [], completionHandler: nil)
             tone.play()
@@ -48,9 +50,9 @@ final class LoopbackProbeAV: LoopbackProbe {
         player = nil
     }
 
-    private static func makeTone(format: AVAudioFormat, hz: Double, seconds: Double) -> AVAudioPCMBuffer {
+    private static func makeTone(format: AVAudioFormat, hz: Double, seconds: Double) -> AVAudioPCMBuffer? {
         let frames = AVAudioFrameCount(format.sampleRate * max(0.1, seconds))
-        let buf = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames)!
+        guard let buf = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames) else { return nil }
         buf.frameLength = frames
         if let ch = buf.floatChannelData?[0] {
             for i in 0..<Int(frames) { ch[i] = Float(0.5 * sin(2 * Double.pi * hz * Double(i) / format.sampleRate)) }

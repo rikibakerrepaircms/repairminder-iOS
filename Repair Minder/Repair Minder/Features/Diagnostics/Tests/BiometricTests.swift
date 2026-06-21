@@ -105,28 +105,47 @@ struct LiDARTest: DiagnosticTest {
 private struct BiometricTestView: View {
     let complete: (TestOutcome) -> Void
     @StateObject private var ctrl = BiometricController()
+    @State private var completed = false
+    @State private var authInFlight = false
 
     var body: some View {
         TestScaffold(
             title: "Biometric Sensor",
             instruction: "Authenticate with Face ID / Touch ID. It passes automatically on a successful match.",
             hints: ["Requires biometrics enrolled on the device"],
-            onPass: { complete(diagnosticOutcome("biometric", "Biometric Sensor", .pass)) },
-            onFail: { complete(diagnosticOutcome("biometric", "Biometric Sensor", .fail)) },
-            onSkip: { complete(diagnosticOutcome("biometric", "Biometric Sensor", .skip)) }
+            onPass: { finish(.pass, nil) },
+            onFail: { finish(.fail, nil) },
+            onSkip: { finish(.skip, nil) }
         ) {
             VStack(spacing: 12) {
                 Image(systemName: "faceid").font(.system(size: 44)).foregroundStyle(Color.accentColor)
                 Button("Authenticate") {
+                    guard !authInFlight, !completed else { return }
+                    authInFlight = true
                     ctrl.authenticate { ok, kind, faceIDStatus in
-                        complete(diagnosticOutcome("biometric", "Biometric Sensor", ok ? .pass : .fail, ["type": kind, "faceid_status": faceIDStatus]))
+                        authInFlight = false
+                        finish(ok ? .pass : .fail, ["type": kind, "faceid_status": faceIDStatus])
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(authInFlight)
                 Text(ctrl.status).font(.caption).foregroundStyle(.secondary)
             }
-            .onAppear { ctrl.authenticate { ok, kind, faceIDStatus in if ok { complete(diagnosticOutcome("biometric", "Biometric Sensor", .pass, ["type": kind, "faceid_status": faceIDStatus])) } } }
+            .onAppear {
+                guard !completed, !authInFlight else { return }
+                authInFlight = true
+                ctrl.authenticate { ok, kind, faceIDStatus in
+                    authInFlight = false
+                    if ok { finish(.pass, ["type": kind, "faceid_status": faceIDStatus]) }
+                }
+            }
         }
+    }
+
+    private func finish(_ s: TestStatus, _ d: [String: String]?) {
+        guard !completed else { return }
+        completed = true
+        complete(diagnosticOutcome("biometric", "Biometric Sensor", s, d))
     }
 }
 

@@ -48,17 +48,25 @@ struct HeadphonesTest: DiagnosticTest {
     private let probe: LoopbackProbe
     @Published var outcome: TestOutcome?
     @Published var phase = ""
+    private var cancelled = false
     init(probe: LoopbackProbe) { self.probe = probe }
 
     func run() async {
         phase = "Testing loudspeaker…"
         let loud = await measure(.speaker)
+        guard !cancelled else { return }
         phase = "Testing earpiece…"
         let ear = await measure(.receiver)
+        guard !cancelled else { return }
         let loudPass = LoopbackGate.heard(levelDb: loud, thresholdDb: -20)
         let earPass = LoopbackGate.heard(levelDb: ear, thresholdDb: -20)
         let details = ["loud": loudPass ? "pass" : "fail", "ear": earPass ? "pass" : "n/a"]
         outcome = diagnosticOutcome("speaker", "Speaker", loudPass ? .pass : .fail, details)
+    }
+
+    func cancel() {
+        cancelled = true
+        probe.stop()
     }
 
     private func measure(_ route: AudioRoute) async -> Double {
@@ -79,8 +87,8 @@ private struct SpeakerTestView: View {
             hints: ["Ensure the volume is not muted"],
             allowManualPass: false,
             onPass: {},
-            onFail: { complete(diagnosticOutcome("speaker", "Speaker", .fail)) },
-            onSkip: { complete(diagnosticOutcome("speaker", "Speaker", .skip)) }
+            onFail: { model.cancel(); complete(diagnosticOutcome("speaker", "Speaker", .fail)) },
+            onSkip: { model.cancel(); complete(diagnosticOutcome("speaker", "Speaker", .skip)) }
         ) {
             VStack(spacing: 12) {
                 Image(systemName: "speaker.wave.3.fill").font(.system(size: 44)).foregroundStyle(Color.accentColor)
@@ -317,6 +325,8 @@ private struct MicrophoneTestView: View {
 private struct HeadphonesTestView: View {
     let complete: (TestOutcome) -> Void
     @State private var connected = false
+    @State private var observer: NSObjectProtocol?
+    @State private var done = false
     var body: some View {
         TestScaffold(
             title: "Headphones",
@@ -329,7 +339,11 @@ private struct HeadphonesTestView: View {
                     .foregroundStyle(connected ? .green : .secondary)
                 Text(connected ? "Connected" : "Not connected").font(.subheadline)
             }
-            .onAppear { check(); NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { _ in check() } }
+            .onAppear {
+                check()
+                observer = NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { _ in check() }
+            }
+            .onDisappear { removeObserver() }
         }
     }
     private func check() {
@@ -338,6 +352,14 @@ private struct HeadphonesTestView: View {
             connected = true; finish(.pass, ["route": outs.first?.rawValue ?? "headphones"])
         }
     }
-    private func finish(_ s: TestStatus, _ d: [String: String]? = nil) { NotificationCenter.default.removeObserver(self); complete(diagnosticOutcome("headphones", "Headphones", s, d)) }
+    private func removeObserver() {
+        if let obs = observer { NotificationCenter.default.removeObserver(obs); observer = nil }
+    }
+    private func finish(_ s: TestStatus, _ d: [String: String]? = nil) {
+        guard !done else { return }
+        done = true
+        removeObserver()
+        complete(diagnosticOutcome("headphones", "Headphones", s, d))
+    }
 }
 #endif
