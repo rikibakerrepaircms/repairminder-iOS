@@ -11,6 +11,7 @@ import Foundation
 /// path can seed it automatically (see docs/plans/device-diagnostics/31-...).
 enum DiagnosticsShopPairing {
     private static let key = "diagnostics.pairedShopCode"
+    private static let nameKey = "diagnostics.pairedShopName"
     private static var store: UserDefaults { .standard }
 
     static func isValidCode(_ code: String) -> Bool {
@@ -22,11 +23,29 @@ enum DiagnosticsShopPairing {
         guard let c = store.string(forKey: key), isValidCode(c) else { return nil }
         return c
     }
+    /// The paired shop's company name (for "Welcome back …"), if known.
+    static var companyName: String? {
+        guard isPaired, let n = store.string(forKey: nameKey), !n.isEmpty else { return nil }
+        return n
+    }
     static var isPaired: Bool { shopCode != nil }
 
-    static func pair(_ code: String) {
+    /// Pair to a shop. A nil/empty `name` leaves any previously-known name intact (e.g. a
+    /// deep-link without a name, or a transmit that didn't return one).
+    static func pair(_ code: String, name: String? = nil) {
         guard isValidCode(code) else { return }
         store.set(code, forKey: key)
+        if let name, !name.isEmpty { store.set(name, forKey: nameKey) }
     }
-    static func unpair() { store.removeObject(forKey: key) }
+
+    /// Refresh the paired shop's name (no-op if unpaired or name empty).
+    static func setName(_ name: String?) {
+        guard isPaired, let name, !name.isEmpty else { return }
+        store.set(name, forKey: nameKey)
+    }
+
+    static func unpair() {
+        store.removeObject(forKey: key)
+        store.removeObject(forKey: nameKey)
+    }
 }

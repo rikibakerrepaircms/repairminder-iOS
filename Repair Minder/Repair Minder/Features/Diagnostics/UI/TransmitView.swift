@@ -129,11 +129,13 @@ struct TransmitView: View {
         phase = .sending
         Task {
             do {
-                try await service.transmit(shopCode: shopCode, platform: "ios", imei: nil, serial: nil,
-                                           deviceDescription: deviceDescription, reportID: runner.reportID,
-                                           outcomes: runner.orderedOutcomes)
+                let companyName = try await service.transmit(
+                    shopCode: shopCode, platform: "ios", imei: nil, serial: nil,
+                    deviceDescription: deviceDescription, reportID: runner.reportID,
+                    outcomes: runner.orderedOutcomes)
                 // Pair this device to the shop (or forget) per the toggle, so future runs auto-send.
-                if remember { DiagnosticsShopPairing.pair(shopCode) } else { DiagnosticsShopPairing.unpair() }
+                // The company name (for "Welcome back …") comes from the server response.
+                if remember { DiagnosticsShopPairing.pair(shopCode, name: companyName) } else { DiagnosticsShopPairing.unpair() }
                 phase = .success
             } catch {
                 DiagnosticsBuffer.save(shopCode: shopCode, deviceDescription: deviceDescription,

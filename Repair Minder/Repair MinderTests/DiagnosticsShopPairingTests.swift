@@ -29,6 +29,16 @@ struct DiagnosticsShopPairingTests {
         DiagnosticsShopPairing.unpair()
         #expect(DiagnosticsShopPairing.shopCode == nil)
 
+        // Company name (for "Welcome back …") — set with pairing, refreshed via setName, cleared on unpair.
+        DiagnosticsShopPairing.pair("654321", name: "Mendmyi")
+        #expect(DiagnosticsShopPairing.companyName == "Mendmyi")
+        DiagnosticsShopPairing.setName("Mendmyi Ltd")
+        #expect(DiagnosticsShopPairing.companyName == "Mendmyi Ltd")
+        DiagnosticsShopPairing.pair("654321")   // re-pair without a name keeps the known one
+        #expect(DiagnosticsShopPairing.companyName == "Mendmyi Ltd")
+        DiagnosticsShopPairing.unpair()
+        #expect(DiagnosticsShopPairing.companyName == nil)
+
         // Deep-link pairing intake (Bridge / QR / universal link can provision via a URL)
         #expect(DeepLinkHandler.shared.handleURL(URL(string: "repairminder://diagnostics/pair?shop=246802")!))
         #expect(DiagnosticsShopPairing.shopCode == "246802")

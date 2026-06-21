@@ -37,6 +37,10 @@ struct TestSelectionView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {
+                if let shopName = DiagnosticsShopPairing.companyName {
+                    welcomeBanner(shopName)
+                }
+
                 ForEach(categories, id: \.self) { category in
                     VStack(alignment: .leading, spacing: 10) {
                         // Category header
@@ -92,6 +96,30 @@ struct TestSelectionView: View {
         .navigationDestination(isPresented: $showRunner) {
             TestRunnerView(runner: runner)
         }
+    }
+
+    /// "Welcome back …" banner for a shop-paired device (name comes from the server, never hard-coded).
+    @ViewBuilder
+    private func welcomeBanner(_ shopName: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.title2)
+                .foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Welcome back")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text(shopName)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+            }
+            Spacer()
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(Color.accentColor.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .accessibilityIdentifier("welcome-shop")
     }
 
     @ViewBuilder

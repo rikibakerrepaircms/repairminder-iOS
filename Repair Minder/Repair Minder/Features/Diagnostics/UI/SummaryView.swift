@@ -175,8 +175,10 @@ struct SummaryView: View {
         let desc = deviceDescription
         Task {
             do {
-                try await service.transmit(shopCode: code, platform: "ios", imei: nil, serial: nil,
-                                           deviceDescription: desc, reportID: reportID, outcomes: outcomes)
+                let companyName = try await service.transmit(
+                    shopCode: code, platform: "ios", imei: nil, serial: nil,
+                    deviceDescription: desc, reportID: reportID, outcomes: outcomes)
+                DiagnosticsShopPairing.setName(companyName)   // refresh "Welcome back …" name from server
                 autoSend = .sent
             } catch {
                 DiagnosticsBuffer.save(shopCode: code, deviceDescription: desc, imei: nil, serial: nil,

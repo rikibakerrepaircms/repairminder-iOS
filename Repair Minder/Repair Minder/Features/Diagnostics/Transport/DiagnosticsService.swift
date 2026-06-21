@@ -45,7 +45,7 @@ struct LiveDiagnosticsAPI: DiagnosticsAPI {
 /// UI-test stub: succeeds without touching the network (enabled via launch arg).
 struct StubDiagnosticsAPI: DiagnosticsAPI {
     func createSession(_ req: CreateSessionRequest) async throws -> DiagnosticSessionResponse {
-        DiagnosticSessionResponse(sessionId: "stub", sessionToken: "stub", expiresAt: nil)
+        DiagnosticSessionResponse(sessionId: "stub", sessionToken: "stub", expiresAt: nil, companyName: nil)
     }
     func submitResult(_ p: DiagnosticResultPayload) async throws {}
     func complete(sessionId: String, token: String) async throws {}
@@ -59,9 +59,12 @@ struct DiagnosticsService: Sendable {
     let api: DiagnosticsAPI
     init(api: DiagnosticsAPI = LiveDiagnosticsAPI()) { self.api = api }
 
+    /// Returns the shop's company name from the server (for "Welcome back …"), or nil if the
+    /// Worker didn't supply one. Never a hard-coded value — always the create-session response.
+    @discardableResult
     func transmit(shopCode: String?, platform: String, imei: String?, serial: String?,
                   deviceDescription: String?, reportID: String? = nil,
-                  outcomes: [TestOutcome]) async throws {
+                  outcomes: [TestOutcome]) async throws -> String? {
         let session = try await api.createSession(CreateSessionRequest(
             shopCode: shopCode, platform: platform, deviceIdentifier: nil,
             deviceDescription: deviceDescription, imei: imei, serial: serial, reportID: reportID))
@@ -71,5 +74,6 @@ struct DiagnosticsService: Sendable {
                 testName: o.id, status: o.status, details: o.details))
         }
         try await api.complete(sessionId: session.sessionId, token: session.sessionToken)
+        return session.companyName
     }
 }

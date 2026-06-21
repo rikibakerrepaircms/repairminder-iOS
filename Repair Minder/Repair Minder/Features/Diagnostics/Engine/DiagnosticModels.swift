@@ -43,6 +43,9 @@ struct DiagnosticSessionResponse: Codable, Sendable {
     let sessionId: String
     let sessionToken: String
     let expiresAt: String?
+    /// The shop's company name (public shop-code path) — used for "Welcome back …". Optional;
+    /// absent on older Workers / staff path.
+    let companyName: String?
 }
 
 /// Request body for POST /api/diagnostics/results.
