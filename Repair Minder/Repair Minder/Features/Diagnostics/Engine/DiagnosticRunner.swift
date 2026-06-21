@@ -16,6 +16,14 @@ final class DiagnosticRunner: ObservableObject {
     @Published private(set) var autoRan = false
     @Published var phase: RunPhase = .runningAuto
     @Published var interactiveIndex = 0
+    /// Interactive tests resolved during the preparing phase by `preflight()` — excluded from the
+    /// interactive queue. Stable during the interactive phase so index-based advancement is unaffected.
+    @Published private(set) var preflightResolvedIds: Set<String> = []
+    /// Guard so pre-flight only runs once per session (re-entering the runner must not re-run it).
+    @Published private(set) var preflightRan = false
+
+    /// Tests whose background pass earns a 1–2s banner during preparing, in display order.
+    static let backgroundBannerIds = ["wifi", "accelerometer", "gyroscope", "bluetooth"]
 
     init(tests: [DiagnosticTest]) { self.tests = tests }
 
@@ -44,6 +52,8 @@ final class DiagnosticRunner: ObservableObject {
         outcomes = [:]
         autoRan = false
         interactiveIndex = 0
+        preflightResolvedIds = []
+        preflightRan = false
         phase = .runningAuto
         _reportID = nil          // a fresh run gets a fresh report reference
         _reportDate = nil
@@ -52,7 +62,7 @@ final class DiagnosticRunner: ObservableObject {
     // MARK: Selection
     var selectedTests: [DiagnosticTest] { tests.filter { selectedIds.contains($0.id) } }
     var selectedInteractiveTests: [DiagnosticTest] {
-        selectedTests.filter { $0.requiresInteraction && $0.isSupported }
+        selectedTests.filter { $0.requiresInteraction && $0.isSupported && !preflightResolvedIds.contains($0.id) }
     }
     /// Tests resolved during the automatic phase: background auto tests + any unsupported selections
     /// (recorded as skips). Shown as a live checklist so their results aren't invisible.
@@ -87,6 +97,26 @@ final class DiagnosticRunner: ObservableObject {
             }
         }
         autoRan = true
+    }
+
+    /// Resolve any selected interactive, supported test that can verify itself in the background.
+    /// A `.pass` is recorded and the test is dropped from the interactive queue; anything else (or
+    /// a nil result) leaves the test for the normal interactive flow. Runs at most once per session.
+    func runPreflight() async {
+        guard !preflightRan else { return }
+        for test in selectedTests where test.requiresInteraction && test.isSupported && outcomes[test.id] == nil {
+            if let outcome = await test.preflight(), outcome.status == .pass {
+                record(outcome)
+                preflightResolvedIds.insert(test.id)
+            }
+        }
+        preflightRan = true
+    }
+
+    /// Background-resolved passes to celebrate with a banner during preparing (auto Wi-Fi + pre-flighted
+    /// sensors/radio), in `backgroundBannerIds` order.
+    var backgroundPassed: [TestOutcome] {
+        Self.backgroundBannerIds.compactMap { outcomes[$0] }.filter { $0.status == .pass }
     }
 
     /// Re-run a single automatic test (interactive retest is handled by the UI).
