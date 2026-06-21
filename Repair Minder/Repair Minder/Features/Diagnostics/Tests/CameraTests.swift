@@ -61,8 +61,10 @@ struct FlashTest: DiagnosticTest {
     let id = "flash"; let name = "Flash"; let category: TestCategory = .hardware
     let requiresInteraction = true
     #if os(iOS)
-    var isSupported: Bool { hasTorch() }
-    @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { AnyView(CameraTestView(id: id, name: name, position: .back, mode: .torch, complete: complete)) }
+    var isSupported: Bool {
+        AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)?.hasTorch ?? false
+    }
+    @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { AnyView(FlashTestView(complete: complete)) }
     #else
     var isSupported: Bool { false }
     #endif
@@ -331,6 +333,93 @@ private struct FrontCameraTestView: View {
         .onAppear { model.start() }
         .onChange(of: model.outcome?.status) { _, _ in
             if let o = model.outcome { complete(o) }
+        }
+    }
+}
+
+// MARK: - Flash View
+
+private struct FlashTestView: View {
+    let complete: (TestOutcome) -> Void
+
+    @State private var probe: CameraProbe? = nil
+    @State private var baseline: Double? = nil
+    @State private var showManualPass = false
+    @State private var completed = false
+
+    private func finish(_ status: TestStatus, _ details: [String: String]?) {
+        guard !completed else { return }
+        completed = true
+        probe?.setTorch(false)
+        probe?.stop()
+        probe = nil
+        complete(diagnosticOutcome("flash", "Flash", status, details))
+    }
+
+    var body: some View {
+        TestScaffold(
+            title: "Flash",
+            instruction: showManualPass
+                ? "If the flash lit up, tap Pass."
+                : "Testing flash automatically via rear camera…",
+            hints: [],
+            allowManualPass: showManualPass,
+            onPass: { finish(.pass, ["auto_detected": "0"]) },
+            onFail: { finish(.fail, nil) },
+            onSkip: { finish(.skip, nil) }
+        ) {
+            if showManualPass {
+                Text("Flash test completed. Did the LED light up?")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            } else {
+                ProgressView("Analysing flash…")
+                    .padding()
+            }
+        }
+        .onAppear {
+            guard let dev = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
+                finish(.skip, nil); return
+            }
+            let p = CameraProbe(device: dev)
+            probe = p
+            var sampleCount = 0
+            var baselineAccum: Double = 0
+            var baselineSamples = 0
+            var torchOn = false
+            var peakAfterTorch: Double = 0
+
+            p.start(onSample: { luma in
+                sampleCount += 1
+                // Collect baseline over first ~20 samples (roughly 0.67s at 30fps)
+                if sampleCount <= 20 {
+                    baselineAccum += luma
+                    baselineSamples += 1
+                } else if sampleCount == 21 {
+                    // Switch torch on after baseline
+                    let base = baselineAccum / Double(max(1, baselineSamples))
+                    p.setTorch(true)
+                    torchOn = true
+                    _ = base  // captured below via closure
+                } else if torchOn {
+                    peakAfterTorch = max(peakAfterTorch, luma)
+                    let base = baselineAccum / Double(max(1, baselineSamples))
+                    if FlashDecision.shouldAutoPass(baseline: base, peak: peakAfterTorch) {
+                        finish(.pass, ["auto_detected": "1"])
+                    }
+                }
+            })
+
+            // After ~4s, if no auto-pass, reveal manual pass
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                guard !completed else { return }
+                showManualPass = true
+            }
+        }
+        .onDisappear {
+            if !completed { finish(.skip, nil) }
         }
     }
 }

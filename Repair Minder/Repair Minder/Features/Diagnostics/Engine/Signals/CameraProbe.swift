@@ -56,6 +56,16 @@ final class CameraProbe: NSObject, LuminanceProbe, QRProbe {
     }
 
     func stop() { if session.isRunning { session.stopRunning() } }
+
+    func setTorch(_ on: Bool) {
+        #if targetEnvironment(simulator)
+        return
+        #else
+        guard device.hasTorch, (try? device.lockForConfiguration()) != nil else { return }
+        device.torchMode = on ? .on : .off
+        device.unlockForConfiguration()
+        #endif
+    }
 }
 
 extension CameraProbe: AVCaptureVideoDataOutputSampleBufferDelegate {
