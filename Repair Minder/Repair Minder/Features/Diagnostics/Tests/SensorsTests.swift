@@ -33,7 +33,8 @@ struct GyroscopeTest: DiagnosticTest {
 
 struct MagneticTest: DiagnosticTest {
     let id = "magnetic"; let name = "Magnetic Sensor"; let category: TestCategory = .sensors
-    var requiredPermissions: [DiagnosticPermission] { [.location] }
+    // No .location: heading updates via CLLocationManager.startUpdatingHeading() do not require
+    // location authorization, so we don't over-request it (I2). Protocol default [] applies.
     let requiresInteraction = true
     #if os(iOS)
     var isSupported: Bool { true }
@@ -217,7 +218,9 @@ private struct GyroscopeTestView: View {
     func stop() { lm.stopUpdatingHeading(); lm.stopUpdatingLocation() }
 
     nonisolated func locationManager(_ m: CLLocationManager, didUpdateHeading h: CLHeading) {
-        guard h.magneticHeading >= 0 else { return }   // <0 == invalid/uncalibrated
+        // headingAccuracy <= 0 means the reading is invalid/uncalibrated (e.g. gyro-fused with no
+        // magnetometer) — don't let it fill sweep sectors and false-pass a dead compass.
+        guard h.headingAccuracy > 0, h.magneticHeading >= 0 else { return }
         Task { @MainActor in
             self.heading = h.magneticHeading
             self.sweptSectors.insert(Int(h.magneticHeading / 10) % 36)

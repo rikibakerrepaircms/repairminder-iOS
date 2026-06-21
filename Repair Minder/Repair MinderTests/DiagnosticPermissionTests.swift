@@ -28,4 +28,13 @@ struct DiagnosticPermissionTests {
         let tests = [P(id: "a", perms: []), P(id: "b", perms: [])]
         #expect(requiredPermissionsUnion(for: tests).isEmpty)
     }
+
+    @MainActor @Test func permissionUnionOverSupportedRegistryHasNoStrayLocation() {
+        let union = Set(TestRegistry.supportedTests().flatMap { $0.requiredPermissions })
+        // Magnetic must NOT contribute .location; GPS still legitimately requires it on devices
+        // where GPS is supported. Assert no permission outside the known set leaks in.
+        #expect(union.isSubset(of: [.camera, .microphone, .location, .bluetooth]))
+        // Magnetic test specifically declares nothing.
+        #expect(MagneticTest().requiredPermissions.isEmpty)
+    }
 }
