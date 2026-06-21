@@ -371,7 +371,7 @@ private struct FlashTestView: View {
             onSkip: { finish(.skip, nil) }
         ) {
             if showManualPass {
-                Text("Flash test completed. Did the LED light up?")
+                Text("Flash test completed. Did the flash light up?")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

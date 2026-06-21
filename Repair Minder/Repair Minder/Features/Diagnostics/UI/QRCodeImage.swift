@@ -31,7 +31,15 @@ struct QRCodeImage: View {
                 .scaledToFit()
                 .frame(width: side, height: side)
         } else {
-            Color.clear.frame(width: side, height: side)
+            VStack(spacing: 6) {
+                Image(systemName: "qrcode")
+                    .font(.system(size: side * 0.35))
+                    .foregroundStyle(.secondary)
+                Text("QR unavailable")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: side, height: side)
         }
     }
 }

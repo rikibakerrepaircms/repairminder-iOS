@@ -98,6 +98,7 @@ private struct BatteryDrainTestView: View {
     @State private var elapsedS: Int = 0
     @State private var running = false
     @State private var timer: Timer? = nil
+    @State private var completed = false   // guard: complete() must fire exactly once
 
     var body: some View {
         TestScaffold(
@@ -110,14 +111,8 @@ private struct BatteryDrainTestView: View {
             ],
             allowManualPass: false,
             onPass: {},
-            onFail: {
-                stopTimer()
-                complete(outcome(status: .fail))
-            },
-            onSkip: {
-                stopTimer()
-                complete(outcome(status: .skip))
-            }
+            onFail: { finishOnce(outcome(status: .fail)) },
+            onSkip: { finishOnce(outcome(status: .skip)) }
         ) {
             VStack(spacing: 16) {
                 if running {
@@ -136,8 +131,7 @@ private struct BatteryDrainTestView: View {
                         .foregroundStyle(.secondary)
 
                     Button("Stop & Record Now") {
-                        stopTimer()
-                        complete(outcome(status: .pass))
+                        finishOnce(outcome(status: .pass))
                     }
                     .buttonStyle(.borderedProminent)
                     .padding(.top, 8)
@@ -159,12 +153,12 @@ private struct BatteryDrainTestView: View {
         let snap = BatteryProbeUIKit().snapshot()
 
         guard snap.state == "unplugged" else {
-            complete(diagnosticOutcome("battery_drain", "Battery Drain", .skip,
+            finishOnce(diagnosticOutcome("battery_drain", "Battery Drain", .skip,
                                       ["reason": "charger_connected"]))
             return
         }
         guard snap.levelPct >= 40 else {
-            complete(diagnosticOutcome("battery_drain", "Battery Drain", .skip,
+            finishOnce(diagnosticOutcome("battery_drain", "Battery Drain", .skip,
                                       ["reason": "battery_below_40"]))
             return
         }
@@ -182,8 +176,7 @@ private struct BatteryDrainTestView: View {
                 let snap = BatteryProbeUIKit().snapshot()
                 currentPct = snap.levelPct
                 if elapsedS >= targetDurationS {
-                    stopTimer()
-                    complete(outcome(status: .pass))
+                    finishOnce(outcome(status: .pass))
                 }
             }
         }
@@ -195,6 +188,14 @@ private struct BatteryDrainTestView: View {
         timer?.invalidate()
         timer = nil
         running = false
+    }
+
+    /// Record the outcome exactly once (multiple call sites + a repeating timer can race).
+    private func finishOnce(_ o: TestOutcome) {
+        guard !completed else { return }
+        completed = true
+        stopTimer()
+        complete(o)
     }
 
     /// Build the final TestOutcome, merging drain stats with the snapshot details.

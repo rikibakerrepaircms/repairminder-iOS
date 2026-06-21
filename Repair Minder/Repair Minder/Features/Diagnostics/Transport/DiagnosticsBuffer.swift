@@ -35,7 +35,11 @@ enum DiagnosticsBuffer {
         do {
             try FileManager.default.createDirectory(at: pendingDirectory, withIntermediateDirectories: true)
             let url = pendingDirectory.appendingPathComponent("\(UUID().uuidString).json")
-            let data = try JSONEncoder().encode(session)
+            let encoder = JSONEncoder()
+            // The Bridge replays these files to the Worker, which expects snake_case keys
+            // (test_name, shop_code, device_description …). Match the wire format.
+            encoder.keyEncodingStrategy = .convertToSnakeCase
+            let data = try encoder.encode(session)
             try data.write(to: url, options: .atomic)
             return url
         } catch {

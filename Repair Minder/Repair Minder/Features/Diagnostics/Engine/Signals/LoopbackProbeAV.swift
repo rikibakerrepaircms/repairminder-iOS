@@ -6,11 +6,20 @@ final class LoopbackProbeAV: LoopbackProbe {
     private let engine = AVAudioEngine()
     private var player: AVAudioPlayerNode?
     private var peakDb: Double = -120
+    private var levelReported = false
 
     func run(route: AudioRoute, durationMs: Int, onLevel: @escaping (Double) -> Void) {
         #if targetEnvironment(simulator)
         onLevel(-120); return
         #else
+        levelReported = false
+        // Report the measured level to the caller exactly once (the timeout and the failure paths
+        // could otherwise both fire).
+        func report(_ db: Double) {
+            guard !levelReported else { return }
+            levelReported = true
+            onLevel(db)
+        }
         do {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playAndRecord, options: [.defaultToSpeaker, .allowBluetoothHFP])
@@ -28,7 +37,7 @@ final class LoopbackProbeAV: LoopbackProbe {
                 Task { @MainActor in self.peakDb = max(self.peakDb, db) }
             }
             guard let toneBuffer = LoopbackProbeAV.makeTone(format: format, hz: 1000, seconds: Double(durationMs)/1000.0) else {
-                onLevel(-120); return
+                report(-120); stop(); return
             }
             let tone = AVAudioPlayerNode(); self.player = tone
             engine.attach(tone)
@@ -38,9 +47,9 @@ final class LoopbackProbeAV: LoopbackProbe {
             tone.play()
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(durationMs)/1000.0) { [weak self] in
                 guard let self else { return }
-                onLevel(self.peakDb); self.stop()
+                report(self.peakDb); self.stop()
             }
-        } catch { onLevel(-120) }
+        } catch { report(-120); stop() }
         #endif
     }
 
@@ -48,6 +57,10 @@ final class LoopbackProbeAV: LoopbackProbe {
         engine.inputNode.removeTap(onBus: 0)
         if engine.isRunning { engine.stop() }
         player = nil
+        #if !targetEnvironment(simulator)
+        // Release the audio session so other audio (and later tests) aren't blocked.
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        #endif
     }
 
     private static func makeTone(format: AVAudioFormat, hz: Double, seconds: Double) -> AVAudioPCMBuffer? {

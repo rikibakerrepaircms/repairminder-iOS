@@ -4,6 +4,13 @@ import Foundation
 /// Per-test result status (wire value matches Worker: pass|fail|skip|error|partial).
 enum TestStatus: String, Codable, Sendable {
     case pass, fail, skip, error, partial
+
+    /// Decode defensively: an unrecognised status from a newer backend maps to `.error`
+    /// rather than failing the entire response decode.
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = TestStatus(rawValue: raw) ?? .error
+    }
 }
 
 /// Request body for POST /api/public/diagnostics/session (shop-code path).

@@ -55,7 +55,14 @@ final class CameraProbe: NSObject, LuminanceProbe, QRProbe {
         #endif
     }
 
-    func stop() { if session.isRunning { session.stopRunning() } }
+    func stop() {
+        if session.isRunning { session.stopRunning() }
+        // Detach delegates + drop callbacks so no buffered frame/metadata fires after stop.
+        videoOut.setSampleBufferDelegate(nil, queue: nil)
+        metaOut.setMetadataObjectsDelegate(nil, queue: nil)
+        onSample = nil
+        onCode = nil
+    }
 
     func setTorch(_ on: Bool) {
         #if targetEnvironment(simulator)

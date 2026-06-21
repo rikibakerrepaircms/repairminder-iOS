@@ -9,7 +9,7 @@ final class BatteryProbeUIKit: BatteryProbing {
         #if canImport(UIKit) && !os(macOS)
         let d = UIDevice.current
         d.isBatteryMonitoringEnabled = true
-        let pct = d.batteryLevel >= 0 ? Int((d.batteryLevel * 100).rounded()) : -1
+        let pct = d.batteryLevel >= 0 ? max(0, min(100, Int((d.batteryLevel * 100).rounded()))) : -1
         let state: String
         switch d.batteryState {
         case .charging: state = "charging"
