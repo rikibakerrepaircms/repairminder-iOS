@@ -86,6 +86,7 @@ struct VibrationTest: DiagnosticTest {
 #if os(iOS)
 import UIKit
 import AVFoundation
+import AudioToolbox
 
 func batteryStateLabel(_ s: UIDevice.BatteryState) -> String {
     switch s {
@@ -190,35 +191,72 @@ private struct HardwareButtonsTestView: View {
     private func finish(_ s: TestStatus, _ d: [String: String]? = nil) { watcher.stop(); complete(diagnosticOutcome("hardwarebutton", "Hardware Buttons", s, d)) }
 }
 
-// Vibration: trigger haptics; auto-pass when the accelerometer detects the motor spike.
+// Vibration: trigger a sustained 2s haptic pulse; auto-pass when the accelerometer detects the motor spike.
 
 @MainActor final class VibrationViewModel: ObservableObject {
     private let probe: AccelProbe
     @Published var outcome: TestOutcome?
     @Published var peak: Double = 0
     @Published var measuring = false
+    private var hapticEngine: CHHapticEngine?
     init(probe: AccelProbe) { self.probe = probe }
 
     func run() async {
         measuring = true
-        buzz()
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            probe.samplePeak(windowMs: 1500) { resting, peak in
-                Task { @MainActor in
-                    self.peak = peak
-                    let pass = VibrationGate.spiked(restingNoise: resting, peak: peak, minDelta: 0.15)
-                    self.outcome = diagnosticOutcome("vibration", "Vibration", pass ? .pass : .fail,
-                                                     ["accel_peak_g": String(format: "%.2f", peak)])
-                    self.measuring = false
-                    cont.resume()
+        let maxCycles = 3
+        for cycle in 0..<maxCycles {
+            // Insert a 2s OFF gap between cycles (not before the first one)
+            if cycle > 0 {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+            }
+            // Fire the sustained vibration
+            await buzz()
+            // Sample the accelerometer over the 2s ON window
+            let (resting, peakVal) = await withCheckedContinuation { (cont: CheckedContinuation<(Double, Double), Never>) in
+                probe.samplePeak(windowMs: 2000) { r, p in
+                    cont.resume(returning: (r, p))
                 }
             }
+            self.peak = peakVal
+            if VibrationGate.spiked(restingNoise: resting, peak: peakVal, minDelta: 0.15) {
+                self.outcome = diagnosticOutcome("vibration", "Vibration", .pass,
+                                                 ["accel_peak_g": String(format: "%.2f", peakVal)])
+                self.measuring = false
+                return
+            }
         }
+        // No spike detected after all cycles — leave for user to Fail/Skip
+        self.measuring = false
     }
 
-    private func buzz() {
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+    private func buzz() async {
+        // Try CoreHaptics sustained continuous vibration (2s)
+        do {
+            if hapticEngine == nil {
+                hapticEngine = try CHHapticEngine()
+            }
+            guard let engine = hapticEngine else { throw NSError(domain: "Haptics", code: 0) }
+            try await engine.start()
+            let event = CHHapticEvent(
+                eventType: .hapticContinuous,
+                parameters: [
+                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0)
+                ],
+                relativeTime: 0,
+                duration: 2.0
+            )
+            let pattern = try CHHapticPattern(events: [event], parameters: [])
+            let player = try engine.makePlayer(with: pattern)
+            try player.start(atTime: CHHapticTimeImmediate)
+        } catch {
+            // Fall back: fire AudioServices vibrate every 0.5s for 2s
+            hapticEngine = nil
+            for _ in 0..<4 {
+                AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+                try? await Task.sleep(nanoseconds: 500_000_000)
+            }
+        }
     }
 }
 
@@ -229,7 +267,7 @@ private struct VibrationTestView: View {
     var body: some View {
         TestScaffold(
             title: "Vibration",
-            instruction: "Hold the device still. It will vibrate and we'll auto-detect the motor via the accelerometer.",
+            instruction: "Hold the device still. It pulses for ~2 seconds and auto-detects the motor via the accelerometer.",
             hints: ["Keep the device resting on a surface or held still"],
             allowManualPass: false,
             onPass: {},

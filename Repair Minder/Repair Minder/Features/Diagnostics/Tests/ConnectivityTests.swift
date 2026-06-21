@@ -6,6 +6,7 @@ import SwiftUI
 import CoreBluetooth
 import CoreNFC
 import UIKit
+import CallKit
 #endif
 
 // MARK: - WiFi (automatic)
@@ -174,18 +175,37 @@ private struct NFCTestView: View {
     }
 }
 
+@MainActor final class CallObserver: NSObject, ObservableObject, CXCallObserverDelegate {
+    @Published var connected = false
+    private let observer = CXCallObserver()
+    override init() {
+        super.init()
+        observer.setDelegate(self, queue: .main)
+    }
+    nonisolated func callObserver(_ callObserver: CXCallObserver, callChanged call: CXCall) {
+        Task { @MainActor in
+            if call.hasConnected && !call.hasEnded {
+                self.connected = true
+            }
+        }
+    }
+}
+
 private struct CallTestView: View {
     let complete: (TestOutcome) -> Void
     @State private var number = ""
+    @StateObject private var callObs = CallObserver()
+    @State private var done = false
+
     var body: some View {
         TestScaffold(
             title: "Call",
-            instruction: "Enter a number and place a test call to check the cellular/calling capability (requires a SIM). Tap Pass if the call connects.",
+            instruction: "Place a test call. It passes automatically when the call connects; if it connected but didn't auto-pass, tap Pass.",
             hints: ["Requires a working SIM card"],
             allowManualPass: true,
-            onPass: { complete(diagnosticOutcome("call", "Call", .pass)) },
-            onFail: { complete(diagnosticOutcome("call", "Call", .fail)) },
-            onSkip: { complete(diagnosticOutcome("call", "Call", .skip)) }
+            onPass: { finish(.pass) },
+            onFail: { finish(.fail) },
+            onSkip: { finish(.skip) }
         ) {
             VStack(spacing: 12) {
                 TextField("Phone number", text: $number)
@@ -197,8 +217,21 @@ private struct CallTestView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(number.isEmpty)
+                if callObs.connected {
+                    Label("Call connected", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green).font(.subheadline)
+                }
+            }
+            .onChange(of: callObs.connected) { _, connected in
+                if connected { finish(.pass, ["connected": "1"]) }
             }
         }
+    }
+
+    private func finish(_ s: TestStatus, _ d: [String: String]? = nil) {
+        guard !done else { return }
+        done = true
+        complete(diagnosticOutcome("call", "Call", s, d))
     }
 }
 #endif

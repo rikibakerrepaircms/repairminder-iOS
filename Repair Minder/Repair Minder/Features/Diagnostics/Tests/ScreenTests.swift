@@ -226,12 +226,12 @@ private struct DeadPixelTestView: View {
 // MARK: UIKit touch capture (multitouch / force / stylus)
 
 private struct TouchCaptureView: UIViewRepresentable {
-    var onUpdate: (_ activeTouches: Int, _ maxForce: CGFloat, _ pencil: Bool) -> Void
+    var onUpdate: (_ activeTouches: Int, _ maxForce: CGFloat, _ pencil: Bool, _ locations: [CGPoint]) -> Void
     func makeUIView(context: Context) -> CaptureView { let v = CaptureView(); v.onUpdate = onUpdate; return v }
     func updateUIView(_ uiView: CaptureView, context: Context) {}
 
     final class CaptureView: UIView {
-        var onUpdate: ((Int, CGFloat, Bool) -> Void)?
+        var onUpdate: ((Int, CGFloat, Bool, [CGPoint]) -> Void)?
         override init(frame: CGRect) {
             super.init(frame: frame)
             isMultipleTouchEnabled = true
@@ -243,7 +243,8 @@ private struct TouchCaptureView: UIViewRepresentable {
             let touches = (event?.allTouches ?? []).filter { $0.phase != .ended && $0.phase != .cancelled }
             let force = touches.map { $0.force }.max() ?? 0
             let pencil = touches.contains { $0.type == .pencil }
-            onUpdate?(touches.count, force, pencil)
+            let locations = touches.map { $0.location(in: self) }
+            onUpdate?(touches.count, force, pencil, locations)
         }
         override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) { report(event) }
         override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) { report(event) }
@@ -257,30 +258,52 @@ private struct TouchCaptureView: UIViewRepresentable {
 private struct MultitouchTestView: View {
     let complete: (TestOutcome) -> Void
     @State private var maxTouches = 0
+    @State private var points: [CGPoint] = []
 
     var body: some View {
         TestScaffold(
             title: "Multitouch",
-            instruction: "Touch the panel with two or more fingers at once. The highest number of simultaneous touches is shown.",
+            instruction: "Touch the screen with two or more fingers at once.",
             hints: ["Touch with 2+ fingers at the same time"],
+            allowManualPass: false,
             fullBleed: true,
             onPass: { complete(diagnosticOutcome("multitouch", "Multitouch", .pass, ["max_touches": "\(maxTouches)"])) },
             onFail: { complete(diagnosticOutcome("multitouch", "Multitouch", .fail, ["max_touches": "\(maxTouches)"])) },
             onSkip: { complete(diagnosticOutcome("multitouch", "Multitouch", .skip)) }
         ) {
-            ZStack(alignment: .top) {
-                TouchCaptureView { count, _, _ in
-                    if count > maxTouches { maxTouches = count }
-                    if maxTouches >= 2 {
-                        complete(diagnosticOutcome("multitouch", "Multitouch", .pass, ["max_touches": "\(maxTouches)"]))
+            GeometryReader { geo in
+                ZStack {
+                    // Touch capture fills the full area
+                    TouchCaptureView { count, _, _, locs in
+                        points = locs
+                        if count > maxTouches { maxTouches = count }
+                        if maxTouches >= 2 {
+                            complete(diagnosticOutcome("multitouch", "Multitouch", .pass, ["max_touches": "\(maxTouches)"]))
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.secondarySystemBackground))
+
+                    // Visible touch indicators
+                    ForEach(Array(points.enumerated()), id: \.offset) { _, pt in
+                        Circle()
+                            .fill(Color.accentColor.opacity(0.7))
+                            .frame(width: 44, height: 44)
+                            .position(pt)
+                    }
+
+                    // Floating pill at top showing touch count
+                    VStack {
+                        Text("\(maxTouches) simultaneous touches")
+                            .font(.subheadline.bold())
+                            .padding(.horizontal, 14).padding(.vertical, 8)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Capsule())
+                            .padding(.top, 12)
+                        Spacer()
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                VStack(spacing: 4) {
-                    Text("\(maxTouches)").font(.system(size: 48, weight: .bold))
-                    Text("simultaneous touches").font(.caption).foregroundStyle(.secondary)
-                }
-                .padding(10).background(.ultraThinMaterial).clipShape(RoundedRectangle(cornerRadius: 12)).padding(.top, 12)
+                .frame(width: geo.size.width, height: geo.size.height)
             }
         }
     }
@@ -303,7 +326,7 @@ private struct ForceTouchTestView: View {
             onSkip: { complete(diagnosticOutcome("touch3d", "3D Touch", .skip)) }
         ) {
             ZStack(alignment: .top) {
-                TouchCaptureView { _, force, _ in
+                TouchCaptureView { _, force, _, _ in
                     if force > maxForce { maxForce = force }
                     if maxForce > 1.5 {
                         complete(diagnosticOutcome("touch3d", "3D Touch", .pass, ["max_force": String(format: "%.2f", maxForce)]))
@@ -337,7 +360,7 @@ private struct StylusTestView: View {
             onSkip: { complete(diagnosticOutcome("pen", "Stylus Pen", .skip)) }
         ) {
             ZStack(alignment: .top) {
-                TouchCaptureView { _, _, pencil in
+                TouchCaptureView { _, _, pencil, _ in
                     if pencil {
                         pencilSeen = true
                         complete(diagnosticOutcome("pen", "Stylus Pen", .pass))
