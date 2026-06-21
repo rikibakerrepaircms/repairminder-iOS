@@ -96,6 +96,7 @@ enum ChargeGate {
 import UIKit
 import AVFoundation
 import AudioToolbox
+import MediaPlayer
 
 func batteryStateLabel(_ s: UIDevice.BatteryState) -> String {
     switch s {
@@ -163,13 +164,23 @@ private struct ChargeTestView: View {
 
     func start() {
         try? AVAudioSession.sharedInstance().setActive(true)
+        setSystemVolume(0.5)
         last = AVAudioSession.sharedInstance().outputVolume
         observation = AVAudioSession.sharedInstance().observe(\.outputVolume, options: [.new]) { [weak self] _, change in
             guard let self, let v = change.newValue else { return }
             Task { @MainActor in
-                if v > self.last { self.up = true } else if v < self.last { self.down = true }
+                if v > self.last + 0.001 { self.up = true } else if v < self.last - 0.001 { self.down = true }
                 self.last = v
             }
+        }
+    }
+
+    /// Seed the system volume mid-range so both Volume Up and Volume Down have headroom to move
+    /// (at 0 a down-press is a no-op; at 1 an up-press is a no-op → false-fail).
+    private func setSystemVolume(_ value: Float) {
+        let mpVolume = MPVolumeView()
+        if let slider = mpVolume.subviews.compactMap({ $0 as? UISlider }).first {
+            DispatchQueue.main.async { slider.value = value }
         }
     }
     func stop() { observation?.invalidate(); observation = nil }
@@ -182,7 +193,7 @@ private struct HardwareButtonsTestView: View {
     var body: some View {
         TestScaffold(
             title: "Hardware Buttons",
-            instruction: "Press Volume Up and Volume Down. Each registers below; both = pass. (Power/Mute can't be read by apps.)",
+            instruction: "Volume has been set to the middle. Press Volume Up, then Volume Down — each registers below; both = pass. (Power/Mute can't be read by apps.)",
             hints: ["Press Volume Up, then Volume Down"],
             onPass: { finish(.pass) }, onFail: { finish(.fail) }, onSkip: { finish(.skip) }
         ) {
