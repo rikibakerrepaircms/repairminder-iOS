@@ -100,48 +100,93 @@ import UIKit
 
 // MARK: Touchscreen view (SwiftUI grid; touch all cells → pass)
 
+/// Immersive full-screen touch grid. The top instruction and bottom controls hide while the
+/// user is touching so the WHOLE screen can be swept; fine cells (~16pt) catch small dead spots.
+/// Drawn with Canvas (≈1500 cells) and drag-path interpolation so fast sweeps don't skip cells.
 private struct TouchscreenTestView: View {
     let complete: (TestOutcome) -> Void
     @State private var touched: Set<Int> = []
+    @State private var started = false
+    @State private var dragging = false
+    @State private var lastLocation: CGPoint?
+
+    private let target: CGFloat = 16   // cell size — ~¼ of the old grid
 
     var body: some View {
-        TestScaffold(
-            title: "Touchscreen",
-            instruction: "Touch every box. Each turns green when registered — any box that won't turn green is a dead spot.",
-            hints: ["Drag across all boxes to complete the test"],
-            fullBleed: true,
-            onPass: { complete(diagnosticOutcome("touchscreen", "Touchscreen", .pass)) },
-            onFail: { complete(diagnosticOutcome("touchscreen", "Touchscreen", .fail)) },
-            onSkip: { complete(diagnosticOutcome("touchscreen", "Touchscreen", .skip)) }
-        ) {
-            GeometryReader { geo in
-                let target: CGFloat = 60
-                let cols = max(4, Int(geo.size.width / target))
-                let rows = max(6, Int(geo.size.height / target))
-                let w = geo.size.width / CGFloat(cols)
-                let h = geo.size.height / CGFloat(rows)
-                let total = cols * rows
-                ZStack {
-                    ForEach(0..<total, id: \.self) { i in
+        GeometryReader { geo in
+            let cols = max(8, Int(geo.size.width / target))
+            let rows = max(12, Int(geo.size.height / target))
+            let w = geo.size.width / CGFloat(cols)
+            let h = geo.size.height / CGFloat(rows)
+            let total = cols * rows
+
+            ZStack(alignment: .top) {
+                Canvas { ctx, _ in
+                    for i in 0..<total {
                         let r = i / cols, c = i % cols
-                        Rectangle()
-                            .fill(touched.contains(i) ? Color.green : Color.platformGray5)
-                            .border(Color.platformGray4)
-                            .frame(width: w, height: h)
-                            .position(x: (CGFloat(c) + 0.5) * w, y: (CGFloat(r) + 0.5) * h)
+                        let rect = CGRect(x: CGFloat(c) * w, y: CGFloat(r) * h, width: w - 1, height: h - 1)
+                        ctx.fill(Path(rect), with: .color(touched.contains(i) ? .green : Color(.systemGray4)))
                     }
                 }
-                .contentShape(Rectangle())
-                .gesture(DragGesture(minimumDistance: 0).onChanged { value in
-                    let c = Int(value.location.x / w), r = Int(value.location.y / h)
-                    if c >= 0, c < cols, r >= 0, r < rows {
-                        touched.insert(r * cols + c)
-                        if touched.count == total {
-                            complete(diagnosticOutcome("touchscreen", "Touchscreen", .pass, ["cells": "\(total)"]))
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { v in
+                            started = true
+                            dragging = true
+                            mark(from: lastLocation ?? v.location, to: v.location,
+                                 w: w, h: h, cols: cols, rows: rows, total: total)
+                            lastLocation = v.location
                         }
+                        .onEnded { _ in dragging = false; lastLocation = nil }
+                )
+
+                if !started {
+                    VStack(spacing: 4) {
+                        Text("Touchscreen").font(.headline)
+                        Text("Drag across the whole screen — every cell turns green. Any cell that won't is a dead spot.")
+                            .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     }
-                })
+                    .padding(12).frame(maxWidth: .infinity).background(.ultraThinMaterial)
+                    .transition(.opacity)
+                }
             }
+            .overlay(alignment: .bottom) {
+                if !dragging {
+                    HStack(spacing: 12) {
+                        Button("Skip") { complete(diagnosticOutcome("touchscreen", "Touchscreen", .skip)) }
+                            .buttonStyle(.bordered).accessibilityIdentifier("test-skip")
+                        Button("Fail") { complete(diagnosticOutcome("touchscreen", "Touchscreen", .fail)) }
+                            .buttonStyle(.borderedProminent).tint(.red).accessibilityIdentifier("test-fail")
+                        Spacer()
+                        Text("\(Int((total > 0 ? Double(touched.count) / Double(total) : 0) * 100))%")
+                            .font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 16).padding(.vertical, 12).background(.ultraThinMaterial)
+                    .transition(.opacity)
+                }
+            }
+            .animation(.easeInOut(duration: 0.15), value: started)
+            .animation(.easeInOut(duration: 0.15), value: dragging)
+        }
+        .ignoresSafeArea()
+        #if os(iOS)
+        .toolbar(.hidden, for: .navigationBar)
+        #endif
+    }
+
+    /// Mark every cell along the segment from→to (interpolated) so fast drags fill continuously.
+    private func mark(from: CGPoint, to: CGPoint, w: CGFloat, h: CGFloat, cols: Int, rows: Int, total: Int) {
+        let dx = to.x - from.x, dy = to.y - from.y
+        let steps = max(1, Int(max(abs(dx), abs(dy)) / (min(w, h) / 2)))
+        var changed = false
+        for s in 0...steps {
+            let t = steps == 0 ? 0 : CGFloat(s) / CGFloat(steps)
+            let x = from.x + dx * t, y = from.y + dy * t
+            let c = Int(x / w), r = Int(y / h)
+            if c >= 0, c < cols, r >= 0, r < rows, touched.insert(r * cols + c).inserted { changed = true }
+        }
+        if changed, touched.count == total {
+            complete(diagnosticOutcome("touchscreen", "Touchscreen", .pass, ["cells": "\(total)"]))
         }
     }
 }
