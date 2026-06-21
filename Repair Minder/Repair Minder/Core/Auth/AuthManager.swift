@@ -76,6 +76,9 @@ final class AuthManager: ObservableObject, TokenProvider {
 
     func clearTokens() {
         KeychainManager.shared.clearStaffTokens()
+        // Clear passcode/biometric app-lock state so a logged-out (or session-expired)
+        // app never prompts Face ID / passcode. The next login re-syncs via syncFromAuthResponse.
+        PasscodeService.shared.clearLocalData()
         Task { @MainActor in
             self.authState = .unauthenticated
             self.currentUser = nil
