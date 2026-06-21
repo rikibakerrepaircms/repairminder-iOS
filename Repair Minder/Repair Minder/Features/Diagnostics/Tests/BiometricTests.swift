@@ -50,6 +50,39 @@ struct LiDARTest: DiagnosticTest {
 
 #if os(iOS)
 
+// MARK: - DepthViewModel (shared by TrueDepth and LiDAR tests)
+
+/// Drives a depth-frame probe, auto-passing once ≥3 frames arrive.
+/// Injected with a `DepthProbe` so it can be tested with a fake.
+@MainActor final class DepthViewModel: ObservableObject {
+    private let probe: DepthProbe
+    private let id: String
+    private let name: String
+    private let detailKey: String
+    @Published var frames = 0
+    @Published var outcome: TestOutcome?
+
+    init(probe: DepthProbe, id: String, name: String, detailKey: String) {
+        self.probe = probe; self.id = id; self.name = name; self.detailKey = detailKey
+    }
+
+    func start() {
+        probe.start(onDepthFrame: { [weak self] in
+            guard let self, self.outcome == nil else { return }
+            self.frames += 1
+            if self.frames >= 3 {
+                self.outcome = diagnosticOutcome(self.id, self.name, .pass, [self.detailKey: String(self.frames)])
+                self.probe.stop()
+            }
+        })
+    }
+
+    func fail() { probe.stop(); outcome = diagnosticOutcome(id, name, .fail, nil) }
+    func skip() { probe.stop(); outcome = diagnosticOutcome(id, name, .skip, nil) }
+}
+
+// MARK: - BiometricController
+
 @MainActor private final class BiometricController: ObservableObject {
     @Published var status: String = "Ready"
     func authenticate(_ done: @escaping (Bool, String, String) -> Void) {
@@ -99,35 +132,66 @@ private struct BiometricTestView: View {
 
 private struct TrueDepthTestView: View {
     let complete: (TestOutcome) -> Void
-    @StateObject private var cam = CameraController()
+    @StateObject private var model = DepthViewModel(
+        probe: TrueDepthProbe(),
+        id: "truedepth",
+        name: "TrueDepth Camera",
+        detailKey: "depth_frames"
+    )
     var body: some View {
         TestScaffold(
             title: "TrueDepth Camera",
-            instruction: "The front TrueDepth camera feed is shown. Confirm a clear image, then tap Pass.",
+            instruction: "Point the front TrueDepth camera at your face or an object — it passes automatically when depth frames are captured.",
             hints: ["Used by Face ID and Portrait selfies"],
-            allowManualPass: true,
-            onPass: { finish(.pass) }, onFail: { finish(.fail) }, onSkip: { finish(.skip) }
+            allowManualPass: false,
+            onPass: {},
+            onFail: { model.fail() },
+            onSkip: { model.skip() }
         ) {
-            CameraPreview(session: cam.session).frame(height: 320).clipShape(RoundedRectangle(cornerRadius: 12))
-                .onAppear { cam.configureAndStart(position: .front, mode: .preview) }
+            VStack(spacing: 8) {
+                Image(systemName: "faceid").font(.system(size: 44)).foregroundStyle(Color.accentColor)
+                Text("Depth frames: \(model.frames)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+        }
+        .onAppear { model.start() }
+        .onChange(of: model.outcome?.status) { _, _ in
+            if let o = model.outcome { complete(o) }
         }
     }
-    private func finish(_ s: TestStatus, _ d: [String: String]? = nil) { cam.stop(); complete(diagnosticOutcome("truedepth", "TrueDepth Camera", s, d)) }
 }
 
 private struct LiDARTestView: View {
     let complete: (TestOutcome) -> Void
+    @StateObject private var model = DepthViewModel(
+        probe: LiDARProbe(),
+        id: "lidar",
+        name: "LiDAR Scanner",
+        detailKey: "scene_depth_frames"
+    )
     var body: some View {
         TestScaffold(
             title: "LiDAR Scanner",
-            instruction: "This device reports a LiDAR scanner. Point it at nearby objects to confirm depth scanning works, then tap Pass.",
+            instruction: "Point the device at nearby objects — it passes automatically when the LiDAR scene-depth stream produces frames.",
             hints: ["LiDAR is used for depth, AR and low-light autofocus"],
-            allowManualPass: true,
-            onPass: { complete(diagnosticOutcome("lidar", "LiDAR Scanner", .pass)) },
-            onFail: { complete(diagnosticOutcome("lidar", "LiDAR Scanner", .fail)) },
-            onSkip: { complete(diagnosticOutcome("lidar", "LiDAR Scanner", .skip)) }
+            allowManualPass: false,
+            onPass: {},
+            onFail: { model.fail() },
+            onSkip: { model.skip() }
         ) {
-            Image(systemName: "cube.transparent").font(.system(size: 44)).foregroundStyle(Color.accentColor)
+            VStack(spacing: 8) {
+                Image(systemName: "cube.transparent").font(.system(size: 44)).foregroundStyle(Color.accentColor)
+                Text("Depth frames: \(model.frames)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+        }
+        .onAppear { model.start() }
+        .onChange(of: model.outcome?.status) { _, _ in
+            if let o = model.outcome { complete(o) }
         }
     }
 }
