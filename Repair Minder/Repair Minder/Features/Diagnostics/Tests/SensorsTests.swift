@@ -42,7 +42,7 @@ struct ProximityTest: DiagnosticTest {
     let id = "proximity"; let name = "Proximity Sensor"; let category: TestCategory = .sensors
     let requiresInteraction = true
     #if os(iOS)
-    var isSupported: Bool { true }
+    var isSupported: Bool { UIDevice.current.userInterfaceIdiom == .phone }
     @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { AnyView(ProximityTestView(complete: complete)) }
     #else
     var isSupported: Bool { false }
@@ -268,22 +268,29 @@ private struct ProximityTestView: View {
     var body: some View {
         TestScaffold(
             title: "Proximity Sensor",
-            instruction: "Cover the top-front of the device with your hand. It passes automatically when the sensor reacts.",
-            hints: ["Move your hand over the top-front of the device"],
+            instruction: "Cover the top-front of the device, then take your hand away. It passes when the sensor sees both.",
+            hints: ["Move your hand over the top-front of the device, then remove it"],
             onPass: { finish(.pass) }, onFail: { finish(.fail) }, onSkip: { finish(.skip) }
         ) {
             VStack(spacing: 8) {
                 Image(systemName: covered ? "hand.raised.fill" : "hand.raised")
                     .font(.system(size: 44)).foregroundStyle(covered ? .green : .secondary)
-                Text(covered ? "Detected" : "Waiting…").font(.caption).foregroundStyle(.secondary)
+                Text(covered ? "Detected — now remove your hand" : "Waiting…").font(.caption).foregroundStyle(.secondary)
             }
             .onAppear {
                 UIDevice.current.isProximityMonitoringEnabled = true
                 observer = NotificationCenter.default.addObserver(forName: UIDevice.proximityStateDidChangeNotification, object: nil, queue: .main) { _ in
-                    if UIDevice.current.proximityState { covered = true; finish(.pass) }
+                    if UIDevice.current.proximityState {
+                        covered = true
+                    } else if covered {
+                        finish(.pass, ["proximity": "1"])
+                    }
                 }
             }
-            .onDisappear { removeObserver() }
+            .onDisappear {
+                UIDevice.current.isProximityMonitoringEnabled = false
+                removeObserver()
+            }
         }
     }
     private func removeObserver() {

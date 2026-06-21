@@ -68,7 +68,7 @@ struct CallTest: DiagnosticTest {
     let id = "call"; let name = "Call"; let category: TestCategory = .connectivity
     let requiresInteraction = true
     #if os(iOS)
-    var isSupported: Bool { true }
+    var isSupported: Bool { UIApplication.shared.canOpenURL(URL(string: "tel://")!) }
     @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { AnyView(CallTestView(complete: complete)) }
     #else
     var isSupported: Bool { false }
@@ -128,8 +128,12 @@ private struct BluetoothTestView: View {
 @MainActor private final class NFCReader: NSObject, ObservableObject, NFCTagReaderSessionDelegate {
     private var session: NFCTagReaderSession?
     var onDetect: (() -> Void)?
+    @Published var errorText: String?
     func scan() {
-        guard NFCTagReaderSession.readingAvailable else { return }
+        guard NFCTagReaderSession.readingAvailable else {
+            errorText = "NFC not available on this device"
+            return
+        }
         session = NFCTagReaderSession(pollingOption: [.iso14443, .iso15693, .iso18092], delegate: self, queue: nil)
         session?.alertMessage = "Hold an NFC tag near the top of the device"
         session?.begin()
@@ -139,7 +143,9 @@ private struct BluetoothTestView: View {
         session.invalidate()
         Task { @MainActor in self.onDetect?() }
     }
-    nonisolated func tagReaderSession(_ session: NFCTagReaderSession, didInvalidateWithError error: Error) {}
+    nonisolated func tagReaderSession(_ session: NFCTagReaderSession, didInvalidateWithError error: Error) {
+        Task { @MainActor in self.errorText = error.localizedDescription }
+    }
 }
 
 private struct NFCTestView: View {
@@ -157,10 +163,12 @@ private struct NFCTestView: View {
             VStack(spacing: 12) {
                 Image(systemName: "wave.3.right.circle").font(.system(size: 44)).foregroundStyle(Color.accentColor)
                 Button("Scan for tag") { nfc.scan() }.buttonStyle(.borderedProminent)
+                if let err = nfc.errorText {
+                    Text(err).font(.caption).foregroundStyle(.red).multilineTextAlignment(.center).padding(.horizontal)
+                }
             }
             .onAppear {
                 nfc.onDetect = { complete(diagnosticOutcome("nfc", "NFC", .pass, ["detected": "1"])) }
-                nfc.scan()
             }
         }
     }

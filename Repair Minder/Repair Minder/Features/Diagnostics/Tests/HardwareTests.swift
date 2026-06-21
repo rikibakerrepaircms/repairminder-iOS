@@ -3,6 +3,9 @@
 // Cameras / TrueDepth / LiDAR / Biometric live in CameraTests.swift + BiometricTests.swift.
 import SwiftUI
 import CoreMotion
+#if os(iOS)
+import CoreHaptics
+#endif
 
 // MARK: - Storage (automatic)
 
@@ -72,8 +75,8 @@ struct VibrationTest: DiagnosticTest {
     let id = "vibration"; let name = "Vibration"; let category: TestCategory = .hardware
     let requiresInteraction = true
     #if os(iOS)
-    // Skip cleanly where there's no accelerometer (e.g. Simulator) so we never false-fail.
-    var isSupported: Bool { CMMotionManager().isAccelerometerAvailable }
+    // iPads have no vibration motor; gate on haptics hardware capability.
+    var isSupported: Bool { CHHapticEngine.capabilitiesForHardware().supportsHaptics }
     @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { AnyView(VibrationTestView(complete: complete)) }
     #else
     var isSupported: Bool { false }

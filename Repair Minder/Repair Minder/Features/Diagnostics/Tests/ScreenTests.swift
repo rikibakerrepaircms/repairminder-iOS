@@ -86,7 +86,7 @@ struct StylusTest: DiagnosticTest {
     let category: TestCategory = .screen
     let requiresInteraction = true
     #if os(iOS)
-    var isSupported: Bool { true }
+    var isSupported: Bool { UIDevice.current.userInterfaceIdiom == .pad }
     @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? {
         AnyView(StylusTestView(complete: complete))
     }
