@@ -16,6 +16,17 @@ enum VibrationGate {
     }
 }
 
+enum MotionAliveGate {
+    /// Accelerometer is "alive" when it delivers samples and the total magnitude sits near gravity
+    /// (a dead/stuck sensor reports ~0 or a wildly off value).
+    static func accelerometerAlive(magnitude: Double, samples: Int) -> Bool {
+        samples >= 5 && magnitude >= 0.7 && magnitude <= 1.3
+    }
+    /// Gyroscope is "alive" when it delivers samples within the window (it reads ~0 at rest, so we
+    /// can only confirm it responds, not its range — full range is the interactive test).
+    static func gyroAlive(samples: Int) -> Bool { samples >= 5 }
+}
+
 enum LoopbackGate {
     static func heard(levelDb: Double, thresholdDb: Double) -> Bool { levelDb >= thresholdDb }
 }
