@@ -29,7 +29,6 @@ enum TestRegistry {
         // Hardware (cameras)
         t.append(RearCameraTest())
         t.append(FrontCameraTest())
-        t.append(AutofocusTest())
         t.append(FlashTest())
         // Hardware (depth + biometric)
         t.append(TrueDepthTest())

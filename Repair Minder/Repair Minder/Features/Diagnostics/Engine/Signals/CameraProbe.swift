@@ -14,6 +14,9 @@ final class CameraProbe: NSObject, LuminanceProbe, QRProbe {
 
     init(device: AVCaptureDevice) { self.device = device; super.init() }
 
+    /// Exposes the underlying AVCaptureSession for live preview (read-only; session itself stays private).
+    var previewSession: AVCaptureSession { session }
+
     static func rearLenses() -> [(type: String, device: AVCaptureDevice)] {
         let types: [(String, AVCaptureDevice.DeviceType)] = [
             ("ultrawide", .builtInUltraWideCamera),

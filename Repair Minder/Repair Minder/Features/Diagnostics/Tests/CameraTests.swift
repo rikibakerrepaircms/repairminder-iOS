@@ -1,5 +1,6 @@
 // Features/Diagnostics/Tests/CameraTests.swift
-// Hardware cameras: Rear Camera, Front Camera, Autofocus (QR auto-pass), Flash.
+// Hardware cameras: Rear Camera (per-lens QR gate), Front Camera, Flash.
+// Autofocus is now folded into the per-lens rear-camera QR test.
 // Camera hardware is absent on the simulator → these report unsupported there; device-verified.
 import SwiftUI
 #if os(iOS)
@@ -16,16 +17,30 @@ private func hasTorch() -> Bool {
 }
 #endif
 
+// MARK: - RearCameraTest
+
 struct RearCameraTest: DiagnosticTest {
     let id = "rearcamera"; let name = "Rear Camera"; let category: TestCategory = .hardware
     let requiresInteraction = true
     #if os(iOS)
-    var isSupported: Bool { hasCamera(.back) }
-    @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { AnyView(CameraTestView(id: id, name: name, position: .back, mode: .preview, complete: complete)) }
+    /// Supported only when at least one physical rear lens is present — false on simulator.
+    /// Uses AVCaptureDevice directly (not @MainActor CameraProbe) so isSupported stays nonisolated.
+    var isSupported: Bool {
+        AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.builtInWideAngleCamera, .builtInUltraWideCamera, .builtInTelephotoCamera],
+            mediaType: .video,
+            position: .back
+        ).devices.isEmpty == false
+    }
+    @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? {
+        AnyView(RearCameraTestView(complete: complete))
+    }
     #else
     var isSupported: Bool { false }
     #endif
 }
+
+// MARK: - FrontCameraTest
 
 struct FrontCameraTest: DiagnosticTest {
     let id = "frontcamera"; let name = "Front Camera"; let category: TestCategory = .hardware
@@ -38,16 +53,7 @@ struct FrontCameraTest: DiagnosticTest {
     #endif
 }
 
-struct AutofocusTest: DiagnosticTest {
-    let id = "autofocus"; let name = "Autofocus"; let category: TestCategory = .hardware
-    let requiresInteraction = true
-    #if os(iOS)
-    var isSupported: Bool { hasCamera(.back) }
-    @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { AnyView(CameraTestView(id: id, name: name, position: .back, mode: .qr, complete: complete)) }
-    #else
-    var isSupported: Bool { false }
-    #endif
-}
+// MARK: - FlashTest
 
 struct FlashTest: DiagnosticTest {
     let id = "flash"; let name = "Flash"; let category: TestCategory = .hardware
@@ -61,6 +67,8 @@ struct FlashTest: DiagnosticTest {
 }
 
 #if os(iOS)
+
+// MARK: - Shared camera infrastructure (FrontCamera / Flash)
 
 enum CameraTestMode { case preview, qr, torch }
 
@@ -170,4 +178,181 @@ private struct CameraTestView: View {
     }
     private func finish(_ s: TestStatus, _ d: [String: String]? = nil) { cam.stop(); complete(diagnosticOutcome(id, name, s, d)) }
 }
+
+// MARK: - Per-lens Rear Camera ViewModel
+
+/// Drives a sequential per-lens QR scan. Moves through each rear lens one by one.
+/// A lens is marked passed the moment any QR/barcode is recognised through it.
+/// When all lenses are done (or the user skips/fails), `outcome` is published.
+@MainActor final class RearCameraViewModel: ObservableObject {
+    struct LensState: Identifiable {
+        let id: String          // "ultrawide" | "wide" | "tele"
+        let device: AVCaptureDevice
+        var passed: Bool?       // nil = pending, true = pass, false = fail (manual)
+    }
+
+    @Published var lenses: [LensState]
+    @Published var activeIndex: Int = 0
+    @Published var outcome: TestOutcome?
+    @Published var denied = false
+
+    private var probe: CameraProbe?
+    private let testId: String
+    private let testName: String
+
+    init(testId: String, testName: String) {
+        self.testId = testId
+        self.testName = testName
+        // CameraProbe.rearLenses() is @MainActor; this init is also @MainActor (class is @MainActor).
+        self.lenses = CameraProbe.rearLenses().map { LensState(id: $0.type, device: $0.device) }
+    }
+
+    var activeLens: LensState? {
+        guard activeIndex < lenses.count else { return nil }
+        return lenses[activeIndex]
+    }
+
+    var activeProbeSession: AVCaptureSession? { probe?.previewSession }
+
+    func startCurrentLens() {
+        guard activeIndex < lenses.count else { return }
+        let lens = lenses[activeIndex]
+        AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+            guard let self else { return }
+            Task { @MainActor in
+                guard granted else { self.denied = true; return }
+                let p = CameraProbe(device: lens.device)
+                self.probe = p
+                p.start(onCode: { [weak self] _ in
+                    Task { @MainActor in self?.markCurrentPassed() }
+                })
+            }
+        }
+    }
+
+    private func markCurrentPassed() {
+        guard activeIndex < lenses.count, lenses[activeIndex].passed == nil else { return }
+        probe?.stop()
+        probe = nil
+        lenses[activeIndex].passed = true
+        advance()
+    }
+
+    /// Called when user taps "Fail" to force-fail the current lens and move on.
+    func failCurrentLens() {
+        guard activeIndex < lenses.count, lenses[activeIndex].passed == nil else { return }
+        probe?.stop()
+        probe = nil
+        lenses[activeIndex].passed = false
+        advance()
+    }
+
+    private func advance() {
+        let next = activeIndex + 1
+        if next < lenses.count {
+            activeIndex = next
+            startCurrentLens()
+        } else {
+            finalize()
+        }
+    }
+
+    private func finalize() {
+        let perLens = Dictionary(uniqueKeysWithValues: lenses.map { ($0.id, $0.passed ?? false) })
+        let (status, details) = RearCameraAggregate.result(perLens: perLens)
+        outcome = diagnosticOutcome(testId, testName, status, details)
+    }
+
+    func skipAll() {
+        probe?.stop()
+        probe = nil
+        outcome = diagnosticOutcome(testId, testName, .skip, nil)
+    }
+
+    func failAll() {
+        probe?.stop()
+        probe = nil
+        outcome = diagnosticOutcome(testId, testName, .fail, ["reason": "user_failed"])
+    }
+}
+
+// MARK: - Per-lens Rear Camera View
+
+private struct RearCameraTestView: View {
+    let complete: (TestOutcome) -> Void
+    @StateObject private var model: RearCameraViewModel
+
+    init(complete: @escaping (TestOutcome) -> Void) {
+        self.complete = complete
+        _model = StateObject(wrappedValue: RearCameraViewModel(testId: "rearcamera", testName: "Rear Camera"))
+    }
+
+    var body: some View {
+        TestScaffold(
+            title: "Rear Camera",
+            instruction: "Point the rear camera at a QR or barcode. Each lens passes automatically once it recognises a code.",
+            hints: ["Hold steady ~15 cm from a code"],
+            allowManualPass: false,
+            onPass: {},
+            onFail: { model.failAll() },
+            onSkip: { model.skipAll() }
+        ) {
+            VStack(spacing: 12) {
+                // Live preview for the active lens
+                if model.denied {
+                    Label("Camera permission denied", systemImage: "xmark.circle").foregroundStyle(.red)
+                } else if let session = model.activeProbeSession {
+                    CameraPreview(session: session)
+                        .frame(height: 280)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+
+                // Per-lens checklist
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(model.lenses) { lens in
+                        HStack(spacing: 8) {
+                            Image(systemName: statusIcon(for: lens, activeIndex: model.activeIndex, lenses: model.lenses))
+                                .foregroundStyle(statusColor(for: lens, activeIndex: model.activeIndex, lenses: model.lenses))
+                            Text(displayName(for: lens.id))
+                                .font(.subheadline)
+                            if lens.id == model.activeLens?.id && lens.passed == nil {
+                                Text("scanning…")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .onAppear { model.startCurrentLens() }
+            .onChange(of: model.outcome?.status) { _, _ in
+                if let o = model.outcome { complete(o) }
+            }
+        }
+    }
+
+    private func displayName(for id: String) -> String {
+        switch id {
+        case "ultrawide": return "Ultra-wide"
+        case "wide": return "Wide"
+        case "tele": return "Telephoto"
+        default: return id.capitalized
+        }
+    }
+
+    private func statusIcon(for lens: RearCameraViewModel.LensState, activeIndex: Int, lenses: [RearCameraViewModel.LensState]) -> String {
+        if let passed = lens.passed { return passed ? "checkmark.circle.fill" : "xmark.circle.fill" }
+        let idx = lenses.firstIndex(where: { $0.id == lens.id }) ?? 0
+        return idx == activeIndex ? "camera.viewfinder" : "circle"
+    }
+
+    private func statusColor(for lens: RearCameraViewModel.LensState, activeIndex: Int, lenses: [RearCameraViewModel.LensState]) -> Color {
+        if let passed = lens.passed { return passed ? .green : .red }
+        let idx = lenses.firstIndex(where: { $0.id == lens.id }) ?? 0
+        return idx == activeIndex ? .blue : .secondary
+    }
+}
+
 #endif
