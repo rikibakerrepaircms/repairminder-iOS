@@ -46,8 +46,10 @@ struct FrontCameraTest: DiagnosticTest {
     let id = "frontcamera"; let name = "Front Camera"; let category: TestCategory = .hardware
     let requiresInteraction = true
     #if os(iOS)
-    var isSupported: Bool { hasCamera(.front) }
-    @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { AnyView(CameraTestView(id: id, name: name, position: .front, mode: .preview, complete: complete)) }
+    var isSupported: Bool {
+        AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera], mediaType: .video, position: .front).devices.first != nil
+    }
+    @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { AnyView(FrontCameraTestView(complete: complete)) }
     #else
     var isSupported: Bool { false }
     #endif
@@ -273,6 +275,63 @@ private struct CameraTestView: View {
         probe?.stop()
         probe = nil
         outcome = diagnosticOutcome(testId, testName, .fail, ["reason": "user_failed"])
+    }
+}
+
+// MARK: - Front Camera ViewModel
+
+@MainActor final class FrontCameraViewModel: ObservableObject {
+    private let probe: QRProbe
+    @Published var outcome: TestOutcome?
+    @Published var qrSeen = false
+
+    /// Exposed for the live preview layer; nil when probe is a test double.
+    var previewSession: AVCaptureSession? { (probe as? CameraProbe)?.previewSession }
+
+    init(probe: QRProbe) { self.probe = probe }
+    func start() {
+        probe.start(onCode: { [weak self] _ in
+            guard let self, self.outcome == nil else { return }
+            self.qrSeen = true
+            self.outcome = diagnosticOutcome("frontcamera", "Front Camera", .pass, ["qr_detected": "1"])
+            self.probe.stop()
+        })
+    }
+    func fail() { probe.stop(); outcome = diagnosticOutcome("frontcamera", "Front Camera", .fail, nil) }
+    func skip() { probe.stop(); outcome = diagnosticOutcome("frontcamera", "Front Camera", .skip, nil) }
+}
+
+// MARK: - Front Camera View
+
+private struct FrontCameraTestView: View {
+    let complete: (TestOutcome) -> Void
+    @StateObject private var model: FrontCameraViewModel
+
+    init(complete: @escaping (TestOutcome) -> Void) {
+        self.complete = complete
+        let p = CameraProbe(device: CameraProbe.front()!)
+        _model = StateObject(wrappedValue: FrontCameraViewModel(probe: p))
+    }
+
+    var body: some View {
+        TestScaffold(
+            title: "Front Camera",
+            instruction: "Point the front camera at a QR/barcode — it passes automatically once recognised.",
+            hints: [],
+            allowManualPass: false,
+            onPass: {},
+            onFail: { model.fail() },
+            onSkip: { model.skip() }
+        ) {
+            if let session = model.previewSession {
+                CameraPreview(session: session)
+                    .frame(height: 320).clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+        }
+        .onAppear { model.start() }
+        .onChange(of: model.outcome?.status) { _, _ in
+            if let o = model.outcome { complete(o) }
+        }
     }
 }
 
