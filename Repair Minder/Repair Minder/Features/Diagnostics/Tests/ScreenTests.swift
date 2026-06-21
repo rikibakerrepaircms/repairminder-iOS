@@ -102,7 +102,6 @@ import UIKit
 
 private struct TouchscreenTestView: View {
     let complete: (TestOutcome) -> Void
-    private let cols = 4, rows = 7
     @State private var touched: Set<Int> = []
 
     var body: some View {
@@ -110,35 +109,39 @@ private struct TouchscreenTestView: View {
             title: "Touchscreen",
             instruction: "Touch every box. Each turns green when registered — any box that won't turn green is a dead spot.",
             hints: ["Drag across all boxes to complete the test"],
+            fullBleed: true,
             onPass: { complete(diagnosticOutcome("touchscreen", "Touchscreen", .pass)) },
             onFail: { complete(diagnosticOutcome("touchscreen", "Touchscreen", .fail)) },
             onSkip: { complete(diagnosticOutcome("touchscreen", "Touchscreen", .skip)) }
         ) {
             GeometryReader { geo in
+                let target: CGFloat = 60
+                let cols = max(4, Int(geo.size.width / target))
+                let rows = max(6, Int(geo.size.height / target))
                 let w = geo.size.width / CGFloat(cols)
-                let h = max(w, 36)
-                let cellsPerRow = cols
-                ForEach(0..<(cols * rows), id: \.self) { i in
-                    let r = i / cols, c = i % cols
-                    Rectangle()
-                        .fill(touched.contains(i) ? Color.green : Color.platformGray5)
-                        .border(Color.platformGray4)
-                        .frame(width: w, height: h)
-                        .position(x: (CGFloat(c) + 0.5) * w, y: (CGFloat(r) + 0.5) * h)
+                let h = geo.size.height / CGFloat(rows)
+                let total = cols * rows
+                ZStack {
+                    ForEach(0..<total, id: \.self) { i in
+                        let r = i / cols, c = i % cols
+                        Rectangle()
+                            .fill(touched.contains(i) ? Color.green : Color.platformGray5)
+                            .border(Color.platformGray4)
+                            .frame(width: w, height: h)
+                            .position(x: (CGFloat(c) + 0.5) * w, y: (CGFloat(r) + 0.5) * h)
+                    }
                 }
                 .contentShape(Rectangle())
                 .gesture(DragGesture(minimumDistance: 0).onChanged { value in
                     let c = Int(value.location.x / w), r = Int(value.location.y / h)
                     if c >= 0, c < cols, r >= 0, r < rows {
-                        touched.insert(r * cellsPerRow + c)
-                        if touched.count == cols * rows {
-                            complete(diagnosticOutcome("touchscreen", "Touchscreen", .pass,
-                                                       ["cells": "\(cols * rows)"]))
+                        touched.insert(r * cols + c)
+                        if touched.count == total {
+                            complete(diagnosticOutcome("touchscreen", "Touchscreen", .pass, ["cells": "\(total)"]))
                         }
                     }
                 })
             }
-            .frame(height: CGFloat(rows) * 44)
         }
     }
 }
@@ -157,17 +160,19 @@ private struct DeadPixelTestView: View {
             instruction: "Tap the swatch to cycle solid colours. Look for any pixels stuck a different colour or black spots.",
             hints: ["Tap the colour to change it", "Inspect the whole screen on each colour"],
             allowManualPass: true,   // subjective: user judges for dead pixels
+            fullBleed: true,
             onPass: { complete(diagnosticOutcome("color", "Dead Pixel", .pass)) },
             onFail: { complete(diagnosticOutcome("color", "Dead Pixel", .fail)) },
             onSkip: { complete(diagnosticOutcome("color", "Dead Pixel", .skip)) }
         ) {
-            VStack(spacing: 8) {
-                Text(colors[index].0).font(.caption).foregroundStyle(.secondary)
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(colors[index].1)
-                    .frame(height: 320)
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.platformGray4))
+            ZStack(alignment: .top) {
+                colors[index].1
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
                     .onTapGesture { index = (index + 1) % colors.count }
+                Text(colors[index].0)
+                    .font(.caption).padding(8).background(.ultraThinMaterial)
+                    .clipShape(Capsule()).padding(.top, 12)
             }
         }
     }
@@ -213,20 +218,24 @@ private struct MultitouchTestView: View {
             title: "Multitouch",
             instruction: "Touch the panel with two or more fingers at once. The highest number of simultaneous touches is shown.",
             hints: ["Touch with 2+ fingers at the same time"],
+            fullBleed: true,
             onPass: { complete(diagnosticOutcome("multitouch", "Multitouch", .pass, ["max_touches": "\(maxTouches)"])) },
             onFail: { complete(diagnosticOutcome("multitouch", "Multitouch", .fail, ["max_touches": "\(maxTouches)"])) },
             onSkip: { complete(diagnosticOutcome("multitouch", "Multitouch", .skip)) }
         ) {
-            VStack(spacing: 8) {
-                Text("\(maxTouches)").font(.system(size: 48, weight: .bold))
-                Text("simultaneous touches").font(.caption).foregroundStyle(.secondary)
+            ZStack(alignment: .top) {
                 TouchCaptureView { count, _, _ in
                     if count > maxTouches { maxTouches = count }
                     if maxTouches >= 2 {
                         complete(diagnosticOutcome("multitouch", "Multitouch", .pass, ["max_touches": "\(maxTouches)"]))
                     }
                 }
-                .frame(height: 240)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack(spacing: 4) {
+                    Text("\(maxTouches)").font(.system(size: 48, weight: .bold))
+                    Text("simultaneous touches").font(.caption).foregroundStyle(.secondary)
+                }
+                .padding(10).background(.ultraThinMaterial).clipShape(RoundedRectangle(cornerRadius: 12)).padding(.top, 12)
             }
         }
     }
@@ -243,20 +252,24 @@ private struct ForceTouchTestView: View {
             title: "3D Touch",
             instruction: "Press firmly on the panel. The pressure reading rises with force; pass when firm pressure registers.",
             hints: ["Tap and apply pressure anywhere on the panel"],
+            fullBleed: true,
             onPass: { complete(diagnosticOutcome("touch3d", "3D Touch", .pass, ["max_force": String(format: "%.2f", maxForce)])) },
             onFail: { complete(diagnosticOutcome("touch3d", "3D Touch", .fail)) },
             onSkip: { complete(diagnosticOutcome("touch3d", "3D Touch", .skip)) }
         ) {
-            VStack(spacing: 8) {
-                Text(String(format: "%.2f", maxForce)).font(.system(size: 44, weight: .bold))
-                Text("max pressure").font(.caption).foregroundStyle(.secondary)
+            ZStack(alignment: .top) {
                 TouchCaptureView { _, force, _ in
                     if force > maxForce { maxForce = force }
                     if maxForce > 1.5 {
                         complete(diagnosticOutcome("touch3d", "3D Touch", .pass, ["max_force": String(format: "%.2f", maxForce)]))
                     }
                 }
-                .frame(height: 240)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack(spacing: 4) {
+                    Text(String(format: "%.2f", maxForce)).font(.system(size: 44, weight: .bold))
+                    Text("max pressure").font(.caption).foregroundStyle(.secondary)
+                }
+                .padding(10).background(.ultraThinMaterial).clipShape(RoundedRectangle(cornerRadius: 12)).padding(.top, 12)
             }
         }
     }
@@ -273,22 +286,26 @@ private struct StylusTestView: View {
             title: "Stylus Pen",
             instruction: "Draw on the panel with an Apple Pencil / stylus. It passes when stylus input is detected.",
             hints: ["Use the stylus, not your finger"],
+            fullBleed: true,
             onPass: { complete(diagnosticOutcome("pen", "Stylus Pen", .pass)) },
             onFail: { complete(diagnosticOutcome("pen", "Stylus Pen", .fail)) },
             onSkip: { complete(diagnosticOutcome("pen", "Stylus Pen", .skip)) }
         ) {
-            VStack(spacing: 8) {
-                Image(systemName: pencilSeen ? "checkmark.circle.fill" : "applepencil")
-                    .font(.system(size: 44))
-                    .foregroundStyle(pencilSeen ? .green : .secondary)
-                Text(pencilSeen ? "Stylus detected" : "Waiting for stylus…").font(.caption).foregroundStyle(.secondary)
+            ZStack(alignment: .top) {
                 TouchCaptureView { _, _, pencil in
                     if pencil {
                         pencilSeen = true
                         complete(diagnosticOutcome("pen", "Stylus Pen", .pass))
                     }
                 }
-                .frame(height: 240)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack(spacing: 4) {
+                    Image(systemName: pencilSeen ? "checkmark.circle.fill" : "applepencil")
+                        .font(.system(size: 44))
+                        .foregroundStyle(pencilSeen ? .green : .secondary)
+                    Text(pencilSeen ? "Stylus detected" : "Waiting for stylus…").font(.caption).foregroundStyle(.secondary)
+                }
+                .padding(10).background(.ultraThinMaterial).clipShape(RoundedRectangle(cornerRadius: 12)).padding(.top, 12)
             }
         }
     }

@@ -245,7 +245,8 @@ private struct FrontCameraActiveView: View {
         ) {
             if let session = model.previewSession {
                 CameraPreview(session: session)
-                    .frame(height: 320).clipShape(RoundedRectangle(cornerRadius: 12))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
             }
         }
         .onAppear { model.start() }
@@ -369,7 +370,7 @@ private struct RearCameraTestView: View {
                     Label("Camera permission denied", systemImage: "xmark.circle").foregroundStyle(.red)
                 } else if let session = model.activeProbeSession {
                     CameraPreview(session: session)
-                        .frame(height: 280)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
 
