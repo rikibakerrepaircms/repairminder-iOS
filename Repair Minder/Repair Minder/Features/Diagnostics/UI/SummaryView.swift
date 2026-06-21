@@ -7,6 +7,7 @@ struct SummaryView: View {
     @ObservedObject var runner: DiagnosticRunner
     @State private var showTransmit = false
     @State private var retestTest: RetestBox?
+    @State private var isGeneratingPDF = false
 
     /// Identifiable wrapper so we can drive a sheet with the chosen interactive test.
     struct RetestBox: Identifiable { let id: String; let test: any DiagnosticTest }
@@ -65,6 +66,19 @@ struct SummaryView: View {
         .navigationTitle("Summary")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: sharePDF) {
+                    if isGeneratingPDF {
+                        ProgressView()
+                    } else {
+                        Label("Share PDF", systemImage: "square.and.arrow.up")
+                    }
+                }
+                .disabled(isGeneratingPDF || runner.orderedOutcomes.isEmpty)
+                .accessibilityIdentifier("share-pdf")
+            }
+        }
         #endif
         .safeAreaInset(edge: .bottom) {
             Button {
@@ -217,6 +231,19 @@ struct SummaryView: View {
         case .skip, .partial: return (Color(.systemGray), "minus.circle.fill")
         }
     }
+
+    // MARK: - Share PDF
+
+    #if os(iOS)
+    /// Build the branded PDF report and present a share sheet (see DiagnosticReportShare).
+    private func sharePDF() {
+        guard !isGeneratingPDF else { return }
+        isGeneratingPDF = true
+        DiagnosticReportShare.presentShareSheet(for: runner) { _ in
+            isGeneratingPDF = false
+        }
+    }
+    #endif
 
     // MARK: - Retest
 
