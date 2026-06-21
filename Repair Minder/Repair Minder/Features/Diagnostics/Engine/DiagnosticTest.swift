@@ -32,10 +32,15 @@ protocol DiagnosticTest: Sendable {
     /// Interactive tests: a view that runs the test and calls `complete` with the outcome.
     /// Automatic tests return nil (the default).
     @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView?
+    /// Attempt to resolve this test in the background, before the interactive phase. Return a
+    /// `.pass` outcome if the hardware signal is confirmed; return nil to fall through to the
+    /// normal interactive flow. Default: nil (no pre-flight).
+    func preflight() async -> TestOutcome?
 }
 
 extension DiagnosticTest {
     var requiredPermissions: [DiagnosticPermission] { [] }
     func run() async -> TestOutcome { TestOutcome(id: id, name: name, status: .skip, details: nil) }
     @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { nil }
+    func preflight() async -> TestOutcome? { nil }
 }
