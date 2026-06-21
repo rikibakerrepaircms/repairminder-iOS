@@ -53,7 +53,7 @@ struct NFCTest: DiagnosticTest {
     let id = "nfc"; let name = "NFC"; let category: TestCategory = .connectivity
     let requiresInteraction = true
     #if os(iOS)
-    var isSupported: Bool { NFCNDEFReaderSession.readingAvailable }
+    var isSupported: Bool { NFCTagReaderSession.readingAvailable }
     @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { AnyView(NFCTestView(complete: complete)) }
     #else
     var isSupported: Bool { false }
@@ -119,19 +119,25 @@ private struct BluetoothTestView: View {
     }
 }
 
-@MainActor private final class NFCReader: NSObject, ObservableObject, NFCNDEFReaderSessionDelegate {
-    private var session: NFCNDEFReaderSession?
+// Uses NFCTagReaderSession (TAG format) rather than NFCNDEFReaderSession: the iOS 18+/26 SDK
+// disallows the `NDEF` value in com.apple.developer.nfc.readersession.formats at upload
+// (App Store error 90778), so the entitlement is `[TAG]` only and the code must match.
+// For a "does the reader detect a tag" diagnostic, detecting any tag is exactly what we want.
+@MainActor private final class NFCReader: NSObject, ObservableObject, NFCTagReaderSessionDelegate {
+    private var session: NFCTagReaderSession?
     var onDetect: (() -> Void)?
     func scan() {
-        guard NFCNDEFReaderSession.readingAvailable else { return }
-        session = NFCNDEFReaderSession(delegate: self, queue: nil, invalidateAfterFirstRead: true)
+        guard NFCTagReaderSession.readingAvailable else { return }
+        session = NFCTagReaderSession(pollingOption: [.iso14443, .iso15693, .iso18092], delegate: self, queue: nil)
         session?.alertMessage = "Hold an NFC tag near the top of the device"
         session?.begin()
     }
-    nonisolated func readerSession(_ session: NFCNDEFReaderSession, didDetectNDEFs messages: [NFCNDEFMessage]) {
+    nonisolated func tagReaderSessionDidBecomeActive(_ session: NFCTagReaderSession) {}
+    nonisolated func tagReaderSession(_ session: NFCTagReaderSession, didDetect tags: [NFCTag]) {
+        session.invalidate()
         Task { @MainActor in self.onDetect?() }
     }
-    nonisolated func readerSession(_ session: NFCNDEFReaderSession, didInvalidateWithError error: Error) {}
+    nonisolated func tagReaderSession(_ session: NFCTagReaderSession, didInvalidateWithError error: Error) {}
 }
 
 private struct NFCTestView: View {
