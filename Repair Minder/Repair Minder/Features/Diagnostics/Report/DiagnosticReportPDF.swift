@@ -12,9 +12,10 @@ final class DiagnosticReportPDFRenderer: NSObject, WKNavigationDelegate {
     private var webView: WKWebView?
     private var fileURL: URL?
     private var completion: ((Result<URL, Error>) -> Void)?
+    private var finished = false
     private static var liveRenders: Set<DiagnosticReportPDFRenderer> = []
 
-    enum RenderError: Error { case pdfFailed }
+    enum RenderError: Error { case pdfFailed, timedOut }
 
     /// Render `html` to a PDF named `fileName` in the temporary directory.
     func render(html: String, fileName: String, completion: @escaping (Result<URL, Error>) -> Void) {
@@ -27,6 +28,12 @@ final class DiagnosticReportPDFRenderer: NSObject, WKNavigationDelegate {
         wv.navigationDelegate = self
         wv.loadHTMLString(html, baseURL: nil)
         self.webView = wv
+
+        // Watchdog: if WebKit never reports finish/fail (rare, but it would otherwise leave the
+        // caller's "generating" spinner stuck forever), fail gracefully. `finish` is idempotent.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15) { [weak self] in
+            self?.finish(.failure(RenderError.timedOut))
+        }
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -57,6 +64,8 @@ final class DiagnosticReportPDFRenderer: NSObject, WKNavigationDelegate {
     }
 
     private func finish(_ result: Result<URL, Error>) {
+        guard !finished else { return }   // idempotent: first of finish/fail/timeout wins
+        finished = true
         completion?(result)
         completion = nil
         webView = nil

@@ -28,8 +28,10 @@ struct TransmitView: View {
     }
 
     private var deviceDescription: String? {
-        guard let d = runner.outcome(for: "device_info")?.details else { return nil }
-        let parts = [d["model"], d["os_version"]].compactMap { $0 }
+        // Prefer the precise marketing name (e.g. "iPhone 15 Pro"), matching the PDF banner,
+        // rather than UIDevice's generic "iPhone". os_version comes from the device_info test.
+        let os = runner.outcome(for: "device_info")?.details?["os_version"]
+        let parts = [DeviceModelName.marketingName, os].compactMap { $0 }.filter { !$0.isEmpty }
         return parts.isEmpty ? nil : parts.joined(separator: " ")
     }
 

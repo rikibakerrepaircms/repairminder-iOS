@@ -22,11 +22,18 @@ enum DeviceModelName {
         return String(cString: machine)
     }
 
+    /// Pure identifier → marketing-name lookup (testable, no device dependency).
+    /// Returns nil for unknown/empty identifiers.
+    static func name(for identifier: String) -> String? {
+        guard !identifier.isEmpty else { return nil }
+        return map[identifier]
+    }
+
     /// Best-effort marketing name (e.g. "iPhone 15 Pro"). Falls back to the generic
     /// UIDevice model ("iPhone") when the identifier is unknown.
     static var marketingName: String {
         let id = identifier
-        if let name = map[id] { return name }
+        if let name = name(for: id) { return name }
         #if canImport(UIKit)
         return UIDevice.current.model
         #else
@@ -56,6 +63,11 @@ enum DeviceModelName {
         // iPhone 16
         "iPhone17,3": "iPhone 16", "iPhone17,4": "iPhone 16 Plus",
         "iPhone17,1": "iPhone 16 Pro", "iPhone17,2": "iPhone 16 Pro Max", "iPhone17,5": "iPhone 16e",
+        // iPhone 17 — only iPhone18,3 is verified here (iOS 26 simulator). The Pro/Pro Max/Air
+        // identifiers (iPhone18,x) are intentionally NOT guessed: a wrong model name on a
+        // customer's certificate is worse than the generic "iPhone" fallback. Add them once
+        // confirmed on real hardware.
+        "iPhone18,3": "iPhone 17",
         // A few iPads (diagnostics is iPhone-led, but iPad may run it)
         "iPad13,18": "iPad (10th gen)", "iPad14,3": "iPad Pro 11-inch (4th gen)",
         "iPad14,5": "iPad Pro 12.9-inch (6th gen)", "iPad13,16": "iPad Air (5th gen)",
