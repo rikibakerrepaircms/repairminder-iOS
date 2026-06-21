@@ -8,7 +8,8 @@ import SwiftUI
 struct TransmitView: View {
     @ObservedObject private var runner: DiagnosticRunner
     private let service: DiagnosticsService
-    @State private var shopCode = ""
+    @State private var shopCode: String
+    @State private var remember: Bool
     @State private var phase: Phase = .idle
     @State private var isGeneratingPDF = false
 
@@ -16,6 +17,9 @@ struct TransmitView: View {
 
     init(runner: DiagnosticRunner) {
         _runner = ObservedObject(wrappedValue: runner)
+        // Prefill (and keep "remember" on) for a device already paired to a shop.
+        _shopCode = State(initialValue: DiagnosticsShopPairing.shopCode ?? "")
+        _remember = State(initialValue: DiagnosticsShopPairing.isPaired)
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-uiTestStubTransmit") {
             service = DiagnosticsService(api: StubDiagnosticsAPI())
@@ -45,6 +49,27 @@ struct TransmitView: View {
                     .keyboardType(.numberPad)
                     #endif
                     .accessibilityIdentifier("shop-code-field")
+
+                Toggle("Remember this shop on this device", isOn: $remember)
+                    .accessibilityIdentifier("remember-shop")
+
+                if DiagnosticsShopPairing.isPaired {
+                    Button("Forget shop on this device", role: .destructive) {
+                        DiagnosticsShopPairing.unpair()
+                        remember = false
+                        shopCode = ""
+                    }
+                    .accessibilityIdentifier("forget-shop")
+                }
+            }
+
+            if remember {
+                Section {
+                    Label("This device will send future results to this shop automatically.",
+                          systemImage: "checkmark.seal")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             switch phase {
@@ -107,6 +132,8 @@ struct TransmitView: View {
                 try await service.transmit(shopCode: shopCode, platform: "ios", imei: nil, serial: nil,
                                            deviceDescription: deviceDescription, reportID: runner.reportID,
                                            outcomes: runner.orderedOutcomes)
+                // Pair this device to the shop (or forget) per the toggle, so future runs auto-send.
+                if remember { DiagnosticsShopPairing.pair(shopCode) } else { DiagnosticsShopPairing.unpair() }
                 phase = .success
             } catch {
                 DiagnosticsBuffer.save(shopCode: shopCode, deviceDescription: deviceDescription,

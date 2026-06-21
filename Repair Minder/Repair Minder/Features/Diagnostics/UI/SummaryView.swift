@@ -8,6 +8,10 @@ struct SummaryView: View {
     @State private var showTransmit = false
     @State private var retestTest: RetestBox?
     @State private var isGeneratingPDF = false
+    @State private var autoSend: AutoSend = .idle
+
+    /// Auto-send state for a shop-paired device (idle until the run is sent on appear / retest).
+    enum AutoSend: Equatable { case idle, sending, sent, failed }
 
     /// Identifiable wrapper so we can drive a sheet with the chosen interactive test.
     struct RetestBox: Identifiable { let id: String; let test: any DiagnosticTest }
@@ -80,10 +84,35 @@ struct SummaryView: View {
             }
         }
         #endif
-        .safeAreaInset(edge: .bottom) {
-            Button {
-                showTransmit = true
-            } label: {
+        .safeAreaInset(edge: .bottom) { bottomBar }
+        .onAppear { autoSendIfPaired() }
+        .navigationDestination(isPresented: $showTransmit) {
+            TransmitView(runner: runner)
+        }
+        .sheet(item: $retestTest) { box in
+            interactiveRetestSheet(box.test)
+        }
+    }
+
+    // MARK: - Bottom bar (auto-send when paired, manual otherwise)
+
+    @ViewBuilder
+    private var bottomBar: some View {
+        if DiagnosticsShopPairing.isPaired {
+            Button { showTransmit = true } label: {
+                autoSendLabel
+                    .font(.subheadline.weight(.medium))
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(autoSendColor.opacity(0.15))
+                    .foregroundStyle(autoSendColor)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .padding()
+            .background(.ultraThinMaterial)
+            .accessibilityIdentifier("auto-send-status")
+        } else {
+            Button { showTransmit = true } label: {
                 Text("Send results")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
@@ -96,11 +125,64 @@ struct SummaryView: View {
             .background(.ultraThinMaterial)
             .accessibilityIdentifier("send-results")
         }
-        .navigationDestination(isPresented: $showTransmit) {
-            TransmitView(runner: runner)
+    }
+
+    private var autoSendColor: Color {
+        switch autoSend {
+        case .sent: return .green
+        case .failed: return .orange
+        default: return .accentColor
         }
-        .sheet(item: $retestTest) { box in
-            interactiveRetestSheet(box.test)
+    }
+
+    @ViewBuilder
+    private var autoSendLabel: some View {
+        switch autoSend {
+        case .idle, .sending:
+            HStack(spacing: 8) { ProgressView(); Text("Sending to your shop…") }
+        case .sent:
+            Label("Sent to your shop", systemImage: "checkmark.circle.fill")
+        case .failed:
+            Label("Saved on device — will sync when connected", systemImage: "exclamationmark.triangle.fill")
+        }
+    }
+
+    // MARK: - Auto-send (shop-paired devices)
+
+    private var deviceDescription: String? {
+        let os = runner.outcome(for: "device_info")?.details?["os_version"]
+        let parts = [DeviceModelName.marketingName, os].compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+
+    private func makeService() -> DiagnosticsService {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-uiTestStubTransmit") {
+            return DiagnosticsService(api: StubDiagnosticsAPI())
+        }
+        #endif
+        return DiagnosticsService()
+    }
+
+    /// On a shop-paired device, send (or re-send) the run to the paired shop. Safe to call
+    /// repeatedly — the Worker reuses one session per run (report_id) and upserts each test.
+    private func autoSendIfPaired() {
+        guard let code = DiagnosticsShopPairing.shopCode, !runner.orderedOutcomes.isEmpty else { return }
+        autoSend = .sending
+        let service = makeService()
+        let outcomes = runner.orderedOutcomes
+        let reportID = runner.reportID
+        let desc = deviceDescription
+        Task {
+            do {
+                try await service.transmit(shopCode: code, platform: "ios", imei: nil, serial: nil,
+                                           deviceDescription: desc, reportID: reportID, outcomes: outcomes)
+                autoSend = .sent
+            } catch {
+                DiagnosticsBuffer.save(shopCode: code, deviceDescription: desc, imei: nil, serial: nil,
+                                       reportID: reportID, outcomes: outcomes)
+                autoSend = .failed
+            }
         }
     }
 
@@ -252,7 +334,10 @@ struct SummaryView: View {
         if test.requiresInteraction {
             retestTest = RetestBox(id: test.id, test: test)
         } else {
-            Task { await runner.retestAuto(test) }
+            Task {
+                await runner.retestAuto(test)
+                autoSendIfPaired()   // re-send so the shop's copy reflects the retest (same session)
+            }
         }
     }
 
@@ -261,6 +346,7 @@ struct SummaryView: View {
         if let view = test.makeView(complete: { outcome in
             runner.record(outcome)
             retestTest = nil
+            autoSendIfPaired()   // re-send so the shop's copy reflects the retest (same session)
         }) {
             view
         } else {
