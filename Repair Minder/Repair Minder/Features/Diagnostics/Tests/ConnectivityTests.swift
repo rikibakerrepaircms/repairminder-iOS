@@ -45,6 +45,10 @@ struct BluetoothTest: DiagnosticTest {
     #if os(iOS)
     var isSupported: Bool { true }
     @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { AnyView(BluetoothTestView(complete: complete)) }
+    func preflight() async -> TestOutcome? {
+        guard await BluetoothAliveProbe().poweredOn(timeoutMs: 2000) else { return nil }
+        return diagnosticOutcome("bluetooth", "Bluetooth", .pass, ["state": "poweredOn", "source": "preflight"])
+    }
     #else
     var isSupported: Bool { false }
     #endif
