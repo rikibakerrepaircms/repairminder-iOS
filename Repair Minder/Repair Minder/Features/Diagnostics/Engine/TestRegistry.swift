@@ -23,6 +23,7 @@ enum TestRegistry {
         // Hardware (part 1)
         t.append(StorageTest())
         t.append(BatteryTest())
+        t.append(BatteryDrainTest())
         t.append(ChargeTest())
         t.append(HardwareButtonsTest())
         t.append(VibrationTest())

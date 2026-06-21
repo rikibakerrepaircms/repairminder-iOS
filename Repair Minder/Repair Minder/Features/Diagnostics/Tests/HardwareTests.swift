@@ -32,15 +32,8 @@ struct BatteryTest: DiagnosticTest {
     var isSupported: Bool { true }
     func run() async -> TestOutcome {
         #if os(iOS)
-        return await MainActor.run {
-            let d = UIDevice.current
-            d.isBatteryMonitoringEnabled = true
-            var details: [String: String] = [:]
-            let level = d.batteryLevel
-            if level >= 0 { details["level"] = "\(Int(level * 100))%" }
-            details["state"] = batteryStateLabel(d.batteryState)
-            return diagnosticOutcome(id, name, .pass, details)
-        }
+        let snap = await MainActor.run { BatteryProbeUIKit().snapshot() }
+        return diagnosticOutcome(id, name, .pass, BatteryTestDetails.from(snap))
         #else
         return diagnosticOutcome(id, name, .skip, ["reason": "unsupported"])
         #endif
