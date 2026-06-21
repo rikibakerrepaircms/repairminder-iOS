@@ -13,8 +13,11 @@ struct TestRunnerView: View {
     var body: some View {
         Group {
             switch runner.phase {
-            case .runningAuto:
-                AutoRunChecklist(runner: runner) { advanceFromAuto() }
+            case .permissions:
+                PermissionPhaseView(runner: runner)
+
+            case .preparing:
+                PreparingView(runner: runner) { advanceFromPreparing() }
 
             case .interactive:
                 if let flash {
@@ -53,8 +56,8 @@ struct TestRunnerView: View {
         }
     }
 
-    /// Auto phase finished → move to the first interactive test, or straight to the summary.
-    private func advanceFromAuto() {
+    /// Preparing finished → move to the first remaining interactive test, or straight to summary.
+    private func advanceFromPreparing() {
         runner.phase = (runner.currentInteractiveTest == nil) ? .finished : .interactive
     }
 
@@ -72,38 +75,61 @@ struct TestRunnerView: View {
     }
 }
 
-/// Runs the automatic tests once and lists each with a live ✓ / ✗ / skip status so passes are
-/// visible rather than silent, then auto-advances.
-private struct AutoRunChecklist: View {
+/// Runs the automatic tests + background pre-flight, showing a live checklist and a 1–2s banner per
+/// background pass, then auto-advances. Re-entry-safe (guards on `autoRan` / `preflightRan`).
+private struct PreparingView: View {
     @ObservedObject var runner: DiagnosticRunner
     let onDone: () -> Void
+    @State private var banner: TestOutcome?
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text("Automated checks")
-                .font(.headline)
-                .accessibilityIdentifier("runner-running")
+        ZStack(alignment: .top) {
+            VStack(spacing: 16) {
+                Text("Preparing…")
+                    .font(.headline)
+                    .accessibilityIdentifier("runner-running")   // keep stable id so existing UITests still match
 
-            VStack(spacing: 10) {
-                ForEach(runner.autoChecklistTests, id: \.id) { test in
-                    HStack(spacing: 12) {
-                        let outcome = runner.outcome(for: test.id)
-                        Image(systemName: icon(for: outcome))
-                            .foregroundStyle(color(for: outcome))
-                            .frame(width: 24)
-                        Text(test.name).font(.subheadline)
-                        Spacer()
-                        if outcome == nil { ProgressView().scaleEffect(0.8) }
+                VStack(spacing: 10) {
+                    ForEach(runner.autoChecklistTests, id: \.id) { test in
+                        HStack(spacing: 12) {
+                            let outcome = runner.outcome(for: test.id)
+                            Image(systemName: icon(for: outcome))
+                                .foregroundStyle(color(for: outcome))
+                                .frame(width: 24)
+                            Text(test.name).font(.subheadline)
+                            Spacer()
+                            if outcome == nil { ProgressView().scaleEffect(0.8) }
+                        }
                     }
                 }
+                .padding(.horizontal, 24)
             }
-            .padding(.horizontal, 24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            if let banner {
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    Text("\(banner.name) passed").font(.subheadline.weight(.semibold))
+                }
+                .padding(.horizontal, 16).padding(.vertical, 10)
+                .background(.ultraThinMaterial, in: Capsule())
+                .padding(.top, 8)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .accessibilityIdentifier("preflight-banner")
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
             if !runner.autoRan { await runner.runAuto() }
-            // Brief beat so completed ticks are visible before the flow moves on.
-            try? await Task.sleep(nanoseconds: 800_000_000)
+            await runner.runPreflight()
+            // Brief beat so completed ticks are visible.
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            // Play a 1.5s banner per background pass.
+            for outcome in runner.backgroundPassed {
+                withAnimation { banner = outcome }
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                withAnimation { banner = nil }
+                try? await Task.sleep(nanoseconds: 150_000_000)
+            }
             onDone()
         }
     }
@@ -170,4 +196,10 @@ private struct ResultFlashView: View {
         case .skip: return "Skipped"
         }
     }
+}
+
+// TEMP stub — replaced in Task 10.
+private struct PermissionPhaseView: View {
+    @ObservedObject var runner: DiagnosticRunner
+    var body: some View { Color.clear.onAppear { runner.phase = .preparing } }
 }

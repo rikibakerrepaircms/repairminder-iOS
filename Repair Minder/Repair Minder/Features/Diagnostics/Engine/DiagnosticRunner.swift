@@ -8,13 +8,13 @@ import Foundation
 final class DiagnosticRunner: ObservableObject {
     /// Where a session is in its lifecycle. Lives on the runner (not the runner *view*) so backing
     /// out of a test and re-entering resumes where the user left off instead of restarting.
-    enum RunPhase { case runningAuto, interactive, finished }
+    enum RunPhase { case permissions, preparing, interactive, finished }
 
     let tests: [DiagnosticTest]
     @Published private(set) var selectedIds: Set<String> = []
     @Published private(set) var outcomes: [String: TestOutcome] = [:]
     @Published private(set) var autoRan = false
-    @Published var phase: RunPhase = .runningAuto
+    @Published var phase: RunPhase = .permissions
     @Published var interactiveIndex = 0
     /// Interactive tests resolved during the preparing phase by `preflight()` — excluded from the
     /// interactive queue. Stable during the interactive phase so index-based advancement is unaffected.
@@ -54,7 +54,7 @@ final class DiagnosticRunner: ObservableObject {
         interactiveIndex = 0
         preflightResolvedIds = []
         preflightRan = false
-        phase = .runningAuto
+        phase = .permissions
         _reportID = nil          // a fresh run gets a fresh report reference
         _reportDate = nil
     }
