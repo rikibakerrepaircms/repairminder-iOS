@@ -52,7 +52,7 @@ struct LiDARTest: DiagnosticTest {
 
 @MainActor private final class BiometricController: ObservableObject {
     @Published var status: String = "Ready"
-    func authenticate(_ done: @escaping (Bool, String) -> Void) {
+    func authenticate(_ done: @escaping (Bool, String, String) -> Void) {
         let ctx = LAContext()
         let kind: String
         switch ctx.biometryType {
@@ -61,7 +61,10 @@ struct LiDARTest: DiagnosticTest {
         default: kind = "unknown"
         }
         ctx.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "Verify the biometric sensor") { ok, err in
-            Task { @MainActor in done(ok, kind); if let err { self.status = err.localizedDescription } }
+            // Use a fresh context for canEvaluatePolicy; the original may be consumed.
+            let statusCtx = LAContext()
+            let faceIDStatus = statusCtx.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil) ? "active" : "inactive"
+            Task { @MainActor in done(ok, kind, faceIDStatus); if let err { self.status = err.localizedDescription } }
         }
     }
 }
@@ -82,14 +85,14 @@ private struct BiometricTestView: View {
             VStack(spacing: 12) {
                 Image(systemName: "faceid").font(.system(size: 44)).foregroundStyle(Color.accentColor)
                 Button("Authenticate") {
-                    ctrl.authenticate { ok, kind in
-                        complete(diagnosticOutcome("biometric", "Biometric Sensor", ok ? .pass : .fail, ["type": kind]))
+                    ctrl.authenticate { ok, kind, faceIDStatus in
+                        complete(diagnosticOutcome("biometric", "Biometric Sensor", ok ? .pass : .fail, ["type": kind, "faceid_status": faceIDStatus]))
                     }
                 }
                 .buttonStyle(.borderedProminent)
                 Text(ctrl.status).font(.caption).foregroundStyle(.secondary)
             }
-            .onAppear { ctrl.authenticate { ok, kind in if ok { complete(diagnosticOutcome("biometric", "Biometric Sensor", .pass, ["type": kind])) } } }
+            .onAppear { ctrl.authenticate { ok, kind, faceIDStatus in if ok { complete(diagnosticOutcome("biometric", "Biometric Sensor", .pass, ["type": kind, "faceid_status": faceIDStatus])) } } }
         }
     }
 }
