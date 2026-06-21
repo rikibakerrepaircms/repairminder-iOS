@@ -396,6 +396,14 @@ private struct ProximityTestView: View {
 
     func fail() { probe.stop(); outcome = diagnosticOutcome("light", "Light Sensor", .fail, nil) }
     func skip() { probe.stop(); outcome = diagnosticOutcome("light", "Light Sensor", .skip, nil) }
+
+    /// Watchdog: auto-fail dead hardware that never registers a light increase. No-op if the user
+    /// already passed/failed/skipped or the success signal already fired (guard: `outcome == nil`).
+    func failIfUnresolved() {
+        guard outcome == nil else { return }
+        probe.stop()
+        outcome = diagnosticOutcome("light", "Light Sensor", .fail, ["reason": "no_light_signal"])
+    }
 }
 
 private struct LightSensorTestView: View {
@@ -508,6 +516,12 @@ private struct LightSensorActiveView: View {
         savedBrightness = UIScreen.main.brightness
         UIScreen.main.brightness = 0
         model.start()
+        // Bounded watchdog: measuring collects a 10-sample baseline first, so allow ~12s before a
+        // dead/covered sensor auto-fails (not skip). Single-shot via the model's `outcome == nil`.
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 12_000_000_000)   // ~12s
+            model.failIfUnresolved()
+        }
     }
 }
 #endif

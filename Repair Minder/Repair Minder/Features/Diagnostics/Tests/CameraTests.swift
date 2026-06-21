@@ -214,6 +214,20 @@ struct CameraPreview: UIViewRepresentable {
         advance()
     }
 
+    /// Watchdog: if the lens at `index` is still the active, unresolved lens (dead hardware that
+    /// never recognised a QR), force-fail it and advance. No-op if it already passed/failed, if the
+    /// sequencer has already moved past it, or if the whole test already produced an outcome
+    /// (single-shot guards: `activeIndex == index`, `passed == nil`, `outcome == nil`).
+    func failCurrentLensIfUnresolved(index: Int) {
+        guard outcome == nil, activeIndex == index, index < lenses.count,
+              lenses[index].passed == nil else { return }
+        probe?.stop()
+        probe = nil
+        activeProbeSession = nil
+        lenses[index].passed = false
+        advance()
+    }
+
     private func advance() {
         let next = activeIndex + 1
         if next < lenses.count {
@@ -266,6 +280,14 @@ struct CameraPreview: UIViewRepresentable {
     }
     func fail() { probe.stop(); outcome = diagnosticOutcome("frontcamera", "Front Camera", .fail, nil) }
     func skip() { probe.stop(); outcome = diagnosticOutcome("frontcamera", "Front Camera", .skip, nil) }
+
+    /// Watchdog: auto-fail dead hardware that never emits a QR signal. No-op if the user already
+    /// passed/failed/skipped or the QR already fired (single-shot guard: `outcome == nil`).
+    func failIfUnresolved() {
+        guard outcome == nil else { return }
+        probe.stop()
+        outcome = diagnosticOutcome("frontcamera", "Front Camera", .fail, ["reason": "no_front_camera_signal"])
+    }
 }
 
 // MARK: - Front Camera View
@@ -335,7 +357,14 @@ private struct FrontCameraActiveView: View {
                 .padding(.top, 8)
             }
         }
-        .onAppear { model.start() }
+        .onAppear {
+            model.start()
+            // Bounded watchdog: dead front camera that never sees a QR auto-fails (not skip).
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 10_000_000_000)   // ~10s
+                model.failIfUnresolved()
+            }
+        }
         .onChange(of: model.outcome?.status) { _, _ in
             if let o = model.outcome { complete(o) }
         }
@@ -433,16 +462,23 @@ private struct FlashTestView: View {
                 }
             })
 
-            // After full window (baseline + torch-on + sample), reveal manual pass
+            // After the full window, reveal manual pass; then a bounded watchdog auto-fails dead
+            // hardware so it grades as a fail rather than a skip ("good").
             let totalWindow = baselineDuration + settleDuration + sampleDuration
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: UInt64(totalWindow * 1_000_000_000))
                 guard !completed else { return }
                 showManualPass = true
+                try? await Task.sleep(nanoseconds: 4_000_000_000)   // ~10s total since appear
+                guard !completed else { return }
+                finish(.fail, ["reason": "no_flash_signal"])
             }
         }
         .onDisappear {
-            if !completed { finish(.skip, nil) }
+            // The watchdog owns the fail decision; a back-out must not silently record a skip
+            // that overrides it. Just clean up the torch/probe and leave the outcome to the runner.
+            probe?.setTorch(false)
+            probe?.stop()
         }
     }
 }
@@ -518,10 +554,27 @@ private struct RearCameraTestView: View {
                     .padding(.top, 8)
                 }
             }
-            .onAppear { model.startCurrentLens() }
+            .onAppear {
+                model.startCurrentLens()
+                armLensWatchdog(for: model.activeIndex)
+            }
+            // Re-arm the per-lens watchdog each time the sequencer advances to the next lens.
+            .onChange(of: model.activeIndex) { _, idx in
+                armLensWatchdog(for: idx)
+            }
             .onChange(of: model.outcome?.status) { _, _ in
                 if let o = model.outcome { complete(o) }
             }
+        }
+    }
+
+    /// Bounded per-lens watchdog: a dead lens that never recognises a QR auto-fails (not skip) after
+    /// ~10s and the sequencer moves on. Single-shot via the model's own guards (active index + lens
+    /// `passed == nil` + overall `outcome == nil`), so it never double-completes or fights Skip/Fail.
+    private func armLensWatchdog(for index: Int) {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 10_000_000_000)   // ~10s per lens
+            model.failCurrentLensIfUnresolved(index: index)
         }
     }
 

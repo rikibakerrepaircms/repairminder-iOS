@@ -71,6 +71,15 @@ struct HeadphonesTest: DiagnosticTest {
         probe.stop()
     }
 
+    /// Watchdog: a hung/dead loopback probe can leave `run()` awaiting forever with no outcome.
+    /// Auto-fail in that case (not skip). No-op if already cancelled or an outcome was produced
+    /// (single-shot guards: `cancelled`, `outcome == nil`).
+    func failIfUnresolved() {
+        guard !cancelled, outcome == nil else { return }
+        probe.stop()
+        outcome = diagnosticOutcome("speaker", "Speaker", .fail, ["reason": "no_speaker_signal"])
+    }
+
     private func measure(_ route: AudioRoute) async -> Double {
         await withCheckedContinuation { (cont: CheckedContinuation<Double, Never>) in
             probe.run(route: route, durationMs: 800) { level in cont.resume(returning: level) }
@@ -97,6 +106,14 @@ private struct SpeakerTestView: View {
                 if !model.phase.isEmpty { ProgressView(model.phase) }
             }
             .task { await model.run() }
+            .onAppear {
+                // Bounded watchdog: both routes measure ~800ms each (~1.6s); allow ~10s before a
+                // hung probe auto-fails (not skip). Single-shot via the model's own guards.
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 10_000_000_000)   // ~10s
+                    model.failIfUnresolved()
+                }
+            }
             .onChange(of: model.outcome?.status) { _, _ in
                 if let o = model.outcome { complete(o) }
             }
