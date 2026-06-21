@@ -436,6 +436,7 @@ private struct LightSensorActiveView: View {
     /// front camera has a dark baseline to detect a light increase against. Without this, the screen
     /// dimmed to black the instant the page opened, which read as the test being broken.
     @State private var started = false
+    @Environment(\.scenePhase) private var scenePhase
 
     init(probe: CameraProbe, complete: @escaping (TestOutcome) -> Void) {
         self.complete = complete
@@ -507,6 +508,18 @@ private struct LightSensorActiveView: View {
             if let o = model.outcome {
                 UIScreen.main.brightness = savedBrightness
                 complete(o)
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .active:
+                // Returning to the foreground while still measuring — re-dim so the probe keeps working.
+                if started, model.outcome == nil { UIScreen.main.brightness = 0 }
+            case .inactive, .background:
+                // Leaving the foreground (Control Center, call, lock) — never leave the screen dark.
+                UIScreen.main.brightness = savedBrightness
+            @unknown default:
+                UIScreen.main.brightness = savedBrightness
             }
         }
     }
