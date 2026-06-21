@@ -84,6 +84,14 @@ struct VibrationTest: DiagnosticTest {
     #endif
 }
 
+/// Pure charge-pass decision: require an observed unplugged→charging edge so a device that was
+/// already plugged in (or resting at .full) cannot pass without proving the charger engaged.
+enum ChargeGate {
+    static func passed(state: String, sawUnplugged: Bool) -> Bool {
+        sawUnplugged && (state == "charging" || state == "full")
+    }
+}
+
 #if os(iOS)
 import UIKit
 import AVFoundation
@@ -105,11 +113,12 @@ private struct ChargeTestView: View {
     @State private var state: UIDevice.BatteryState = .unknown
     @State private var observer: NSObjectProtocol?
     @State private var done = false
+    @State private var sawUnplugged = false
 
     var body: some View {
         TestScaffold(
             title: "Charge",
-            instruction: "Connect the device to a wired or wireless charger. It passes automatically when charging is detected.",
+            instruction: "Make sure the device is unplugged, then connect a wired or wireless charger. It passes when charging starts.",
             hints: ["Plug in a charger (or place on a wireless pad)"],
             onPass: { finish(.pass) }, onFail: { finish(.fail) }, onSkip: { finish(.skip) }
         ) {
@@ -121,9 +130,13 @@ private struct ChargeTestView: View {
             .onAppear {
                 UIDevice.current.isBatteryMonitoringEnabled = true
                 state = UIDevice.current.batteryState
+                if state == .unplugged { sawUnplugged = true }
                 observer = NotificationCenter.default.addObserver(forName: UIDevice.batteryStateDidChangeNotification, object: nil, queue: .main) { _ in
                     state = UIDevice.current.batteryState
-                    if state == .charging || state == .full { finish(.pass, ["state": batteryStateLabel(state), "ac": "n/a", "dock": "n/a", "usb": "n/a", "wireless": "n/a"]) }
+                    if state == .unplugged { sawUnplugged = true }
+                    if ChargeGate.passed(state: batteryStateLabel(state), sawUnplugged: sawUnplugged) {
+                        finish(.pass, ["state": batteryStateLabel(state), "transition": "unplugged_to_charging", "ac": "n/a", "dock": "n/a", "usb": "n/a", "wireless": "n/a"])
+                    }
                 }
             }
             .onDisappear { removeObserver() }
