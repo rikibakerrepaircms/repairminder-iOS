@@ -121,7 +121,7 @@ private struct ChargeTestView: View {
                 state = UIDevice.current.batteryState
                 NotificationCenter.default.addObserver(forName: UIDevice.batteryStateDidChangeNotification, object: nil, queue: .main) { _ in
                     state = UIDevice.current.batteryState
-                    if state == .charging || state == .full { finish(.pass, ["state": batteryStateLabel(state)]) }
+                    if state == .charging || state == .full { finish(.pass, ["state": batteryStateLabel(state), "ac": "n/a", "dock": "n/a", "usb": "n/a", "wireless": "n/a"]) }
                 }
             }
         }
@@ -180,7 +180,7 @@ private struct HardwareButtonsTestView: View {
             Text(label).font(.caption)
         }
     }
-    private func checkDone() { if watcher.up && watcher.down { finish(.pass, ["volume_up": "1", "volume_down": "1"]) } }
+    private func checkDone() { if watcher.up && watcher.down { finish(.pass, ["volume_up": "1", "volume_down": "1", "power": "n/a", "mute": "n/a"]) } }
     private func finish(_ s: TestStatus, _ d: [String: String]? = nil) { watcher.stop(); complete(diagnosticOutcome("hardwarebutton", "Hardware Buttons", s, d)) }
 }
 
