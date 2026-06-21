@@ -25,6 +25,8 @@ protocol DiagnosticTest: Sendable {
     var requiresInteraction: Bool { get }
     /// False when the hardware/capability is absent on this device → engine records `.skip`.
     var isSupported: Bool { get }
+    /// Permissions this test needs, requested up front at Start. Default: none.
+    var requiredPermissions: [DiagnosticPermission] { get }
     /// Automatic tests: run and return an outcome. (Interactive tests can rely on the default.)
     func run() async -> TestOutcome
     /// Interactive tests: a view that runs the test and calls `complete` with the outcome.
@@ -33,6 +35,7 @@ protocol DiagnosticTest: Sendable {
 }
 
 extension DiagnosticTest {
+    var requiredPermissions: [DiagnosticPermission] { [] }
     func run() async -> TestOutcome { TestOutcome(id: id, name: name, status: .skip, details: nil) }
     @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { nil }
 }
