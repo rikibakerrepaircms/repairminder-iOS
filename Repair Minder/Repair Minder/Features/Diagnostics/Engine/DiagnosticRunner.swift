@@ -55,10 +55,10 @@ final class DiagnosticRunner: ObservableObject {
     }
     var allSelectedHaveOutcome: Bool { selectedTests.allSatisfy { outcomes[$0.id] != nil } }
 
+    // MARK: Derived grade
+    var grade: DiagnosticGrade { DiagnosticGrade.grade(for: orderedOutcomes) }
+    /// Wire/legacy string ("pass"/"partial"/"fail") kept for existing callers.
     var overallResult: String {
-        let o = orderedOutcomes
-        if o.contains(where: { $0.status == .fail }) { return "fail" }
-        if o.contains(where: { $0.status == .partial || $0.status == .error }) { return "partial" }
-        return "pass"
+        switch grade { case .bad: return "fail"; case .good: return "partial"; case .excellent: return "pass" }
     }
 }
