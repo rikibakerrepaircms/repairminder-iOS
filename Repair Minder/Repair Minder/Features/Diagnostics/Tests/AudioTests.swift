@@ -94,8 +94,9 @@ private struct SpeakerTestView: View {
     }
 }
 
-// MARK: Microphone (live input level → auto-pass when sound detected)
+// MARK: Microphone (per input data-source, sequential with 3 s window per source)
 
+/// Meters a single AVAudioRecorder for up to `windowMs` ms; reports peak dBFS at end.
 @MainActor private final class MicMeter: ObservableObject {
     @Published var level: Float = 0
     @Published var denied = false
@@ -124,7 +125,7 @@ private struct SpeakerTestView: View {
             r.updateMeters()
             let peak = r.peakPower(forChannel: 0)   // dBFS, -160…0
             Task { @MainActor in
-                self.level = max(0, (peak + 60) / 60)   // 0…1
+                self.level = max(0, (peak + 60) / 60)   // 0…1 normalised for UI
                 if peak > -20 { onDetect() }
             }
         }
@@ -132,25 +133,183 @@ private struct SpeakerTestView: View {
     func stop() { timer?.invalidate(); timer = nil; recorder?.stop(); recorder = nil }
 }
 
+// MARK: Per-source sequencer
+
+private struct MicSource: Identifiable {
+    let id: String          // "bottom", "front", "back", or "default"
+    let label: String       // human-readable
+    var result: Bool?       // nil = not yet tested
+}
+
+@MainActor private final class MicrophoneViewModel: ObservableObject {
+    @Published var sources: [MicSource] = []
+    @Published var currentIndex: Int = 0
+    @Published var level: Float = 0
+    @Published var denied = false
+    @Published var done = false
+
+    private var meter = MicMeter()
+    private var timeoutTask: Task<Void, Never>?
+
+    // Build source list from AVAudioSession, falling back to a single "default".
+    func prepare() {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playAndRecord, options: [.defaultToSpeaker])
+        try? session.setActive(true)
+
+        if let inputs = session.availableInputs,
+           let port = inputs.first,
+           let dataSources = port.dataSources, !dataSources.isEmpty {
+            sources = dataSources.map { ds in
+                let key = ds.dataSourceName.lowercased()
+                let label: String
+                switch key {
+                case let k where k.contains("bottom"): label = "Bottom mic"
+                case let k where k.contains("front"):  label = "Front mic"
+                case let k where k.contains("back"):   label = "Back mic"
+                default:                               label = ds.dataSourceName
+                }
+                return MicSource(id: key, label: label)
+            }
+        } else {
+            sources = [MicSource(id: "default", label: "Microphone")]
+        }
+    }
+
+    func startCurrentSource() {
+        guard currentIndex < sources.count else { finish(); return }
+        let session = AVAudioSession.sharedInstance()
+        // Point session at this data source
+        if let inputs = session.availableInputs,
+           let port = inputs.first,
+           let ds = port.dataSources?.first(where: { $0.dataSourceName.lowercased() == sources[currentIndex].id }) {
+            try? port.setPreferredDataSource(ds)
+            try? session.setPreferredInput(port)
+        }
+        meter.stop()
+        meter = MicMeter()
+        level = 0
+        timeoutTask?.cancel()
+
+        meter.start { [weak self] in
+            guard let self else { return }
+            self.markCurrent(pass: true)
+        }
+        // Observe denied via binding on next runloop
+        Task { @MainActor in
+            // Poll denial once (requestRecordPermission is async)
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            if self.meter.denied { self.denied = true; self.finish() }
+        }
+        // 3-second timeout per source
+        timeoutTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard let self, !Task.isCancelled else { return }
+            self.markCurrent(pass: false)
+        }
+    }
+
+    private func markCurrent(pass: Bool) {
+        timeoutTask?.cancel()
+        meter.stop()
+        guard currentIndex < sources.count else { return }
+        sources[currentIndex].result = pass
+        currentIndex += 1
+        if currentIndex < sources.count {
+            startCurrentSource()
+        } else {
+            finish()
+        }
+    }
+
+    private func finish() {
+        timeoutTask?.cancel()
+        meter.stop()
+        done = true
+    }
+
+    func stopAll() {
+        timeoutTask?.cancel()
+        meter.stop()
+    }
+
+    func outcome() -> TestOutcome {
+        let perSource = Dictionary(uniqueKeysWithValues: sources.compactMap { s -> (String, Bool)? in
+            guard let r = s.result else { return nil }
+            return (s.id, r)
+        })
+        let (status, details) = MicSourceAggregate.result(perSource: perSource.isEmpty ? ["default": false] : perSource)
+        return diagnosticOutcome("microphone", "Microphone", status, details)
+    }
+}
+
 private struct MicrophoneTestView: View {
     let complete: (TestOutcome) -> Void
-    @StateObject private var mic = MicMeter()
+    @StateObject private var model = MicrophoneViewModel()
+
     var body: some View {
         TestScaffold(
             title: "Microphone",
-            instruction: "Speak or tap near the device. It passes automatically when the microphone picks up sound.",
-            hints: ["Say a few words"],
-            onPass: { finish(.pass) }, onFail: { finish(.fail) }, onSkip: { finish(.skip) }
+            instruction: "Speak or tap near each microphone location when prompted. Each source is tested for 3 seconds.",
+            hints: ["Say 'test' or tap the device near each mic"],
+            allowManualPass: false,
+            onPass: {},
+            onFail: { finish(.fail) },
+            onSkip: { finish(.skip) }
         ) {
-            VStack(spacing: 10) {
-                if mic.denied { Label("Microphone permission denied", systemImage: "xmark.circle").foregroundStyle(.red) }
-                ProgressView(value: Double(mic.level)).tint(.green)
-                Text("Input level").font(.caption).foregroundStyle(.secondary)
+            VStack(spacing: 16) {
+                if model.denied {
+                    Label("Microphone permission denied", systemImage: "xmark.circle").foregroundStyle(.red)
+                } else {
+                    ForEach(model.sources.indices, id: \.self) { i in
+                        sourceRow(index: i)
+                    }
+                    if model.currentIndex < model.sources.count {
+                        VStack(spacing: 6) {
+                            ProgressView(value: Double(model.level)).tint(.green)
+                            Text("Listening…").font(.caption).foregroundStyle(.secondary)
+                        }
+                        .padding(.top, 4)
+                    }
+                }
             }
-            .onAppear { mic.start { finish(.pass, ["detected": "1"]) } }
+            .onAppear {
+                model.prepare()
+                model.startCurrentSource()
+            }
+            .onChange(of: model.done) { _, done in
+                if done { complete(model.outcome()) }
+            }
         }
     }
-    private func finish(_ s: TestStatus, _ d: [String: String]? = nil) { mic.stop(); complete(diagnosticOutcome("microphone", "Microphone", s, d)) }
+
+    @ViewBuilder private func sourceRow(index i: Int) -> some View {
+        let src = model.sources[i]
+        let isActive = i == model.currentIndex
+        HStack {
+            Image(systemName: rowIcon(src.result, isActive: isActive))
+                .foregroundStyle(rowColor(src.result, isActive: isActive))
+                .frame(width: 24)
+            Text(src.label).font(.subheadline)
+            Spacer()
+            if isActive { ProgressView().scaleEffect(0.7) }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func rowIcon(_ result: Bool?, isActive: Bool) -> String {
+        if let r = result { return r ? "checkmark.circle.fill" : "xmark.circle.fill" }
+        return isActive ? "mic.fill" : "circle"
+    }
+    private func rowColor(_ result: Bool?, isActive: Bool) -> Color {
+        if let r = result { return r ? .green : .red }
+        return isActive ? .accentColor : .secondary
+    }
+
+    private func finish(_ s: TestStatus) {
+        model.stopAll()
+        complete(diagnosticOutcome("microphone", "Microphone", s))
+    }
 }
 
 // MARK: Headphones (auto-detect output route)
