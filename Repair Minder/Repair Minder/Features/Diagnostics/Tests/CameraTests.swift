@@ -15,6 +15,61 @@ private func hasCamera(_ position: AVCaptureDevice.Position) -> Bool {
 private func hasTorch() -> Bool {
     AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)?.hasTorch ?? false
 }
+
+// MARK: - Camera target constant
+
+/// Page that displays a large QR focus target; the technician opens it on a SECOND device,
+/// then points the device-under-test's camera at it. (Served by the RepairMinder web app.)
+let cameraTargetURL = "https://repairminder.com/camera-test"
+
+// MARK: - Camera target help overlay
+
+/// A compact overlay button that expands (sheet) to show a QR the technician can scan
+/// on a second device to open the camera-test target page.
+private struct CameraTargetHelp: View {
+    @State private var showSheet = false
+
+    var body: some View {
+        Button {
+            showSheet = true
+        } label: {
+            Label("Need a QR to scan?", systemImage: "qrcode")
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(.ultraThinMaterial, in: Capsule())
+                .foregroundStyle(.primary)
+        }
+        .sheet(isPresented: $showSheet) {
+            CameraTargetHelpSheet()
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+        }
+    }
+}
+
+private struct CameraTargetHelpSheet: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Open on another device")
+                .font(.headline)
+            Text("On another device, open:")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Text(cameraTargetURL)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            QRCodeImage(string: cameraTargetURL, side: 140)
+            Text("Point this device's camera at the QR code on that screen.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity)
+    }
+}
 #endif
 
 // MARK: - RearCameraTest
@@ -115,6 +170,7 @@ struct CameraPreview: UIViewRepresentable {
         return lenses[activeIndex]
     }
 
+    /// The live preview session for the currently active lens probe.
     var activeProbeSession: AVCaptureSession? { probe?.previewSession }
 
     func startCurrentLens() {
@@ -239,14 +295,34 @@ private struct FrontCameraActiveView: View {
             instruction: "Point the front camera at a QR/barcode — it passes automatically once recognised.",
             hints: [],
             allowManualPass: false,
+            fullBleed: true,
             onPass: {},
             onFail: { model.fail() },
             onSkip: { model.skip() }
         ) {
-            if let session = model.previewSession {
-                CameraPreview(session: session)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            ZStack(alignment: .top) {
+                // Full-screen live preview
+                if let session = model.previewSession {
+                    CameraPreview(session: session)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .ignoresSafeArea(edges: .horizontal)
+                }
+
+                // Compact overlay: QR-detected indicator + help button
+                HStack {
+                    if model.qrSeen {
+                        Label("QR detected", systemImage: "checkmark.circle.fill")
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(.green.opacity(0.85), in: Capsule())
+                            .foregroundStyle(.white)
+                    }
+                    Spacer()
+                    CameraTargetHelp()
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
             }
         }
         .onAppear { model.start() }
@@ -360,38 +436,59 @@ private struct RearCameraTestView: View {
             instruction: "Point the rear camera at a QR or barcode. Each lens passes automatically once it recognises a code.",
             hints: ["Hold steady ~15 cm from a code"],
             allowManualPass: false,
+            fullBleed: true,
             onPass: {},
             onFail: { model.failAll() },
             onSkip: { model.skipAll() }
         ) {
-            VStack(spacing: 12) {
-                // Live preview for the active lens
+            ZStack(alignment: .top) {
+                // Full-screen live preview for the active lens
                 if model.denied {
-                    Label("Camera permission denied", systemImage: "xmark.circle").foregroundStyle(.red)
+                    Color.black
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .overlay {
+                            Label("Camera permission denied", systemImage: "xmark.circle")
+                                .foregroundStyle(.red)
+                        }
                 } else if let session = model.activeProbeSession {
                     CameraPreview(session: session)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .ignoresSafeArea(edges: .horizontal)
+                        // Re-renders when the active probe changes (session identity changes)
+                        .id(model.activeIndex)
                 }
 
-                // Per-lens checklist
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(model.lenses) { lens in
-                        HStack(spacing: 8) {
-                            Image(systemName: statusIcon(for: lens, activeIndex: model.activeIndex, lenses: model.lenses))
-                                .foregroundStyle(statusColor(for: lens, activeIndex: model.activeIndex, lenses: model.lenses))
-                            Text(displayName(for: lens.id))
-                                .font(.subheadline)
-                            if lens.id == model.activeLens?.id && lens.passed == nil {
-                                Text("scanning…")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                // Compact overlay: per-lens progress + QR target help
+                VStack(alignment: .trailing, spacing: 8) {
+                    HStack(alignment: .top) {
+                        // Per-lens status pill
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(model.lenses) { lens in
+                                HStack(spacing: 5) {
+                                    Image(systemName: statusIcon(for: lens, activeIndex: model.activeIndex, lenses: model.lenses))
+                                        .foregroundStyle(statusColor(for: lens, activeIndex: model.activeIndex, lenses: model.lenses))
+                                        .imageScale(.small)
+                                    Text(displayName(for: lens.id))
+                                        .font(.caption.weight(.medium))
+                                    if lens.id == model.activeLens?.id && lens.passed == nil {
+                                        Text("scanning…")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
                             }
-                            Spacer()
                         }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+
+                        Spacer()
+
+                        CameraTargetHelp()
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
                 }
-                .padding(.horizontal)
             }
             .onAppear { model.startCurrentLens() }
             .onChange(of: model.outcome?.status) { _, _ in
