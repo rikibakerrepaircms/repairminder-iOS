@@ -177,7 +177,7 @@ enum DiagnosticReportShare {
 /// Retained data source/delegate for a Quick Look PDF preview. `QLPreviewController.dataSource` is
 /// weak, so the source must outlive the controller; it self-retains until the preview dismisses.
 @MainActor
-private final class PDFPreviewSource: NSObject, QLPreviewControllerDataSource, QLPreviewControllerDelegate {
+private final class PDFPreviewSource: NSObject, @preconcurrency QLPreviewControllerDataSource, @preconcurrency QLPreviewControllerDelegate {
     private let url: URL
     private static var live: Set<PDFPreviewSource> = []
 

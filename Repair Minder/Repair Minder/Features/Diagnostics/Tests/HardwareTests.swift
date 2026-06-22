@@ -349,8 +349,12 @@ private struct HardwareButtonsTestView: View {
         // Mute: sample a baseline, then poll for a change after the tech flips the switch.
         muteProbe.sampleSilenced { base in muteBaseline = base }
         mutePoll = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { _ in
-            muteProbe.sampleSilenced { current in
-                if let base = muteBaseline, current != base { mute = "1"; mutePoll?.invalidate(); checkDone() }
+            // The timer fires on the main run loop; assume main-actor isolation so the @MainActor
+            // probe call is valid synchronously (no behavioural/timing change).
+            MainActor.assumeIsolated {
+                muteProbe.sampleSilenced { current in
+                    if let base = muteBaseline, current != base { mute = "1"; mutePoll?.invalidate(); checkDone() }
+                }
             }
         }
         if !cameraEligible { cameraControl = "na"; checkDone() }
