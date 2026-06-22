@@ -1,5 +1,6 @@
 // Repair MinderTests/DiagnosticsServiceTests.swift
 import Testing
+import Foundation
 @testable import Repair_Minder
 
 actor StubAPI: DiagnosticsAPI {
@@ -47,5 +48,29 @@ struct DiagnosticsServiceTests {
                                    overallResult: "partial",
                                    outcomes: [TestOutcome(id: "a", name: "A", status: .pass, details: nil)])
         #expect(await api.lastCreate?.overallResult == "partial")
+    }
+}
+
+struct DiagnosticsTransmitErrorTests {
+    @Test func forbiddenOnTokenPairingIsHardAuth() {
+        let outcome = DiagnosticsTransmitOutcome.classify(
+            APIError.forbidden(message: "Pairing not recognised or revoked", code: nil),
+            wasTokenPairing: true)
+        #expect(outcome == .revokedPairing)
+    }
+    @Test func notFoundOnTokenPairingIsHardAuth() {
+        #expect(DiagnosticsTransmitOutcome.classify(APIError.notFound, wasTokenPairing: true) == .revokedPairing)
+    }
+    @Test func forbiddenOnShopCodeIsNotRevocation() {
+        // A 403/404 on a manually-typed shop code is a bad code, not a revoked device pairing.
+        #expect(DiagnosticsTransmitOutcome.classify(APIError.notFound, wasTokenPairing: false) == .transient)
+    }
+    @Test func networkErrorIsTransient() {
+        #expect(DiagnosticsTransmitOutcome.classify(
+            APIError.networkError(URLError(.notConnectedToInternet)), wasTokenPairing: true) == .transient)
+    }
+    @Test func expiredOrServerErrorIsTransient() {
+        #expect(DiagnosticsTransmitOutcome.classify(APIError.httpError(statusCode: 410, message: nil), wasTokenPairing: true) == .transient)
+        #expect(DiagnosticsTransmitOutcome.classify(APIError.httpError(statusCode: 503, message: nil), wasTokenPairing: true) == .transient)
     }
 }

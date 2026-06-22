@@ -13,7 +13,7 @@ struct TransmitView: View {
     @State private var phase: Phase = .idle
     @State private var isGeneratingPDF = false
 
-    enum Phase: Equatable { case idle, sending, success, failed }
+    enum Phase: Equatable { case idle, sending, success, failed, unlinked }
 
     init(runner: DiagnosticRunner) {
         _runner = ObservedObject(wrappedValue: runner)
@@ -84,6 +84,11 @@ struct TransmitView: View {
                       systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
                     .accessibilityIdentifier("transmit-buffered")
+            case .unlinked:
+                Label("This device is no longer linked to a shop. Enter a shop code to send.",
+                      systemImage: "link.badge.minus")
+                    .foregroundStyle(.orange)
+                    .accessibilityIdentifier("transmit-unlinked")
             }
         }
         .navigationTitle("Send Results")
@@ -136,10 +141,18 @@ struct TransmitView: View {
                 if remember { DiagnosticsShopPairing.pair(shopCode, name: companyName) } else { DiagnosticsShopPairing.unpair() }
                 phase = .success
             } catch {
-                DiagnosticsBuffer.save(shopCode: shopCode, deviceDescription: deviceDescription,
-                                       imei: nil, serial: nil, reportID: runner.reportID,
-                                       outcomes: runner.orderedOutcomes)
-                phase = .failed
+                let wasToken = DiagnosticsShopPairing.token != nil && shopCode.isEmpty
+                switch DiagnosticsTransmitOutcome.classify(error, wasTokenPairing: wasToken) {
+                case .revokedPairing:
+                    DiagnosticsShopPairing.unpair()
+                    remember = false
+                    phase = .unlinked
+                case .transient:
+                    DiagnosticsBuffer.save(shopCode: shopCode, deviceDescription: deviceDescription,
+                                           imei: nil, serial: nil, reportID: runner.reportID,
+                                           outcomes: runner.orderedOutcomes)
+                    phase = .failed
+                }
             }
         }
     }

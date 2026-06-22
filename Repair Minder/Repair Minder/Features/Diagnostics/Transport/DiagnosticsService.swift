@@ -15,6 +15,25 @@ enum DiagnosticsError: Error, Equatable {
     case malformedSessionId(String)
 }
 
+/// How the UI should react to a failed transmit.
+/// - `revokedPairing`: the server rejected our credential (403/404) on a *token* pairing — the
+///   device is no longer linked. Unpair + tell the user; do NOT buffer (it can never succeed).
+/// - `transient`: connectivity / expiry / server hiccup — buffer for the Bridge to replay.
+enum DiagnosticsTransmitOutcome: Equatable {
+    case revokedPairing
+    case transient
+
+    /// `wasTokenPairing` is true only when the failed call authenticated with a server-issued
+    /// pairing token (not a manually-typed shop code — a bad code is the user's typo, not revocation).
+    static func classify(_ error: Error, wasTokenPairing: Bool) -> DiagnosticsTransmitOutcome {
+        guard wasTokenPairing, let api = error as? APIError else { return .transient }
+        switch api {
+        case .forbidden, .notFound: return .revokedPairing
+        default: return .transient
+        }
+    }
+}
+
 /// Abstraction over the Worker diagnostics endpoints (lets tests stub the network).
 protocol DiagnosticsAPI: Sendable {
     func createSession(_ req: CreateSessionRequest) async throws -> DiagnosticSessionResponse

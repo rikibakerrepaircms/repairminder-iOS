@@ -39,7 +39,7 @@ struct SummaryView: View {
     @Namespace private var resultGlass
 
     /// Auto-send state for a shop-paired device (idle until the run is sent on appear / retest).
-    enum AutoSend: Equatable { case idle, sending, sent, failed }
+    enum AutoSend: Equatable { case idle, sending, sent, failed, unlinked }
 
     /// Identifiable wrapper so we can drive a sheet with the chosen interactive test.
     struct RetestBox: Identifiable { let id: String; let test: any DiagnosticTest }
@@ -160,7 +160,7 @@ struct SummaryView: View {
     private var autoSendColor: Color {
         switch autoSend {
         case .sent: return .green
-        case .failed: return .orange
+        case .failed, .unlinked: return .orange
         default: return .accentColor
         }
     }
@@ -174,6 +174,8 @@ struct SummaryView: View {
             Label("Sent to your shop", systemImage: "checkmark.circle.fill")
         case .failed:
             Label("Saved on device — will sync when connected", systemImage: "exclamationmark.triangle.fill")
+        case .unlinked:
+            Label("This device is no longer linked to a shop", systemImage: "link.badge.minus")
         }
     }
 
@@ -214,9 +216,15 @@ struct SummaryView: View {
                 DiagnosticsShopPairing.setName(companyName)   // refresh "Welcome back …" name from server
                 autoSend = .sent
             } catch {
-                DiagnosticsBuffer.save(shopCode: code, pairingToken: token, deviceDescription: desc,
-                                       imei: nil, serial: nil, reportID: reportID, outcomes: outcomes)
-                autoSend = .failed
+                switch DiagnosticsTransmitOutcome.classify(error, wasTokenPairing: token != nil) {
+                case .revokedPairing:
+                    DiagnosticsShopPairing.unpair()   // device no longer linked — stop auto-sending
+                    autoSend = .unlinked
+                case .transient:
+                    DiagnosticsBuffer.save(shopCode: code, pairingToken: token, deviceDescription: desc,
+                                           imei: nil, serial: nil, reportID: reportID, outcomes: outcomes)
+                    autoSend = .failed
+                }
             }
         }
     }
