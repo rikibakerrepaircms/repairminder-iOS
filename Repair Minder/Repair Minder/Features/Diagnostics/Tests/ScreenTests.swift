@@ -13,6 +13,14 @@ enum ForceTouchGate {
     }
 }
 
+/// Touchscreen pass decision: cover ≥99% of cells so a single unreachable edge cell can't block a
+/// pass on an otherwise-perfect panel. The actual coverage is still recorded.
+enum TouchCoverageGate {
+    static func passed(touched: Int, total: Int) -> Bool {
+        total > 0 && Double(touched) >= Double(total) * 0.99
+    }
+}
+
 // MARK: - Touchscreen
 
 struct TouchscreenTest: DiagnosticTest {
@@ -111,7 +119,7 @@ import UIKit
 // MARK: Touchscreen view (SwiftUI grid; touch all cells → pass)
 
 /// Immersive full-screen touch grid. The top instruction and bottom controls hide while the
-/// user is touching so the WHOLE screen can be swept; fine cells (~16pt) catch small dead spots.
+/// user is touching so the WHOLE screen can be swept; ~30pt cells catch small dead spots.
 /// Drawn with Canvas (≈1500 cells) and drag-path interpolation so fast sweeps don't skip cells.
 private struct TouchscreenTestView: View {
     let complete: (TestOutcome) -> Void
@@ -120,7 +128,7 @@ private struct TouchscreenTestView: View {
     @State private var dragging = false
     @State private var lastLocation: CGPoint?
 
-    private let target: CGFloat = 21   // cell size (bumped ~30% from 16 for easier sweeping)
+    private let target: CGFloat = 30   // larger cells: easier to sweep, fewer stubborn edge cells
 
     var body: some View {
         GeometryReader { geo in
@@ -182,6 +190,7 @@ private struct TouchscreenTestView: View {
             .animation(.easeInOut(duration: 0.15), value: dragging)
         }
         .ignoresSafeArea()
+        .defersSystemGestures(on: .bottom)
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
         #endif
@@ -198,8 +207,10 @@ private struct TouchscreenTestView: View {
             let c = Int(x / w), r = Int(y / h)
             if c >= 0, c < cols, r >= 0, r < rows, touched.insert(r * cols + c).inserted { changed = true }
         }
-        if changed, touched.count == total {
-            complete(diagnosticOutcome("touchscreen", "Touchscreen", .pass, ["cells": "\(total)"]))
+        if changed, TouchCoverageGate.passed(touched: touched.count, total: total) {
+            let pct = Int((Double(touched.count) / Double(total)) * 100)
+            complete(diagnosticOutcome("touchscreen", "Touchscreen", .pass,
+                                       ["cells": "\(total)", "coverage_pct": "\(pct)"]))
         }
     }
 }
