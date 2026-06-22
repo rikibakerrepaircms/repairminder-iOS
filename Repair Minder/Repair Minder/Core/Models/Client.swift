@@ -21,7 +21,7 @@ struct ClientListResponse: Decodable, Sendable {
 /// Client model - supports both list and detail responses
 struct Client: Identifiable, Equatable, Sendable {
     let id: String
-    let email: String
+    let email: String?
     let firstName: String?
     let lastName: String?
     let name: String?
@@ -97,7 +97,7 @@ struct Client: Identifiable, Equatable, Sendable {
             return name
         }
         let fullName = [firstName, lastName].compactMap { $0 }.joined(separator: " ")
-        return fullName.isEmpty ? email : fullName
+        return fullName.isEmpty ? (email ?? "") : fullName
     }
 
     /// Full name from first and last name
@@ -110,7 +110,7 @@ struct Client: Identifiable, Equatable, Sendable {
         let first = firstName?.first.map(String.init) ?? ""
         let last = lastName?.first.map(String.init) ?? ""
         let result = first + last
-        return result.isEmpty ? String(email.prefix(2)).uppercased() : result.uppercased()
+        return result.isEmpty ? String((email ?? "").prefix(2)).uppercased() : result.uppercased()
     }
 
     /// Full formatted address
@@ -198,7 +198,7 @@ extension Client: Decodable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
         id = try container.decode(String.self, forKey: .id)
-        email = try container.decode(String.self, forKey: .email)
+        email = try container.decodeIfPresent(String.self, forKey: .email)
         firstName = try container.decodeIfPresent(String.self, forKey: .firstName)
         lastName = try container.decodeIfPresent(String.self, forKey: .lastName)
         name = try container.decodeIfPresent(String.self, forKey: .name)

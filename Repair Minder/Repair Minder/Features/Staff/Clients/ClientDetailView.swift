@@ -161,7 +161,7 @@ struct ClientDetailView: View {
     private func contactSection(_ client: Client) -> some View {
         SectionCard(title: "Contact", icon: "person.text.rectangle") {
             VStack(spacing: 12) {
-                contactRow(icon: "envelope", label: "Email", value: client.email)
+                contactRow(icon: "envelope", label: "Email", value: client.email ?? "")
 
                 if let phone = client.phone, !phone.isEmpty {
                     contactRow(icon: "phone", label: "Phone", value: phone)

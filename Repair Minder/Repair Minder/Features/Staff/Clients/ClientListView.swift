@@ -232,7 +232,7 @@ struct ClientRowView: View {
 
             // Contact info
             VStack(alignment: .leading, spacing: 2) {
-                Label(client.email, systemImage: "envelope")
+                Label(client.email ?? "", systemImage: "envelope")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
@@ -293,7 +293,7 @@ struct ClientRowView: View {
 
             // Email
             Label {
-                Text(client.email)
+                Text(client.email ?? "")
                     .lineLimit(1)
             } icon: {
                 Image(systemName: "envelope")
