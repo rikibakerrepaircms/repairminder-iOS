@@ -280,10 +280,11 @@ private struct MicSource: Identifiable {
         recordTask?.cancel()
         recordTask = Task { @MainActor in
             for s in stride(from: recordSeconds, through: 1, by: -1) {
+                if Task.isCancelled { return }
                 self.countdown = s
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
-                if Task.isCancelled { return }
             }
+            if Task.isCancelled { return }
             self.finalizeRecording()
         }
     }
@@ -316,6 +317,7 @@ private struct MicSource: Identifiable {
 
     /// Re-record the current source (same index) — used by "Record again".
     func recordAgain() {
+        recordTask?.cancel()
         playbackTask?.cancel(); player?.stop()
         startCurrentSource()
     }
