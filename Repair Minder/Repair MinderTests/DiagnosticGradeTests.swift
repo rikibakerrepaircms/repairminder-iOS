@@ -20,4 +20,7 @@ struct DiagnosticGradeTests {
     @Test func emptyIsGood() {
         #expect(DiagnosticGrade.grade(for: []) == .good)
     }
+    @Test func partialIsBad() {
+        #expect(DiagnosticGrade.grade(for: [outcome("a", .pass), outcome("b", .partial)]) == .bad)
+    }
 }
