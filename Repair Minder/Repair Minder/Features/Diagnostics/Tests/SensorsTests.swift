@@ -148,6 +148,7 @@ private struct AccelerometerTestView: View {
             .background(Color.platformGray6)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .onAppear { motion.startGravity() }
+            .onDisappear { motion.stop() }
             .onChange(of: motion.gravity.dx) { _, x in if x < -0.6 { mark("left") }; if x > 0.6 { mark("right") } }
             .onChange(of: motion.gravity.dy) { _, y in if y < -0.6 { mark("up") }; if y > 0.6 { mark("down") } }
         }
@@ -189,6 +190,7 @@ private struct GyroscopeTestView: View {
                 axis("Yaw (z)", motion.rotationMax.z)
             }
             .onAppear { motion.startGyro() }
+            .onDisappear { motion.stop() }
             .onChange(of: motion.rotationMax.z) { _, _ in
                 let r = motion.rotationMax
                 if r.x > 2, r.y > 2, r.z > 2 { finish(.pass, ["axes": "3"]) }
