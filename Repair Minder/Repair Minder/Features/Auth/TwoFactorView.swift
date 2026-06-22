@@ -74,16 +74,16 @@ struct TwoFactorView: View {
                         ZStack {
                             // Single hidden TextField — sole keyboard input target
                             TextField("", text: $code)
-                                .keyboardType(.numberPad)
+                                .keyboardType(.asciiCapable)
                                 .textContentType(.oneTimeCode)
                                 .focused($hiddenFieldFocused)
                                 .opacity(0.01)
                                 .frame(width: 1, height: 1)
                                 .onChange(of: code) { _, newValue in
-                                    let digits = String(newValue.filter { $0.isNumber }.prefix(6))
-                                    if digits != newValue {
-                                        code = digits
-                                    } else if digits.count == 6 && !authManager.isLoading {
+                                    let normalized = TwoFactorView.normalizeCode(newValue)
+                                    if normalized != newValue {
+                                        code = normalized
+                                    } else if TwoFactorView.isSubmittable(normalized) && !authManager.isLoading {
                                         verifyCode()
                                     }
                                 }
@@ -196,8 +196,19 @@ struct TwoFactorView: View {
         }
     }
 
+    /// Keep alphanumerics, uppercase, cap at 8 (TOTP=6 digits, recovery=8 alnum)
+    static func normalizeCode(_ raw: String) -> String {
+        String(raw.filter { $0.isLetter || $0.isNumber }.uppercased().prefix(8))
+    }
+
+    /// Submittable when a 6-digit numeric TOTP or an 8-char recovery code
+    static func isSubmittable(_ code: String) -> Bool {
+        if code.count == 8 { return true }
+        return code.count == 6 && code.allSatisfy { $0.isNumber }
+    }
+
     private func verifyCode() {
-        guard code.count == 6 else { return }
+        guard TwoFactorView.isSubmittable(code) else { return }
 
         hiddenFieldFocused = false
 
