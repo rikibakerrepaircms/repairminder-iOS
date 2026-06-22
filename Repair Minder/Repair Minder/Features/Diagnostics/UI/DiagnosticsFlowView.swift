@@ -9,6 +9,10 @@ struct DiagnosticsFlowView: View {
         NavigationStack {
             TestSelectionView()
         }
+        // Best-effort, non-blocking: replay any sessions buffered offline so they complete
+        // (create → results → complete) instead of stranding `in_progress`. The flow opening
+        // means we likely have network now.
+        .task { await DiagnosticsService().flushPending() }
     }
 }
 

@@ -141,6 +141,7 @@ struct TransmitView: View {
         phase = .sending
         let token = DiagnosticsShopPairing.token
         let code = shopCode
+        let overall = runner.overallResult
         Task {
             do {
                 let companyName = try await service.transmit(
@@ -166,7 +167,8 @@ struct TransmitView: View {
                 case .transient:
                     DiagnosticsBuffer.save(shopCode: codeIsValid ? code : nil, pairingToken: token,
                                            deviceDescription: deviceDescription, imei: nil, serial: nil,
-                                           reportID: runner.reportID, outcomes: runner.orderedOutcomes)
+                                           reportID: runner.reportID, overallResult: overall,
+                                           outcomes: runner.orderedOutcomes)
                     phase = .failed
                 }
             }

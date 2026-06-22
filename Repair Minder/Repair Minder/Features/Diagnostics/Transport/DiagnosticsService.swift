@@ -73,7 +73,8 @@ struct StubDiagnosticsAPI: DiagnosticsAPI {
 
 /// Orchestrates create → submit each → complete. Hybrid C: this is the POST path.
 /// If transmit fails for connectivity reasons, callers persist the payloads to the app
-/// container so the Bridge can pull them over USB/AFC later (see TransmitView buffering).
+/// container (see TransmitView buffering); `flushPending` later replays them through the
+/// same create → results → complete path so they never strand `in_progress`.
 struct DiagnosticsService: Sendable {
     let api: DiagnosticsAPI
     init(api: DiagnosticsAPI = LiveDiagnosticsAPI()) { self.api = api }
@@ -97,5 +98,31 @@ struct DiagnosticsService: Sendable {
         }
         try await api.complete(sessionId: session.sessionId, token: session.sessionToken)
         return session.companyName
+    }
+
+    /// Best-effort replay of any buffered (offline) sessions. Each is re-sent through `transmit`
+    /// (create -> results -> complete), so a replayed session is fully completed, never stranded
+    /// `in_progress`. Removes the file on success or on a hard-auth failure (revoked token = dead
+    /// on arrival); keeps it on transient failure to retry later.
+    func flushPending() async {
+        for url in DiagnosticsBuffer.pendingURLs() {
+            guard let s = DiagnosticsBuffer.load(url) else { DiagnosticsBuffer.remove(url); continue }
+            let outcomes = s.results.map {
+                TestOutcome(id: $0.testName, name: $0.testName,
+                            status: TestStatus(rawValue: $0.status) ?? .skip, details: $0.details)
+            }
+            do {
+                _ = try await transmit(shopCode: s.shopCode, pairingToken: s.pairingToken, platform: s.platform,
+                                       imei: s.imei, serial: s.serial, deviceDescription: s.deviceDescription,
+                                       reportID: s.reportID, overallResult: s.overallResult, outcomes: outcomes)
+                DiagnosticsBuffer.remove(url)
+            } catch {
+                let wasToken = s.pairingToken != nil && s.shopCode == nil
+                if DiagnosticsTransmitOutcome.classify(error, wasTokenPairing: wasToken) == .revokedPairing {
+                    DiagnosticsBuffer.remove(url)   // can never succeed; drop it
+                }
+                // transient -> leave buffered for the next flush
+            }
+        }
     }
 }

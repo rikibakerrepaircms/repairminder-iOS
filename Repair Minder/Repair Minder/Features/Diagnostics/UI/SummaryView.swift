@@ -222,7 +222,8 @@ struct SummaryView: View {
                     autoSend = .unlinked
                 case .transient:
                     DiagnosticsBuffer.save(shopCode: code, pairingToken: token, deviceDescription: desc,
-                                           imei: nil, serial: nil, reportID: reportID, outcomes: outcomes)
+                                           imei: nil, serial: nil, reportID: reportID,
+                                           overallResult: overall, outcomes: outcomes)
                     autoSend = .failed
                 }
             }

@@ -64,6 +64,81 @@ struct DiagnosticsBufferTests {
     }
 }
 
+/// Recording stub that can be configured to throw, for flush tests.
+actor FlushStubAPI: DiagnosticsAPI {
+    enum Failure { case none, transient, forbidden }
+    private let failure: Failure
+    private(set) var created = 0
+    private(set) var results: [DiagnosticResultPayload] = []
+    private(set) var completed = 0
+
+    init(failure: Failure = .none) { self.failure = failure }
+
+    func createSession(_ req: CreateSessionRequest) async throws -> DiagnosticSessionResponse {
+        switch failure {
+        case .none: break
+        case .transient: throw APIError.networkError(URLError(.notConnectedToInternet))
+        case .forbidden: throw APIError.forbidden(message: "revoked", code: nil)
+        }
+        created += 1
+        return DiagnosticSessionResponse(sessionId: "sid", sessionToken: "tok", expiresAt: nil, companyName: "Mendmyi")
+    }
+    func submitResult(_ p: DiagnosticResultPayload) async throws { results.append(p) }
+    func complete(sessionId: String, token: String) async throws { completed += 1 }
+}
+
+struct DiagnosticsFlushTests {
+    /// Remove every buffered file so a test starts and ends with a clean pending directory.
+    private func clearPending() {
+        for url in DiagnosticsBuffer.pendingURLs() { DiagnosticsBuffer.remove(url) }
+    }
+
+    @Test func flushSuccessfullyReplaysAndRemovesFile() async throws {
+        clearPending()
+        defer { clearPending() }
+        let url = try #require(DiagnosticsBuffer.save(
+            shopCode: "123456", deviceDescription: "iPhone", imei: nil, serial: nil,
+            reportID: "RM-1", overallResult: "pass",
+            outcomes: [TestOutcome(id: "a", name: "A", status: .pass, details: nil),
+                       TestOutcome(id: "b", name: "B", status: .fail, details: ["x": "y"])]))
+        let api = FlushStubAPI(failure: .none)
+        await DiagnosticsService(api: api).flushPending()
+        // create + N results + complete all happened
+        #expect(await api.created == 1)
+        #expect(await api.results.count == 2)
+        #expect(await api.completed == 1)
+        // the file is gone (replayed successfully)
+        #expect(!DiagnosticsBuffer.pendingURLs().contains(url))
+    }
+
+    @Test func flushKeepsFileOnTransientFailure() async throws {
+        clearPending()
+        defer { clearPending() }
+        let url = try #require(DiagnosticsBuffer.save(
+            shopCode: "123456", deviceDescription: "iPhone", imei: nil, serial: nil,
+            reportID: "RM-1", overallResult: "pass",
+            outcomes: [TestOutcome(id: "a", name: "A", status: .pass, details: nil)]))
+        let api = FlushStubAPI(failure: .transient)
+        await DiagnosticsService(api: api).flushPending()
+        // transient -> file remains buffered for the next flush
+        #expect(DiagnosticsBuffer.pendingURLs().contains(url))
+    }
+
+    @Test func flushDropsFileOnRevokedTokenPairing() async throws {
+        clearPending()
+        defer { clearPending() }
+        // pairingToken set + shopCode nil => a token pairing; forbidden = revoked = dead on arrival.
+        let url = try #require(DiagnosticsBuffer.save(
+            shopCode: nil, pairingToken: "tok-123", deviceDescription: "iPhone", imei: nil, serial: nil,
+            reportID: "RM-1", overallResult: "pass",
+            outcomes: [TestOutcome(id: "a", name: "A", status: .pass, details: nil)]))
+        let api = FlushStubAPI(failure: .forbidden)
+        await DiagnosticsService(api: api).flushPending()
+        // revoked -> file removed (can never succeed)
+        #expect(!DiagnosticsBuffer.pendingURLs().contains(url))
+    }
+}
+
 struct DiagnosticsTransmitErrorTests {
     @Test func forbiddenOnTokenPairingIsHardAuth() {
         let outcome = DiagnosticsTransmitOutcome.classify(
