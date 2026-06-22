@@ -308,11 +308,13 @@ private struct MagneticTestView: View {
                             .offset(y: -96)
                             .rotationEffect(.degrees(Double(i) * 10))
                     }
-                    // Live heading needle.
+                    // Live heading needle. Negated: the needle points to magnetic North, so it
+                    // counter-rotates as the device twists (matching a real compass), rather than
+                    // spinning the opposite way to the phone.
                     Image(systemName: "location.north.fill")
                         .font(.system(size: 40))
                         .foregroundStyle(Color.accentColor)
-                        .rotationEffect(.degrees(loc.heading))
+                        .rotationEffect(.degrees(-loc.heading))
                     Text("\(Int(loc.heading))°")
                         .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                         .offset(y: 40)
