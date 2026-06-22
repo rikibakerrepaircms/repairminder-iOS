@@ -15,10 +15,10 @@ struct TestSelectionView: View {
     /// silently skipped at run time.
     @State private var supportedIds: Set<String> = []
 
+    // Adaptive grid: tiles ~80pt wide and the row fits as many as the width allows
+    // (≈4 on standard/large iPhones, 3 on a small SE, 6+ on iPad/landscape).
     private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
+        GridItem(.adaptive(minimum: 80), spacing: 8)
     ]
 
     /// Tests offered to the user: only those supported on this device.
@@ -48,18 +48,18 @@ struct TestSelectionView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 24) {
+            LazyVStack(alignment: .leading, spacing: 16) {
                 if let shopName = DiagnosticsShopPairing.companyName {
                     welcomeBanner(shopName)
                 }
 
                 ForEach(categories, id: \.self) { category in
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 8) {
                         // Category header
                         categoryHeader(category)
 
                         // Icon grid of test tiles
-                        LazyVGrid(columns: columns, spacing: 12) {
+                        LazyVGrid(columns: columns, spacing: 8) {
                             ForEach(tests(for: category), id: \.id) { test in
                                 testTile(test)
                             }
@@ -178,30 +178,30 @@ struct TestSelectionView: View {
             runner.toggle(test.id)
         } label: {
             ZStack(alignment: .topTrailing) {
-                VStack(spacing: 8) {
+                VStack(spacing: 6) {
                     Image(systemName: DiagnosticIcons.symbol(for: test.id))
-                        .font(.system(size: 28, weight: .regular))
+                        .font(.system(size: 22, weight: .regular))
                         .foregroundStyle(isSelected ? .white : Color.accentColor)
 
                     Text(test.name)
-                        .font(.caption)
+                        .font(.caption2)
                         .multilineTextAlignment(.center)
-                        .lineLimit(3)
+                        .lineLimit(2)
                         .foregroundStyle(isSelected ? .white : .primary)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(minHeight: 96)
+                .frame(minHeight: 76)
                 .rmGlassTintedCard(
-                    cornerRadius: 14,
+                    cornerRadius: 12,
                     tint: isSelected ? Color.accentColor.opacity(0.6) : Color(.systemGray4).opacity(0.4),
                     fallbackFill: isSelected ? Color.accentColor : Color(.systemGray6)
                 )
 
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.white)
-                        .padding(6)
+                        .padding(4)
                 }
             }
         }
