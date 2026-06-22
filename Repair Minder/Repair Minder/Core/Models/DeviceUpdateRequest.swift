@@ -176,7 +176,7 @@ struct DeviceAction: Decodable, Sendable, Identifiable {
     let displayLabel: String?
     let isDevicePageAction: Bool?
     let requiresConfirmation: Bool?
-    let requiresInput: Bool?
+    let requiresInput: [String]?
     let requiresNotes: Bool?
     let confirmationMessage: String?
 
