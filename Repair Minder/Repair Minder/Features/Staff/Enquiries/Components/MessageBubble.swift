@@ -155,6 +155,8 @@ struct MessageBubble: View {
             return Color.blue.opacity(0.15)
         case .note:
             return Color.orange.opacity(0.15)
+        case .unknown:
+            return Color.platformGray5
         }
     }
 
@@ -166,6 +168,8 @@ struct MessageBubble: View {
             return .blue
         case .note:
             return .orange
+        case .unknown:
+            return .gray
         }
     }
 
