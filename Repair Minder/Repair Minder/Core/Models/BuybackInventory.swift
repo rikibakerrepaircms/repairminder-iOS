@@ -295,6 +295,7 @@ struct BuybackDetail: Decodable, Identifiable, Equatable, Sendable {
     let images: [BuybackImage]?
     let notes: [BuybackNote]?
     let totals: BuybackTotals?
+    let salvageBudget: SalvageBudget?
 
     // MARK: - Computed Properties
 
@@ -396,6 +397,9 @@ struct BuybackTotals: Decodable, Equatable, Sendable {
     let totalCost: Double?
     let profit: Double?
     let vatLiability: Double?
+    let labourCost: Double?
+    let repairMinutes: Int?
+    let labourRate: Double?
 
     var formattedRefurbishmentCost: String? {
         guard let cost = refurbishmentCost else { return nil }
@@ -416,4 +420,15 @@ struct BuybackTotals: Decodable, Equatable, Sendable {
         guard let vat = vatLiability else { return nil }
         return CurrencyFormatter.format(vat)
     }
+
+    var formattedLabourCost: String? {
+        guard let c = labourCost else { return nil }
+        return CurrencyFormatter.format(c)
+    }
+}
+
+struct SalvageBudget: Decodable, Equatable, Sendable {
+    let cap: Double?
+    let booked: Double?
+    let remaining: Double?
 }
