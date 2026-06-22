@@ -9,7 +9,7 @@
 import Foundation
 
 /// Decodes a value that may be Int or String into a String.
-struct FlexibleString: Decodable, Equatable, Sendable, Hashable {
+struct FlexibleString: Codable, Equatable, Sendable, Hashable {
     let value: String
 
     init(from decoder: Decoder) throws {
@@ -21,6 +21,11 @@ struct FlexibleString: Decodable, Equatable, Sendable, Hashable {
         } else {
             value = ""
         }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(value)
     }
 
     /// Direct initializer for use in previews and tests.
