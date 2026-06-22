@@ -5,6 +5,7 @@ import CoreMedia
 @MainActor
 final class CameraProbe: NSObject, LuminanceProbe, QRProbe {
     private let device: AVCaptureDevice
+    private let lockExposureForMeasurement: Bool
     private let session = AVCaptureSession()
     private let videoOut = AVCaptureVideoDataOutput()
     private let metaOut = AVCaptureMetadataOutput()
@@ -12,7 +13,11 @@ final class CameraProbe: NSObject, LuminanceProbe, QRProbe {
     private var onSample: ((Double) -> Void)?
     private var onCode: ((String) -> Void)?
 
-    init(device: AVCaptureDevice) { self.device = device; super.init() }
+    init(device: AVCaptureDevice, lockExposureForMeasurement: Bool = false) {
+        self.device = device
+        self.lockExposureForMeasurement = lockExposureForMeasurement
+        super.init()
+    }
 
     /// Exposes the underlying AVCaptureSession for live preview (read-only; session itself stays private).
     var previewSession: AVCaptureSession { session }
@@ -51,10 +56,28 @@ final class CameraProbe: NSObject, LuminanceProbe, QRProbe {
             metaOut.metadataObjectTypes = [.qr, .ean13, .code128]
         }
         session.commitConfiguration()
+        let lockForMeasurement = lockExposureForMeasurement
         queue.async { [session, device] in
             session.startRunning()
-            CameraProbe.lockExposure(device)
+            if lockForMeasurement {
+                CameraProbe.lockExposure(device)
+            } else {
+                CameraProbe.enableContinuousFocusExposure(device)
+            }
         }
+        #endif
+    }
+
+    /// Normal capture: continuous autofocus + auto-exposure so the preview focuses and is correctly
+    /// exposed. Used by the rear/front camera tests (the lens stays fixed; only AF/AE are continuous).
+    private nonisolated static func enableContinuousFocusExposure(_ device: AVCaptureDevice) {
+        #if targetEnvironment(simulator)
+        return
+        #else
+        guard (try? device.lockForConfiguration()) != nil else { return }
+        if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
+        if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+        device.unlockForConfiguration()
         #endif
     }
 
