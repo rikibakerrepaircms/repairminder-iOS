@@ -63,6 +63,8 @@ enum AudioRoute: String, Sendable { case speaker, receiver }
 
 /// Reports resting + peak magnitude of user acceleration (g) over a short window.
 protocol AccelProbe: Sendable {
+    /// Average resting deviation from gravity (g) over the window — sample this BEFORE any stimulus.
+    @MainActor func sampleBaseline(windowMs: Int, completion: @escaping (_ resting: Double) -> Void)
     @MainActor func samplePeak(windowMs: Int, completion: @escaping (_ resting: Double, _ peak: Double) -> Void)
 }
 

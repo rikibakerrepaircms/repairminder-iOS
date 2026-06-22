@@ -4,6 +4,24 @@ import CoreMotion
 @MainActor
 final class AccelProbeCM: AccelProbe {
     private let mm = CMMotionManager()
+    func sampleBaseline(windowMs: Int, completion: @escaping (Double) -> Void) {
+        #if targetEnvironment(simulator)
+        completion(0); return
+        #else
+        guard mm.isAccelerometerAvailable else { completion(0); return }
+        mm.accelerometerUpdateInterval = 1.0 / 50.0
+        var deviations: [Double] = []
+        mm.startAccelerometerUpdates(to: .main) { data, _ in
+            guard let a = data?.acceleration else { return }
+            deviations.append(abs(sqrt(a.x*a.x + a.y*a.y + a.z*a.z) - 1.0))
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Double(windowMs)/1000.0) { [weak self] in
+            self?.mm.stopAccelerometerUpdates()
+            let resting = deviations.isEmpty ? 0 : deviations.reduce(0, +) / Double(deviations.count)
+            completion(resting)
+        }
+        #endif
+    }
     func samplePeak(windowMs: Int, completion: @escaping (Double, Double) -> Void) {
         #if targetEnvironment(simulator)
         completion(0, 0); return

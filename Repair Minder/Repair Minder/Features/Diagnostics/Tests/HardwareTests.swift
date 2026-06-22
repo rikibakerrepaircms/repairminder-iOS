@@ -250,6 +250,11 @@ private struct HardwareButtonsTestView: View {
     func run() async {
         measuring = true
         detected = false
+        // Genuine pre-buzz resting baseline (motor OFF) — used by the gate so the buzz isn't
+        // compared against itself. Sampled once; the per-cycle in-window resting is logged only.
+        let baseline = await withCheckedContinuation { (cont: CheckedContinuation<Double, Never>) in
+            probe.sampleBaseline(windowMs: 400) { cont.resume(returning: $0) }
+        }
         let maxCycles = 3
         for cycle in 0..<maxCycles {
             // Insert a 2s OFF gap between cycles (not before the first one)
@@ -265,11 +270,11 @@ private struct HardwareButtonsTestView: View {
                 }
             }
             self.peak = peakVal
-            self.lastResting = resting
-            let spiked = VibrationGate.spiked(restingNoise: resting, peak: peakVal, minDelta: 0.15)
+            self.lastResting = baseline
+            let spiked = VibrationGate.spiked(restingNoise: baseline, peak: peakVal, minDelta: 0.15)
             // Logged so we can re-tune the 0.15 g threshold against real devices (Console.app /
             // `log stream --predicate 'subsystem == "com.repairminder.diagnostics"'`).
-            log.info("cycle \(cycle, privacy: .public) resting=\(resting, format: .fixed(precision: 3), privacy: .public)g peak=\(peakVal, format: .fixed(precision: 3), privacy: .public)g delta=\(peakVal - resting, format: .fixed(precision: 3), privacy: .public)g spiked=\(spiked, privacy: .public)")
+            log.info("cycle \(cycle, privacy: .public) baseline=\(baseline, format: .fixed(precision: 3), privacy: .public)g inWindowResting=\(resting, format: .fixed(precision: 3), privacy: .public)g peak=\(peakVal, format: .fixed(precision: 3), privacy: .public)g spiked=\(spiked, privacy: .public)")
             if spiked {
                 self.detected = true
                 self.outcome = diagnosticOutcome("vibration", "Vibration", .pass,
