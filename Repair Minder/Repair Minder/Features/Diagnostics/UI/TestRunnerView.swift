@@ -22,6 +22,13 @@ struct TestRunnerView: View {
             case .interactive:
                 if let flash {
                     ResultFlashView(outcome: flash)
+                        .task(id: flash.id) {
+                            try? await Task.sleep(nanoseconds: 1_100_000_000)
+                            guard !Task.isCancelled else { return }
+                            self.flash = nil
+                            runner.interactiveIndex += 1
+                            if runner.currentInteractiveTest == nil { runner.phase = .finished }
+                        }
                 } else if let test = runner.currentInteractiveTest,
                           let view = test.makeView(complete: { handleOutcome($0) }) {
                     view.id(test.id)   // force a fresh view per interactive test
@@ -61,17 +68,12 @@ struct TestRunnerView: View {
         runner.phase = (runner.currentInteractiveTest == nil) ? .finished : .interactive
     }
 
-    /// Record an interactive test's outcome, flash it briefly, then advance.
+    /// Record an interactive test's outcome and flash it; the flash view owns the advance timer
+    /// (bound to its lifetime so backing out cancels it cleanly).
     private func handleOutcome(_ outcome: TestOutcome) {
         guard flash == nil else { return }   // ignore extra callbacks during the flash
         runner.record(outcome)
         flash = outcome
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 1_100_000_000)
-            flash = nil
-            runner.interactiveIndex += 1
-            if runner.currentInteractiveTest == nil { runner.phase = .finished }
-        }
     }
 }
 
