@@ -92,6 +92,14 @@ enum ChargeGate {
     }
 }
 
+/// Charge result: wired is required; wireless is optional (skip/na never fails the test).
+enum ChargeAggregate {
+    static func result(wiredPassed: Bool, wireless: String) -> (status: TestStatus, details: [String: String]) {
+        (wiredPassed ? .pass : .fail,
+         ["wired": wiredPassed ? "pass" : "fail", "wireless": wireless])
+    }
+}
+
 #if os(iOS)
 import UIKit
 import AVFoundation
@@ -107,42 +115,102 @@ func batteryStateLabel(_ s: UIDevice.BatteryState) -> String {
     }
 }
 
-// Charge: pass when the device starts charging.
+// Charge: two-step test — wired (required) then wireless (optional / skippable).
+
+private enum ChargeStep { case wired, wireless }
 
 private struct ChargeTestView: View {
     let complete: (TestOutcome) -> Void
+    @State private var step: ChargeStep = .wired
+    @State private var wiredPassed = false
+    @State private var wirelessResult: String? = nil   // "pass" / "skip" ; nil = pending
+    @State private var sawUnplugged = false
     @State private var state: UIDevice.BatteryState = .unknown
     @State private var observer: NSObjectProtocol?
     @State private var done = false
-    @State private var sawUnplugged = false
+    /// True when the device was already charging on appear and hasn't been unplugged yet — Step 1
+    /// can't tick until a real unplugged→charging edge is seen, so we prompt the tech to unplug first.
+    @State private var alreadyCharging = false
 
     var body: some View {
         TestScaffold(
             title: "Charge",
-            instruction: "Make sure the device is unplugged, then connect a wired or wireless charger. It passes when charging starts.",
-            hints: ["Plug in a charger (or place on a wireless pad)"],
-            onPass: { finish(.pass) }, onFail: { finish(.fail) }, onSkip: { finish(.skip) }
+            instruction: step == .wired
+                ? "Step 1 of 2 — make sure the device is unplugged, then connect the WIRED charger. Ticks when charging starts."
+                : "Step 2 of 2 — unplug the wired charger, then place the device on a WIRELESS charger. Tap 'Skip wireless' if you don't have one.",
+            hints: step == .wired ? ["Plug in the Lightning/USB-C charger"] : ["Place it on a wireless pad — or Skip wireless"],
+            onPass: {}, onFail: { finish(.fail) }, onSkip: { finish(.skip) }
         ) {
-            VStack(spacing: 8) {
-                Image(systemName: (state == .charging || state == .full) ? "bolt.fill" : "bolt.slash")
-                    .font(.system(size: 44)).foregroundStyle((state == .charging || state == .full) ? .green : .secondary)
-                Text(batteryStateLabel(state).capitalized).font(.subheadline)
-            }
-            .onAppear {
-                UIDevice.current.isBatteryMonitoringEnabled = true
-                state = UIDevice.current.batteryState
-                if state == .unplugged { sawUnplugged = true }
-                observer = NotificationCenter.default.addObserver(forName: UIDevice.batteryStateDidChangeNotification, object: nil, queue: .main) { _ in
-                    state = UIDevice.current.batteryState
-                    if state == .unplugged { sawUnplugged = true }
-                    if ChargeGate.passed(state: batteryStateLabel(state), sawUnplugged: sawUnplugged) {
-                        finish(.pass, ["state": batteryStateLabel(state), "transition": "unplugged_to_charging", "ac": "n/a", "dock": "n/a", "usb": "n/a", "wireless": "n/a"])
-                    }
+            VStack(spacing: 16) {
+                chargeTile(title: "Wired", icon: "cable.connector", isDone: wiredPassed, active: step == .wired)
+                chargeTile(title: "Wireless", icon: "wave.3.right.circle",
+                           isDone: wirelessResult == "pass", skipped: wirelessResult == "skip", active: step == .wireless)
+                if step == .wired, alreadyCharging, !wiredPassed {
+                    Label("Unplug the device first, then reconnect the charger.", systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundStyle(.orange)
+                }
+                if step == .wireless, wirelessResult == nil {
+                    Button("Skip wireless") { skipWireless() }
+                        .buttonStyle(.rmGlass())
+                        .accessibilityIdentifier("charge-skip-wireless")
                 }
             }
+            .onAppear { startMonitoring() }
             .onDisappear { removeObserver() }
         }
     }
+
+    private func chargeTile(title: String, icon: String, isDone: Bool, skipped: Bool = false, active: Bool) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: isDone ? "checkmark.circle.fill" : (skipped ? "minus.circle" : icon))
+                .font(.title2).foregroundStyle(isDone ? .green : (skipped ? .secondary : (active ? Color.accentColor : .secondary)))
+            VStack(alignment: .leading) {
+                Text(title).font(.headline)
+                Text(isDone ? "Charging detected" : (skipped ? "Skipped" : (active ? "Waiting…" : "Pending")))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if active && !isDone && !skipped { ProgressView() }
+        }
+        .padding(12).background(Color.platformGray6).clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func startMonitoring() {
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        state = UIDevice.current.batteryState
+        if state == .unplugged { sawUnplugged = true } else { alreadyCharging = true }
+        observer = NotificationCenter.default.addObserver(forName: UIDevice.batteryStateDidChangeNotification, object: nil, queue: .main) { _ in
+            state = UIDevice.current.batteryState
+            if state == .unplugged { sawUnplugged = true; alreadyCharging = false }
+            handleEdge()
+        }
+    }
+
+    private func handleEdge() {
+        guard !done else { return }
+        guard ChargeGate.passed(state: batteryStateLabel(state), sawUnplugged: sawUnplugged) else { return }
+        switch step {
+        case .wired:
+            wiredPassed = true
+            // Require a fresh unplugged→charging edge for the wireless step.
+            sawUnplugged = false
+            step = .wireless
+        case .wireless:
+            wirelessResult = "pass"
+            finishOverall()
+        }
+    }
+
+    private func skipWireless() {
+        wirelessResult = "skip"
+        finishOverall()
+    }
+
+    private func finishOverall() {
+        let (status, details) = ChargeAggregate.result(wiredPassed: wiredPassed, wireless: wirelessResult ?? "na")
+        finish(status, details)
+    }
+
     private func removeObserver() {
         if let obs = observer { NotificationCenter.default.removeObserver(obs); observer = nil }
     }
