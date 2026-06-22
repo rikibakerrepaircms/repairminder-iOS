@@ -56,18 +56,22 @@ struct PosTerminal: Decodable, Identifiable, Equatable, Sendable {
 
 // MARK: - POS Transaction Status
 
-enum PosTransactionStatus: String, Codable, Sendable {
+enum PosTransactionStatus: String, Codable, Sendable, UnknownDefaultable {
     case pending
     case processing
     case completed
     case failed
     case cancelled
     case timeout
+    case unknown = "__unknown__"
+
+    static var unknownFallback: PosTransactionStatus { .unknown }
 
     var isTerminal: Bool {
         switch self {
         case .completed, .failed, .cancelled, .timeout: return true
         case .pending, .processing: return false
+        case .unknown: return true
         }
     }
 
@@ -79,6 +83,7 @@ enum PosTransactionStatus: String, Codable, Sendable {
         case .failed: return "Payment Failed"
         case .cancelled: return "Payment Cancelled"
         case .timeout: return "Payment Timed Out"
+        case .unknown: return "Unknown Status"
         }
     }
 }
@@ -141,12 +146,15 @@ struct PosPaymentLink: Decodable, Identifiable, Equatable, Sendable {
     }
 }
 
-enum PaymentLinkStatus: String, Codable, Sendable {
+enum PaymentLinkStatus: String, Codable, Sendable, UnknownDefaultable {
     case pending
     case completed
     case failed
     case cancelled
     case expired
+    case unknown = "__unknown__"
+
+    static var unknownFallback: PaymentLinkStatus { .unknown }
 }
 
 struct CreatePaymentLinkRequest: Encodable {
