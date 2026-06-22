@@ -30,6 +30,7 @@ extension SettingsDestination {
         case .buyback: .buyback
         case .enquiries: .enquiries
         case .clients: .clients
+        case .devices: nil // No dedicated settings destination for Devices
         }
     }
 }

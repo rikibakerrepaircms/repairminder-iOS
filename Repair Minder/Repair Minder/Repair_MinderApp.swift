@@ -446,6 +446,11 @@ private struct StaffMainView: View {
 
         case .clients:
             ClientListView()
+
+        case .devices:
+            NavigationStack {
+                DevicesView()
+            }
         }
     }
 
