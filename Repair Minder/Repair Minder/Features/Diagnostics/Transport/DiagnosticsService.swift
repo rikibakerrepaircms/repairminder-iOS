@@ -65,10 +65,12 @@ struct DiagnosticsService: Sendable {
     func transmit(shopCode: String?, pairingToken: String? = nil, platform: String,
                   imei: String?, serial: String?,
                   deviceDescription: String?, reportID: String? = nil,
+                  overallResult: String? = nil,
                   outcomes: [TestOutcome]) async throws -> String? {
         let session = try await api.createSession(CreateSessionRequest(
             shopCode: shopCode, pairingToken: pairingToken, platform: platform, deviceIdentifier: nil,
-            deviceDescription: deviceDescription, imei: imei, serial: serial, reportID: reportID))
+            deviceDescription: deviceDescription, imei: imei, serial: serial, reportID: reportID,
+            overallResult: overallResult))
         for o in outcomes {
             try await api.submitResult(DiagnosticResultPayload(
                 sessionId: session.sessionId, token: session.sessionToken,

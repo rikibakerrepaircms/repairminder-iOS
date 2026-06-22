@@ -202,6 +202,7 @@ struct SummaryView: View {
         let service = makeService()
         let outcomes = runner.orderedOutcomes
         let reportID = runner.reportID
+        let overall = runner.overallResult
         let desc = deviceDescription
         let code = DiagnosticsShopPairing.shopCode       // one of these is set (token preferred)
         let token = DiagnosticsShopPairing.token
@@ -209,7 +210,7 @@ struct SummaryView: View {
             do {
                 let companyName = try await service.transmit(
                     shopCode: code, pairingToken: token, platform: "ios", imei: nil, serial: nil,
-                    deviceDescription: desc, reportID: reportID, outcomes: outcomes)
+                    deviceDescription: desc, reportID: reportID, overallResult: overall, outcomes: outcomes)
                 DiagnosticsShopPairing.setName(companyName)   // refresh "Welcome back …" name from server
                 autoSend = .sent
             } catch {
