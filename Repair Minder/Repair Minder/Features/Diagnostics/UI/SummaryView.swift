@@ -9,6 +9,7 @@ struct SummaryView: View {
     @State private var retestTest: RetestBox?
     @State private var isGeneratingPDF = false
     @State private var autoSend: AutoSend = .idle
+    @Namespace private var resultGlass
 
     /// Auto-send state for a shop-paired device (idle until the run is sent on appear / retest).
     enum AutoSend: Equatable { case idle, sending, sent, failed }
@@ -32,35 +33,37 @@ struct SummaryView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
-                // Header card — grade + overall label + counts
-                gradeHeaderCard
+            RMGlassEffectContainer(spacing: 12) {
+                VStack(spacing: 20) {
+                    // Header card — grade + overall label + counts
+                    gradeHeaderCard
 
-                // Failed / error section (red) — always first
-                if !failedOutcomes.isEmpty {
-                    gridSection(
-                        title: "Failed",
-                        titleColor: .red,
-                        outcomes: failedOutcomes
-                    )
-                }
+                    // Failed / error section (red) — always first
+                    if !failedOutcomes.isEmpty {
+                        gridSection(
+                            title: "Failed",
+                            titleColor: .red,
+                            outcomes: failedOutcomes
+                        )
+                    }
 
-                // Skipped section (grey)
-                if !skippedOutcomes.isEmpty {
-                    gridSection(
-                        title: "Skipped",
-                        titleColor: .secondary,
-                        outcomes: skippedOutcomes
-                    )
-                }
+                    // Skipped section (grey)
+                    if !skippedOutcomes.isEmpty {
+                        gridSection(
+                            title: "Skipped",
+                            titleColor: .secondary,
+                            outcomes: skippedOutcomes
+                        )
+                    }
 
-                // Passed section (green)
-                if !passedOutcomes.isEmpty {
-                    gridSection(
-                        title: "Passed",
-                        titleColor: .green,
-                        outcomes: passedOutcomes
-                    )
+                    // Passed section (green)
+                    if !passedOutcomes.isEmpty {
+                        gridSection(
+                            title: "Passed",
+                            titleColor: .green,
+                            outcomes: passedOutcomes
+                        )
+                    }
                 }
             }
             .padding(.horizontal, 16)
@@ -213,9 +216,7 @@ struct SummaryView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
         .padding(.horizontal, 16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
+        .rmGlassCardBackground(cornerRadius: 12, fallbackFill: Color(.systemBackground))
     }
 
     @ViewBuilder
@@ -296,12 +297,16 @@ struct SummaryView: View {
                     .padding(6)
             }
             .frame(minHeight: 96)
-            .background(tileColor.opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .rmGlassTintedCard(
+                cornerRadius: 14,
+                tint: tileColor.opacity(0.35),
+                fallbackFill: tileColor.opacity(0.12)
+            )
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
                     .strokeBorder(tileColor.opacity(0.25), lineWidth: 1)
             )
+            .modifier(ResultTileGlassID(id: outcome.id, namespace: resultGlass))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("retest-\(outcome.id)")
@@ -353,6 +358,21 @@ struct SummaryView: View {
             view
         } else {
             Color.clear.onAppear { retestTest = nil }
+        }
+    }
+}
+
+/// Stable glass identity so a result tile morphs when it moves between sections on retest
+/// (e.g. Failed → Passed). No-op below iOS 26.
+private struct ResultTileGlassID: ViewModifier {
+    let id: String
+    let namespace: Namespace.ID
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26, macOS 26, *) {
+            content.glassEffectID(id, in: namespace)
+        } else {
+            content
         }
     }
 }

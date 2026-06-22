@@ -132,8 +132,9 @@ struct TestSelectionView: View {
         }
         .padding()
         .frame(maxWidth: .infinity)
-        .background(Color.accentColor.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .rmGlassTintedCard(cornerRadius: 14,
+                           tint: Color.accentColor.opacity(0.25),
+                           fallbackFill: Color.accentColor.opacity(0.1))
         .accessibilityIdentifier("welcome-shop")
     }
 
@@ -189,9 +190,10 @@ struct TestSelectionView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 96)
-                .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(isSelected ? Color.accentColor : Color(.systemGray6))
+                .rmGlassTintedCard(
+                    cornerRadius: 14,
+                    tint: isSelected ? Color.accentColor.opacity(0.6) : Color(.systemGray4).opacity(0.4),
+                    fallbackFill: isSelected ? Color.accentColor : Color(.systemGray6)
                 )
 
                 if isSelected {
