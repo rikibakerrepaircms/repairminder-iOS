@@ -125,6 +125,7 @@ enum ReportDetailFormatter {
         switch key {
         case "battery_level", "health_percent", "drain_percent", "delta_pct":
             return raw.hasSuffix("%") ? raw : "\(raw)%"
+        case "drain_percent_per_hour": return "\(raw)%/hr (est.)"
         case "voltage_mv":      return "\(raw) mV"
         case "temperature_c":   return "\(raw)°C"
         case "max_capacity_mah": return "\(raw) mAh"

@@ -153,6 +153,13 @@ struct DiagnosticReportTests {
         #expect(dict["Temperature"] == "31°C")
     }
 
+    @Test func formatterQualifiesDrainPerHour() {
+        // The test now emits a plain number; the report layer adds the unit + estimate qualifier.
+        #expect(ReportDetailFormatter.value(for: "drain_percent_per_hour", "30") == "30%/hr (est.)")
+        // Plain percent keys still get a bare "%".
+        #expect(ReportDetailFormatter.value(for: "drain_percent", "5") == "5%")
+    }
+
     // MARK: - from(runner:)
 
     @MainActor @Test func fromRunnerPullsDeviceBannerAndGroupsResults() {

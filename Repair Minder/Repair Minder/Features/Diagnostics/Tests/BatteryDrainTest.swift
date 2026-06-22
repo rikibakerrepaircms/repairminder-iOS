@@ -260,7 +260,7 @@ private struct BatteryDrainTestView: View {
         details["drain_end"]             = finalPct >= 0 ? "\(finalPct)%" : "n/a"
         details["drain_elapsed_s"]       = "\(elapsedS)"
         details["drain_percent"]         = "\(drain.drainPct)"
-        details["drain_percent_per_hour"] = "~\(drain.drainPctPerHour) (est.)"
+        details["drain_percent_per_hour"] = "\(drain.drainPctPerHour)"
         details["drain_confidence"]      = drain.confidence
         return diagnosticOutcome("battery_drain", "Battery Drain", status, details)
     }
