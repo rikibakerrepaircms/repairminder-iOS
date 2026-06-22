@@ -70,7 +70,7 @@ struct HardwareButtonsTest: DiagnosticTest {
     #endif
 }
 
-// MARK: - Vibration (accelerometer-gated; auto-pass on detected motor spike)
+// MARK: - Vibration (mic + magnetometer coded-pulse fusion; auto-pass when both channels correlate)
 
 struct VibrationTest: DiagnosticTest {
     let id = "vibration"; let name = "Vibration"; let category: TestCategory = .hardware
@@ -78,6 +78,7 @@ struct VibrationTest: DiagnosticTest {
     #if os(iOS)
     // iPads have no vibration motor; gate on haptics hardware capability.
     var isSupported: Bool { CHHapticEngine.capabilitiesForHardware().supportsHaptics }
+    var requiredPermissions: [DiagnosticPermission] { [.microphone] }
     @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { AnyView(VibrationTestView(complete: complete)) }
     #else
     var isSupported: Bool { false }
@@ -408,103 +409,113 @@ private struct HardwareButtonsTestView: View {
     }
 }
 
-// Vibration: trigger a sustained 2s haptic pulse; auto-pass when the accelerometer detects the motor spike.
+// Vibration: fire a randomized on/off buzz code and require BOTH microphone band energy AND
+// magnetometer deviation to correlate with the code → spoof-resistant auto-detection.
+
+enum VibrationPhase { case idle, running, resolved }
 
 @MainActor final class VibrationViewModel: ObservableObject {
-    private let probe: AccelProbe
+    @Published var phase: VibrationPhase = .idle
     @Published var outcome: TestOutcome?
-    @Published var peak: Double = 0
-    @Published var measuring = false
-    /// Last accelerometer reading from a measuring cycle, shown on screen and logged so the
-    /// auto-detect threshold (`minDelta`) can be re-tuned against real hardware. On some devices a
-    /// continuous Taptic pulse on a resting surface doesn't clear 0.15 g, so auto-detect never fires
-    /// and the tech must confirm the buzz by feel via the manual Pass button.
-    @Published var lastResting: Double = 0
-    @Published var detected = false
-    @Published var waitingForStill = false
+    @Published var autoFailed = false
+    @Published var micScore: Double = 0
+    @Published var magScore: Double = 0
     private var hapticEngine: CHHapticEngine?
+    private let micProbe = MicBandEnergyProbe()
+    private let magProbe = MagnetometerEnvelopeProbe()
     private let log = Logger(subsystem: "com.repairminder.diagnostics", category: "vibration")
-    init(probe: AccelProbe) { self.probe = probe }
 
     func run() async {
-        // Wait for the device to be laid flat & still so the buzz spike is detectable.
-        // Up to ~10s ceiling (12 iterations × ≈400ms sample + 500ms sleep). Bails on cancellation
-        // (view dismissed) so a backed-out test doesn't keep sampling motion.
-        waitingForStill = true
-        for _ in 0..<12 {
-            guard !Task.isCancelled else { break }
-            let resting = await withCheckedContinuation { (cont: CheckedContinuation<Double, Never>) in
-                probe.sampleBaseline(windowMs: 400) { cont.resume(returning: $0) }
-            }
-            if StillnessGate.isStill(resting: resting) { break }
-            try? await Task.sleep(nanoseconds: 500_000_000)
+        guard phase != .running else { return }
+        phase = .running
+        autoFailed = false
+        outcome = nil
+
+        // --- Baseline: let magnetometer probe settle before the code starts ---
+        let baselineSeconds = 0.5
+        let startTime = CACurrentMediaTime()
+
+        var micSamples: [(t: Double, v: Double)] = []
+        var magSamples: [(t: Double, v: Double)] = []
+
+        micProbe.start(startTime: startTime) { t, v in micSamples.append((t, v)) }
+        magProbe.start(startTime: startTime) { t, v in magSamples.append((t, v)) }
+
+        // Wait for baseline window
+        try? await Task.sleep(nanoseconds: UInt64(baselineSeconds * 1_000_000_000))
+
+        // --- Generate random code ---
+        let code = VibrationCode.random { Double.random(in: 0..<1) }
+
+        // --- Play coded haptic pattern ---
+        await playCode(code, offset: baselineSeconds)
+
+        // Wait for code to finish plus a small tail for last-slot energy to be captured
+        let codeDuration = Double(code.slots.count) * code.slotS + 0.2
+        try? await Task.sleep(nanoseconds: UInt64(codeDuration * 1_000_000_000))
+
+        // --- Stop probes ---
+        micProbe.stop()
+        magProbe.stop()
+
+        // --- Score: align samples to code start (t=0 at code first slot) ---
+        let codeOffset = baselineSeconds
+        let micAligned = micSamples.compactMap { s -> (t: Double, v: Double)? in
+            let t = s.t - codeOffset; return t >= 0 ? (t, s.v) : nil
         }
-        waitingForStill = false
-        measuring = true
-        detected = false
-        // Genuine pre-buzz resting baseline (motor OFF) — used by the gate so the buzz isn't
-        // compared against itself. Sampled once; the per-cycle in-window resting is logged only.
-        let baseline = await withCheckedContinuation { (cont: CheckedContinuation<Double, Never>) in
-            probe.sampleBaseline(windowMs: 400) { cont.resume(returning: $0) }
+        let magAligned = magSamples.compactMap { s -> (t: Double, v: Double)? in
+            let t = s.t - codeOffset; return t >= 0 ? (t, s.v) : nil
         }
-        let maxCycles = 3
-        for cycle in 0..<maxCycles {
-            // Insert a 2s OFF gap between cycles (not before the first one)
-            if cycle > 0 {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-            }
-            // Fire the sustained vibration
-            await buzz()
-            // Sample the accelerometer over the 2s ON window
-            let (resting, peakVal) = await withCheckedContinuation { (cont: CheckedContinuation<(Double, Double), Never>) in
-                probe.samplePeak(windowMs: 2000) { r, p in
-                    cont.resume(returning: (r, p))
-                }
-            }
-            self.peak = peakVal
-            self.lastResting = baseline
-            let spiked = VibrationGate.spiked(restingNoise: baseline, peak: peakVal, minDelta: 0.08)
-            // Logged so we can re-tune the 0.15 g threshold against real devices (Console.app /
-            // `log stream --predicate 'subsystem == "com.repairminder.diagnostics"'`).
-            log.info("cycle \(cycle, privacy: .public) baseline=\(baseline, format: .fixed(precision: 3), privacy: .public)g inWindowResting=\(resting, format: .fixed(precision: 3), privacy: .public)g peak=\(peakVal, format: .fixed(precision: 3), privacy: .public)g spiked=\(spiked, privacy: .public)")
-            if spiked {
-                self.detected = true
-                self.outcome = diagnosticOutcome("vibration", "Vibration", .pass,
-                                                 ["accel_peak_g": String(format: "%.2f", peakVal)])
-                self.measuring = false
-                return
-            }
+
+        let micEnergies = VibrationFusion.slotEnergies(samples: micAligned, slotS: code.slotS, slotCount: code.slots.count)
+        let magEnergies = VibrationFusion.slotEnergies(samples: magAligned, slotS: code.slotS, slotCount: code.slots.count)
+        let mScore = VibrationFusion.score(slotEnergies: micEnergies, code: code)
+        let gScore = VibrationFusion.score(slotEnergies: magEnergies, code: code)
+        self.micScore = mScore
+        self.magScore = gScore
+
+        log.info("vibration fusion mic_score=\(mScore, format: .fixed(precision: 3), privacy: .public) mag_score=\(gScore, format: .fixed(precision: 3), privacy: .public) code=\(code.slots.map { $0 ? "1" : "0" }.joined(), privacy: .public)")
+
+        if VibrationFusion.passes(micScore: mScore, magScore: gScore) {
+            outcome = diagnosticOutcome("vibration", "Vibration", .pass,
+                                        ["verified": "mic+magnetometer",
+                                         "mic_score": String(format: "%.2f", mScore),
+                                         "mag_score": String(format: "%.2f", gScore)])
+        } else {
+            autoFailed = true
         }
-        // No spike detected after all cycles — leave for user to Pass (by feel) / Fail / Skip
-        self.measuring = false
+        phase = .resolved
     }
 
-    private func buzz() async {
-        // Try CoreHaptics sustained continuous vibration (2s)
+    private func playCode(_ code: VibrationCode, offset: Double) async {
         do {
-            if hapticEngine == nil {
-                hapticEngine = try CHHapticEngine()
-            }
+            if hapticEngine == nil { hapticEngine = try CHHapticEngine() }
             guard let engine = hapticEngine else { throw NSError(domain: "Haptics", code: 0) }
             try await engine.start()
-            let event = CHHapticEvent(
-                eventType: .hapticContinuous,
-                parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0)
-                ],
-                relativeTime: 0,
-                duration: 2.0
-            )
-            let pattern = try CHHapticPattern(events: [event], parameters: [])
+            var events: [CHHapticEvent] = []
+            for (i, on) in code.slots.enumerated() where on {
+                let t = Double(i) * code.slotS
+                events.append(CHHapticEvent(
+                    eventType: .hapticContinuous,
+                    parameters: [
+                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0)
+                    ],
+                    relativeTime: t,
+                    duration: code.slotS
+                ))
+            }
+            guard !events.isEmpty else { return }
+            let pattern = try CHHapticPattern(events: events, parameters: [])
             let player = try engine.makePlayer(with: pattern)
             try player.start(atTime: CHHapticTimeImmediate)
         } catch {
-            // Fall back: fire AudioServices vibrate every 0.5s for 2s
+            // Fallback: fire AudioServices for each ON slot
             hapticEngine = nil
-            for _ in 0..<4 {
+            for (i, on) in code.slots.enumerated() where on {
+                let delay = UInt64(Double(i) * code.slotS * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: delay)
                 AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
-                try? await Task.sleep(nanoseconds: 500_000_000)
             }
         }
     }
@@ -512,42 +523,45 @@ private struct HardwareButtonsTestView: View {
 
 private struct VibrationTestView: View {
     let complete: (TestOutcome) -> Void
-    @StateObject private var model = VibrationViewModel(probe: AccelProbeCM())
+    @StateObject private var model = VibrationViewModel()
 
     var body: some View {
         TestScaffold(
             title: "Vibration",
-            instruction: "Lay the device flat on a hard surface and keep still. It pulses for ~2 seconds and auto-detects the motor. If you feel it buzz but it isn’t detected, tap Pass.",
-            hints: ["Place it flat on a hard surface (not a soft hand/lap)", "If you feel the buzz, you can Pass it manually"],
-            // Auto-detection can miss on devices where a continuous Taptic pulse doesn't register
-            // strongly on the accelerometer, so allow a tech to confirm the buzz by feel.
-            allowManualPass: true,
-            onPass: { complete(diagnosticOutcome("vibration", "Vibration", .pass, ["confirmed": "manual"])) },
+            instruction: "Lay the device flat on a hard surface. It buzzes a short coded pattern and checks the microphone + magnetometer.",
+            hints: ["Place it flat on a hard, non-soft surface", "Keep still during the buzz sequence"],
+            allowManualPass: model.autoFailed,
+            onPass: {
+                complete(diagnosticOutcome("vibration", "Vibration", .pass, ["confirmed": "manual"]))
+            },
             onFail: { complete(diagnosticOutcome("vibration", "Vibration", .fail)) },
             onSkip: { complete(diagnosticOutcome("vibration", "Vibration", .skip)) }
         ) {
             VStack(spacing: 12) {
-                Image(systemName: "iphone.radiowaves.left.and.right").font(.system(size: 44)).foregroundStyle(Color.accentColor)
-                if model.waitingForStill {
-                    ProgressView("Place the device flat and keep still…")
-                } else if model.measuring {
-                    ProgressView("Measuring…")
-                } else if !model.detected {
-                    Text("No motor spike detected automatically. If you felt it buzz, tap Pass — otherwise Vibrate again or Fail.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
+                Image(systemName: "iphone.radiowaves.left.and.right")
+                    .font(.system(size: 44)).foregroundStyle(Color.accentColor)
+                switch model.phase {
+                case .idle:
+                    EmptyView()
+                case .running:
+                    ProgressView("Checking vibration…")
+                case .resolved:
+                    if model.autoFailed {
+                        Text("Coded buzz not detected. If you felt it vibrate, tap Pass — otherwise tap Fail.")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center).padding(.horizontal)
+                        Text(String(format: "mic %.2f · mag %.2f", model.micScore, model.magScore))
+                            .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                    }
                 }
-                if model.peak > 0 {
-                    Text(String(format: "Accel peak %.2f g · resting %.2f g", model.peak, model.lastResting))
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                if model.phase == .resolved {
+                    Button("Run again") { Task { await model.run() } }.buttonStyle(.bordered)
                 }
-                Button("Vibrate again") { Task { await model.run() } }.buttonStyle(.bordered)
             }
             .task { await model.run() }
-            .onChange(of: model.outcome?.status) { _, _ in if let o = model.outcome { complete(o) } }
+            .onChange(of: model.outcome?.status) { _, _ in
+                if let o = model.outcome { complete(o) }
+            }
         }
     }
 }
