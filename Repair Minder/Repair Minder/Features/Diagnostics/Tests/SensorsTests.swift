@@ -274,7 +274,10 @@ private struct GyroscopeTestView: View {
         guard h.headingAccuracy > 0, h.magneticHeading >= 0 else { return }
         Task { @MainActor in
             self.heading = h.magneticHeading
-            self.sweptSectors.insert(Int(h.magneticHeading / 10) % 36)
+            // Light the ring segment where the needle points. The needle is rotated by -heading, so
+            // it points at screen angle (360 - heading); map the lit sector to the same side rather
+            // than to +heading (which put the highlight opposite the arrow).
+            self.sweptSectors.insert(Int((360 - h.magneticHeading) / 10) % 36)
         }
     }
     nonisolated func locationManager(_ m: CLLocationManager, didUpdateLocations locs: [CLLocation]) {
