@@ -476,18 +476,11 @@ private struct LightSensorActiveView: View {
                         .buttonStyle(.rmGlassProminent())
                         .accessibilityIdentifier("light-start")
                 } else if model.baseline > 0 {
-                    // Live luminance bar relative to baseline
-                    let ratio = min(model.current / (model.baseline * 2), 1.0)
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 6).fill(Color.platformGray6)
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(ratio >= 0.625 ? Color.green : Color.accentColor)
-                                .frame(width: geo.size.width * ratio)
-                        }
-                    }
-                    .frame(height: 20)
-                    .padding(.horizontal)
+                    // Live luminance vs the pass threshold (baseline + 25%).
+                    SignalMeterView(value: model.current,
+                                    threshold: model.baseline * 1.25,
+                                    label: "Light level")
+                        .padding(.horizontal)
 
                     Text(String(format: "Baseline %.0f  ·  Current %.0f", model.baseline, model.current))
                         .font(.caption.monospacedDigit())

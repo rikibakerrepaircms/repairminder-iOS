@@ -34,6 +34,11 @@ struct SignalMeterView: View {
             }
             .frame(height: 8)
             .accessibilityIdentifier("signal-meter")
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(label.isEmpty ? "Signal level" : label)
+            .accessibilityValue(isAboveThreshold
+                ? "Above threshold"
+                : "\(Int(fraction * 100)) percent of threshold")
         }
     }
 }
