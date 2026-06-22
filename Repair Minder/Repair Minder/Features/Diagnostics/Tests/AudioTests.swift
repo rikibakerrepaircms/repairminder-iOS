@@ -210,18 +210,23 @@ private struct MicSource: Identifiable {
 
 @MainActor private final class MicrophoneViewModel: ObservableObject {
     @Published var sources: [MicSource] = []
-    @Published var currentIndex: Int = 0
+    @Published var currentIndex = 0
     @Published var level: Float = 0
+    @Published var countdown = 3
+    @Published var signalDetected = false
     @Published var denied = false
     @Published var done = false
-    enum SourcePhase { case metering, playing, awaitingContinue }
-    @Published var phase: SourcePhase = .metering
-    private var player: AVAudioPlayer?
-    private var playbackTask: Task<Void, Never>?
-    private var didPlayback = false
+    enum SourcePhase { case recording, playing, awaitingContinue }
+    @Published var phase: SourcePhase = .recording
 
     private var meter = MicMeter()
-    private var timeoutTask: Task<Void, Never>?
+    private var player: AVAudioPlayer?
+    private var recordTask: Task<Void, Never>?
+    private var playbackTask: Task<Void, Never>?
+    private var didPlayback = false
+    private let recordSeconds = 3
+
+    var currentLabel: String { currentIndex < sources.count ? sources[currentIndex].label : "" }
 
     // Build source list from AVAudioSession, falling back to a single "default".
     func prepare() {
@@ -251,94 +256,84 @@ private struct MicSource: Identifiable {
     func startCurrentSource() {
         guard currentIndex < sources.count else { finish(); return }
         let session = AVAudioSession.sharedInstance()
-        // Reset to an input-capable category before selecting the data source: playback (from the
-        // previous source's clip) leaves the session on .playback, where setPreferredDataSource/Input
-        // silently no-op — which would leave sources 2+ recording on the wrong mic.
+        // Reset to an input-capable category before selecting the data source (playback leaves the
+        // session on a state where setPreferredDataSource/Input can silently no-op).
         try? session.setCategory(.playAndRecord, options: [.defaultToSpeaker])
         try? session.setActive(true)
-        // Point session at this data source
-        if let inputs = session.availableInputs,
-           let port = inputs.first,
+        if let inputs = session.availableInputs, let port = inputs.first,
            let ds = port.dataSources?.first(where: { $0.dataSourceName.lowercased() == sources[currentIndex].id }) {
             try? port.setPreferredDataSource(ds)
             try? session.setPreferredInput(port)
         }
-        meter.stop()
-        meter = MicMeter()
-        level = 0
-        timeoutTask?.cancel()
-
-        meter.start(onLevel: { [weak self] lvl in self?.level = lvl }, onDetect: { [weak self] in
-            guard let self else { return }
-            self.markCurrent(pass: true)
-        })
-        // Observe denied via binding on next runloop
+        // Reset per-attempt state and start a FIXED-LENGTH recording.
+        player?.stop()
+        meter.stop(); meter = MicMeter()
+        level = 0; signalDetected = false; countdown = recordSeconds; phase = .recording
+        meter.start(onLevel: { [weak self] lvl in self?.level = lvl },
+                    onDetect: { [weak self] in self?.signalDetected = true })   // flag only — do NOT advance
+        // Poll for permission denial (requestRecordPermission is async).
         Task { @MainActor in
-            // Poll denial once (requestRecordPermission is async)
             try? await Task.sleep(nanoseconds: 200_000_000)
             if self.meter.denied { self.denied = true; self.finish() }
         }
-        // 3-second timeout per source
-        timeoutTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            guard let self, !Task.isCancelled else { return }
-            self.markCurrent(pass: false)
+        // Fixed 3s window with a visible 3→1 countdown, THEN finalise.
+        recordTask?.cancel()
+        recordTask = Task { @MainActor in
+            for s in stride(from: recordSeconds, through: 1, by: -1) {
+                self.countdown = s
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if Task.isCancelled { return }
+            }
+            self.finalizeRecording()
         }
     }
 
-    private func markCurrent(pass: Bool) {
-        timeoutTask?.cancel()
+    private func finalizeRecording() {
+        let url = meter.recordingURL
+        meter.stop()
         guard currentIndex < sources.count else { return }
-        sources[currentIndex].result = pass
-        if pass {
-            // Let the tech hear what the mic captured, then require an explicit Continue.
-            let url = meter.recordingURL
-            meter.stop()
-            playBack(url)
-        } else {
-            meter.stop()
-            advance()
-        }
+        sources[currentIndex].result = signalDetected   // pass iff signal heard during the window
+        playBack(url)
     }
 
     private func playBack(_ url: URL?) {
         guard let url else { phase = .awaitingContinue; return }
         didPlayback = true
         let session = AVAudioSession.sharedInstance()
-        // .playAndRecord (not .playback) so overrideOutputAudioPort(.speaker) is valid here.
         try? session.setCategory(.playAndRecord, options: [.defaultToSpeaker])
         try? session.overrideOutputAudioPort(.speaker)
         player = try? AVAudioPlayer(contentsOf: url)
         player?.play()
         phase = .playing
         let secs = player?.duration ?? 0
+        playbackTask?.cancel()
         playbackTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: UInt64(max(0.5, secs) * 1_000_000_000))
-            guard !Task.isCancelled else { return }
+            if Task.isCancelled { return }
             if self.phase == .playing { self.phase = .awaitingContinue }
         }
     }
 
-    /// Advance to the next source (or finish). Called after Continue (passed) or timeout (failed).
+    /// Re-record the current source (same index) — used by "Record again".
+    func recordAgain() {
+        playbackTask?.cancel(); player?.stop()
+        startCurrentSource()
+    }
+
+    /// Advance to the next source (or finish). The current source's result is already recorded.
     func advance() {
-        playbackTask?.cancel()
-        player?.stop()
+        recordTask?.cancel(); playbackTask?.cancel(); player?.stop()
         currentIndex += 1
-        phase = .metering
         if currentIndex < sources.count { startCurrentSource() } else { finish() }
     }
 
     private func finish() {
-        timeoutTask?.cancel()
-        meter.stop()
+        recordTask?.cancel(); playbackTask?.cancel(); meter.stop(); player?.stop()
         done = true
     }
 
     func stopAll() {
-        timeoutTask?.cancel()
-        playbackTask?.cancel()
-        meter.stop()
-        player?.stop()
+        recordTask?.cancel(); playbackTask?.cancel(); meter.stop(); player?.stop()
     }
 
     func outcome() -> TestOutcome {
@@ -375,21 +370,32 @@ private struct MicrophoneTestView: View {
                         sourceRow(index: i)
                     }
                     if model.currentIndex < model.sources.count {
-                        VStack(spacing: 8) {
+                        VStack(spacing: 10) {
                             switch model.phase {
-                            case .metering:
+                            case .recording:
+                                Text("Recording \(model.currentLabel)… \(model.countdown)s")
+                                    .font(.subheadline.weight(.semibold))
                                 SignalMeterView(value: Double(model.level), threshold: 0.667, label: "Input level")
-                                Text("Make a sound near the mic until the bar fills past the line")
+                                Text("Make a sound near this microphone")
                                     .font(.caption).foregroundStyle(.secondary)
                             case .playing:
-                                Label("Playing back what the mic recorded…", systemImage: "speaker.wave.2.fill")
+                                Label("Playing back \(model.currentLabel)…", systemImage: "speaker.wave.2.fill")
                                     .font(.subheadline)
                             case .awaitingContinue:
-                                Text("Did you hear the recording play back clearly?")
-                                    .font(.subheadline)
-                                Button("Continue") { model.advance() }
-                                    .buttonStyle(.rmGlassProminent())
-                                    .accessibilityIdentifier("mic-continue")
+                                if model.signalDetected {
+                                    Label("Sound detected", systemImage: "checkmark.circle.fill")
+                                        .foregroundStyle(.green).font(.subheadline)
+                                } else {
+                                    Label("No sound detected", systemImage: "exclamationmark.triangle.fill")
+                                        .foregroundStyle(.orange).font(.subheadline)
+                                }
+                                HStack(spacing: 12) {
+                                    Button("Record again") { model.recordAgain() }
+                                        .buttonStyle(.rmGlass())
+                                    Button("Continue") { model.advance() }
+                                        .buttonStyle(.rmGlassProminent())
+                                        .accessibilityIdentifier("mic-continue")
+                                }
                             }
                         }
                         .padding(.top, 4)
@@ -416,7 +422,7 @@ private struct MicrophoneTestView: View {
                 .frame(width: 24)
             Text(src.label).font(.subheadline)
             Spacer()
-            if isActive, model.phase == .metering { ProgressView().scaleEffect(0.7) }
+            if isActive, model.phase == .recording { ProgressView().scaleEffect(0.7) }
         }
         .padding(.vertical, 4)
     }
