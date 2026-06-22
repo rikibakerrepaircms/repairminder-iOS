@@ -113,6 +113,7 @@ private struct BluetoothTestView: View {
             .onChange(of: bt.state) { _, s in
                 if s == .poweredOn { complete(diagnosticOutcome("bluetooth", "Bluetooth", .pass, ["state": "poweredOn"])) }
                 else if s == .unsupported { complete(diagnosticOutcome("bluetooth", "Bluetooth", .skip, ["state": "unsupported"])) }
+                else if s == .unauthorized { complete(diagnosticOutcome("bluetooth", "Bluetooth", .skip, ["reason": "permission_denied", "state": "unauthorized"])) }
             }
         }
     }
