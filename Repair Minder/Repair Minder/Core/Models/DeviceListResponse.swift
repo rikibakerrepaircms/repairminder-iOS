@@ -27,16 +27,10 @@ struct DeviceListFilters: Decodable, Equatable, Sendable {
     let categoryCounts: DeviceCategoryCounts?
 }
 
-/// Engineer info for filter dropdown (includes first/last name)
+/// Engineer info for filter dropdown. API returns pre-joined `{id, name}`.
 struct EngineerFilterInfo: Decodable, Equatable, Sendable, Identifiable {
     let id: String
-    let firstName: String
-    let lastName: String
-
-    /// Computed full name
-    var name: String {
-        "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
-    }
+    let name: String
 }
 
 /// Category counts for filter tabs

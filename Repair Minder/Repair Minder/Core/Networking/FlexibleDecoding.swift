@@ -22,6 +22,11 @@ struct FlexibleString: Decodable, Equatable, Sendable, Hashable {
             value = ""
         }
     }
+
+    /// Direct initializer for use in previews and tests.
+    init(_ value: String) {
+        self.value = value
+    }
 }
 
 /// Decodes a value that may be Int (0/1) or Bool into a Bool.

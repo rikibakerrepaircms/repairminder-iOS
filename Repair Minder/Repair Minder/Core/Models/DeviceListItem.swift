@@ -15,7 +15,7 @@ struct DeviceListItem: Decodable, Identifiable, Sendable, Equatable, Hashable {
     let id: String
     let orderId: String?  // Made optional - buyback items might not have an order
     let ticketId: String?
-    let orderNumber: String?
+    let orderNumber: FlexibleString?
     let clientFirstName: String?
     let clientLastName: String?
     let displayName: String
