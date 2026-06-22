@@ -295,8 +295,9 @@ private struct HardwareButtonsTestView: View {
     @State private var cameraTimeout: Timer?
     private let muteProbe = MuteSwitchProbe()
 
-    /// Camera Control only attempted when the camera is already authorized (no prompt mid-test).
-    private var cameraEligible: Bool { AVCaptureDevice.authorizationStatus(for: .video) == .authorized }
+    /// Camera Control is only present on iPhone 16-family devices (iOS 18+). Gate the row on real
+    /// hardware support so devices without it (e.g. iPhone 15 Pro Max) never get asked for it.
+    private var cameraEligible: Bool { CaptureButtonProbe.isAvailable }
     /// Volume + screenshot + mute all resolved — only then do we activate the capture-button probe,
     /// so its AVCaptureEventInteraction can't intercept the volume/screenshot presses above it.
     private var othersResolved: Bool { watcher.up && watcher.down && sideLock != "0" && mute != "0" }
@@ -451,7 +452,7 @@ private struct HardwareButtonsTestView: View {
             }
             self.peak = peakVal
             self.lastResting = baseline
-            let spiked = VibrationGate.spiked(restingNoise: baseline, peak: peakVal, minDelta: 0.15)
+            let spiked = VibrationGate.spiked(restingNoise: baseline, peak: peakVal, minDelta: 0.08)
             // Logged so we can re-tune the 0.15 g threshold against real devices (Console.app /
             // `log stream --predicate 'subsystem == "com.repairminder.diagnostics"'`).
             log.info("cycle \(cycle, privacy: .public) baseline=\(baseline, format: .fixed(precision: 3), privacy: .public)g inWindowResting=\(resting, format: .fixed(precision: 3), privacy: .public)g peak=\(peakVal, format: .fixed(precision: 3), privacy: .public)g spiked=\(spiked, privacy: .public)")

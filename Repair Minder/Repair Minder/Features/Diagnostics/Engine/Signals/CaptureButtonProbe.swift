@@ -12,6 +12,20 @@ import UIKit
 struct CaptureButtonProbe: UIViewRepresentable {
     let onPress: () -> Void
 
+    /// True only on devices with a hardware Camera Control button (iPhone 16 family, iOS 18+).
+    /// Uses AVCaptureSession.supportsControls — the authoritative API — rather than guessing by model.
+    static var isAvailable: Bool {
+        guard #available(iOS 18.0, *) else { return false }
+        guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized,
+              let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+              let input = try? AVCaptureDeviceInput(device: device) else { return false }
+        let session = AVCaptureSession()
+        session.beginConfiguration()
+        if session.canAddInput(input) { session.addInput(input) }
+        session.commitConfiguration()
+        return session.supportsControls
+    }
+
     func makeUIView(context: Context) -> UIView {
         // Stop any session from a prior makeUIView on the same coordinator so it isn't orphaned
         // running if SwiftUI recreates the view without an intervening dismantle.

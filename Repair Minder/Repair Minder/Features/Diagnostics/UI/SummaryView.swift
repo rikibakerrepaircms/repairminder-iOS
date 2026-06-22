@@ -65,6 +65,11 @@ struct SummaryView: View {
                     // Header card — grade + overall label + counts
                     gradeHeaderCard
 
+                    // On-device PDF preview row (same report as the top-right Share arrow)
+                    #if os(iOS)
+                    generatePDFRow
+                    #endif
+
                     // Failed / error section (red) — always first
                     if !failedOutcomes.isEmpty {
                         gridSection(
@@ -356,14 +361,59 @@ struct SummaryView: View {
         .accessibilityHint("Double tap to retest")
     }
 
-    // MARK: - Share PDF
+    // MARK: - PDF (share arrow + preview row share one generate path)
 
     #if os(iOS)
-    /// Build the branded PDF report and present a share sheet (see DiagnosticReportShare).
+    /// On-device PDF preview affordance. Renders the SAME report as the top-right Share arrow
+    /// (both go through DiagnosticReportShare.generatePDF) and opens it in Quick Look.
+    @ViewBuilder
+    private var generatePDFRow: some View {
+        Button(action: previewPDF) {
+            HStack(spacing: 12) {
+                Image(systemName: "doc.text.magnifyingglass")
+                    .font(.title3)
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 28)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Generate PDF")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.primary)
+                    Text("Preview the full report on this device")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if isGeneratingPDF {
+                    ProgressView()
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding()
+            .frame(maxWidth: .infinity)
+            .rmGlassCardBackground(cornerRadius: 12, fallbackFill: Color(.systemBackground))
+        }
+        .buttonStyle(.plain)
+        .disabled(isGeneratingPDF || runner.orderedOutcomes.isEmpty)
+        .accessibilityIdentifier("generate-pdf")
+    }
+
+    /// Top-right arrow: build the report and present the system share sheet.
     private func sharePDF() {
         guard !isGeneratingPDF else { return }
         isGeneratingPDF = true
         DiagnosticReportShare.presentShareSheet(for: runner) { _ in
+            isGeneratingPDF = false
+        }
+    }
+
+    /// "Generate PDF" row: build the same report and preview it on-device (Quick Look).
+    private func previewPDF() {
+        guard !isGeneratingPDF else { return }
+        isGeneratingPDF = true
+        DiagnosticReportShare.presentPreview(for: runner) { _ in
             isGeneratingPDF = false
         }
     }

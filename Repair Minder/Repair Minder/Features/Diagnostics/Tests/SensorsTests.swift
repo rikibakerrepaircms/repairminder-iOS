@@ -463,7 +463,7 @@ private struct LightSensorTestView: View {
 
     init(complete: @escaping (TestOutcome) -> Void) {
         self.complete = complete
-        self.probe = CameraProbe.front().map { CameraProbe(device: $0) }
+        self.probe = CameraProbe.front().map { CameraProbe(device: $0, lockExposureForMeasurement: true) }
     }
 
     var body: some View {
