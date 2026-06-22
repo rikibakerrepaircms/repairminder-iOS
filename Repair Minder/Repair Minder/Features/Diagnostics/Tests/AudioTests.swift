@@ -127,6 +127,7 @@ private struct SpeakerTestView: View {
     @Published var denied = false
     private var recorder: AVAudioRecorder?
     private var timer: Timer?
+    private(set) var recordingURL: URL?
 
     func start(onLevel: @escaping (Float) -> Void, onDetect: @escaping () -> Void) {
         AVAudioApplication.requestRecordPermission { granted in
@@ -140,7 +141,8 @@ private struct SpeakerTestView: View {
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.playAndRecord, options: [.defaultToSpeaker])
         try? session.setActive(true)
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("mic-test.caf")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("mic-\(UUID().uuidString).caf")
+        recordingURL = url
         let settings: [String: Any] = [AVFormatIDKey: kAudioFormatAppleLossless, AVSampleRateKey: 44100, AVNumberOfChannelsKey: 1]
         recorder = try? AVAudioRecorder(url: url, settings: settings)
         recorder?.isMeteringEnabled = true
@@ -173,6 +175,11 @@ private struct MicSource: Identifiable {
     @Published var level: Float = 0
     @Published var denied = false
     @Published var done = false
+    enum SourcePhase { case metering, playing, awaitingContinue }
+    @Published var phase: SourcePhase = .metering
+    private var player: AVAudioPlayer?
+    private var playbackTask: Task<Void, Never>?
+    private var didPlayback = false
 
     private var meter = MicMeter()
     private var timeoutTask: Task<Void, Never>?
@@ -205,6 +212,11 @@ private struct MicSource: Identifiable {
     func startCurrentSource() {
         guard currentIndex < sources.count else { finish(); return }
         let session = AVAudioSession.sharedInstance()
+        // Reset to an input-capable category before selecting the data source: playback (from the
+        // previous source's clip) leaves the session on .playback, where setPreferredDataSource/Input
+        // silently no-op — which would leave sources 2+ recording on the wrong mic.
+        try? session.setCategory(.playAndRecord, options: [.defaultToSpeaker])
+        try? session.setActive(true)
         // Point session at this data source
         if let inputs = session.availableInputs,
            let port = inputs.first,
@@ -237,15 +249,44 @@ private struct MicSource: Identifiable {
 
     private func markCurrent(pass: Bool) {
         timeoutTask?.cancel()
-        meter.stop()
         guard currentIndex < sources.count else { return }
         sources[currentIndex].result = pass
-        currentIndex += 1
-        if currentIndex < sources.count {
-            startCurrentSource()
+        if pass {
+            // Let the tech hear what the mic captured, then require an explicit Continue.
+            let url = meter.recordingURL
+            meter.stop()
+            playBack(url)
         } else {
-            finish()
+            meter.stop()
+            advance()
         }
+    }
+
+    private func playBack(_ url: URL?) {
+        guard let url else { phase = .awaitingContinue; return }
+        didPlayback = true
+        let session = AVAudioSession.sharedInstance()
+        // .playAndRecord (not .playback) so overrideOutputAudioPort(.speaker) is valid here.
+        try? session.setCategory(.playAndRecord, options: [.defaultToSpeaker])
+        try? session.overrideOutputAudioPort(.speaker)
+        player = try? AVAudioPlayer(contentsOf: url)
+        player?.play()
+        phase = .playing
+        let secs = player?.duration ?? 0
+        playbackTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(max(0.5, secs) * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            if self.phase == .playing { self.phase = .awaitingContinue }
+        }
+    }
+
+    /// Advance to the next source (or finish). Called after Continue (passed) or timeout (failed).
+    func advance() {
+        playbackTask?.cancel()
+        player?.stop()
+        currentIndex += 1
+        phase = .metering
+        if currentIndex < sources.count { startCurrentSource() } else { finish() }
     }
 
     private func finish() {
@@ -256,7 +297,9 @@ private struct MicSource: Identifiable {
 
     func stopAll() {
         timeoutTask?.cancel()
+        playbackTask?.cancel()
         meter.stop()
+        player?.stop()
     }
 
     func outcome() -> TestOutcome {
@@ -264,7 +307,9 @@ private struct MicSource: Identifiable {
             guard let r = s.result else { return nil }
             return (s.id, r)
         })
-        let (status, details) = MicSourceAggregate.result(perSource: perSource.isEmpty ? ["default": false] : perSource)
+        let (status, baseDetails) = MicSourceAggregate.result(perSource: perSource.isEmpty ? ["default": false] : perSource)
+        var details = baseDetails
+        if didPlayback { details["playback"] = "1" }
         return diagnosticOutcome("microphone", "Microphone", status, details)
     }
 }
@@ -291,13 +336,22 @@ private struct MicrophoneTestView: View {
                         sourceRow(index: i)
                     }
                     if model.currentIndex < model.sources.count {
-                        VStack(spacing: 6) {
-                            // Live input level. Fills as sound is picked up and turns green once it
-                            // crosses the pass threshold (~ -20 dBFS → 0.667 normalised); quiet
-                            // background noise stays below it and won't pass the test.
-                            SignalMeterView(value: Double(model.level), threshold: 0.667, label: "Input level")
-                            Text("Make a sound near the mic until the bar fills past the line")
-                                .font(.caption).foregroundStyle(.secondary)
+                        VStack(spacing: 8) {
+                            switch model.phase {
+                            case .metering:
+                                SignalMeterView(value: Double(model.level), threshold: 0.667, label: "Input level")
+                                Text("Make a sound near the mic until the bar fills past the line")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            case .playing:
+                                Label("Playing back what the mic recorded…", systemImage: "speaker.wave.2.fill")
+                                    .font(.subheadline)
+                            case .awaitingContinue:
+                                Text("Did you hear the recording play back clearly?")
+                                    .font(.subheadline)
+                                Button("Continue") { model.advance() }
+                                    .buttonStyle(.rmGlassProminent())
+                                    .accessibilityIdentifier("mic-continue")
+                            }
                         }
                         .padding(.top, 4)
                     }
@@ -323,7 +377,7 @@ private struct MicrophoneTestView: View {
                 .frame(width: 24)
             Text(src.label).font(.subheadline)
             Spacer()
-            if isActive { ProgressView().scaleEffect(0.7) }
+            if isActive, model.phase == .metering { ProgressView().scaleEffect(0.7) }
         }
         .padding(.vertical, 4)
     }
