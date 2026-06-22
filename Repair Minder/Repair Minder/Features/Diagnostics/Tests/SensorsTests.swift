@@ -173,6 +173,49 @@ private func clampOffset(_ g: CGFloat, travel: CGFloat) -> CGFloat {
     return max(-travel, min(travel, scaled))
 }
 
+/// Parametric figure-8 (lemniscate of Gerono): x = sin θ, y = sin θ·cos θ (y ∈ [-0.5, 0.5]).
+private func figure8Point(theta: Double, in size: CGSize) -> CGPoint {
+    let padX = size.width / 2 - 18, padY = size.height / 2 - 18
+    let x = sin(theta), y = sin(theta) * cos(theta)
+    return CGPoint(x: size.width / 2 + CGFloat(x) * padX,
+                   y: size.height / 2 + CGFloat(y) * padY * 2)
+}
+
+/// Dashed figure-8 outline the tech traces with the device.
+private struct Figure8Shape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        for i in 0...140 {
+            let theta = Double(i) / 140.0 * 2 * .pi
+            let pt = figure8Point(theta: theta, in: rect.size)
+            if i == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
+        }
+        return p
+    }
+}
+
+/// Figure-8 guide: dashed path + a dot that travels it continuously so the tech mirrors the motion.
+private struct Figure8Guide: View {
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                Figure8Shape()
+                    .stroke(Color.platformGray4, style: StrokeStyle(lineWidth: 3, dash: [7, 7]))
+                TimelineView(.animation) { ctx in
+                    let theta = ctx.date.timeIntervalSinceReferenceDate
+                        .truncatingRemainder(dividingBy: 3.0) / 3.0 * 2 * .pi
+                    Circle()
+                        .fill(Color.accentColor)
+                        .frame(width: 22, height: 22)
+                        .position(figure8Point(theta: theta, in: geo.size))
+                }
+            }
+        }
+        .frame(height: 200)
+        .padding(.horizontal, 8)
+    }
+}
+
 private struct GyroscopeTestView: View {
     let complete: (TestOutcome) -> Void
     @StateObject private var motion = MotionCoordinator()
@@ -180,14 +223,17 @@ private struct GyroscopeTestView: View {
     var body: some View {
         TestScaffold(
             title: "Gyroscope",
-            instruction: "Rotate the device around all three axes (pitch, roll, yaw). It passes when rotation is detected on every axis.",
-            hints: ["Perform all rotation movements"],
+            instruction: "Wave the device through the air in a figure-8, like the moving dot below.",
+            hints: ["Trace a big '8' in the air — it exercises all three axes"],
             onPass: { finish(.pass) }, onFail: { finish(.fail) }, onSkip: { finish(.skip) }
         ) {
-            VStack(spacing: 6) {
-                axis("Pitch (x)", motion.rotationMax.x)
-                axis("Roll (y)", motion.rotationMax.y)
-                axis("Yaw (z)", motion.rotationMax.z)
+            VStack(spacing: 16) {
+                Figure8Guide()
+                HStack(spacing: 18) {
+                    axisDot("Pitch", motion.rotationMax.x)
+                    axisDot("Roll", motion.rotationMax.y)
+                    axisDot("Yaw", motion.rotationMax.z)
+                }
             }
             .onAppear { motion.startGyro() }
             .onDisappear { motion.stop() }
@@ -197,9 +243,12 @@ private struct GyroscopeTestView: View {
             }
         }
     }
-    private func axis(_ label: String, _ v: Double) -> some View {
-        HStack { Text(label); Spacer(); Text(String(format: "%.1f", v)).foregroundStyle(v > 2 ? .green : .secondary) }
-            .font(.subheadline).padding(8).background(Color.platformGray6).clipShape(RoundedRectangle(cornerRadius: 8))
+    private func axisDot(_ label: String, _ v: Double) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: v > 2 ? "checkmark.circle.fill" : "circle")
+                .font(.title2).foregroundStyle(v > 2 ? .green : .secondary)
+            Text(label).font(.caption)
+        }
     }
     private func finish(_ s: TestStatus, _ d: [String: String]? = nil) { motion.stop(); complete(diagnosticOutcome("gyroscope", "Gyroscope", s, d)) }
 }

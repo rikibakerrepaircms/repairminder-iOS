@@ -24,6 +24,13 @@ enum VibrationGate {
     }
 }
 
+enum StillnessGate {
+    /// The device is "still" (resting flat) when accelerometer deviation from gravity (g) is below
+    /// this. We require stillness before buzzing so the pre-buzz baseline is genuine and the motor
+    /// spike stands out — vibration couples to the accelerometer far better on a hard flat surface.
+    static func isStill(resting: Double) -> Bool { resting < 0.05 }
+}
+
 enum MotionAliveGate {
     /// Accelerometer is "alive" when it delivers samples and the total magnitude sits near gravity
     /// (a dead/stuck sensor reports ~0 or a wildly off value).
