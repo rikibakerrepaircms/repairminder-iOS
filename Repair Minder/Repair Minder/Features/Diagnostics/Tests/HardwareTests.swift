@@ -100,6 +100,16 @@ enum ChargeAggregate {
     }
 }
 
+/// Hardware-buttons result: every testable (non-`na`) row must be detected ("1"). `na` rows (absent
+/// hardware — no mute switch, no Camera Control) are excluded and never fail the test.
+enum HardwareButtonsAggregate {
+    static func result(rows: [String: String]) -> (status: TestStatus, details: [String: String]) {
+        let testable = rows.filter { $0.value != "na" }
+        let allPass = !testable.isEmpty && testable.values.allSatisfy { $0 == "1" }
+        return (allPass ? .pass : .fail, rows)
+    }
+}
+
 #if os(iOS)
 import UIKit
 import AVFoundation
@@ -272,31 +282,118 @@ private struct HardwareButtonsTestView: View {
     let complete: (TestOutcome) -> Void
     @StateObject private var watcher = VolumeWatcher()
 
+    // Rows: "0" pending, "1" detected, "na" not present on this device.
+    @State private var mute = "0"
+    @State private var sideLock = "0"
+    @State private var cameraControl = "0"
+    @State private var muteBaseline: Bool?
+    @State private var done = false
+
+    @State private var screenshotObserver: NSObjectProtocol?
+    @State private var mutePoll: Timer?
+    @State private var muteTimeout: Timer?
+    @State private var cameraTimeout: Timer?
+    private let muteProbe = MuteSwitchProbe()
+
+    /// Camera Control only attempted when the camera is already authorized (no prompt mid-test).
+    private var cameraEligible: Bool { AVCaptureDevice.authorizationStatus(for: .video) == .authorized }
+    /// Volume + screenshot + mute all resolved — only then do we activate the capture-button probe,
+    /// so its AVCaptureEventInteraction can't intercept the volume/screenshot presses above it.
+    private var othersResolved: Bool { watcher.up && watcher.down && sideLock != "0" && mute != "0" }
+
     var body: some View {
         TestScaffold(
             title: "Hardware Buttons",
-            instruction: "Volume has been set to the middle. Press Volume Up, then Volume Down — each registers below; both = pass. (Power/Mute can't be read by apps.)",
-            hints: ["Press Volume Up, then Volume Down"],
-            onPass: { finish(.pass) }, onFail: { finish(.fail) }, onSkip: { finish(.skip) }
+            instruction: "Press each button as listed — every row ticks automatically. Buttons your device doesn't have are marked n/a.",
+            hints: ["Volume Up, then Down · flip the Ring/Silent switch either way (or hold an Action button set to Silent) · Side + Volume Up together for a screenshot · then press Camera Control"],
+            onPass: {}, onFail: { finish(.fail) }, onSkip: { finish(.skip) }
         ) {
-            HStack(spacing: 24) {
-                buttonState("Volume Up", watcher.up)
-                buttonState("Volume Down", watcher.down)
+            VStack(spacing: 12) {
+                row("Volume Up", ok: watcher.up ? "1" : "0")
+                row("Volume Down", ok: watcher.down ? "1" : "0")
+                row("Mute / Action (Silent)", ok: mute)
+                row("Side / Lock (screenshot)", ok: sideLock)
+                row("Camera Control", ok: cameraControl)
+                if cameraEligible, othersResolved, cameraControl == "0" {
+                    CaptureButtonProbe { cameraControl = "1"; checkDone() }
+                        .frame(width: 0, height: 0)
+                        .onAppear { armCameraTimeout() }
+                }
             }
-            .onAppear { watcher.start() }
-            .onDisappear { watcher.stop() }
-            .onChange(of: watcher.down) { _, _ in checkDone() }
+            .onAppear { start() }
+            .onDisappear { teardown() }
             .onChange(of: watcher.up) { _, _ in checkDone() }
+            .onChange(of: watcher.down) { _, _ in checkDone() }
         }
     }
-    private func buttonState(_ label: String, _ ok: Bool) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: ok ? "checkmark.circle.fill" : "circle").font(.title).foregroundStyle(ok ? .green : .secondary)
-            Text(label).font(.caption)
+
+    private func row(_ label: String, ok: String) -> some View {
+        HStack {
+            Image(systemName: ok == "1" ? "checkmark.circle.fill" : (ok == "na" ? "minus.circle" : "circle"))
+                .foregroundStyle(ok == "1" ? .green : .secondary)
+            Text(label).font(.subheadline)
+            Spacer()
+            if ok == "na" { Text("n/a").font(.caption).foregroundStyle(.secondary) }
+        }
+        .padding(10).background(Color.platformGray6).clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func start() {
+        watcher.start()
+        // Side/Lock via the screenshot combo (Side + Volume Up).
+        screenshotObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.userDidTakeScreenshotNotification, object: nil, queue: .main) { _ in
+            sideLock = "1"; checkDone()
+        }
+        // Mute: sample a baseline, then poll for a change after the tech flips the switch.
+        muteProbe.sampleSilenced { base in muteBaseline = base }
+        mutePoll = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { _ in
+            muteProbe.sampleSilenced { current in
+                if let base = muteBaseline, current != base { mute = "1"; mutePoll?.invalidate(); checkDone() }
+            }
+        }
+        if !cameraEligible { cameraControl = "na"; checkDone() }
+        // Mute degrades to n/a if no toggle is seen (no switch / Action button not set to Silent).
+        muteTimeout = Timer.scheduledTimer(withTimeInterval: 15, repeats: false) { _ in
+            if mute == "0" { mute = "na" }
+            mutePoll?.invalidate()
+            checkDone()
         }
     }
-    private func checkDone() { if watcher.up && watcher.down { finish(.pass, ["volume_up": "1", "volume_down": "1", "power": "n/a", "mute": "n/a"]) } }
-    private func finish(_ s: TestStatus, _ d: [String: String]? = nil) { watcher.stop(); complete(diagnosticOutcome("hardwarebutton", "Hardware Buttons", s, d)) }
+
+    /// Armed when the capture probe is finally hosted; degrades Camera Control to n/a if no press.
+    private func armCameraTimeout() {
+        cameraTimeout?.invalidate()
+        cameraTimeout = Timer.scheduledTimer(withTimeInterval: 12, repeats: false) { _ in
+            if cameraControl == "0" { cameraControl = "na" }
+            checkDone()
+        }
+    }
+
+    private func checkDone() {
+        guard !done else { return }
+        let rows = ["volume_up": watcher.up ? "1" : "0",
+                    "volume_down": watcher.down ? "1" : "0",
+                    "mute": mute, "side_lock": sideLock, "camera_control": cameraControl]
+        guard !rows.values.contains("0") else { return }   // a still-pending row → keep waiting
+        let (status, details) = HardwareButtonsAggregate.result(rows: rows)
+        finish(status, details)
+    }
+
+    private func teardown() {
+        watcher.stop()
+        mutePoll?.invalidate(); mutePoll = nil
+        muteTimeout?.invalidate(); muteTimeout = nil
+        cameraTimeout?.invalidate(); cameraTimeout = nil
+        if let obs = screenshotObserver { NotificationCenter.default.removeObserver(obs); screenshotObserver = nil }
+    }
+
+    private func finish(_ s: TestStatus, _ d: [String: String]? = nil) {
+        guard !done else { return }
+        done = true
+        teardown()
+        complete(diagnosticOutcome("hardwarebutton", "Hardware Buttons", s, d))
+    }
 }
 
 // Vibration: trigger a sustained 2s haptic pulse; auto-pass when the accelerometer detects the motor spike.
