@@ -446,8 +446,8 @@ private struct HeadphonesTestView: View {
     var body: some View {
         TestScaffold(
             title: "Headphones",
-            instruction: "Connect wired or Bluetooth headphones. It passes automatically when a headphone output is detected.",
-            hints: ["With nothing connected this shows ‘Not connected’"],
+            instruction: "Connect WIRED headphones (3.5mm or Lightning/USB-C). It passes automatically when a wired headphone output is detected. Bluetooth is not tested here.",
+            hints: ["Plug in wired headphones — Bluetooth won’t pass"],
             onPass: { finish(.pass) }, onFail: { finish(.fail) }, onSkip: { finish(.skip) }
         ) {
             VStack(spacing: 8) {
@@ -464,8 +464,9 @@ private struct HeadphonesTestView: View {
     }
     private func check() {
         let outs = AVAudioSession.sharedInstance().currentRoute.outputs.map(\.portType)
-        if outs.contains(where: { [.headphones, .bluetoothA2DP, .bluetoothHFP, .bluetoothLE].contains($0) }) {
-            connected = true; finish(.pass, ["route": outs.first?.rawValue ?? "headphones"])
+        // Wired headphones only — Bluetooth audio routes must not pass this test.
+        if outs.contains(.headphones) {
+            connected = true; finish(.pass, ["route": "wired", "type": "wired"])
         }
     }
     private func removeObserver() {
