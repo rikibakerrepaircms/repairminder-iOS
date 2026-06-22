@@ -421,6 +421,9 @@ enum VibrationPhase { case idle, running, resolved }
     @Published var micScore: Double = 0
     @Published var magScore: Double = 0
     private var hapticEngine: CHHapticEngine?
+    /// Retained for the lifetime of playback — a local player is released when playCode returns,
+    /// which silently stops the haptic before it's felt (the "no vibration at all" bug).
+    private var hapticPlayer: CHHapticPatternPlayer?
     private let micProbe = MicBandEnergyProbe()
     private let magProbe = MagnetometerEnvelopeProbe()
     private let log = Logger(subsystem: "com.repairminder.diagnostics", category: "vibration")
@@ -489,7 +492,14 @@ enum VibrationPhase { case idle, running, resolved }
 
     private func playCode(_ code: VibrationCode, offset: Double) async {
         do {
-            if hapticEngine == nil { hapticEngine = try CHHapticEngine() }
+            if hapticEngine == nil {
+                let e = try CHHapticEngine()
+                // The mic probe holds an active record session; playsHapticsOnly decouples the haptic
+                // engine from audio routing so the buzz isn't suppressed. Keep it alive across the run.
+                e.playsHapticsOnly = true
+                e.isAutoShutdownEnabled = false
+                hapticEngine = e
+            }
             guard let engine = hapticEngine else { throw NSError(domain: "Haptics", code: 0) }
             try await engine.start()
             var events: [CHHapticEvent] = []
@@ -508,6 +518,7 @@ enum VibrationPhase { case idle, running, resolved }
             guard !events.isEmpty else { return }
             let pattern = try CHHapticPattern(events: events, parameters: [])
             let player = try engine.makePlayer(with: pattern)
+            hapticPlayer = player   // retain so playback isn't released mid-buzz
             try player.start(atTime: CHHapticTimeImmediate)
         } catch {
             // Fallback: fire AudioServices for each ON slot
@@ -528,8 +539,8 @@ private struct VibrationTestView: View {
     var body: some View {
         TestScaffold(
             title: "Vibration",
-            instruction: "Lay the device flat on a hard surface. It buzzes a short coded pattern and checks the microphone + magnetometer.",
-            hints: ["Place it flat on a hard, non-soft surface", "Keep still during the buzz sequence"],
+            instruction: "Lay the device flat on a hard surface. It will vibrate for a few seconds to test the motor.",
+            hints: ["Place it flat on a hard surface (not a soft hand or lap)", "Keep still while it vibrates"],
             allowManualPass: model.autoFailed,
             onPass: {
                 complete(diagnosticOutcome("vibration", "Vibration", .pass, ["confirmed": "manual"]))
@@ -547,7 +558,7 @@ private struct VibrationTestView: View {
                     ProgressView("Checking vibration…")
                 case .resolved:
                     if model.autoFailed {
-                        Text("Coded buzz not detected. If you felt it vibrate, tap Pass — otherwise tap Fail.")
+                        Text("Couldn’t confirm the vibration automatically. If you felt it vibrate, tap Pass; if not, tap Fail.")
                             .font(.caption).foregroundStyle(.secondary)
                             .multilineTextAlignment(.center).padding(.horizontal)
                         Text(String(format: "mic %.2f · mag %.2f", model.micScore, model.magScore))
