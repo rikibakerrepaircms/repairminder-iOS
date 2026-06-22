@@ -244,11 +244,25 @@ private struct HardwareButtonsTestView: View {
     /// and the tech must confirm the buzz by feel via the manual Pass button.
     @Published var lastResting: Double = 0
     @Published var detected = false
+    @Published var waitingForStill = false
     private var hapticEngine: CHHapticEngine?
     private let log = Logger(subsystem: "com.repairminder.diagnostics", category: "vibration")
     init(probe: AccelProbe) { self.probe = probe }
 
     func run() async {
+        // Wait for the device to be laid flat & still so the buzz spike is detectable.
+        // Up to ~10s ceiling (12 iterations × ≈400ms sample + 500ms sleep). Bails on cancellation
+        // (view dismissed) so a backed-out test doesn't keep sampling motion.
+        waitingForStill = true
+        for _ in 0..<12 {
+            guard !Task.isCancelled else { break }
+            let resting = await withCheckedContinuation { (cont: CheckedContinuation<Double, Never>) in
+                probe.sampleBaseline(windowMs: 400) { cont.resume(returning: $0) }
+            }
+            if StillnessGate.isStill(resting: resting) { break }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+        waitingForStill = false
         measuring = true
         detected = false
         // Genuine pre-buzz resting baseline (motor OFF) — used by the gate so the buzz isn't
@@ -326,8 +340,8 @@ private struct VibrationTestView: View {
     var body: some View {
         TestScaffold(
             title: "Vibration",
-            instruction: "Hold the device still. It pulses for ~2 seconds and tries to auto-detect the motor. If you feel it buzz but it isn’t detected, tap Pass.",
-            hints: ["Keep the device resting on a surface or held still", "If you feel the buzz, you can Pass it manually"],
+            instruction: "Lay the device flat on a hard surface and keep still. It pulses for ~2 seconds and auto-detects the motor. If you feel it buzz but it isn’t detected, tap Pass.",
+            hints: ["Place it flat on a hard surface (not a soft hand/lap)", "If you feel the buzz, you can Pass it manually"],
             // Auto-detection can miss on devices where a continuous Taptic pulse doesn't register
             // strongly on the accelerometer, so allow a tech to confirm the buzz by feel.
             allowManualPass: true,
@@ -337,7 +351,9 @@ private struct VibrationTestView: View {
         ) {
             VStack(spacing: 12) {
                 Image(systemName: "iphone.radiowaves.left.and.right").font(.system(size: 44)).foregroundStyle(Color.accentColor)
-                if model.measuring {
+                if model.waitingForStill {
+                    ProgressView("Place the device flat and keep still…")
+                } else if model.measuring {
                     ProgressView("Measuring…")
                 } else if !model.detected {
                     Text("No motor spike detected automatically. If you felt it buzz, tap Pass — otherwise Vibrate again or Fail.")
