@@ -165,7 +165,7 @@ struct SettingsView: View {
         case .clients:
             ClientListView(isEmbedded: true)
         case .devices:
-            DevicesView()
+            DevicesView(isEmbedded: true)
         case .queue:
             MyQueueView(isEmbedded: true)
                 .navigationTitle("My Queue")

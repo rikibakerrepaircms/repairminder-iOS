@@ -17,6 +17,8 @@ private struct DeviceDetailNavigation: Hashable {
 
 /// Main device list view with filtering capabilities
 struct DevicesView: View {
+    var isEmbedded: Bool = false
+
     @State private var viewModel = DevicesViewModel()
     @State private var boardViewModel = BoardViewModel(scope: "company")
     @State private var showingFilterSheet = false
@@ -31,11 +33,33 @@ struct DevicesView: View {
     }
 
     var body: some View {
-        if isRegularWidth {
+        if isEmbedded {
+            embeddedBody
+        } else if isRegularWidth {
             iPadBody
         } else {
             iPhoneBody
         }
+    }
+
+    // MARK: - Embedded Layout (inside another NavigationStack/SplitView detail pane)
+
+    private var embeddedBody: some View {
+        devicesContent(wideRows: false)
+            .navigationDestination(for: DeviceListItem.self) { device in
+                if let orderId = device.orderId {
+                    DeviceDetailView(orderId: orderId, deviceId: device.id)
+                } else {
+                    ContentUnavailableView(
+                        "No Order",
+                        systemImage: "doc.questionmark",
+                        description: Text("This device is not associated with an order")
+                    )
+                }
+            }
+            .navigationDestination(item: $selectedDeviceNav) { nav in
+                DeviceDetailView(orderId: nav.orderId, deviceId: nav.deviceId)
+            }
     }
 
     // MARK: - iPhone Layout

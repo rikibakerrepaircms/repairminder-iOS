@@ -448,9 +448,7 @@ private struct StaffMainView: View {
             ClientListView()
 
         case .devices:
-            NavigationStack {
-                DevicesView()
-            }
+            DevicesView()
         }
     }
 
