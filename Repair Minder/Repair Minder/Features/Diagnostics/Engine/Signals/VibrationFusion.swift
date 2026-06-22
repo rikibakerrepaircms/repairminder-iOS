@@ -43,10 +43,12 @@ enum VibrationFusion {
         return (onMean - offMean) / (offMean + 1e-9)
     }
 
-    /// BOTH channels must correlate for an auto-pass (fusion AND) — mic gives sensitivity,
-    /// magnetometer makes acoustic/shake spoofing impossible. Thresholds are on-device-tunable.
+    /// Auto-pass only when BOTH channels correlate with the coded buzz on the SAME cycle — the
+    /// magnetometer can't be faked by sound and the mic can't be faked off-frequency, so requiring
+    /// both simultaneously is the strong anti-spoof. The runner retries several cycles to find one
+    /// where both register (run-to-run sensor variance). Thresholds are on-device-tunable.
     static func passes(micScore: Double, magScore: Double,
-                       micThreshold: Double = 1.0, magThreshold: Double = 0.25) -> Bool {
+                       micThreshold: Double = 0.4, magThreshold: Double = 0.4) -> Bool {
         micScore >= micThreshold && magScore >= magThreshold
     }
 }

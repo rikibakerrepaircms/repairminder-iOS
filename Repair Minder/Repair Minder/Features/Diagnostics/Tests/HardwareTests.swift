@@ -434,57 +434,69 @@ enum VibrationPhase { case idle, running, resolved }
         autoFailed = false
         outcome = nil
 
-        // --- Baseline: let magnetometer probe settle before the code starts ---
-        let baselineSeconds = 0.5
         let startTime = CACurrentMediaTime()
-
         var micSamples: [(t: Double, v: Double)] = []
         var magSamples: [(t: Double, v: Double)] = []
-
         micProbe.start(startTime: startTime) { t, v in micSamples.append((t, v)) }
         magProbe.start(startTime: startTime) { t, v in magSamples.append((t, v)) }
 
-        // Wait for baseline window
-        try? await Task.sleep(nanoseconds: UInt64(baselineSeconds * 1_000_000_000))
+        // Let the magnetometer baseline settle before the first coded buzz.
+        try? await Task.sleep(nanoseconds: 500_000_000)
 
-        // --- Generate random code ---
-        let code = VibrationCode.random { Double.random(in: 0..<1) }
+        // Try up to 10 coded cycles; pass on the first where BOTH channels correlate. Run-to-run
+        // sensor variance means a genuine buzz may not register on both channels every cycle, so we
+        // retry internally instead of making the tech re-run the test by hand.
+        let maxCycles = 10
+        var bestMic = -Double.greatestFiniteMagnitude
+        var bestMag = -Double.greatestFiniteMagnitude
+        var passed = false
 
-        // --- Play coded haptic pattern ---
-        await playCode(code, offset: baselineSeconds)
+        for cycle in 0..<maxCycles {
+            micSamples.removeAll()
+            magSamples.removeAll()
+            let cycleStart = CACurrentMediaTime() - startTime   // elapsed at this cycle's code start
 
-        // Wait for code to finish plus a small tail for last-slot energy to be captured
-        let codeDuration = Double(code.slots.count) * code.slotS + 0.2
-        try? await Task.sleep(nanoseconds: UInt64(codeDuration * 1_000_000_000))
+            let code = VibrationCode.random { Double.random(in: 0..<1) }
+            await playCode(code, offset: 0)
 
-        // --- Stop probes ---
+            let codeDuration = Double(code.slots.count) * code.slotS + 0.2
+            try? await Task.sleep(nanoseconds: UInt64(codeDuration * 1_000_000_000))
+
+            let micAligned = micSamples.compactMap { s -> (t: Double, v: Double)? in
+                let t = s.t - cycleStart; return t >= 0 ? (t, s.v) : nil
+            }
+            let magAligned = magSamples.compactMap { s -> (t: Double, v: Double)? in
+                let t = s.t - cycleStart; return t >= 0 ? (t, s.v) : nil
+            }
+            let micEnergies = VibrationFusion.slotEnergies(samples: micAligned, slotS: code.slotS, slotCount: code.slots.count)
+            let magEnergies = VibrationFusion.slotEnergies(samples: magAligned, slotS: code.slotS, slotCount: code.slots.count)
+            let mScore = VibrationFusion.score(slotEnergies: micEnergies, code: code)
+            let gScore = VibrationFusion.score(slotEnergies: magEnergies, code: code)
+            bestMic = max(bestMic, mScore)
+            bestMag = max(bestMag, gScore)
+            self.micScore = mScore
+            self.magScore = gScore
+            log.info("vibration cycle=\(cycle, privacy: .public) mic=\(mScore, format: .fixed(precision: 3), privacy: .public) mag=\(gScore, format: .fixed(precision: 3), privacy: .public) code=\(code.slots.map { $0 ? "1" : "0" }.joined(), privacy: .public)")
+
+            if VibrationFusion.passes(micScore: mScore, magScore: gScore) {
+                passed = true
+                outcome = diagnosticOutcome("vibration", "Vibration", .pass,
+                                            ["verified": "mic+magnetometer",
+                                             "mic_score": String(format: "%.2f", mScore),
+                                             "mag_score": String(format: "%.2f", gScore),
+                                             "cycles": String(cycle + 1)])
+                break
+            }
+            // Brief OFF gap between cycles so they don't bleed together.
+            if cycle < maxCycles - 1 { try? await Task.sleep(nanoseconds: 400_000_000) }
+        }
+
         micProbe.stop()
         magProbe.stop()
 
-        // --- Score: align samples to code start (t=0 at code first slot) ---
-        let codeOffset = baselineSeconds
-        let micAligned = micSamples.compactMap { s -> (t: Double, v: Double)? in
-            let t = s.t - codeOffset; return t >= 0 ? (t, s.v) : nil
-        }
-        let magAligned = magSamples.compactMap { s -> (t: Double, v: Double)? in
-            let t = s.t - codeOffset; return t >= 0 ? (t, s.v) : nil
-        }
-
-        let micEnergies = VibrationFusion.slotEnergies(samples: micAligned, slotS: code.slotS, slotCount: code.slots.count)
-        let magEnergies = VibrationFusion.slotEnergies(samples: magAligned, slotS: code.slotS, slotCount: code.slots.count)
-        let mScore = VibrationFusion.score(slotEnergies: micEnergies, code: code)
-        let gScore = VibrationFusion.score(slotEnergies: magEnergies, code: code)
-        self.micScore = mScore
-        self.magScore = gScore
-
-        log.info("vibration fusion mic_score=\(mScore, format: .fixed(precision: 3), privacy: .public) mag_score=\(gScore, format: .fixed(precision: 3), privacy: .public) code=\(code.slots.map { $0 ? "1" : "0" }.joined(), privacy: .public)")
-
-        if VibrationFusion.passes(micScore: mScore, magScore: gScore) {
-            outcome = diagnosticOutcome("vibration", "Vibration", .pass,
-                                        ["verified": "mic+magnetometer",
-                                         "mic_score": String(format: "%.2f", mScore),
-                                         "mag_score": String(format: "%.2f", gScore)])
-        } else {
+        if !passed {
+            self.micScore = bestMic.isFinite ? bestMic : 0
+            self.magScore = bestMag.isFinite ? bestMag : 0
             autoFailed = true
         }
         phase = .resolved

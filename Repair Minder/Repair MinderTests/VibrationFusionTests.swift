@@ -23,9 +23,12 @@ struct VibrationFusionTests {
         #expect(s[0] == 3)   // (2+4)/2 in slot 0 (0–0.3)
         #expect(s[1] == 10)  // slot 1 (0.3–0.6)
     }
+    // Both channels must correlate on the SAME cycle to pass (strong anti-spoof). Cases mirror real
+    // device data: only the cycle where mic AND mag both cleared (0.65/0.79) passes.
     @Test func fusionRequiresBothChannels() {
-        #expect(VibrationFusion.passes(micScore: 2.0, magScore: 0.5))
-        #expect(!VibrationFusion.passes(micScore: 2.0, magScore: 0.1))   // mag fails → no pass
-        #expect(!VibrationFusion.passes(micScore: 0.3, magScore: 0.5))   // mic fails → no pass
+        #expect(VibrationFusion.passes(micScore: 0.65, magScore: 0.79))   // both ≥0.4 → pass
+        #expect(!VibrationFusion.passes(micScore: 1.63, magScore: -0.32)) // mag fails → no pass
+        #expect(!VibrationFusion.passes(micScore: 0.31, magScore: 1.30))  // mic 0.31<0.4 → no pass
+        #expect(!VibrationFusion.passes(micScore: -0.2, magScore: -0.14)) // both fail
     }
 }
