@@ -169,11 +169,10 @@ final class ScannerViewModel: NSObject {
             searchFilter.search = code
             searchFilter.limit = 1
 
-            let response: DeviceListResponse = try await APIClient.shared.request(
-                .devices(filter: searchFilter)
-            )
+            let (data, _, _): ([DeviceListItem], Pagination?, DeviceListFilters?) =
+                try await APIClient.shared.requestWithFilters(.devices(filter: searchFilter))
 
-            if let device = response.data.first {
+            if let device = data.first {
                 searchResult = device
             } else {
                 error = "No device found for: \(code)"
