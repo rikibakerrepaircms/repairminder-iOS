@@ -452,7 +452,7 @@ private struct HardwareButtonsTestView: View {
             }
             self.peak = peakVal
             self.lastResting = baseline
-            let spiked = VibrationGate.spiked(restingNoise: baseline, peak: peakVal, minDelta: 0.15)
+            let spiked = VibrationGate.spiked(restingNoise: baseline, peak: peakVal, minDelta: 0.08)
             // Logged so we can re-tune the 0.15 g threshold against real devices (Console.app /
             // `log stream --predicate 'subsystem == "com.repairminder.diagnostics"'`).
             log.info("cycle \(cycle, privacy: .public) baseline=\(baseline, format: .fixed(precision: 3), privacy: .public)g inWindowResting=\(resting, format: .fixed(precision: 3), privacy: .public)g peak=\(peakVal, format: .fixed(precision: 3), privacy: .public)g spiked=\(spiked, privacy: .public)")

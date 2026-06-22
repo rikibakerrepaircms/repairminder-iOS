@@ -18,7 +18,10 @@ enum LightGate {
 }
 
 enum VibrationGate {
-    /// Peak acceleration magnitude minus resting noise must exceed minDelta (g).
+    /// Both inputs are now peak-to-peak energy of the acceleration magnitude (not mean-deviation).
+    /// The gate fires when the vibration window's peak-to-peak exceeds the resting-floor
+    /// peak-to-peak by at least minDelta. A Taptic buzz produces large rapid oscillations that
+    /// register clearly as peak-to-peak spread even though the mean stays near 1 g.
     static func spiked(restingNoise: Double, peak: Double, minDelta: Double) -> Bool {
         (peak - restingNoise) >= minDelta
     }
