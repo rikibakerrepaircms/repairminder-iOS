@@ -122,6 +122,8 @@ enum APIEndpoint {
     case ticketNote(id: String)
     case ticketGenerateResponse(id: String)
     case ticketRewriteResponse(id: String)
+    case ticketGenerateResponseStatus(id: String)
+    case ticketRewriteResponseStatus(id: String)
     case ticketMacroExecutions(id: String)
     case ticketExecuteMacro(id: String)
     case ticketPreviewMacro(id: String)
@@ -325,10 +327,10 @@ enum APIEndpoint {
             return "/api/orders/\(orderId)/devices/\(deviceId)"
         case .updateDeviceStatus(let orderId, let deviceId):
             return "/api/orders/\(orderId)/devices/\(deviceId)/status"
-        case .deviceActions(let orderId, let deviceId):
-            return "/api/orders/\(orderId)/devices/\(deviceId)/actions"
-        case .executeDeviceAction(let orderId, let deviceId):
-            return "/api/orders/\(orderId)/devices/\(deviceId)/action"
+        case .deviceActions(_, let deviceId):
+            return "/api/devices/\(deviceId)/actions"
+        case .executeDeviceAction(_, let deviceId):
+            return "/api/devices/\(deviceId)/action"
         case .updateDeviceBankDetails(let deviceId):
             return "/api/devices/\(deviceId)/bank-details"
         case .updateDeviceEngineer(let deviceId):
@@ -386,6 +388,10 @@ enum APIEndpoint {
         case .ticketGenerateResponse(let id):
             return "/api/tickets/\(id)/generate-response"
         case .ticketRewriteResponse(let id):
+            return "/api/tickets/\(id)/rewrite-response"
+        case .ticketGenerateResponseStatus(let id):
+            return "/api/tickets/\(id)/generate-response"
+        case .ticketRewriteResponseStatus(let id):
             return "/api/tickets/\(id)/rewrite-response"
         case .ticketMacroExecutions(let id):
             return "/api/tickets/\(id)/macro-executions"
@@ -537,6 +543,7 @@ enum APIEndpoint {
              .orders, .order, .orderItems, .orderPayments, .orderSignatures, .orderDocument,
              .clients, .client, .clientSearch, .clientsExport,
              .tickets, .ticket, .ticketMacroExecutions,
+             .ticketGenerateResponseStatus, .ticketRewriteResponseStatus,
              .macros, .macro, .macroExecutions, .macroExecution,
              .productTypes, .productComponents,
              .locations, .deviceSearch, .deviceTypes, .companyPublicInfo, .aiReadiness,

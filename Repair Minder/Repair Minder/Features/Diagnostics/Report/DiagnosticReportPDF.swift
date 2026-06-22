@@ -4,6 +4,7 @@
 #if os(iOS)
 import UIKit
 import WebKit
+import QuickLook
 
 /// Renders report HTML to a PDF file off-screen. Retains itself for the lifetime of one
 /// render (WKWebView + navigation delegate must outlive the async createPDF callback).
@@ -91,48 +92,107 @@ enum DiagnosticReportShare {
         )
     }
 
-    /// Generate the PDF for `runner` and present a share sheet. Calls `onComplete` (main thread)
-    /// with success/failure so the caller can clear any progress state.
+    /// Build the branded PDF for `runner` and call `completion` (main thread) with the file URL.
+    /// SINGLE SOURCE OF TRUTH for generating the report — both Share (top-right arrow) and Preview
+    /// (the "Generate PDF" row) go through this, so the render pipeline changes in one place.
     @MainActor
-    static func presentShareSheet(for runner: DiagnosticRunner,
-                                  onComplete: @escaping (Bool) -> Void) {
+    static func generatePDF(for runner: DiagnosticRunner,
+                            completion: @escaping (Result<URL, Error>) -> Void) {
         let data = DiagnosticReportData.from(runner: runner,
                                              deviceName: DeviceModelName.marketingName)
         let html = DiagnosticReportHTML.render(data, assets: assets())
         let fileName = DiagnosticReportHTML.fileName(reportID: data.reportID)
 
         let renderer = DiagnosticReportPDFRenderer()
-        renderer.render(html: html, fileName: fileName) { result in
+        renderer.render(html: html, fileName: fileName, completion: completion)
+    }
+
+    /// Generate the PDF and present the system share sheet (the top-right arrow). Calls `onComplete`
+    /// (main thread) so the caller can clear any progress state.
+    @MainActor
+    static func presentShareSheet(for runner: DiagnosticRunner,
+                                  onComplete: @escaping (Bool) -> Void) {
+        generatePDF(for: runner) { result in
             switch result {
-            case .success(let url):
-                present(url: url)
-                onComplete(true)
-            case .failure:
-                onComplete(false)
+            case .success(let url): present(url: url); onComplete(true)
+            case .failure:          onComplete(false)
             }
         }
+    }
+
+    /// Generate the SAME PDF and preview it on-device via Quick Look (the "Generate PDF" row).
+    /// Quick Look includes its own Share/Print, so the user can still send from the preview.
+    @MainActor
+    static func presentPreview(for runner: DiagnosticRunner,
+                               onComplete: @escaping (Bool) -> Void) {
+        generatePDF(for: runner) { result in
+            switch result {
+            case .success(let url): presentQuickLook(url: url); onComplete(true)
+            case .failure:          onComplete(false)
+            }
+        }
+    }
+
+    /// Top-most presented view controller in the active window scene.
+    @MainActor
+    private static func topPresenter() -> UIViewController? {
+        let scene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+            ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        guard let scene,
+              let root = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController
+                ?? scene.windows.first?.rootViewController
+        else { return nil }
+        var presenter = root
+        while let presented = presenter.presentedViewController { presenter = presented }
+        return presenter
     }
 
     /// Present a UIActivityViewController for the generated file from the top-most controller.
     @MainActor
     private static func present(url: URL) {
+        guard let presenter = topPresenter() else { return }
         let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-        guard let scene = UIApplication.shared.connectedScenes
-                .compactMap({ $0 as? UIWindowScene })
-                .first(where: { $0.activationState == .foregroundActive }) ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first,
-              let root = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController
-                ?? scene.windows.first?.rootViewController
-        else { return }
-
-        var presenter = root
-        while let presented = presenter.presentedViewController { presenter = presented }
-
         if let popover = activityVC.popoverPresentationController {
             popover.sourceView = presenter.view
             popover.sourceRect = CGRect(x: presenter.view.bounds.midX, y: presenter.view.bounds.midY, width: 0, height: 0)
             popover.permittedArrowDirections = []
         }
         presenter.present(activityVC, animated: true)
+    }
+
+    /// Present the PDF in a Quick Look preview from the top-most controller.
+    @MainActor
+    private static func presentQuickLook(url: URL) {
+        guard let presenter = topPresenter() else { return }
+        let source = PDFPreviewSource(url: url)
+        let controller = QLPreviewController()
+        controller.dataSource = source
+        controller.delegate = source
+        presenter.present(controller, animated: true)
+    }
+}
+
+/// Retained data source/delegate for a Quick Look PDF preview. `QLPreviewController.dataSource` is
+/// weak, so the source must outlive the controller; it self-retains until the preview dismisses.
+@MainActor
+private final class PDFPreviewSource: NSObject, @preconcurrency QLPreviewControllerDataSource, @preconcurrency QLPreviewControllerDelegate {
+    private let url: URL
+    private static var live: Set<PDFPreviewSource> = []
+
+    init(url: URL) {
+        self.url = url
+        super.init()
+        Self.live.insert(self)
+    }
+
+    func numberOfPreviewItems(in controller: QLPreviewController) -> Int { 1 }
+    func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
+        url as NSURL
+    }
+    func previewControllerDidDismiss(_ controller: QLPreviewController) {
+        Self.live.remove(self)
     }
 }
 #endif

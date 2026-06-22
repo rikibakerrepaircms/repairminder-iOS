@@ -137,14 +137,14 @@ enum StatusUpdateContext: String, Sendable {
 
 // MARK: - Device Action Request
 
-/// Request body for `POST /api/orders/:orderId/devices/:deviceId/action`
+/// Request body for `POST /api/devices/:deviceId/action`
 struct DeviceActionRequest: Encodable, Sendable {
-    let action: String
+    let toStatus: String
     var notes: String?
     var context: String?
 
-    init(action: String, notes: String? = nil, context: StatusUpdateContext? = nil) {
-        self.action = action
+    init(toStatus: String, notes: String? = nil, context: StatusUpdateContext? = nil) {
+        self.toStatus = toStatus
         self.notes = notes
         self.context = context?.rawValue
     }
@@ -173,7 +173,10 @@ struct DeviceActionsResponse: Decodable, Sendable {
 struct DeviceAction: Decodable, Sendable, Identifiable {
     let toStatus: String
     let label: String
-    let isDevicePageAction: Bool
+    let displayLabel: String?
+    let isDevicePageAction: Bool?
+    let requiresConfirmation: Bool?
+    let requiresInput: [String]?
     let requiresNotes: Bool?
     let confirmationMessage: String?
 

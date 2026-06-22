@@ -80,8 +80,12 @@ final class PasscodeService: ObservableObject {
         passcodeEnabled = keychain.isPasscodeEnabled()
         isBiometricEnabled = keychain.isBiometricEnabled()
         timeoutMinutes = keychain.getPasscodeTimeout() ?? 15
-        // Auto-lock on cold launch when "On App Close" is set
-        if hasPasscode && passcodeEnabled && timeoutMinutes == 0 {
+        // Auto-lock on cold launch when "On App Close" is set — but ONLY if a staff
+        // session actually exists. A logged-out app must never show the passcode/Face ID
+        // lock, even if stale passcode keychain data lingers (iOS keychain survives app
+        // deletion, so leftover state can outlive a logout). See clearLocalData().
+        let hasSession = keychain.getAccessToken() != nil
+        if hasSession && hasPasscode && passcodeEnabled && timeoutMinutes == 0 {
             isLocked = true
         }
     }

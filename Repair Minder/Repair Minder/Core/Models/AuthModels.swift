@@ -15,12 +15,13 @@ struct StaffLoginRequest: Encodable {
     let password: String
 }
 
-/// Staff login response - always requires 2FA
+/// Staff login response — either 2FA step or a magic-link-only redirect
 struct StaffLoginResponse: Decodable {
-    let requiresTwoFactor: Bool
-    let userId: String
-    let email: String
-    let user: StaffLoginUser
+    let requiresTwoFactor: Bool?
+    let requiresMagicLink: Bool?
+    let userId: String?
+    let email: String?
+    let user: StaffLoginUser?
 
     /// Partial user info returned from initial login
     struct StaffLoginUser: Decodable {

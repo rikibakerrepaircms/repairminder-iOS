@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 // MARK: - Pure gate functions (unit-tested without hardware)
 
@@ -18,10 +19,20 @@ enum LightGate {
 }
 
 enum VibrationGate {
-    /// Peak acceleration magnitude minus resting noise must exceed minDelta (g).
+    /// Both inputs are now peak-to-peak energy of the acceleration magnitude (not mean-deviation).
+    /// The gate fires when the vibration window's peak-to-peak exceeds the resting-floor
+    /// peak-to-peak by at least minDelta. A Taptic buzz produces large rapid oscillations that
+    /// register clearly as peak-to-peak spread even though the mean stays near 1 g.
     static func spiked(restingNoise: Double, peak: Double, minDelta: Double) -> Bool {
         (peak - restingNoise) >= minDelta
     }
+}
+
+enum StillnessGate {
+    /// The device is "still" (resting flat) when accelerometer deviation from gravity (g) is below
+    /// this. We require stillness before buzzing so the pre-buzz baseline is genuine and the motor
+    /// spike stands out — vibration couples to the accelerometer far better on a hard flat surface.
+    static func isStill(resting: Double) -> Bool { resting < 0.05 }
 }
 
 enum MotionAliveGate {
@@ -78,8 +89,10 @@ protocol MotionAliveProbe: Sendable {
 }
 
 /// Emits a tick per valid depth frame captured (TrueDepth or LiDAR).
+/// `onDepthFrame` ticks once per valid depth frame; `onDepthImage` provides a throttled grayscale
+/// CGImage of the depth map for live display.
 protocol DepthProbe: Sendable {
-    @MainActor func start(onDepthFrame: @escaping () -> Void)
+    @MainActor func start(onDepthFrame: @escaping () -> Void, onDepthImage: @escaping (CGImage) -> Void)
     @MainActor func stop()
 }
 

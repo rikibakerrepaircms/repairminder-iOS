@@ -416,7 +416,7 @@ private struct FlashTestView: View {
             guard let dev = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
                 finish(.skip, nil); return
             }
-            let p = CameraProbe(device: dev)
+            let p = CameraProbe(device: dev, lockExposureForMeasurement: true)
             probe = p
 
             // Phase timing (wall-clock, so actual frame rate doesn't matter):

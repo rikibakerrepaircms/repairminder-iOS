@@ -1,6 +1,13 @@
 import Foundation
 import CoreMotion
 
+/// Peak-to-peak spread of a sample series — captures rapid oscillation (a vibrating motor) even when
+/// the mean stays near 1 g, where mean-deviation barely moves.
+private func peakToPeak(_ xs: [Double]) -> Double {
+    guard let lo = xs.min(), let hi = xs.max() else { return 0 }
+    return hi - lo
+}
+
 @MainActor
 final class AccelProbeCM: AccelProbe {
     private let mm = CMMotionManager()
@@ -9,16 +16,16 @@ final class AccelProbeCM: AccelProbe {
         completion(0); return
         #else
         guard mm.isAccelerometerAvailable else { completion(0); return }
-        mm.accelerometerUpdateInterval = 1.0 / 50.0
-        var deviations: [Double] = []
+        mm.accelerometerUpdateInterval = 1.0 / 100.0
+        var mags: [Double] = []
         mm.startAccelerometerUpdates(to: .main) { data, _ in
             guard let a = data?.acceleration else { return }
-            deviations.append(abs(sqrt(a.x*a.x + a.y*a.y + a.z*a.z) - 1.0))
+            mags.append(sqrt(a.x*a.x + a.y*a.y + a.z*a.z))
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + Double(windowMs)/1000.0) { [weak self] in
             self?.mm.stopAccelerometerUpdates()
-            let resting = deviations.isEmpty ? 0 : deviations.reduce(0, +) / Double(deviations.count)
-            completion(resting)
+            // Resting energy floor as peak-to-peak of magnitude (same metric as samplePeak).
+            completion(peakToPeak(mags))
         }
         #endif
     }
@@ -27,18 +34,17 @@ final class AccelProbeCM: AccelProbe {
         completion(0, 0); return
         #else
         guard mm.isAccelerometerAvailable else { completion(0, 0); return }
-        mm.accelerometerUpdateInterval = 1.0 / 50.0
-        var deviations: [Double] = []
+        mm.accelerometerUpdateInterval = 1.0 / 100.0
+        var mags: [Double] = []
         mm.startAccelerometerUpdates(to: .main) { data, _ in
             guard let a = data?.acceleration else { return }
-            let mag = sqrt(a.x*a.x + a.y*a.y + a.z*a.z)   // ~1g at rest
-            deviations.append(abs(mag - 1.0))
+            mags.append(sqrt(a.x*a.x + a.y*a.y + a.z*a.z))
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + Double(windowMs)/1000.0) { [weak self] in
             self?.mm.stopAccelerometerUpdates()
-            let resting = deviations.prefix(5).reduce(0, +) / Double(max(1, min(5, deviations.count)))
-            let peak = deviations.max() ?? 0
-            completion(resting, peak)
+            // Peak-to-peak of magnitude over the window — a buzzing motor produces large rapid swings
+            // even though the mean stays ~1 g. First return value kept for signature compatibility.
+            completion(0, peakToPeak(mags))
         }
         #endif
     }

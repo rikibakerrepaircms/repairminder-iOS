@@ -166,7 +166,7 @@ struct PauseExecutionRequest: Encodable {
 
 /// Response from PATCH /api/macro-executions/:id/pause
 struct PauseExecutionResponse: Decodable, Sendable {
-    let success: Bool
+    let success: Bool?
     let execution: MacroExecution?
     let pendingStagesCount: Int?
     let message: String?
@@ -183,7 +183,7 @@ struct ResumeExecutionRequest: Encodable {
 
 /// Response from PATCH /api/macro-executions/:id/resume
 struct ResumeExecutionResponse: Decodable, Sendable {
-    let success: Bool
+    let success: Bool?
     let execution: MacroExecution?
     let nextStage: NextStage?
     let message: String?
