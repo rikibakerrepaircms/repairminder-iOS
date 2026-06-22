@@ -219,10 +219,12 @@ struct DeviceChecklist: Equatable, Sendable {
     let nextActionLabel: String?
 
     struct ChecklistItem: Decodable, Equatable, Sendable, Identifiable {
+        let key: String?
         let label: String
         let completed: Bool
+        let required: Bool?
 
-        var id: String { label }
+        var id: String { key ?? label }
     }
 }
 
@@ -240,22 +242,26 @@ extension DeviceChecklist: Decodable {
     }
 }
 
-/// Wrapper to handle checklist that can be either an empty array or an object
+/// Wrapper to handle checklist that can be an array (order devices) or an object (buyback)
 struct FlexibleChecklist: Decodable, Equatable, Sendable {
     let value: DeviceChecklist?
 
     init(from decoder: Decoder) throws {
-        // Try to decode as single value (empty array case)
-        if let container = try? decoder.singleValueContainer() {
-            // Check if it's an empty array by trying to decode as [String]
-            if let _ = try? container.decode([String].self) {
-                // It's an empty array, set to nil
+        // Array shape: order-device checklist is a bare array of items
+        if let container = try? decoder.singleValueContainer(),
+           let items = try? container.decode([DeviceChecklist.ChecklistItem].self) {
+            if items.isEmpty {
                 value = nil
-                return
+            } else {
+                let done = items.filter { $0.completed }.count
+                let pct = Int((Double(done) / Double(items.count) * 100).rounded())
+                let next = items.first { !$0.completed }?.label
+                value = DeviceChecklist(items: items, percentComplete: pct, nextActionLabel: next)
             }
+            return
         }
 
-        // Try to decode as object
+        // Object shape (buyback): {items, percent_complete, next_action_label}
         if let checklist = try? DeviceChecklist(from: decoder) {
             value = checklist
         } else {
