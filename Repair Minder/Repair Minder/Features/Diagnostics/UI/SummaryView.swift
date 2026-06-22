@@ -1,6 +1,33 @@
 // Features/Diagnostics/UI/SummaryView.swift
 import SwiftUI
 
+/// Pure visual + textual mapping for a result tile, factored out so it can be unit-tested.
+/// `.partial` is now distinct from `.skip` (orange "exclamationmark" + the word "Partial")
+/// instead of both rendering as grey "minus".
+struct ResultTileAppearance: Equatable {
+    let color: Color
+    let icon: String
+    /// Human/VoiceOver status word.
+    let statusWord: String
+}
+
+enum ResultTilePresentation {
+    static func appearance(for status: TestStatus) -> ResultTileAppearance {
+        switch status {
+        case .pass:    return ResultTileAppearance(color: .green,  icon: "checkmark.circle.fill", statusWord: "Passed")
+        case .fail:    return ResultTileAppearance(color: .red,    icon: "xmark.circle.fill",     statusWord: "Failed")
+        case .error:   return ResultTileAppearance(color: .red,    icon: "xmark.circle.fill",     statusWord: "Error")
+        case .partial: return ResultTileAppearance(color: .orange, icon: "exclamationmark.circle.fill", statusWord: "Partial")
+        case .skip:    return ResultTileAppearance(color: Color(.systemGray), icon: "minus.circle.fill", statusWord: "Skipped")
+        }
+    }
+
+    /// VoiceOver label for a result tile: "<name>: <status>".
+    static func accessibilityLabel(name: String, status: TestStatus) -> String {
+        "\(name): \(appearance(for: status).statusWord)"
+    }
+}
+
 /// Results: colour-coded icon grid with failed tiles grouped at top.
 /// Every tile is tappable to retest — pass, fail, or skip alike.
 struct SummaryView: View {
@@ -261,7 +288,9 @@ struct SummaryView: View {
 
     @ViewBuilder
     private func resultTile(_ outcome: TestOutcome) -> some View {
-        let (tileColor, badgeIcon) = tileAppearance(for: outcome.status)
+        let appearance = ResultTilePresentation.appearance(for: outcome.status)
+        let tileColor = appearance.color
+        let badgeIcon = appearance.icon
 
         Button {
             retest(outcome)
@@ -284,7 +313,7 @@ struct SummaryView: View {
                         .font(.caption)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.primary)
-                        .lineLimit(2)
+                        .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity)
@@ -312,15 +341,9 @@ struct SummaryView: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("retest-\(outcome.id)")
-    }
-
-    /// Returns (tint colour, badge SF symbol) for a given status.
-    private func tileAppearance(for status: TestStatus) -> (Color, String) {
-        switch status {
-        case .pass:           return (.green,  "checkmark.circle.fill")
-        case .fail, .error:   return (.red,    "xmark.circle.fill")
-        case .skip, .partial: return (Color(.systemGray), "minus.circle.fill")
-        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(ResultTilePresentation.accessibilityLabel(name: outcome.name, status: outcome.status))
+        .accessibilityHint("Double tap to retest")
     }
 
     // MARK: - Share PDF

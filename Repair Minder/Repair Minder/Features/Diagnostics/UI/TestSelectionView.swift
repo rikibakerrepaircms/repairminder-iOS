@@ -186,11 +186,11 @@ struct TestSelectionView: View {
                     Text(test.name)
                         .font(.caption)
                         .multilineTextAlignment(.center)
-                        .lineLimit(2)
+                        .lineLimit(3)
                         .foregroundStyle(isSelected ? .white : .primary)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 96)
+                .frame(minHeight: 96)
                 .rmGlassTintedCard(
                     cornerRadius: 14,
                     tint: isSelected ? Color.accentColor.opacity(0.6) : Color(.systemGray4).opacity(0.4),
