@@ -141,7 +141,12 @@ private struct BluetoothTestView: View {
             errorText = "NFC not available on this device"
             return
         }
-        session = NFCTagReaderSession(pollingOption: [.iso14443, .iso15693, .iso18092], delegate: self, queue: nil)
+        // NOTE: do NOT add .iso18092 (FeliCa) — CoreNFC requires the Info.plist key
+        // com.apple.developer.nfc.readersession.felica.systemcodes whenever FeliCa is polled, and
+        // without it the session invalidates with a *misleading* NFCError 2 "Missing required
+        // entitlement" even though the TAG entitlement is valid. ISO14443 + ISO15693 cover the tags
+        // a generic reader diagnostic cares about; FeliCa is Japan-only transit/payment.
+        session = NFCTagReaderSession(pollingOption: [.iso14443, .iso15693], delegate: self, queue: nil)
         session?.alertMessage = "Hold an NFC tag near the top of the device"
         session?.begin()
     }
