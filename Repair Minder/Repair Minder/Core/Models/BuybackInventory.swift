@@ -37,7 +37,7 @@ struct BuybackFilterEngineer: Decodable, Equatable, Sendable, Identifiable {
 
 // MARK: - Buyback Status
 
-enum BuybackStatus: String, CaseIterable, Sendable {
+enum BuybackStatus: String, CaseIterable, Sendable, Decodable, UnknownDefaultable {
     case purchased
     case awaitingParts = "awaiting_parts"
     case readyToRepair = "ready_to_repair"
@@ -45,6 +45,13 @@ enum BuybackStatus: String, CaseIterable, Sendable {
     case forSale = "for_sale"
     case sold
     case salvaged
+    case unknown = "__unknown__"
+
+    static var unknownFallback: BuybackStatus { .unknown }
+
+    static var allCases: [BuybackStatus] {
+        [.purchased, .awaitingParts, .readyToRepair, .refurbishing, .forSale, .sold, .salvaged]
+    }
 
     var displayName: String {
         switch self {
@@ -55,6 +62,7 @@ enum BuybackStatus: String, CaseIterable, Sendable {
         case .forSale: return "For Sale"
         case .sold: return "Sold"
         case .salvaged: return "Salvaged"
+        case .unknown: return "Unknown"
         }
     }
 }
