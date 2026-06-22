@@ -325,10 +325,10 @@ enum APIEndpoint {
             return "/api/orders/\(orderId)/devices/\(deviceId)"
         case .updateDeviceStatus(let orderId, let deviceId):
             return "/api/orders/\(orderId)/devices/\(deviceId)/status"
-        case .deviceActions(let orderId, let deviceId):
-            return "/api/orders/\(orderId)/devices/\(deviceId)/actions"
-        case .executeDeviceAction(let orderId, let deviceId):
-            return "/api/orders/\(orderId)/devices/\(deviceId)/action"
+        case .deviceActions(_, let deviceId):
+            return "/api/devices/\(deviceId)/actions"
+        case .executeDeviceAction(_, let deviceId):
+            return "/api/devices/\(deviceId)/action"
         case .updateDeviceBankDetails(let deviceId):
             return "/api/devices/\(deviceId)/bank-details"
         case .updateDeviceEngineer(let deviceId):

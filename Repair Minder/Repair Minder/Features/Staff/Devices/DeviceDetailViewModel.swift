@@ -52,12 +52,12 @@ final class DeviceDetailViewModel {
 
     /// Actions available from device page context
     var devicePageActions: [DeviceAction] {
-        availableActions.filter { $0.isDevicePageAction }
+        availableActions.filter { $0.isDevicePageAction ?? true }
     }
 
     /// Actions available from order page context
     var orderPageActions: [DeviceAction] {
-        availableActions.filter { !$0.isDevicePageAction }
+        availableActions.filter { ($0.isDevicePageAction ?? true) == false }
     }
 
     // MARK: - Data Loading
@@ -110,11 +110,12 @@ final class DeviceDetailViewModel {
         error = nil
 
         do {
-            device = try await APIClient.shared.request(
+            try await APIClient.shared.requestVoid(
                 .updateOrderDevice(orderId: orderId, deviceId: deviceId),
                 body: request
             )
             successMessage = "Device updated"
+            await loadDevice()
             await loadActions()
         } catch {
             self.error = error.localizedDescription
@@ -133,11 +134,12 @@ final class DeviceDetailViewModel {
 
         do {
             let request = DeviceStatusUpdateRequest(status: newStatus, context: context, notes: notes)
-            device = try await APIClient.shared.request(
+            try await APIClient.shared.requestVoid(
                 .updateDeviceStatus(orderId: orderId, deviceId: deviceId),
                 body: request
             )
             successMessage = "Status updated to \(newStatus.label)"
+            await loadDevice()
             await loadActions()
         } catch {
             self.error = error.localizedDescription
@@ -156,15 +158,16 @@ final class DeviceDetailViewModel {
 
         do {
             let request = DeviceActionRequest(
-                action: action.toStatus,
+                toStatus: action.toStatus,
                 notes: notes,
-                context: action.isDevicePageAction ? .devicePage : .orderPage
+                context: (action.isDevicePageAction ?? true) ? .devicePage : .orderPage
             )
-            device = try await APIClient.shared.request(
+            try await APIClient.shared.requestVoid(
                 .executeDeviceAction(orderId: orderId, deviceId: deviceId),
                 body: request
             )
             successMessage = action.label
+            await loadDevice()
             await loadActions()
         } catch {
             self.error = error.localizedDescription
