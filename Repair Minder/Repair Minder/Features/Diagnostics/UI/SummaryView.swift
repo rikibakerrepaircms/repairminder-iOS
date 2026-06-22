@@ -108,9 +108,10 @@ struct SummaryView: View {
                     .font(.subheadline.weight(.medium))
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(autoSendColor.opacity(0.15))
                     .foregroundStyle(autoSendColor)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .rmGlassTintedCard(cornerRadius: 12,
+                                       tint: autoSendColor.opacity(0.3),
+                                       fallbackFill: autoSendColor.opacity(0.15))
             }
             .padding()
             .background(.ultraThinMaterial)

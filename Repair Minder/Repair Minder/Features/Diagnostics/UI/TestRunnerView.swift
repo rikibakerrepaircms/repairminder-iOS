@@ -114,7 +114,7 @@ private struct PreparingView: View {
                     Text("\(banner.name) passed").font(.subheadline.weight(.semibold))
                 }
                 .padding(.horizontal, 16).padding(.vertical, 10)
-                .background(.ultraThinMaterial, in: Capsule())
+                .rmGlassCapsule()
                 .padding(.top, 8)
                 .transition(.move(edge: .top).combined(with: .opacity))
                 .accessibilityIdentifier("preflight-banner")
@@ -169,6 +169,8 @@ private struct ResultFlashView: View {
             Text(label).font(.title2.bold())
             Text(outcome.name).font(.subheadline).foregroundStyle(.secondary)
         }
+        .padding(32)
+        .rmGlassCardBackground(cornerRadius: 24, fallbackFill: Color(.secondarySystemGroupedBackground))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemGroupedBackground))
     }
