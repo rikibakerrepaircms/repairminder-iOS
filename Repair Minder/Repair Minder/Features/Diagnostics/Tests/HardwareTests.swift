@@ -216,6 +216,7 @@ private struct HardwareButtonsTestView: View {
                 buttonState("Volume Down", watcher.down)
             }
             .onAppear { watcher.start() }
+            .onDisappear { watcher.stop() }
             .onChange(of: watcher.down) { _, _ in checkDone() }
             .onChange(of: watcher.up) { _, _ in checkDone() }
         }
