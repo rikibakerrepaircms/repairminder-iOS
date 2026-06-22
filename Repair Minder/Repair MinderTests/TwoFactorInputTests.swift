@@ -14,4 +14,9 @@ struct TwoFactorInputTests {
     @Test func sixLettersNotSubmittable() {
         #expect(!TwoFactorView.isSubmittable("ABCDEF"))
     }
+    @Test func eightCharRecoveryCodeIsSubmittable() {
+        #expect(TwoFactorView.isSubmittable("ABCD1234"))
+        #expect(TwoFactorView.isSubmittable("123456"))
+        #expect(!TwoFactorView.isSubmittable("1234"))
+    }
 }

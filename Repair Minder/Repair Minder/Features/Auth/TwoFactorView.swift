@@ -144,12 +144,12 @@ struct TwoFactorView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
-                        .background(code.count == 6 && !authManager.isLoading ? Color.blue : Color.blue.opacity(0.4))
+                        .background(TwoFactorView.isSubmittable(code) && !authManager.isLoading ? Color.blue : Color.blue.opacity(0.4))
                         .foregroundStyle(.white)
                         .contentShape(Rectangle())
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                         .padding(.horizontal, 24)
-                        .disabled(code.count < 6 || authManager.isLoading)
+                        .disabled(!TwoFactorView.isSubmittable(code) || authManager.isLoading)
 
                         // Resend code button
                         Button {
