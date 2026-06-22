@@ -309,6 +309,7 @@ private struct MicrophoneTestView: View {
                 model.prepare()
                 model.startCurrentSource()
             }
+            .onDisappear { model.stopAll() }
             .onChange(of: model.done) { _, done in
                 if done { complete(model.outcome()) }
             }
