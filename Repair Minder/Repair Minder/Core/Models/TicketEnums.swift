@@ -10,11 +10,15 @@ import SwiftUI
 // MARK: - Ticket Status
 
 /// Status of a support ticket
-enum TicketStatus: String, Codable, CaseIterable, Sendable {
+enum TicketStatus: String, Codable, CaseIterable, UnknownDefaultable, Sendable {
     case open
     case pending
     case resolved
     case closed
+    case unknown = "__unknown__"
+
+    static var unknownFallback: TicketStatus { .unknown }
+    static var allCases: [TicketStatus] { [.open, .pending, .resolved, .closed] }
 
     var label: String {
         switch self {
@@ -22,6 +26,7 @@ enum TicketStatus: String, Codable, CaseIterable, Sendable {
         case .pending: return "Pending"
         case .resolved: return "Resolved"
         case .closed: return "Closed"
+        case .unknown: return "Unknown"
         }
     }
 
@@ -31,6 +36,7 @@ enum TicketStatus: String, Codable, CaseIterable, Sendable {
         case .pending: return "Pending"
         case .resolved: return "Resolved"
         case .closed: return "Closed"
+        case .unknown: return "Unknown"
         }
     }
 
@@ -40,6 +46,7 @@ enum TicketStatus: String, Codable, CaseIterable, Sendable {
         case .pending: return .orange
         case .resolved: return .green
         case .closed: return .gray
+        case .unknown: return .gray
         }
     }
 
@@ -49,6 +56,7 @@ enum TicketStatus: String, Codable, CaseIterable, Sendable {
         case .pending: return "clock"
         case .resolved: return "checkmark.circle"
         case .closed: return "archivebox"
+        case .unknown: return "questionmark"
         }
     }
 }
