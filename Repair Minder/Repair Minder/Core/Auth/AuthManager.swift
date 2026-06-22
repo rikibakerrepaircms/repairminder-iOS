@@ -139,9 +139,18 @@ final class AuthManager: ObservableObject, TokenProvider {
             let request = StaffLoginRequest(email: email, password: password)
             let response: StaffLoginResponse = try await APIClient.shared.request(.login, body: request)
 
+            if response.requiresMagicLink == true {
+                pendingEmail = email
+                try await requestMagicLink(email: email)
+                return
+            }
+            guard let userId = response.userId, let userEmail = response.email else {
+                throw APIError.serverError(message: "Unexpected login response", code: nil)
+            }
+
             // Store pending state for 2FA
-            pendingUserId = response.userId
-            pendingEmail = response.email
+            pendingUserId = userId
+            pendingEmail = userEmail
 
             // Request 2FA code
             try await request2FACode()
