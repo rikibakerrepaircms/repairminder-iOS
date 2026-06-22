@@ -20,4 +20,12 @@ struct FlashDecisionTests {
         #expect(FlashDecision.shouldAutoPass(baseline: 0, peak: 255) == false)
         #expect(FlashDecision.shouldAutoPass(baseline: 1, peak: 255) == false)
     }
+    // C2 inherited: a torch test against a dead/black sensor read (zero/negative baseline) must
+    // never auto-pass, even with a large peak.
+    @Test func zeroBaseline_doesNotAutoPass() {
+        #expect(FlashDecision.shouldAutoPass(baseline: 0, peak: 130) == false)
+    }
+    @Test func negativeBaseline_doesNotAutoPass() {
+        #expect(FlashDecision.shouldAutoPass(baseline: -5, peak: 130) == false)
+    }
 }
