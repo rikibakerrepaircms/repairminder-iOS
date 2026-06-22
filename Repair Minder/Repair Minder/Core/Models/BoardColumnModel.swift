@@ -80,7 +80,6 @@ struct BoardCardPosition: Decodable, Identifiable, Sendable, Equatable {
     let id: String
     let deviceId: String
     let columnId: String
-    let sortOrder: Int?
 }
 
 // MARK: - API Response Wrappers
@@ -127,7 +126,7 @@ struct ScheduleItemModel: Decodable, Identifiable, Sendable, Equatable {
     let id: String
     let deviceId: String
     let orderId: String?
-    let scheduleDate: String
+    let scheduleDate: String?
     let startMinutes: Int
     var duration: Int
     let deviceName: String?
