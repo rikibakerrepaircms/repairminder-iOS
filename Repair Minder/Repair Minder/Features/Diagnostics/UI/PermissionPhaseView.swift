@@ -60,6 +60,10 @@ private struct PermissionPhaseBody: View {
             needed = requiredPermissionsUnion(for: runner.selectedTests)
             guard !needed.isEmpty else { runner.phase = .preparing; return }
             await coordinator.request(needed)
+            // Record the granted map on the runner BEFORE any transition to .preparing so preflight
+            // (which runs in the preparing phase) can skip probes for denied permissions. Covers both
+            // the no-denied path below and the "Continue anyway" button (which also goes to .preparing).
+            runner.grantedPermissions = coordinator.granted
             let anyDenied = needed.contains { coordinator.granted[$0] == false }
             if anyDenied { showDeniedWarning = true } else { runner.phase = .preparing }
         }

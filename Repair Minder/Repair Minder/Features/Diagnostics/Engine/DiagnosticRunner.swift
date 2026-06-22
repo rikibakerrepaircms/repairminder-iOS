@@ -21,6 +21,9 @@ final class DiagnosticRunner: ObservableObject {
     @Published private(set) var preflightResolvedIds: Set<String> = []
     /// Guard so pre-flight only runs once per session (re-entering the runner must not re-run it).
     @Published private(set) var preflightRan = false
+    /// Permission outcomes from the permission phase, keyed by permission. A value of `false` means
+    /// denied; a missing key means "not denied" (so an empty map is a no-op — preserves prior behaviour).
+    @Published var grantedPermissions: [DiagnosticPermission: Bool] = [:]
 
     /// Tests whose background pass earns a 1–2s banner during preparing, in display order.
     static let backgroundBannerIds = ["wifi", "accelerometer", "gyroscope", "bluetooth"]
@@ -81,6 +84,12 @@ final class DiagnosticRunner: ObservableObject {
     }
     func isSelected(_ id: String) -> Bool { selectedIds.contains(id) }
 
+    /// A test's permissions are satisfied unless a required permission is explicitly denied
+    /// (granted map value == false). Absent keys are treated as not-denied so an empty map is a no-op.
+    func permissionsSatisfied(for test: DiagnosticTest) -> Bool {
+        test.requiredPermissions.allSatisfy { grantedPermissions[$0] != false }
+    }
+
     // MARK: Results
     func record(_ outcome: TestOutcome) { outcomes[outcome.id] = outcome }
     func outcome(for id: String) -> TestOutcome? { outcomes[id] }
@@ -100,6 +109,7 @@ final class DiagnosticRunner: ObservableObject {
     func runPreflight() async {
         guard !preflightRan else { return }
         for test in selectedTests where test.requiresInteraction && test.isSupported && outcomes[test.id] == nil {
+            guard permissionsSatisfied(for: test) else { continue }   // denied perms can't pass — don't spin the probe
             if let outcome = await test.preflight(), outcome.status == .pass {
                 record(outcome)
                 preflightResolvedIds.insert(test.id)
