@@ -76,24 +76,6 @@ struct ActiveWorkItem: Decodable, Equatable, Sendable, Identifiable {
     }
 }
 
-// MARK: - Flexible String
-
-/// Helper type for decoding values that may be Int or String
-struct FlexibleString: Decodable, Equatable, Sendable, Hashable {
-    let value: String
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if let stringValue = try? container.decode(String.self) {
-            value = stringValue
-        } else if let intValue = try? container.decode(Int.self) {
-            value = String(intValue)
-        } else {
-            value = ""
-        }
-    }
-}
-
 // MARK: - Work Type
 
 /// Type of active work on a device

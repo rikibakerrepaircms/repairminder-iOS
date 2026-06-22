@@ -95,28 +95,6 @@ struct BoardCardPositionsData: Decodable, Sendable {
     let positions: [BoardCardPosition]
 }
 
-// MARK: - Flexible Bool
-
-/// Handles `is_visible` which can be Int (0/1) or Bool from the API
-struct FlexibleBool: Decodable, Sendable, Equatable {
-    let value: Bool
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if let intValue = try? container.decode(Int.self) {
-            value = intValue != 0
-        } else if let boolValue = try? container.decode(Bool.self) {
-            value = boolValue
-        } else {
-            value = true
-        }
-    }
-
-    init(_ value: Bool) {
-        self.value = value
-    }
-}
-
 // MARK: - Single Column Response
 
 /// Response from `POST /api/board/columns` or `PATCH /api/board/columns/:id`
