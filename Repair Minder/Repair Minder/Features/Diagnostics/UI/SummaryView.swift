@@ -70,6 +70,7 @@ struct SummaryView: View {
             .padding(.vertical, 12)
         }
         .background(Color(.systemGroupedBackground))
+        .rmSoftTopScrollEdge()
         .navigationTitle("Summary")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)

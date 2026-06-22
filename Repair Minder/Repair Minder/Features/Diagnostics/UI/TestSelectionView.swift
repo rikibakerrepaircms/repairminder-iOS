@@ -71,6 +71,7 @@ struct TestSelectionView: View {
             .padding(.vertical, 12)
         }
         .background(Color(.systemGroupedBackground))
+        .rmSoftTopScrollEdge()
         .onAppear {
             if supportedIds.isEmpty {
                 supportedIds = Set(runner.tests.filter { $0.isSupported }.map(\.id))

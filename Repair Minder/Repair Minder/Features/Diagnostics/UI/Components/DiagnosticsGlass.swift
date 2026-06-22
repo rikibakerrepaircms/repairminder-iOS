@@ -77,6 +77,16 @@ extension View {
             self.background(.ultraThinMaterial, in: Capsule())
         }
     }
+
+    /// Soft scroll-edge effect under the top bar on iOS 26+; no-op below.
+    @ViewBuilder
+    func rmSoftTopScrollEdge() -> some View {
+        if #available(iOS 26, macOS 26, *) {
+            self.scrollEdgeEffectStyle(.soft, for: .top)
+        } else {
+            self
+        }
+    }
 }
 
 // MARK: - Glass buttons
