@@ -41,9 +41,9 @@ private struct PermissionPhaseBody: View {
                 Button("Open Settings") {
                     if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.rmGlass())
                 Button("Continue anyway") { runner.phase = .preparing }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.rmGlassProminent())
                     .accessibilityIdentifier("permissions-continue")
             } else {
                 Text("Setting up")

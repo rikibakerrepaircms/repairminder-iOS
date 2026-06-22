@@ -147,7 +147,7 @@ private struct BatteryDrainTestView: View {
                         blockMessage = nil
                         checkPreconditionsAndStart()
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.rmGlassProminent())
                     .padding(.top, 8)
                 } else if running {
                     ProgressView(value: Double(elapsedS), total: Double(targetDurationS))
@@ -167,7 +167,7 @@ private struct BatteryDrainTestView: View {
                     Button("Stop & Record Now") {
                         finishOnce(outcome(status: .pass))
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.rmGlassProminent())
                     .padding(.top, 8)
                 } else {
                     // Shown before pre-conditions are validated on appear

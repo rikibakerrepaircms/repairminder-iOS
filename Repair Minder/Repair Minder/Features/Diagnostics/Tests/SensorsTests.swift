@@ -473,7 +473,7 @@ private struct LightSensorActiveView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                     Button("Start") { beginMeasuring() }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.rmGlassProminent())
                         .accessibilityIdentifier("light-start")
                 } else if model.baseline > 0 {
                     // Live luminance bar relative to baseline

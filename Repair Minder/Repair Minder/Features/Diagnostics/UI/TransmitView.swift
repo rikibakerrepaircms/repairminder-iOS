@@ -114,11 +114,9 @@ struct TransmitView: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .padding()
-                .background(codeIsValid ? Color.accentColor : Color.gray)
-                .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
             }
+            .controlSize(.large)
+            .buttonStyle(.rmGlassProminent(tint: codeIsValid ? .accentColor : .gray))
             .disabled(!codeIsValid || phase == .sending || phase == .success)
             .padding()
             .accessibilityIdentifier("submit-results")

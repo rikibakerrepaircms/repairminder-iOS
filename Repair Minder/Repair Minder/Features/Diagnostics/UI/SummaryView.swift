@@ -116,11 +116,9 @@ struct SummaryView: View {
                 Text("Send results")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.accentColor)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
             }
+            .controlSize(.large)
+            .buttonStyle(.rmGlassProminent())
             .padding()
             .background(.ultraThinMaterial)
             .accessibilityIdentifier("send-results")

@@ -100,11 +100,9 @@ struct TestSelectionView: View {
                 Text(startLabel)
                     .font(.headline)
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(runner.selectedIds.isEmpty ? Color.gray : Color.accentColor)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
             }
+            .controlSize(.large)
+            .buttonStyle(.rmGlassProminent(tint: runner.selectedIds.isEmpty ? .gray : .accentColor))
             .disabled(runner.selectedIds.isEmpty)
             .padding()
             .background(.ultraThinMaterial)
