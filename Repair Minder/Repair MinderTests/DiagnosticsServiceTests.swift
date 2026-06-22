@@ -51,6 +51,19 @@ struct DiagnosticsServiceTests {
     }
 }
 
+struct DiagnosticsBufferTests {
+    @Test func bufferedSessionEncodesNeedsCompleteAsSnakeCase() throws {
+        let url = DiagnosticsBuffer.save(shopCode: "123456", deviceDescription: "iPhone",
+                                         imei: nil, serial: nil, reportID: "RM-1",
+                                         outcomes: [TestOutcome(id: "a", name: "A", status: .pass, details: nil)])
+        let data = try Data(contentsOf: #require(url))
+        let json = String(decoding: data, as: UTF8.self)
+        #expect(json.contains("\"needs_complete\":true"))
+        #expect(json.contains("\"report_id\":\"RM-1\""))
+        try? FileManager.default.removeItem(at: #require(url))
+    }
+}
+
 struct DiagnosticsTransmitErrorTests {
     @Test func forbiddenOnTokenPairingIsHardAuth() {
         let outcome = DiagnosticsTransmitOutcome.classify(

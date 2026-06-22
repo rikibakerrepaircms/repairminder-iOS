@@ -19,6 +19,9 @@ enum DiagnosticsBuffer {
         let serial: String?
         let reportID: String?
         let results: [PendingResult]
+        /// Always true for app-buffered runs: the replayer must POST /complete after replaying
+        /// all results, otherwise the session is stranded `in_progress`.
+        let needsComplete: Bool
     }
 
     static var pendingDirectory: URL {
@@ -34,7 +37,8 @@ enum DiagnosticsBuffer {
         let session = PendingSession(
             shopCode: shopCode, pairingToken: pairingToken, platform: platform,
             deviceDescription: deviceDescription, imei: imei, serial: serial, reportID: reportID,
-            results: outcomes.map { PendingResult(testName: $0.id, status: $0.status.rawValue, details: $0.details) })
+            results: outcomes.map { PendingResult(testName: $0.id, status: $0.status.rawValue, details: $0.details) },
+            needsComplete: true)
         do {
             try FileManager.default.createDirectory(at: pendingDirectory, withIntermediateDirectories: true)
             let url = pendingDirectory.appendingPathComponent("\(UUID().uuidString).json")
