@@ -84,12 +84,18 @@ struct User: Codable, Identifiable, Equatable, Sendable {
 // MARK: - User Role
 
 /// Staff role levels with their permissions
-enum UserRole: String, Codable, CaseIterable, Sendable {
+enum UserRole: String, Codable, CaseIterable, Sendable, UnknownDefaultable {
     case masterAdmin = "master_admin"
     case admin = "admin"
     case seniorEngineer = "senior_engineer"
     case engineer = "engineer"
     case office = "office"
+    /// Sentinel for any server role this client doesn't recognise yet.
+    /// Excluded from `allCases` so it never appears in pickers.
+    case unknown = "__unknown__"
+
+    static var unknownFallback: UserRole { .unknown }
+    static var allCases: [UserRole] { [.masterAdmin, .admin, .seniorEngineer, .engineer, .office] }
 
     /// Human-readable display name
     var displayName: String {
@@ -99,6 +105,7 @@ enum UserRole: String, Codable, CaseIterable, Sendable {
         case .seniorEngineer: return "Senior Engineer"
         case .engineer: return "Engineer"
         case .office: return "Office"
+        case .unknown: return "Unknown"
         }
     }
 

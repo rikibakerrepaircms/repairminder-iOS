@@ -387,6 +387,8 @@ struct SettingsView: View {
             return "wrench.fill"
         case .office:
             return "desktopcomputer"
+        case .unknown:
+            return "questionmark.circle"
         }
     }
 }
