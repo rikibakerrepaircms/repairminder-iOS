@@ -397,6 +397,18 @@ struct AIResponseResult: Decodable, Sendable {
     let provider: String
 }
 
+/// POST start response for an async AI job
+struct AIJobStart: Decodable, Sendable {
+    let jobId: String
+    let status: String
+}
+
+/// GET status response for an async AI job
+struct AIJobStatus: Decodable, Sendable {
+    let status: String           // idle | running | done | error
+    let result: AIResponseResult?
+}
+
 /// Token usage for AI generation
 struct AIUsage: Decodable, Sendable {
     let inputTokens: Int

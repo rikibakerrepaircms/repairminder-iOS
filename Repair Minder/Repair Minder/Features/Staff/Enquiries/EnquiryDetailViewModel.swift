@@ -267,14 +267,13 @@ final class EnquiryDetailViewModel: ObservableObject {
 
         do {
             let request = AIResponseRequest(locationId: ticket?.locationId)
-            let response: AIResponseResult = try await APIClient.shared.request(
-                .ticketGenerateResponse(id: ticketId),
-                body: request
+            let start: AIJobStart = try await APIClient.shared.request(
+                .ticketGenerateResponse(id: ticketId), body: request
             )
-
-            replyText = response.text
+            _ = start
+            let result = try await pollAIJob(.ticketGenerateResponseStatus(id: ticketId))
+            replyText = result.text
             replyMode = .reply
-
         } catch let apiError as APIError {
             error = friendlyAIError(apiError)
         } catch {
@@ -294,14 +293,13 @@ final class EnquiryDetailViewModel: ObservableObject {
 
         do {
             let request = AIRewriteRequest(text: replyText, locationId: ticket?.locationId)
-            let response: AIResponseResult = try await APIClient.shared.request(
-                .ticketRewriteResponse(id: ticketId),
-                body: request
+            let start: AIJobStart = try await APIClient.shared.request(
+                .ticketRewriteResponse(id: ticketId), body: request
             )
-
-            replyText = response.text
+            _ = start
+            let result = try await pollAIJob(.ticketRewriteResponseStatus(id: ticketId))
+            replyText = result.text
             hasRewrittenAI = true
-
         } catch let apiError as APIError {
             error = friendlyAIError(apiError)
         } catch {
@@ -309,6 +307,25 @@ final class EnquiryDetailViewModel: ObservableObject {
         }
 
         isRewritingAI = false
+    }
+
+    /// Poll an AI job status endpoint until it is done; throws on error/timeout.
+    private func pollAIJob(_ endpoint: APIEndpoint) async throws -> AIResponseResult {
+        let maxAttempts = 40            // ~80s
+        for attempt in 0..<maxAttempts {
+            try await Task.sleep(for: .milliseconds(attempt == 0 ? 1500 : 2000))
+            let status: AIJobStatus = try await APIClient.shared.request(endpoint)
+            switch status.status {
+            case "done":
+                if let result = status.result { return result }
+                throw APIError.serverError(message: "AI job finished without a result", code: nil)
+            case "error":
+                throw APIError.serverError(message: "AI generation failed", code: nil)
+            default:
+                continue                // idle / running
+            }
+        }
+        throw APIError.serverError(message: "AI generation timed out", code: nil)
     }
 
     /// Map an AI-endpoint error to a friendly, non-scary message when it's the
