@@ -91,8 +91,25 @@ private struct PreparingView: View {
                     .font(.headline)
                     .accessibilityIdentifier("runner-running")   // keep stable id so existing UITests still match
 
+                // Determinate "Checking sensors N of M" — N = banner-eligible tests already resolved.
+                let eligible = runner.backgroundEligibleSelected
+                if !eligible.isEmpty {
+                    let done = eligible.filter { runner.outcome(for: $0.id) != nil }.count
+                    VStack(spacing: 6) {
+                        ProgressView(value: Double(done), total: Double(eligible.count))
+                            .progressViewStyle(.linear)
+                            .frame(maxWidth: 220)
+                        Text("Checking sensors \(done) of \(eligible.count)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("preparing-progress")
+                    }
+                }
+
+                // Auto checklist + banner-eligible tests as pending rows (so something animates
+                // during the probe windows instead of a blank wait).
                 VStack(spacing: 10) {
-                    ForEach(runner.autoChecklistTests, id: \.id) { test in
+                    ForEach(rows, id: \.id) { test in
                         HStack(spacing: 12) {
                             let outcome = runner.outcome(for: test.id)
                             Image(systemName: icon(for: outcome))
@@ -125,15 +142,27 @@ private struct PreparingView: View {
             await runner.runPreflight()
             // Brief beat so completed ticks are visible.
             try? await Task.sleep(nanoseconds: 400_000_000)
-            // Play a 1.5s banner per background pass.
-            for outcome in runner.backgroundPassed {
-                withAnimation { banner = outcome }
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
+            // Capped celebratory banner: show only the FIRST background pass, briefly, then move on.
+            // (Was: a serial 1.65s loop over every pass — up to ~7s of dwell.)
+            if let first = runner.backgroundPassed.first {
+                withAnimation { banner = first }
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
                 withAnimation { banner = nil }
                 try? await Task.sleep(nanoseconds: 150_000_000)
             }
             onDone()
         }
+    }
+
+    /// De-duplicated rows: the auto checklist plus any banner-eligible test not already in it,
+    /// so pre-flighting sensors appear as pending rows during the probe window.
+    private var rows: [DiagnosticTest] {
+        var seen = Set<String>()
+        var out: [DiagnosticTest] = []
+        for t in runner.autoChecklistTests + runner.backgroundEligibleSelected where seen.insert(t.id).inserted {
+            out.append(t)
+        }
+        return out
     }
 
     private func icon(for outcome: TestOutcome?) -> String {

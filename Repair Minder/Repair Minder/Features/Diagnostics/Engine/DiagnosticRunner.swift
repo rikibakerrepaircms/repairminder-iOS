@@ -124,6 +124,12 @@ final class DiagnosticRunner: ObservableObject {
         Self.backgroundBannerIds.compactMap { outcomes[$0] }.filter { $0.status == .pass }
     }
 
+    /// Banner-eligible tests that are actually selected, in banner order (denominator for the
+    /// "Checking sensors N of M" progress shown during Preparing).
+    var backgroundEligibleSelected: [DiagnosticTest] {
+        Self.backgroundBannerIds.compactMap { id in selectedTests.first { $0.id == id } }
+    }
+
     /// Re-run a single automatic test (interactive retest is handled by the UI).
     func retestAuto(_ test: DiagnosticTest) async {
         guard test.isSupported, !test.requiresInteraction else { return }
