@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 // MARK: - Pure gate functions (unit-tested without hardware)
 
@@ -88,8 +89,10 @@ protocol MotionAliveProbe: Sendable {
 }
 
 /// Emits a tick per valid depth frame captured (TrueDepth or LiDAR).
+/// `onDepthFrame` ticks once per valid depth frame; `onDepthImage` provides a throttled grayscale
+/// CGImage of the depth map for live display.
 protocol DepthProbe: Sendable {
-    @MainActor func start(onDepthFrame: @escaping () -> Void)
+    @MainActor func start(onDepthFrame: @escaping () -> Void, onDepthImage: @escaping (CGImage) -> Void)
     @MainActor func stop()
 }
 
