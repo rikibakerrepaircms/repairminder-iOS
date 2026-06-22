@@ -138,6 +138,7 @@ private struct SpeakerTestView: View {
             .onChange(of: model.outcome?.status) { _, _ in
                 if let o = model.outcome { complete(o) }
             }
+            .onDisappear { model.cancel() }   // stop the loopback probe if dismissed mid-run
         }
     }
 
