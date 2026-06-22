@@ -293,11 +293,11 @@ private struct HardwareButtonsTestView: View {
     @State private var mutePoll: Timer?
     @State private var muteTimeout: Timer?
     @State private var cameraTimeout: Timer?
+    /// Camera Control hardware presence (iPhone 16 family, iOS 18+). Resolved ONCE in start();
+    /// when false the row is hidden entirely (not shown as n/a) — e.g. iPhone 15 Pro Max. Cached in
+    /// @State because CaptureButtonProbe.isAvailable builds an AVCaptureSession each call.
+    @State private var cameraSupported = false
     private let muteProbe = MuteSwitchProbe()
-
-    /// Camera Control is only present on iPhone 16-family devices (iOS 18+). Gate the row on real
-    /// hardware support so devices without it (e.g. iPhone 15 Pro Max) never get asked for it.
-    private var cameraEligible: Bool { CaptureButtonProbe.isAvailable }
     /// Volume + screenshot + mute all resolved — only then do we activate the capture-button probe,
     /// so its AVCaptureEventInteraction can't intercept the volume/screenshot presses above it.
     private var othersResolved: Bool { watcher.up && watcher.down && sideLock != "0" && mute != "0" }
@@ -314,8 +314,10 @@ private struct HardwareButtonsTestView: View {
                 row("Volume Down", ok: watcher.down ? "1" : "0")
                 row("Mute / Action (Silent)", ok: mute)
                 row("Side / Lock (screenshot)", ok: sideLock)
-                row("Camera Control", ok: cameraControl)
-                if cameraEligible, othersResolved, cameraControl == "0" {
+                if cameraSupported {
+                    row("Camera Control", ok: cameraControl)
+                }
+                if cameraSupported, othersResolved, cameraControl == "0" {
                     CaptureButtonProbe { cameraControl = "1"; checkDone() }
                         .frame(width: 0, height: 0)
                         .onAppear { armCameraTimeout() }
@@ -357,7 +359,9 @@ private struct HardwareButtonsTestView: View {
                 }
             }
         }
-        if !cameraEligible { cameraControl = "na"; checkDone() }
+        // Resolve Camera Control hardware presence once. If absent, the row is omitted entirely
+        // (not shown, not in the result) rather than displayed as n/a.
+        cameraSupported = CaptureButtonProbe.isAvailable
         // Mute degrades to n/a if no toggle is seen (no switch / Action button not set to Silent).
         muteTimeout = Timer.scheduledTimer(withTimeInterval: 15, repeats: false) { _ in
             if mute == "0" { mute = "na" }
@@ -377,9 +381,12 @@ private struct HardwareButtonsTestView: View {
 
     private func checkDone() {
         guard !done else { return }
-        let rows = ["volume_up": watcher.up ? "1" : "0",
+        var rows = ["volume_up": watcher.up ? "1" : "0",
                     "volume_down": watcher.down ? "1" : "0",
-                    "mute": mute, "side_lock": sideLock, "camera_control": cameraControl]
+                    "mute": mute, "side_lock": sideLock]
+        // Only include Camera Control when the device actually has it; otherwise it's absent from
+        // both the UI and the recorded result (never "na").
+        if cameraSupported { rows["camera_control"] = cameraControl }
         guard !rows.values.contains("0") else { return }   // a still-pending row → keep waiting
         let (status, details) = HardwareButtonsAggregate.result(rows: rows)
         finish(status, details)
