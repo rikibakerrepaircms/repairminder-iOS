@@ -26,10 +26,14 @@ struct CreateSessionRequest: Codable, Sendable {
     /// Client-generated run reference (also printed on the customer's PDF) so the results we
     /// log can be matched to the report. Sent as `report_id`; ignored by older Workers.
     let reportID: String?
+    /// Run verdict ("pass"/"partial"/"fail") computed by the runner; sent as `overall_result`.
+    /// Additive — older Workers ignore it.
+    let overallResult: String?
 
     init(shopCode: String? = nil, pairingToken: String? = nil, platform: String = "ios",
          deviceIdentifier: String? = nil, deviceDescription: String? = nil,
-         imei: String? = nil, serial: String? = nil, reportID: String? = nil) {
+         imei: String? = nil, serial: String? = nil, reportID: String? = nil,
+         overallResult: String? = nil) {
         self.shopCode = shopCode
         self.pairingToken = pairingToken
         self.platform = platform
@@ -38,6 +42,7 @@ struct CreateSessionRequest: Codable, Sendable {
         self.imei = imei
         self.serial = serial
         self.reportID = reportID
+        self.overallResult = overallResult
     }
 }
 

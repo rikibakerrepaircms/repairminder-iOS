@@ -57,18 +57,25 @@ struct HeadphonesTest: DiagnosticTest {
         phase = "Testing loudspeaker…"
         let loud = await measure(.speaker)
         guard !cancelled else { return }
-        phase = "Testing earpiece…"
-        let ear = await measure(.receiver)
-        guard !cancelled else { return }
         let loudPass = LoopbackGate.heard(levelDb: loud, thresholdDb: -20)
-        let earPass = LoopbackGate.heard(levelDb: ear, thresholdDb: -20)
-        let details = ["loud": loudPass ? "pass" : "fail", "ear": earPass ? "pass" : "n/a"]
+        // Earpiece (receiver) loopback isn't reliably audible to the bottom mic, so it can't be
+        // certified here — we report only the loudspeaker result rather than a misleading "ear" value.
+        let details = ["loud": loudPass ? "pass" : "fail"]
         outcome = diagnosticOutcome("speaker", "Speaker", loudPass ? .pass : .fail, details)
     }
 
     func cancel() {
         cancelled = true
         probe.stop()
+    }
+
+    /// Watchdog: a hung/dead loopback probe can leave `run()` awaiting forever with no outcome.
+    /// Auto-fail in that case (not skip). No-op if already cancelled or an outcome was produced
+    /// (single-shot guards: `cancelled`, `outcome == nil`).
+    func failIfUnresolved() {
+        guard !cancelled, outcome == nil else { return }
+        probe.stop()
+        outcome = diagnosticOutcome("speaker", "Speaker", .fail, ["reason": "no_speaker_signal"])
     }
 
     private func measure(_ route: AudioRoute) async -> Double {
@@ -85,7 +92,7 @@ private struct SpeakerTestView: View {
     var body: some View {
         TestScaffold(
             title: "Speaker",
-            instruction: "Hold the device still and keep quiet. The loudspeaker and earpiece are tested automatically via the microphone.",
+            instruction: "Hold the device still and keep quiet. The loudspeaker is tested automatically via the microphone.",
             hints: ["Ensure the volume is not muted"],
             allowManualPass: false,
             onPass: {},
@@ -97,6 +104,14 @@ private struct SpeakerTestView: View {
                 if !model.phase.isEmpty { ProgressView(model.phase) }
             }
             .task { await model.run() }
+            .onAppear {
+                // Bounded watchdog: both routes measure ~800ms each (~1.6s); allow ~10s before a
+                // hung probe auto-fails (not skip). Single-shot via the model's own guards.
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 10_000_000_000)   // ~10s
+                    model.failIfUnresolved()
+                }
+            }
             .onChange(of: model.outcome?.status) { _, _ in
                 if let o = model.outcome { complete(o) }
             }
@@ -292,6 +307,7 @@ private struct MicrophoneTestView: View {
                 model.prepare()
                 model.startCurrentSource()
             }
+            .onDisappear { model.stopAll() }
             .onChange(of: model.done) { _, done in
                 if done { complete(model.outcome()) }
             }

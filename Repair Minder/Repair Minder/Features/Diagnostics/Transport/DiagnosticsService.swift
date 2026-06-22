@@ -15,6 +15,25 @@ enum DiagnosticsError: Error, Equatable {
     case malformedSessionId(String)
 }
 
+/// How the UI should react to a failed transmit.
+/// - `revokedPairing`: the server rejected our credential (403/404) on a *token* pairing — the
+///   device is no longer linked. Unpair + tell the user; do NOT buffer (it can never succeed).
+/// - `transient`: connectivity / expiry / server hiccup — buffer for the Bridge to replay.
+enum DiagnosticsTransmitOutcome: Equatable {
+    case revokedPairing
+    case transient
+
+    /// `wasTokenPairing` is true only when the failed call authenticated with a server-issued
+    /// pairing token (not a manually-typed shop code — a bad code is the user's typo, not revocation).
+    static func classify(_ error: Error, wasTokenPairing: Bool) -> DiagnosticsTransmitOutcome {
+        guard wasTokenPairing, let api = error as? APIError else { return .transient }
+        switch api {
+        case .forbidden, .notFound: return .revokedPairing
+        default: return .transient
+        }
+    }
+}
+
 /// Abstraction over the Worker diagnostics endpoints (lets tests stub the network).
 protocol DiagnosticsAPI: Sendable {
     func createSession(_ req: CreateSessionRequest) async throws -> DiagnosticSessionResponse
@@ -54,7 +73,8 @@ struct StubDiagnosticsAPI: DiagnosticsAPI {
 
 /// Orchestrates create → submit each → complete. Hybrid C: this is the POST path.
 /// If transmit fails for connectivity reasons, callers persist the payloads to the app
-/// container so the Bridge can pull them over USB/AFC later (see TransmitView buffering).
+/// container (see TransmitView buffering); `flushPending` later replays them through the
+/// same create → results → complete path so they never strand `in_progress`.
 struct DiagnosticsService: Sendable {
     let api: DiagnosticsAPI
     init(api: DiagnosticsAPI = LiveDiagnosticsAPI()) { self.api = api }
@@ -65,10 +85,12 @@ struct DiagnosticsService: Sendable {
     func transmit(shopCode: String?, pairingToken: String? = nil, platform: String,
                   imei: String?, serial: String?,
                   deviceDescription: String?, reportID: String? = nil,
+                  overallResult: String? = nil,
                   outcomes: [TestOutcome]) async throws -> String? {
         let session = try await api.createSession(CreateSessionRequest(
             shopCode: shopCode, pairingToken: pairingToken, platform: platform, deviceIdentifier: nil,
-            deviceDescription: deviceDescription, imei: imei, serial: serial, reportID: reportID))
+            deviceDescription: deviceDescription, imei: imei, serial: serial, reportID: reportID,
+            overallResult: overallResult))
         for o in outcomes {
             try await api.submitResult(DiagnosticResultPayload(
                 sessionId: session.sessionId, token: session.sessionToken,
@@ -76,5 +98,31 @@ struct DiagnosticsService: Sendable {
         }
         try await api.complete(sessionId: session.sessionId, token: session.sessionToken)
         return session.companyName
+    }
+
+    /// Best-effort replay of any buffered (offline) sessions. Each is re-sent through `transmit`
+    /// (create -> results -> complete), so a replayed session is fully completed, never stranded
+    /// `in_progress`. Removes the file on success or on a hard-auth failure (revoked token = dead
+    /// on arrival); keeps it on transient failure to retry later.
+    func flushPending() async {
+        for url in DiagnosticsBuffer.pendingURLs() {
+            guard let s = DiagnosticsBuffer.load(url) else { DiagnosticsBuffer.remove(url); continue }
+            let outcomes = s.results.map {
+                TestOutcome(id: $0.testName, name: $0.testName,
+                            status: TestStatus(rawValue: $0.status) ?? .skip, details: $0.details)
+            }
+            do {
+                _ = try await transmit(shopCode: s.shopCode, pairingToken: s.pairingToken, platform: s.platform,
+                                       imei: s.imei, serial: s.serial, deviceDescription: s.deviceDescription,
+                                       reportID: s.reportID, overallResult: s.overallResult, outcomes: outcomes)
+                DiagnosticsBuffer.remove(url)
+            } catch {
+                let wasToken = s.pairingToken != nil && s.shopCode == nil
+                if DiagnosticsTransmitOutcome.classify(error, wasTokenPairing: wasToken) == .revokedPairing {
+                    DiagnosticsBuffer.remove(url)   // can never succeed; drop it
+                }
+                // transient -> leave buffered for the next flush
+            }
+        }
     }
 }

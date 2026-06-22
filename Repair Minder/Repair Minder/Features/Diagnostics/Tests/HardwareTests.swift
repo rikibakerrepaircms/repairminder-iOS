@@ -84,10 +84,19 @@ struct VibrationTest: DiagnosticTest {
     #endif
 }
 
+/// Pure charge-pass decision: require an observed unplugged→charging edge so a device that was
+/// already plugged in (or resting at .full) cannot pass without proving the charger engaged.
+enum ChargeGate {
+    static func passed(state: String, sawUnplugged: Bool) -> Bool {
+        sawUnplugged && (state == "charging" || state == "full")
+    }
+}
+
 #if os(iOS)
 import UIKit
 import AVFoundation
 import AudioToolbox
+import MediaPlayer
 
 func batteryStateLabel(_ s: UIDevice.BatteryState) -> String {
     switch s {
@@ -105,11 +114,12 @@ private struct ChargeTestView: View {
     @State private var state: UIDevice.BatteryState = .unknown
     @State private var observer: NSObjectProtocol?
     @State private var done = false
+    @State private var sawUnplugged = false
 
     var body: some View {
         TestScaffold(
             title: "Charge",
-            instruction: "Connect the device to a wired or wireless charger. It passes automatically when charging is detected.",
+            instruction: "Make sure the device is unplugged, then connect a wired or wireless charger. It passes when charging starts.",
             hints: ["Plug in a charger (or place on a wireless pad)"],
             onPass: { finish(.pass) }, onFail: { finish(.fail) }, onSkip: { finish(.skip) }
         ) {
@@ -121,9 +131,13 @@ private struct ChargeTestView: View {
             .onAppear {
                 UIDevice.current.isBatteryMonitoringEnabled = true
                 state = UIDevice.current.batteryState
+                if state == .unplugged { sawUnplugged = true }
                 observer = NotificationCenter.default.addObserver(forName: UIDevice.batteryStateDidChangeNotification, object: nil, queue: .main) { _ in
                     state = UIDevice.current.batteryState
-                    if state == .charging || state == .full { finish(.pass, ["state": batteryStateLabel(state), "ac": "n/a", "dock": "n/a", "usb": "n/a", "wireless": "n/a"]) }
+                    if state == .unplugged { sawUnplugged = true }
+                    if ChargeGate.passed(state: batteryStateLabel(state), sawUnplugged: sawUnplugged) {
+                        finish(.pass, ["state": batteryStateLabel(state), "transition": "unplugged_to_charging", "ac": "n/a", "dock": "n/a", "usb": "n/a", "wireless": "n/a"])
+                    }
                 }
             }
             .onDisappear { removeObserver() }
@@ -147,15 +161,39 @@ private struct ChargeTestView: View {
     @Published var down = false
     private var last: Float = AVAudioSession.sharedInstance().outputVolume
     private var observation: NSKeyValueObservation?
+    /// Gate: ignore volume changes until the self-induced mid-rail seed has settled.
+    /// Setting the slider fires the KVO observer asynchronously, which would otherwise
+    /// register a phantom up/down delta before the user presses anything.
+    private var armed = false
 
     func start() {
         try? AVAudioSession.sharedInstance().setActive(true)
-        last = AVAudioSession.sharedInstance().outputVolume
+        armed = false
         observation = AVAudioSession.sharedInstance().observe(\.outputVolume, options: [.new]) { [weak self] _, change in
             guard let self, let v = change.newValue else { return }
             Task { @MainActor in
-                if v > self.last { self.up = true } else if v < self.last { self.down = true }
+                guard self.armed else { return }
+                if v > self.last + 0.001 { self.up = true } else if v < self.last - 0.001 { self.down = true }
                 self.last = v
+            }
+        }
+        setSystemVolume(0.5)
+    }
+
+    /// Seed the system volume mid-range so both Volume Up and Volume Down have headroom to move
+    /// (at 0 a down-press is a no-op; at 1 an up-press is a no-op → false-fail).
+    private func setSystemVolume(_ value: Float) {
+        let mpVolume = MPVolumeView()
+        if let slider = mpVolume.subviews.compactMap({ $0 as? UISlider }).first {
+            DispatchQueue.main.async { [weak self] in
+                slider.value = value
+                // Arm only once the self-induced change has propagated, then seed `last`
+                // from the settled volume so deltas are measured from the mid-rail value.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                    guard let self else { return }
+                    self.last = AVAudioSession.sharedInstance().outputVolume
+                    self.armed = true
+                }
             }
         }
     }
@@ -169,7 +207,7 @@ private struct HardwareButtonsTestView: View {
     var body: some View {
         TestScaffold(
             title: "Hardware Buttons",
-            instruction: "Press Volume Up and Volume Down. Each registers below; both = pass. (Power/Mute can't be read by apps.)",
+            instruction: "Volume has been set to the middle. Press Volume Up, then Volume Down — each registers below; both = pass. (Power/Mute can't be read by apps.)",
             hints: ["Press Volume Up, then Volume Down"],
             onPass: { finish(.pass) }, onFail: { finish(.fail) }, onSkip: { finish(.skip) }
         ) {
@@ -178,6 +216,7 @@ private struct HardwareButtonsTestView: View {
                 buttonState("Volume Down", watcher.down)
             }
             .onAppear { watcher.start() }
+            .onDisappear { watcher.stop() }
             .onChange(of: watcher.down) { _, _ in checkDone() }
             .onChange(of: watcher.up) { _, _ in checkDone() }
         }
@@ -212,6 +251,11 @@ private struct HardwareButtonsTestView: View {
     func run() async {
         measuring = true
         detected = false
+        // Genuine pre-buzz resting baseline (motor OFF) — used by the gate so the buzz isn't
+        // compared against itself. Sampled once; the per-cycle in-window resting is logged only.
+        let baseline = await withCheckedContinuation { (cont: CheckedContinuation<Double, Never>) in
+            probe.sampleBaseline(windowMs: 400) { cont.resume(returning: $0) }
+        }
         let maxCycles = 3
         for cycle in 0..<maxCycles {
             // Insert a 2s OFF gap between cycles (not before the first one)
@@ -227,11 +271,11 @@ private struct HardwareButtonsTestView: View {
                 }
             }
             self.peak = peakVal
-            self.lastResting = resting
-            let spiked = VibrationGate.spiked(restingNoise: resting, peak: peakVal, minDelta: 0.15)
+            self.lastResting = baseline
+            let spiked = VibrationGate.spiked(restingNoise: baseline, peak: peakVal, minDelta: 0.15)
             // Logged so we can re-tune the 0.15 g threshold against real devices (Console.app /
             // `log stream --predicate 'subsystem == "com.repairminder.diagnostics"'`).
-            log.info("cycle \(cycle, privacy: .public) resting=\(resting, format: .fixed(precision: 3), privacy: .public)g peak=\(peakVal, format: .fixed(precision: 3), privacy: .public)g delta=\(peakVal - resting, format: .fixed(precision: 3), privacy: .public)g spiked=\(spiked, privacy: .public)")
+            log.info("cycle \(cycle, privacy: .public) baseline=\(baseline, format: .fixed(precision: 3), privacy: .public)g inWindowResting=\(resting, format: .fixed(precision: 3), privacy: .public)g peak=\(peakVal, format: .fixed(precision: 3), privacy: .public)g spiked=\(spiked, privacy: .public)")
             if spiked {
                 self.detected = true
                 self.outcome = diagnosticOutcome("vibration", "Vibration", .pass,

@@ -8,12 +8,11 @@ import Testing
 }
 
 struct SpeakerLoopbackTests {
-    @Test @MainActor func loudPassesEarpieceNAWhenQuiet() async {
+    @Test @MainActor func loudPassesWhenHeard() async {
         let m = SpeakerViewModel(probe: FakeLoopback())
         await m.run()
         #expect(m.outcome?.status == .pass)
         #expect(m.outcome?.details?["loud"] == "pass")
-        #expect(m.outcome?.details?["ear"] == "n/a")
     }
     @Test @MainActor func loudFailFailsTest() async {
         let f = FakeLoopback(); f.levels = [.speaker: -50, .receiver: -50]

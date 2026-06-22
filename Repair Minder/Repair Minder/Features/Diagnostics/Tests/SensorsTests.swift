@@ -11,12 +11,8 @@ struct AccelerometerTest: DiagnosticTest {
     #if os(iOS)
     var isSupported: Bool { true }
     @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { AnyView(AccelerometerTestView(complete: complete)) }
-    func preflight() async -> TestOutcome? {
-        guard let r = await MotionAliveProbeCM().accelerometerAlive(windowMs: 600),
-              MotionAliveGate.accelerometerAlive(magnitude: r.magnitude, samples: r.samples) else { return nil }
-        return diagnosticOutcome("accelerometer", "Accelerometer", .pass,
-                                 ["accel_g": String(format: "%.2f", r.magnitude), "source": "preflight"])
-    }
+    // No preflight auto-pass (I1): a brief liveness sample is too weak to certify the sensor, so it
+    // must run the interactive tilt test. The protocol default preflight() returns nil.
     #else
     var isSupported: Bool { false }
     #endif
@@ -28,12 +24,8 @@ struct GyroscopeTest: DiagnosticTest {
     #if os(iOS)
     var isSupported: Bool { true }
     @MainActor func makeView(complete: @escaping (TestOutcome) -> Void) -> AnyView? { AnyView(GyroscopeTestView(complete: complete)) }
-    func preflight() async -> TestOutcome? {
-        guard let samples = await MotionAliveProbeCM().gyroAlive(windowMs: 600),
-              MotionAliveGate.gyroAlive(samples: samples) else { return nil }
-        return diagnosticOutcome("gyroscope", "Gyroscope", .pass,
-                                 ["gyro_samples": "\(samples)", "source": "preflight"])
-    }
+    // No preflight auto-pass (I1): a brief liveness sample is too weak to certify the sensor, so it
+    // must run the interactive axis-rotation test. The protocol default preflight() returns nil.
     #else
     var isSupported: Bool { false }
     #endif
@@ -41,7 +33,8 @@ struct GyroscopeTest: DiagnosticTest {
 
 struct MagneticTest: DiagnosticTest {
     let id = "magnetic"; let name = "Magnetic Sensor"; let category: TestCategory = .sensors
-    var requiredPermissions: [DiagnosticPermission] { [.location] }
+    // No .location: heading updates via CLLocationManager.startUpdatingHeading() do not require
+    // location authorization, so we don't over-request it (I2). Protocol default [] applies.
     let requiresInteraction = true
     #if os(iOS)
     var isSupported: Bool { true }
@@ -155,6 +148,7 @@ private struct AccelerometerTestView: View {
             .background(Color.platformGray6)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .onAppear { motion.startGravity() }
+            .onDisappear { motion.stop() }
             .onChange(of: motion.gravity.dx) { _, x in if x < -0.6 { mark("left") }; if x > 0.6 { mark("right") } }
             .onChange(of: motion.gravity.dy) { _, y in if y < -0.6 { mark("up") }; if y > 0.6 { mark("down") } }
         }
@@ -196,6 +190,7 @@ private struct GyroscopeTestView: View {
                 axis("Yaw (z)", motion.rotationMax.z)
             }
             .onAppear { motion.startGyro() }
+            .onDisappear { motion.stop() }
             .onChange(of: motion.rotationMax.z) { _, _ in
                 let r = motion.rotationMax
                 if r.x > 2, r.y > 2, r.z > 2 { finish(.pass, ["axes": "3"]) }
@@ -225,7 +220,9 @@ private struct GyroscopeTestView: View {
     func stop() { lm.stopUpdatingHeading(); lm.stopUpdatingLocation() }
 
     nonisolated func locationManager(_ m: CLLocationManager, didUpdateHeading h: CLHeading) {
-        guard h.magneticHeading >= 0 else { return }   // <0 == invalid/uncalibrated
+        // headingAccuracy <= 0 means the reading is invalid/uncalibrated (e.g. gyro-fused with no
+        // magnetometer) — don't let it fill sweep sectors and false-pass a dead compass.
+        guard h.headingAccuracy > 0, h.magneticHeading >= 0 else { return }
         Task { @MainActor in
             self.heading = h.magneticHeading
             self.sweptSectors.insert(Int(h.magneticHeading / 10) % 36)
@@ -386,7 +383,8 @@ private struct ProximityTestView: View {
                     self.baseline = self.samples.reduce(0, +) / Double(self.samples.count)
                     self.baselineSet = true
                 }
-            } else if self.outcome == nil, LightGate.passes(baseline: self.baseline, peak: v, thresholdPct: 25) {
+            } else if self.outcome == nil,
+                      LightGate.passes(baseline: self.baseline, peak: v, thresholdPct: 25, minAbsoluteDelta: 30) {
                 let delta = (v - self.baseline) / self.baseline * 100
                 self.outcome = diagnosticOutcome("light", "Light Sensor", .pass, [
                     "lux_baseline": String(format: "%.0f", self.baseline),
@@ -400,6 +398,14 @@ private struct ProximityTestView: View {
 
     func fail() { probe.stop(); outcome = diagnosticOutcome("light", "Light Sensor", .fail, nil) }
     func skip() { probe.stop(); outcome = diagnosticOutcome("light", "Light Sensor", .skip, nil) }
+
+    /// Watchdog: auto-fail dead hardware that never registers a light increase. No-op if the user
+    /// already passed/failed/skipped or the success signal already fired (guard: `outcome == nil`).
+    func failIfUnresolved() {
+        guard outcome == nil else { return }
+        probe.stop()
+        outcome = diagnosticOutcome("light", "Light Sensor", .fail, ["reason": "no_light_signal"])
+    }
 }
 
 private struct LightSensorTestView: View {
@@ -432,6 +438,7 @@ private struct LightSensorActiveView: View {
     /// front camera has a dark baseline to detect a light increase against. Without this, the screen
     /// dimmed to black the instant the page opened, which read as the test being broken.
     @State private var started = false
+    @Environment(\.scenePhase) private var scenePhase
 
     init(probe: CameraProbe, complete: @escaping (TestOutcome) -> Void) {
         self.complete = complete
@@ -466,21 +473,14 @@ private struct LightSensorActiveView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                     Button("Start") { beginMeasuring() }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.rmGlassProminent())
                         .accessibilityIdentifier("light-start")
                 } else if model.baseline > 0 {
-                    // Live luminance bar relative to baseline
-                    let ratio = min(model.current / (model.baseline * 2), 1.0)
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 6).fill(Color.platformGray6)
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(ratio >= 0.625 ? Color.green : Color.accentColor)
-                                .frame(width: geo.size.width * ratio)
-                        }
-                    }
-                    .frame(height: 20)
-                    .padding(.horizontal)
+                    // Live luminance vs the pass threshold (baseline + 25%).
+                    SignalMeterView(value: model.current,
+                                    threshold: model.baseline * 1.25,
+                                    label: "Light level")
+                        .padding(.horizontal)
 
                     Text(String(format: "Baseline %.0f  ·  Current %.0f", model.baseline, model.current))
                         .font(.caption.monospacedDigit())
@@ -505,6 +505,18 @@ private struct LightSensorActiveView: View {
                 complete(o)
             }
         }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .active:
+                // Returning to the foreground while still measuring — re-dim so the probe keeps working.
+                if started, model.outcome == nil { UIScreen.main.brightness = 0 }
+            case .inactive, .background:
+                // Leaving the foreground (Control Center, call, lock) — never leave the screen dark.
+                UIScreen.main.brightness = savedBrightness
+            @unknown default:
+                UIScreen.main.brightness = savedBrightness
+            }
+        }
     }
 
     private func beginMeasuring() {
@@ -512,6 +524,12 @@ private struct LightSensorActiveView: View {
         savedBrightness = UIScreen.main.brightness
         UIScreen.main.brightness = 0
         model.start()
+        // Bounded watchdog: measuring collects a 10-sample baseline first, so allow ~12s before a
+        // dead/covered sensor auto-fails (not skip). Single-shot via the model's `outcome == nil`.
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 12_000_000_000)   // ~12s
+            model.failIfUnresolved()
+        }
     }
 }
 #endif

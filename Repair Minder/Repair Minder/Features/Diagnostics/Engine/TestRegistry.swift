@@ -46,4 +46,10 @@ enum TestRegistry {
         t.append(CallTest())
         return t
     }
+
+    /// Every test the current device actually supports. Selection, the runner, grading, and report
+    /// assembly route through this — unsupported tests are never shown, run, graded, or transmitted.
+    @MainActor static func supportedTests() -> [DiagnosticTest] {
+        allTests().filter { $0.isSupported }
+    }
 }

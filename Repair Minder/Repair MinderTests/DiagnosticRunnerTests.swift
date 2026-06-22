@@ -14,7 +14,7 @@ struct DiagnosticRunnerTests {
         func run() async -> TestOutcome { TestOutcome(id: id, name: name, status: result, details: nil) }
     }
 
-    @Test func runAutoRunsSelectedAndSkipsUnsupported() async {
+    @Test func runAutoRunsSelectedAndDropsUnsupported() async {
         let a = FakeTest(id: "a", name: "A", category: .sensors, isSupported: true, result: .pass)
         let b = FakeTest(id: "b", name: "B", category: .sensors, isSupported: true, result: .pass)
         let c = FakeTest(id: "c", name: "C", category: .sensors, isSupported: false, result: .pass)
@@ -22,7 +22,7 @@ struct DiagnosticRunnerTests {
         runner.select(ids: ["a", "c"])              // c is unsupported, b not selected
         await runner.runAuto()
         #expect(runner.outcome(for: "a")?.status == .pass)
-        #expect(runner.outcome(for: "c")?.status == .skip)   // unsupported -> skip
+        #expect(runner.outcome(for: "c") == nil)             // unsupported -> dropped entirely
         #expect(runner.outcome(for: "b") == nil)             // not selected -> no outcome
     }
 

@@ -22,6 +22,13 @@ struct TestRunnerView: View {
             case .interactive:
                 if let flash {
                     ResultFlashView(outcome: flash)
+                        .task(id: flash.id) {
+                            try? await Task.sleep(nanoseconds: 1_100_000_000)
+                            guard !Task.isCancelled else { return }
+                            self.flash = nil
+                            runner.interactiveIndex += 1
+                            if runner.currentInteractiveTest == nil { runner.phase = .finished }
+                        }
                 } else if let test = runner.currentInteractiveTest,
                           let view = test.makeView(complete: { handleOutcome($0) }) {
                     view.id(test.id)   // force a fresh view per interactive test
@@ -61,17 +68,12 @@ struct TestRunnerView: View {
         runner.phase = (runner.currentInteractiveTest == nil) ? .finished : .interactive
     }
 
-    /// Record an interactive test's outcome, flash it briefly, then advance.
+    /// Record an interactive test's outcome and flash it; the flash view owns the advance timer
+    /// (bound to its lifetime so backing out cancels it cleanly).
     private func handleOutcome(_ outcome: TestOutcome) {
         guard flash == nil else { return }   // ignore extra callbacks during the flash
         runner.record(outcome)
         flash = outcome
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 1_100_000_000)
-            flash = nil
-            runner.interactiveIndex += 1
-            if runner.currentInteractiveTest == nil { runner.phase = .finished }
-        }
     }
 }
 
@@ -89,8 +91,25 @@ private struct PreparingView: View {
                     .font(.headline)
                     .accessibilityIdentifier("runner-running")   // keep stable id so existing UITests still match
 
+                // Determinate "Checking sensors N of M" — N = banner-eligible tests already resolved.
+                let eligible = runner.backgroundEligibleSelected
+                if !eligible.isEmpty {
+                    let done = eligible.filter { runner.outcome(for: $0.id) != nil }.count
+                    VStack(spacing: 6) {
+                        ProgressView(value: Double(done), total: Double(eligible.count))
+                            .progressViewStyle(.linear)
+                            .frame(maxWidth: 220)
+                        Text("Checking sensors \(done) of \(eligible.count)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("preparing-progress")
+                    }
+                }
+
+                // Auto checklist + banner-eligible tests as pending rows (so something animates
+                // during the probe windows instead of a blank wait).
                 VStack(spacing: 10) {
-                    ForEach(runner.autoChecklistTests, id: \.id) { test in
+                    ForEach(rows, id: \.id) { test in
                         HStack(spacing: 12) {
                             let outcome = runner.outcome(for: test.id)
                             Image(systemName: icon(for: outcome))
@@ -112,7 +131,7 @@ private struct PreparingView: View {
                     Text("\(banner.name) passed").font(.subheadline.weight(.semibold))
                 }
                 .padding(.horizontal, 16).padding(.vertical, 10)
-                .background(.ultraThinMaterial, in: Capsule())
+                .rmGlassCapsule()
                 .padding(.top, 8)
                 .transition(.move(edge: .top).combined(with: .opacity))
                 .accessibilityIdentifier("preflight-banner")
@@ -123,15 +142,27 @@ private struct PreparingView: View {
             await runner.runPreflight()
             // Brief beat so completed ticks are visible.
             try? await Task.sleep(nanoseconds: 400_000_000)
-            // Play a 1.5s banner per background pass.
-            for outcome in runner.backgroundPassed {
-                withAnimation { banner = outcome }
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
+            // Capped celebratory banner: show only the FIRST background pass, briefly, then move on.
+            // (Was: a serial 1.65s loop over every pass — up to ~7s of dwell.)
+            if let first = runner.backgroundPassed.first {
+                withAnimation { banner = first }
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
                 withAnimation { banner = nil }
                 try? await Task.sleep(nanoseconds: 150_000_000)
             }
             onDone()
         }
+    }
+
+    /// De-duplicated rows: the auto checklist plus any banner-eligible test not already in it,
+    /// so pre-flighting sensors appear as pending rows during the probe window.
+    private var rows: [DiagnosticTest] {
+        var seen = Set<String>()
+        var out: [DiagnosticTest] = []
+        for t in runner.autoChecklistTests + runner.backgroundEligibleSelected where seen.insert(t.id).inserted {
+            out.append(t)
+        }
+        return out
     }
 
     private func icon(for outcome: TestOutcome?) -> String {
@@ -167,6 +198,8 @@ private struct ResultFlashView: View {
             Text(label).font(.title2.bold())
             Text(outcome.name).font(.subheadline).foregroundStyle(.secondary)
         }
+        .padding(32)
+        .rmGlassCardBackground(cornerRadius: 24, fallbackFill: Color(.secondarySystemGroupedBackground))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemGroupedBackground))
     }

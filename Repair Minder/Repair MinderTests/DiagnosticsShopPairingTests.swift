@@ -68,4 +68,14 @@ struct DiagnosticsShopPairingTests {
         DiagnosticsShopPairing.unpair()
         #expect(!DiagnosticsShopPairing.isPaired)
     }
+
+    @Test func submitEnabledWhenTokenPresentEvenWithBlankCode() {
+        #expect(TransmitGate.canSubmit(codeIsValid: false, hasToken: true))
+    }
+    @Test func submitEnabledWhenCodeValidNoToken() {
+        #expect(TransmitGate.canSubmit(codeIsValid: true, hasToken: false))
+    }
+    @Test func submitDisabledWhenNeither() {
+        #expect(!TransmitGate.canSubmit(codeIsValid: false, hasToken: false))
+    }
 }

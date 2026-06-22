@@ -9,9 +9,44 @@ struct BatteryDrainTests {
         #expect(r.confidence == "low")
     }
     @Test func highConfidenceWhenAboveGranularity() {
-        let r = BatteryDrain.compute(startPct: 80, endPct: 73, elapsedS: 600, granularityPct: 5)
+        // ≥ 2 granularity steps (12% over 600s) is "high"
+        let r = BatteryDrain.compute(startPct: 80, endPct: 68, elapsedS: 600, granularityPct: 5)
         #expect(r.confidence == "high")
     }
+    @Test func highConfidenceRequiresTwoGranularitySteps() {
+        // one 5% step over 600s: now "low" (was "high" before the fix)
+        let oneStep = BatteryDrain.compute(startPct: 80, endPct: 74, elapsedS: 600, granularityPct: 5)
+        #expect(oneStep.confidence == "low")
+        // a 12% drop (≥ 2 * 5%) is "high"
+        let twoSteps = BatteryDrain.compute(startPct: 80, endPct: 68, elapsedS: 600, granularityPct: 5)
+        #expect(twoSteps.confidence == "high")
+    }
+    @Test func zeroElapsedNoDivideByZero() {
+        let r = BatteryDrain.compute(startPct: 80, endPct: 75, elapsedS: 0, granularityPct: 5)
+        #expect(r.drainPctPerHour == 0)
+    }
+    // Charger reconnected mid-run: endPct > startPct -> drop clamps to 0, not a negative "drain".
+    @Test func chargerReconnect_clampsDrainToZero() {
+        let r = BatteryDrain.compute(startPct: 78, endPct: 82, elapsedS: 600, granularityPct: 5)
+        #expect(r.drainPct == 0)
+        #expect(r.drainPctPerHour == 0)
+        #expect(r.confidence == "low")   // 0 drop is never "high" confidence
+    }
+
+    // Zero elapsed time must not divide by zero; per-hour is 0 but the raw drop is preserved.
+    @Test func zeroElapsed_noDivideByZero() {
+        let r = BatteryDrain.compute(startPct: 80, endPct: 75, elapsedS: 0, granularityPct: 5)
+        #expect(r.drainPctPerHour == 0)
+        #expect(r.drainPct == 5)
+    }
+
+    // Equal start/end (no movement) is zero drain, low confidence.
+    @Test func noChange_isZeroDrainLowConfidence() {
+        let r = BatteryDrain.compute(startPct: 80, endPct: 80, elapsedS: 600, granularityPct: 5)
+        #expect(r.drainPct == 0)
+        #expect(r.confidence == "low")
+    }
+
     @Test func snapshotMappingReadsAllFields() {
         let snap = BatterySnapshot(levelPct: 80, state: "unplugged", thermalState: "nominal", lowPowerMode: false)
         let d = BatteryTestDetails.from(snap)

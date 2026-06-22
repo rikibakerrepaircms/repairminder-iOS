@@ -33,12 +33,14 @@ struct TestScaffold<Content: View>: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(fullBleed ? 0 : 16)
 
-            // Action bar — pinned, always visible.
-            HStack(spacing: 12) {
-                DiagnosticActionButton("Skip", color: .gray, id: "test-skip", action: onSkip)
-                DiagnosticActionButton("Fail", color: .red, id: "test-fail", action: onFail)
-                if allowManualPass {
-                    DiagnosticActionButton("Pass", color: .green, id: "test-pass", action: onPass)
+            // Action bar — pinned, always visible. Glass cluster on iOS 26+ (blends as one).
+            RMGlassEffectContainer(spacing: 12) {
+                HStack(spacing: 12) {
+                    DiagnosticActionButton("Skip", color: .gray, id: "test-skip", action: onSkip)
+                    DiagnosticActionButton("Fail", color: .red, id: "test-fail", action: onFail)
+                    if allowManualPass {
+                        DiagnosticActionButton("Pass", color: .green, id: "test-pass", action: onPass)
+                    }
                 }
             }
             .padding(.horizontal, 16).padding(.vertical, 12)
@@ -67,9 +69,12 @@ struct DiagnosticActionButton: View {
 
     var body: some View {
         Button(action: action) {
-            Text(label).font(.headline).frame(maxWidth: .infinity).padding(.vertical, 14)
-                .background(color).foregroundStyle(.white).clipShape(RoundedRectangle(cornerRadius: 12))
+            Text(label)
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
         }
+        .buttonStyle(.rmGlassProminent(tint: color))
         .accessibilityIdentifier(id)
     }
 }

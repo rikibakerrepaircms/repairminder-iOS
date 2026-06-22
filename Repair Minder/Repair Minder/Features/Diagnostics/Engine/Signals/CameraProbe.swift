@@ -51,7 +51,22 @@ final class CameraProbe: NSObject, LuminanceProbe, QRProbe {
             metaOut.metadataObjectTypes = [.qr, .ean13, .code128]
         }
         session.commitConfiguration()
-        queue.async { [session] in session.startRunning() }
+        queue.async { [session, device] in
+            session.startRunning()
+            CameraProbe.lockExposure(device)
+        }
+        #endif
+    }
+
+    /// Lock exposure + gain so luminance samples reflect actual scene light, not the camera's
+    /// auto-exposure compensating a dark frame upward (which false-passes a dead sensor/torch).
+    private nonisolated static func lockExposure(_ device: AVCaptureDevice) {
+        #if targetEnvironment(simulator)
+        return
+        #else
+        guard (try? device.lockForConfiguration()) != nil else { return }
+        if device.isExposureModeSupported(.locked) { device.exposureMode = .locked }
+        device.unlockForConfiguration()
         #endif
     }
 

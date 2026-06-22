@@ -1,6 +1,33 @@
 // Features/Diagnostics/UI/SummaryView.swift
 import SwiftUI
 
+/// Pure visual + textual mapping for a result tile, factored out so it can be unit-tested.
+/// `.partial` is now distinct from `.skip` (orange "exclamationmark" + the word "Partial")
+/// instead of both rendering as grey "minus".
+struct ResultTileAppearance: Equatable {
+    let color: Color
+    let icon: String
+    /// Human/VoiceOver status word.
+    let statusWord: String
+}
+
+enum ResultTilePresentation {
+    static func appearance(for status: TestStatus) -> ResultTileAppearance {
+        switch status {
+        case .pass:    return ResultTileAppearance(color: .green,  icon: "checkmark.circle.fill", statusWord: "Passed")
+        case .fail:    return ResultTileAppearance(color: .red,    icon: "xmark.circle.fill",     statusWord: "Failed")
+        case .error:   return ResultTileAppearance(color: .red,    icon: "xmark.circle.fill",     statusWord: "Error")
+        case .partial: return ResultTileAppearance(color: .orange, icon: "exclamationmark.circle.fill", statusWord: "Partial")
+        case .skip:    return ResultTileAppearance(color: Color(.systemGray), icon: "minus.circle.fill", statusWord: "Skipped")
+        }
+    }
+
+    /// VoiceOver label for a result tile: "<name>: <status>".
+    static func accessibilityLabel(name: String, status: TestStatus) -> String {
+        "\(name): \(appearance(for: status).statusWord)"
+    }
+}
+
 /// Results: colour-coded icon grid with failed tiles grouped at top.
 /// Every tile is tappable to retest — pass, fail, or skip alike.
 struct SummaryView: View {
@@ -9,9 +36,10 @@ struct SummaryView: View {
     @State private var retestTest: RetestBox?
     @State private var isGeneratingPDF = false
     @State private var autoSend: AutoSend = .idle
+    @Namespace private var resultGlass
 
     /// Auto-send state for a shop-paired device (idle until the run is sent on appear / retest).
-    enum AutoSend: Equatable { case idle, sending, sent, failed }
+    enum AutoSend: Equatable { case idle, sending, sent, failed, unlinked }
 
     /// Identifiable wrapper so we can drive a sheet with the chosen interactive test.
     struct RetestBox: Identifiable { let id: String; let test: any DiagnosticTest }
@@ -32,41 +60,44 @@ struct SummaryView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
-                // Header card — grade + overall label + counts
-                gradeHeaderCard
+            RMGlassEffectContainer(spacing: 12) {
+                VStack(spacing: 20) {
+                    // Header card — grade + overall label + counts
+                    gradeHeaderCard
 
-                // Failed / error section (red) — always first
-                if !failedOutcomes.isEmpty {
-                    gridSection(
-                        title: "Failed",
-                        titleColor: .red,
-                        outcomes: failedOutcomes
-                    )
-                }
+                    // Failed / error section (red) — always first
+                    if !failedOutcomes.isEmpty {
+                        gridSection(
+                            title: "Failed",
+                            titleColor: .red,
+                            outcomes: failedOutcomes
+                        )
+                    }
 
-                // Skipped section (grey)
-                if !skippedOutcomes.isEmpty {
-                    gridSection(
-                        title: "Skipped",
-                        titleColor: .secondary,
-                        outcomes: skippedOutcomes
-                    )
-                }
+                    // Skipped section (grey)
+                    if !skippedOutcomes.isEmpty {
+                        gridSection(
+                            title: "Skipped",
+                            titleColor: .secondary,
+                            outcomes: skippedOutcomes
+                        )
+                    }
 
-                // Passed section (green)
-                if !passedOutcomes.isEmpty {
-                    gridSection(
-                        title: "Passed",
-                        titleColor: .green,
-                        outcomes: passedOutcomes
-                    )
+                    // Passed section (green)
+                    if !passedOutcomes.isEmpty {
+                        gridSection(
+                            title: "Passed",
+                            titleColor: .green,
+                            outcomes: passedOutcomes
+                        )
+                    }
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
         .background(Color(.systemGroupedBackground))
+        .rmSoftTopScrollEdge()
         .navigationTitle("Summary")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -104,9 +135,10 @@ struct SummaryView: View {
                     .font(.subheadline.weight(.medium))
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(autoSendColor.opacity(0.15))
                     .foregroundStyle(autoSendColor)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .rmGlassTintedCard(cornerRadius: 12,
+                                       tint: autoSendColor.opacity(0.3),
+                                       fallbackFill: autoSendColor.opacity(0.15))
             }
             .padding()
             .background(.ultraThinMaterial)
@@ -116,11 +148,9 @@ struct SummaryView: View {
                 Text("Send results")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.accentColor)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
             }
+            .controlSize(.large)
+            .buttonStyle(.rmGlassProminent())
             .padding()
             .background(.ultraThinMaterial)
             .accessibilityIdentifier("send-results")
@@ -130,7 +160,7 @@ struct SummaryView: View {
     private var autoSendColor: Color {
         switch autoSend {
         case .sent: return .green
-        case .failed: return .orange
+        case .failed, .unlinked: return .orange
         default: return .accentColor
         }
     }
@@ -144,6 +174,8 @@ struct SummaryView: View {
             Label("Sent to your shop", systemImage: "checkmark.circle.fill")
         case .failed:
             Label("Saved on device — will sync when connected", systemImage: "exclamationmark.triangle.fill")
+        case .unlinked:
+            Label("This device is no longer linked to a shop", systemImage: "link.badge.minus")
         }
     }
 
@@ -172,6 +204,7 @@ struct SummaryView: View {
         let service = makeService()
         let outcomes = runner.orderedOutcomes
         let reportID = runner.reportID
+        let overall = runner.overallResult
         let desc = deviceDescription
         let code = DiagnosticsShopPairing.shopCode       // one of these is set (token preferred)
         let token = DiagnosticsShopPairing.token
@@ -179,13 +212,20 @@ struct SummaryView: View {
             do {
                 let companyName = try await service.transmit(
                     shopCode: code, pairingToken: token, platform: "ios", imei: nil, serial: nil,
-                    deviceDescription: desc, reportID: reportID, outcomes: outcomes)
+                    deviceDescription: desc, reportID: reportID, overallResult: overall, outcomes: outcomes)
                 DiagnosticsShopPairing.setName(companyName)   // refresh "Welcome back …" name from server
                 autoSend = .sent
             } catch {
-                DiagnosticsBuffer.save(shopCode: code, pairingToken: token, deviceDescription: desc,
-                                       imei: nil, serial: nil, reportID: reportID, outcomes: outcomes)
-                autoSend = .failed
+                switch DiagnosticsTransmitOutcome.classify(error, wasTokenPairing: token != nil) {
+                case .revokedPairing:
+                    DiagnosticsShopPairing.unpair()   // device no longer linked — stop auto-sending
+                    autoSend = .unlinked
+                case .transient:
+                    DiagnosticsBuffer.save(shopCode: code, pairingToken: token, deviceDescription: desc,
+                                           imei: nil, serial: nil, reportID: reportID,
+                                           overallResult: overall, outcomes: outcomes)
+                    autoSend = .failed
+                }
             }
         }
     }
@@ -215,9 +255,7 @@ struct SummaryView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
         .padding(.horizontal, 16)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
+        .rmGlassCardBackground(cornerRadius: 12, fallbackFill: Color(.systemBackground))
     }
 
     @ViewBuilder
@@ -260,7 +298,9 @@ struct SummaryView: View {
 
     @ViewBuilder
     private func resultTile(_ outcome: TestOutcome) -> some View {
-        let (tileColor, badgeIcon) = tileAppearance(for: outcome.status)
+        let appearance = ResultTilePresentation.appearance(for: outcome.status)
+        let tileColor = appearance.color
+        let badgeIcon = appearance.icon
 
         Button {
             retest(outcome)
@@ -283,7 +323,7 @@ struct SummaryView: View {
                         .font(.caption)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.primary)
-                        .lineLimit(2)
+                        .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity)
@@ -298,24 +338,22 @@ struct SummaryView: View {
                     .padding(6)
             }
             .frame(minHeight: 96)
-            .background(tileColor.opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .rmGlassTintedCard(
+                cornerRadius: 14,
+                tint: tileColor.opacity(0.35),
+                fallbackFill: tileColor.opacity(0.12)
+            )
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
                     .strokeBorder(tileColor.opacity(0.25), lineWidth: 1)
             )
+            .modifier(ResultTileGlassID(id: outcome.id, namespace: resultGlass))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("retest-\(outcome.id)")
-    }
-
-    /// Returns (tint colour, badge SF symbol) for a given status.
-    private func tileAppearance(for status: TestStatus) -> (Color, String) {
-        switch status {
-        case .pass:           return (.green,  "checkmark.circle.fill")
-        case .fail, .error:   return (.red,    "xmark.circle.fill")
-        case .skip, .partial: return (Color(.systemGray), "minus.circle.fill")
-        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(ResultTilePresentation.accessibilityLabel(name: outcome.name, status: outcome.status))
+        .accessibilityHint("Double tap to retest")
     }
 
     // MARK: - Share PDF
@@ -355,6 +393,21 @@ struct SummaryView: View {
             view
         } else {
             Color.clear.onAppear { retestTest = nil }
+        }
+    }
+}
+
+/// Stable glass identity so a result tile morphs when it moves between sections on retest
+/// (e.g. Failed → Passed). No-op below iOS 26.
+private struct ResultTileGlassID: ViewModifier {
+    let id: String
+    let namespace: Namespace.ID
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26, macOS 26, *) {
+            content.glassEffectID(id, in: namespace)
+        } else {
+            content
         }
     }
 }

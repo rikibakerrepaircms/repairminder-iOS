@@ -3,9 +3,17 @@ import Foundation
 // MARK: - Pure gate functions (unit-tested without hardware)
 
 enum LightGate {
-    static func passes(baseline: Double, peak: Double, thresholdPct: Double) -> Bool {
-        guard baseline > 0 else { return false }
-        return (peak - baseline) / baseline * 100.0 >= thresholdPct
+    /// Minimum baseline luminance (0–255) we trust as a real read. Below this the camera is
+    /// effectively dark (covered / dead) and no relative jump should count as a pass.
+    static let baselineFloor: Double = 3.0
+
+    /// Passes only when BOTH a relative jump (≥ thresholdPct of baseline) AND an absolute jump
+    /// (≥ minAbsoluteDelta in luminance units) occur, and the baseline is above the trust floor.
+    static func passes(baseline: Double, peak: Double, thresholdPct: Double, minAbsoluteDelta: Double) -> Bool {
+        guard baseline >= baselineFloor else { return false }
+        let absoluteDelta = peak - baseline
+        guard absoluteDelta >= minAbsoluteDelta else { return false }
+        return absoluteDelta / baseline * 100.0 >= thresholdPct
     }
 }
 
@@ -55,6 +63,8 @@ enum AudioRoute: String, Sendable { case speaker, receiver }
 
 /// Reports resting + peak magnitude of user acceleration (g) over a short window.
 protocol AccelProbe: Sendable {
+    /// Average resting deviation from gravity (g) over the window — sample this BEFORE any stimulus.
+    @MainActor func sampleBaseline(windowMs: Int, completion: @escaping (_ resting: Double) -> Void)
     @MainActor func samplePeak(windowMs: Int, completion: @escaping (_ resting: Double, _ peak: Double) -> Void)
 }
 

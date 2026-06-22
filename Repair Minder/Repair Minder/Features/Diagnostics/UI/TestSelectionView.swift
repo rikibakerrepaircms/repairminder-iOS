@@ -71,6 +71,7 @@ struct TestSelectionView: View {
             .padding(.vertical, 12)
         }
         .background(Color(.systemGroupedBackground))
+        .rmSoftTopScrollEdge()
         .onAppear {
             if supportedIds.isEmpty {
                 supportedIds = Set(runner.tests.filter { $0.isSupported }.map(\.id))
@@ -100,11 +101,9 @@ struct TestSelectionView: View {
                 Text(startLabel)
                     .font(.headline)
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(runner.selectedIds.isEmpty ? Color.gray : Color.accentColor)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
             }
+            .controlSize(.large)
+            .buttonStyle(.rmGlassProminent(tint: runner.selectedIds.isEmpty ? .gray : .accentColor))
             .disabled(runner.selectedIds.isEmpty)
             .padding()
             .background(.ultraThinMaterial)
@@ -134,8 +133,9 @@ struct TestSelectionView: View {
         }
         .padding()
         .frame(maxWidth: .infinity)
-        .background(Color.accentColor.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .rmGlassTintedCard(cornerRadius: 14,
+                           tint: Color.accentColor.opacity(0.25),
+                           fallbackFill: Color.accentColor.opacity(0.1))
         .accessibilityIdentifier("welcome-shop")
     }
 
@@ -186,14 +186,15 @@ struct TestSelectionView: View {
                     Text(test.name)
                         .font(.caption)
                         .multilineTextAlignment(.center)
-                        .lineLimit(2)
+                        .lineLimit(3)
                         .foregroundStyle(isSelected ? .white : .primary)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 96)
-                .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(isSelected ? Color.accentColor : Color(.systemGray6))
+                .frame(minHeight: 96)
+                .rmGlassTintedCard(
+                    cornerRadius: 14,
+                    tint: isSelected ? Color.accentColor.opacity(0.6) : Color(.systemGray4).opacity(0.4),
+                    fallbackFill: isSelected ? Color.accentColor : Color(.systemGray6)
                 )
 
                 if isSelected {

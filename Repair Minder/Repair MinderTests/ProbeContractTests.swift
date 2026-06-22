@@ -3,8 +3,8 @@ import Testing
 
 struct ProbeContractTests {
     @Test func luminanceDeltaPasses() {
-        #expect(LightGate.passes(baseline: 100, peak: 130, thresholdPct: 25) == true)
-        #expect(LightGate.passes(baseline: 100, peak: 120, thresholdPct: 25) == false)
+        #expect(LightGate.passes(baseline: 100, peak: 130, thresholdPct: 25, minAbsoluteDelta: 30) == true)
+        #expect(LightGate.passes(baseline: 100, peak: 120, thresholdPct: 25, minAbsoluteDelta: 30) == false)
     }
     @Test func accelSpikePasses() {
         #expect(VibrationGate.spiked(restingNoise: 0.02, peak: 0.5, minDelta: 0.15) == true)

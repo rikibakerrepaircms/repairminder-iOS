@@ -5,6 +5,12 @@ import SwiftUI
 /// Hybrid C: POST when online; on failure the results are buffered on-device for the
 /// Bridge to pull later. (iOS apps cannot read IMEI/serial, so the self-service path
 /// sends device_description only; device matching happens server-side when possible.)
+/// Submit is allowed when the user typed a valid shop code OR the device already holds a
+/// server-issued pairing token (a token-paired device needs no code). Extracted for testing.
+enum TransmitGate {
+    static func canSubmit(codeIsValid: Bool, hasToken: Bool) -> Bool { codeIsValid || hasToken }
+}
+
 struct TransmitView: View {
     @ObservedObject private var runner: DiagnosticRunner
     private let service: DiagnosticsService
@@ -13,7 +19,7 @@ struct TransmitView: View {
     @State private var phase: Phase = .idle
     @State private var isGeneratingPDF = false
 
-    enum Phase: Equatable { case idle, sending, success, failed }
+    enum Phase: Equatable { case idle, sending, success, failed, unlinked }
 
     init(runner: DiagnosticRunner) {
         _runner = ObservedObject(wrappedValue: runner)
@@ -40,6 +46,9 @@ struct TransmitView: View {
     }
 
     private var codeIsValid: Bool { shopCode.count == 6 && shopCode.allSatisfy(\.isNumber) }
+
+    private var hasToken: Bool { DiagnosticsShopPairing.token != nil }
+    private var canSubmit: Bool { TransmitGate.canSubmit(codeIsValid: codeIsValid, hasToken: hasToken) }
 
     var body: some View {
         Form {
@@ -84,6 +93,11 @@ struct TransmitView: View {
                       systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
                     .accessibilityIdentifier("transmit-buffered")
+            case .unlinked:
+                Label("This device is no longer linked to a shop. Enter a shop code to send.",
+                      systemImage: "link.badge.minus")
+                    .foregroundStyle(.orange)
+                    .accessibilityIdentifier("transmit-unlinked")
             }
         }
         .navigationTitle("Send Results")
@@ -114,12 +128,10 @@ struct TransmitView: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .padding()
-                .background(codeIsValid ? Color.accentColor : Color.gray)
-                .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
             }
-            .disabled(!codeIsValid || phase == .sending || phase == .success)
+            .controlSize(.large)
+            .buttonStyle(.rmGlassProminent(tint: canSubmit ? .accentColor : .gray))
+            .disabled(!canSubmit || phase == .sending || phase == .success)
             .padding()
             .accessibilityIdentifier("submit-results")
         }
@@ -127,21 +139,38 @@ struct TransmitView: View {
 
     private func submit() {
         phase = .sending
+        let token = DiagnosticsShopPairing.token
+        let code = shopCode
+        let overall = runner.overallResult
         Task {
             do {
                 let companyName = try await service.transmit(
-                    shopCode: shopCode, platform: "ios", imei: nil, serial: nil,
-                    deviceDescription: deviceDescription, reportID: runner.reportID,
+                    shopCode: codeIsValid ? code : nil, pairingToken: token, platform: "ios",
+                    imei: nil, serial: nil, deviceDescription: deviceDescription,
+                    reportID: runner.reportID, overallResult: runner.overallResult,
                     outcomes: runner.orderedOutcomes)
-                // Pair this device to the shop (or forget) per the toggle, so future runs auto-send.
-                // The company name (for "Welcome back …") comes from the server response.
-                if remember { DiagnosticsShopPairing.pair(shopCode, name: companyName) } else { DiagnosticsShopPairing.unpair() }
+                // Persist pairing per the toggle. Only a freshly-typed valid code re-pairs by code;
+                // a token pairing is preserved (do NOT downgrade it to a shop code). If the user
+                // turned "remember" off, forget entirely.
+                if remember {
+                    if codeIsValid { DiagnosticsShopPairing.pair(code, name: companyName) }
+                    else { DiagnosticsShopPairing.setName(companyName) }   // keep existing token pairing
+                } else {
+                    DiagnosticsShopPairing.unpair()
+                }
                 phase = .success
             } catch {
-                DiagnosticsBuffer.save(shopCode: shopCode, deviceDescription: deviceDescription,
-                                       imei: nil, serial: nil, reportID: runner.reportID,
-                                       outcomes: runner.orderedOutcomes)
-                phase = .failed
+                let wasToken = token != nil && !codeIsValid
+                switch DiagnosticsTransmitOutcome.classify(error, wasTokenPairing: wasToken) {
+                case .revokedPairing:
+                    DiagnosticsShopPairing.unpair(); remember = false; phase = .unlinked
+                case .transient:
+                    DiagnosticsBuffer.save(shopCode: codeIsValid ? code : nil, pairingToken: token,
+                                           deviceDescription: deviceDescription, imei: nil, serial: nil,
+                                           reportID: runner.reportID, overallResult: overall,
+                                           outcomes: runner.orderedOutcomes)
+                    phase = .failed
+                }
             }
         }
     }
