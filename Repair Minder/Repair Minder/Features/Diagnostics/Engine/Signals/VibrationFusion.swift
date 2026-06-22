@@ -51,4 +51,12 @@ enum VibrationFusion {
                        micThreshold: Double = 0.4, magThreshold: Double = 0.4) -> Bool {
         micScore >= micThreshold && magScore >= magThreshold
     }
+
+    /// Stillness veto: a cycle only counts if the phone was resting still. A genuine buzz barely
+    /// moves user-acceleration (~0.05 g); shaking/handling spikes it. Disqualifying moving cycles is
+    /// the real anti-spoof — it stops "shake the phone" from faking the mic/mag correlation.
+    /// `motionLevel` is the mean user-acceleration magnitude (g) over the cycle. Tunable.
+    static func isStill(motionLevel: Double, threshold: Double = 0.08) -> Bool {
+        motionLevel < threshold
+    }
 }

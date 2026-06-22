@@ -420,12 +420,14 @@ enum VibrationPhase { case idle, running, resolved }
     @Published var autoFailed = false
     @Published var micScore: Double = 0
     @Published var magScore: Double = 0
+    /// True when the most recent cycle was disqualified because the phone was being moved/shaken.
+    @Published var moved = false
     private var hapticEngine: CHHapticEngine?
     /// Retained for the lifetime of playback — a local player is released when playCode returns,
     /// which silently stops the haptic before it's felt (the "no vibration at all" bug).
     private var hapticPlayer: CHHapticPatternPlayer?
     private let micProbe = MicBandEnergyProbe()
-    private let magProbe = MagnetometerEnvelopeProbe()
+    private let motionProbe = DeviceMotionProbe()
     private let log = Logger(subsystem: "com.repairminder.diagnostics", category: "vibration")
 
     func run() async {
@@ -437,8 +439,12 @@ enum VibrationPhase { case idle, running, resolved }
         let startTime = CACurrentMediaTime()
         var micSamples: [(t: Double, v: Double)] = []
         var magSamples: [(t: Double, v: Double)] = []
+        var motionSamples: [(t: Double, v: Double)] = []
         micProbe.start(startTime: startTime) { t, v in micSamples.append((t, v)) }
-        magProbe.start(startTime: startTime) { t, v in magSamples.append((t, v)) }
+        motionProbe.start(startTime: startTime) { t, magDev, motion in
+            magSamples.append((t, magDev))
+            motionSamples.append((t, motion))
+        }
 
         // Let the magnetometer baseline settle before the first coded buzz.
         try? await Task.sleep(nanoseconds: 500_000_000)
@@ -449,11 +455,16 @@ enum VibrationPhase { case idle, running, resolved }
         let maxCycles = 10
         var bestMic = -Double.greatestFiniteMagnitude
         var bestMag = -Double.greatestFiniteMagnitude
+        // Require TWO matching cycles (each with its own random code) to pass — a single lucky noise
+        // alignment can't qualify, but a real motor clears both channels repeatedly.
+        let requiredMatches = 2
+        var matches = 0
         var passed = false
 
         for cycle in 0..<maxCycles {
             micSamples.removeAll()
             magSamples.removeAll()
+            motionSamples.removeAll()
             let cycleStart = CACurrentMediaTime() - startTime   // elapsed at this cycle's code start
 
             let code = VibrationCode.random { Double.random(in: 0..<1) }
@@ -468,6 +479,13 @@ enum VibrationPhase { case idle, running, resolved }
             let magAligned = magSamples.compactMap { s -> (t: Double, v: Double)? in
                 let t = s.t - cycleStart; return t >= 0 ? (t, s.v) : nil
             }
+            // Gross-motion samples over the cycle → mean user-acceleration = how much the phone moved.
+            let motionAligned = motionSamples.compactMap { s -> Double? in
+                let t = s.t - cycleStart; return t >= 0 ? s.v : nil
+            }
+            let motionLevel = motionAligned.isEmpty ? 0 : motionAligned.reduce(0, +) / Double(motionAligned.count)
+            let still = VibrationFusion.isStill(motionLevel: motionLevel)
+
             let micEnergies = VibrationFusion.slotEnergies(samples: micAligned, slotS: code.slotS, slotCount: code.slots.count)
             let magEnergies = VibrationFusion.slotEnergies(samples: magAligned, slotS: code.slotS, slotCount: code.slots.count)
             let mScore = VibrationFusion.score(slotEnergies: micEnergies, code: code)
@@ -476,23 +494,31 @@ enum VibrationPhase { case idle, running, resolved }
             bestMag = max(bestMag, gScore)
             self.micScore = mScore
             self.magScore = gScore
-            log.info("vibration cycle=\(cycle, privacy: .public) mic=\(mScore, format: .fixed(precision: 3), privacy: .public) mag=\(gScore, format: .fixed(precision: 3), privacy: .public) code=\(code.slots.map { $0 ? "1" : "0" }.joined(), privacy: .public)")
+            self.moved = !still
+            log.info("vibration cycle=\(cycle, privacy: .public) mic=\(mScore, format: .fixed(precision: 3), privacy: .public) mag=\(gScore, format: .fixed(precision: 3), privacy: .public) motion=\(motionLevel, format: .fixed(precision: 3), privacy: .public) still=\(still, privacy: .public) code=\(code.slots.map { $0 ? "1" : "0" }.joined(), privacy: .public)")
 
-            if VibrationFusion.passes(micScore: mScore, magScore: gScore) {
-                passed = true
-                outcome = diagnosticOutcome("vibration", "Vibration", .pass,
-                                            ["verified": "mic+magnetometer",
-                                             "mic_score": String(format: "%.2f", mScore),
-                                             "mag_score": String(format: "%.2f", gScore),
-                                             "cycles": String(cycle + 1)])
-                break
+            // A cycle only counts when the phone was STILL (shaking/handling is disqualified — the
+            // anti-spoof) AND both channels correlate with the coded buzz.
+            if still, VibrationFusion.passes(micScore: mScore, magScore: gScore) {
+                matches += 1
+                if matches >= requiredMatches {
+                    passed = true
+                    outcome = diagnosticOutcome("vibration", "Vibration", .pass,
+                                                ["verified": "mic+magnetometer",
+                                                 "mic_score": String(format: "%.2f", mScore),
+                                                 "mag_score": String(format: "%.2f", gScore),
+                                                 "motion": String(format: "%.2f", motionLevel),
+                                                 "cycles": String(cycle + 1),
+                                                 "matches": String(matches)])
+                    break
+                }
             }
             // Brief OFF gap between cycles so they don't bleed together.
             if cycle < maxCycles - 1 { try? await Task.sleep(nanoseconds: 400_000_000) }
         }
 
         micProbe.stop()
-        magProbe.stop()
+        motionProbe.stop()
 
         if !passed {
             self.micScore = bestMic.isFinite ? bestMic : 0
@@ -568,6 +594,12 @@ private struct VibrationTestView: View {
                     EmptyView()
                 case .running:
                     ProgressView("Checking vibration…")
+                    if model.moved {
+                        Label("Keep the device flat and still — don’t hold or shake it.",
+                              systemImage: "hand.raised.slash")
+                            .font(.caption).foregroundStyle(.orange)
+                            .multilineTextAlignment(.center).padding(.horizontal)
+                    }
                 case .resolved:
                     if model.autoFailed {
                         Text("Couldn’t confirm the vibration automatically. If you felt it vibrate, tap Pass; if not, tap Fail.")

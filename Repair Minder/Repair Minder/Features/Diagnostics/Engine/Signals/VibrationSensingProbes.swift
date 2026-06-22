@@ -97,57 +97,57 @@ final class MicBandEnergyProbe {
     }
 }
 
-/// Streams magnetometer deviation samples relative to a start time.
-/// Establishes a baseline over the first ~0.4 s, then emits magnitude-of-deviation.
+/// Streams device-motion samples relative to a start time, from a SINGLE CMMotionManager (Apple's
+/// guidance). Emits, per sample, (elapsed, magneticFieldDeviation, userAccelMagnitude):
+///  - magneticFieldDeviation: ‖calibrated field − baseline‖ — the channel that correlates with the
+///    actuator coil during the coded buzz.
+///  - userAccelMagnitude: ‖user acceleration‖ (gravity removed) — gross motion, used as a STILLNESS
+///    veto. A genuine buzz barely moves it (~0.05 g); shaking/handling spikes it, disqualifying the
+///    cycle so a moving phone can't fake a pass.
 @MainActor
-final class MagnetometerEnvelopeProbe {
+final class DeviceMotionProbe {
     private let motionManager = CMMotionManager()
-    private var onSample: ((Double, Double) -> Void)?
+    private var onSample: ((_ t: Double, _ magDeviation: Double, _ motion: Double) -> Void)?
     private var startTime: Double = 0
-    private var baselineSamples: [(x: Double, y: Double, z: Double)] = []
-    private var baselineX: Double = 0
-    private var baselineY: Double = 0
-    private var baselineZ: Double = 0
+    private var baseline: [(x: Double, y: Double, z: Double)] = []
+    private var baseX: Double = 0, baseY: Double = 0, baseZ: Double = 0
     private var baselineSettled = false
     private let baselineDuration: Double = 0.4
 
-    func start(startTime: Double, onSample: @escaping (Double, Double) -> Void) {
+    func start(startTime: Double, onSample: @escaping (Double, Double, Double) -> Void) {
         #if targetEnvironment(simulator)
         return
         #else
         self.startTime = startTime
         self.onSample = onSample
-        baselineSamples = []
+        baseline = []
         baselineSettled = false
 
-        guard motionManager.isMagnetometerAvailable else { return }
-        motionManager.magnetometerUpdateInterval = 1.0 / 100.0
+        guard motionManager.isDeviceMotionAvailable else { return }
+        motionManager.deviceMotionUpdateInterval = 1.0 / 100.0
 
         let queue = OperationQueue()
-        motionManager.startMagnetometerUpdates(to: queue) { [weak self] data, _ in
-            guard let self, let data else { return }
+        motionManager.startDeviceMotionUpdates(to: queue) { [weak self] motion, _ in
+            guard let self, let m = motion else { return }
             let elapsed = CACurrentMediaTime() - startTime
-            let x = data.magneticField.x
-            let y = data.magneticField.y
-            let z = data.magneticField.z
+            let f = m.magneticField.field          // calibrated magnetic field (x,y,z)
+            let ua = m.userAcceleration            // gravity removed (g)
+            let motionMag = sqrt(ua.x*ua.x + ua.y*ua.y + ua.z*ua.z)
 
             Task { @MainActor in
                 if !self.baselineSettled {
-                    self.baselineSamples.append((x, y, z))
+                    self.baseline.append((f.x, f.y, f.z))
                     if elapsed >= self.baselineDuration {
-                        // Compute baseline mean
-                        let n = Double(self.baselineSamples.count)
-                        self.baselineX = self.baselineSamples.map { $0.x }.reduce(0, +) / n
-                        self.baselineY = self.baselineSamples.map { $0.y }.reduce(0, +) / n
-                        self.baselineZ = self.baselineSamples.map { $0.z }.reduce(0, +) / n
+                        let n = Double(self.baseline.count)
+                        self.baseX = self.baseline.map { $0.x }.reduce(0, +) / n
+                        self.baseY = self.baseline.map { $0.y }.reduce(0, +) / n
+                        self.baseZ = self.baseline.map { $0.z }.reduce(0, +) / n
                         self.baselineSettled = true
                     }
                 } else {
-                    let dx = x - self.baselineX
-                    let dy = y - self.baselineY
-                    let dz = z - self.baselineZ
-                    let magnitude = sqrt(dx*dx + dy*dy + dz*dz)
-                    self.onSample?(elapsed, magnitude)
+                    let dx = f.x - self.baseX, dy = f.y - self.baseY, dz = f.z - self.baseZ
+                    let magDeviation = sqrt(dx*dx + dy*dy + dz*dz)
+                    self.onSample?(elapsed, magDeviation, motionMag)
                 }
             }
         }
@@ -158,7 +158,7 @@ final class MagnetometerEnvelopeProbe {
         #if targetEnvironment(simulator)
         return
         #else
-        motionManager.stopMagnetometerUpdates()
+        motionManager.stopDeviceMotionUpdates()
         #endif
     }
 }

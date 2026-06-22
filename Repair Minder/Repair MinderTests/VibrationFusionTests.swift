@@ -31,4 +31,12 @@ struct VibrationFusionTests {
         #expect(!VibrationFusion.passes(micScore: 0.31, magScore: 1.30))  // mic 0.31<0.4 → no pass
         #expect(!VibrationFusion.passes(micScore: -0.2, magScore: -0.14)) // both fail
     }
+
+    // Stillness veto: a resting phone (buzz ~0.05g) is still; a shaken phone (>0.08g) is not.
+    @Test func stillnessVetoRejectsMotion() {
+        #expect(VibrationFusion.isStill(motionLevel: 0.02))   // at rest
+        #expect(VibrationFusion.isStill(motionLevel: 0.05))   // genuine buzz, phone resting
+        #expect(!VibrationFusion.isStill(motionLevel: 0.30))  // shaking/handling → disqualified
+        #expect(!VibrationFusion.isStill(motionLevel: 0.08))  // at the threshold → not still
+    }
 }
