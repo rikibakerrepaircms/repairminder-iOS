@@ -31,6 +31,14 @@ struct MicrophoneTest: DiagnosticTest {
     #endif
 }
 
+/// Speaker result: both the loudspeaker and the earpiece must be heard by the mic.
+enum SpeakerOutcome {
+    static func result(loudPass: Bool, earPass: Bool) -> (status: TestStatus, details: [String: String]) {
+        ((loudPass && earPass) ? .pass : .fail,
+         ["loud": loudPass ? "pass" : "fail", "ear": earPass ? "pass" : "fail"])
+    }
+}
+
 struct HeadphonesTest: DiagnosticTest {
     let id = "headphones"; let name = "Headphones"; let category: TestCategory = .audio
     let requiresInteraction = true
@@ -50,18 +58,30 @@ struct HeadphonesTest: DiagnosticTest {
     private let probe: LoopbackProbe
     @Published var outcome: TestOutcome?
     @Published var phase = ""
+    @Published var loudState: TileState = .pending
+    @Published var earState: TileState = .pending
+    enum TileState { case pending, testing, pass, fail }
     private var cancelled = false
     init(probe: LoopbackProbe) { self.probe = probe }
 
     func run() async {
         phase = "Testing loudspeaker…"
-        let loud = await measure(.speaker)
+        loudState = .testing
+        let loud = await measure(.speaker, durationMs: 800)
         guard !cancelled else { return }
         let loudPass = LoopbackGate.heard(levelDb: loud, thresholdDb: -20)
-        // Earpiece (receiver) loopback isn't reliably audible to the bottom mic, so it can't be
-        // certified here — we report only the loudspeaker result rather than a misleading "ear" value.
-        let details = ["loud": loudPass ? "pass" : "fail"]
-        outcome = diagnosticOutcome("speaker", "Speaker", loudPass ? .pass : .fail, details)
+        loudState = loudPass ? .pass : .fail
+
+        phase = "Testing earpiece — keep quiet and still…"
+        earState = .testing
+        // The receiver is quiet, so give it a longer window and a more sensitive threshold.
+        let ear = await measure(.receiver, durationMs: 1500)
+        guard !cancelled else { return }
+        let earPass = LoopbackGate.heard(levelDb: ear, thresholdDb: -38)
+        earState = earPass ? .pass : .fail
+
+        let (status, details) = SpeakerOutcome.result(loudPass: loudPass, earPass: earPass)
+        outcome = diagnosticOutcome("speaker", "Speaker", status, details)
     }
 
     func cancel() {
@@ -75,12 +95,16 @@ struct HeadphonesTest: DiagnosticTest {
     func failIfUnresolved() {
         guard !cancelled, outcome == nil else { return }
         probe.stop()
-        outcome = diagnosticOutcome("speaker", "Speaker", .fail, ["reason": "no_speaker_signal"])
+        // Record what we'd already established before the hang (e.g. loudspeaker may have passed)
+        // rather than blanket-failing both fields, so the report matches the visible tiles.
+        let loud = loudState == .pass ? "pass" : "fail"
+        let ear = earState == .pass ? "pass" : "fail"
+        outcome = diagnosticOutcome("speaker", "Speaker", .fail, ["reason": "no_speaker_signal", "loud": loud, "ear": ear])
     }
 
-    private func measure(_ route: AudioRoute) async -> Double {
+    private func measure(_ route: AudioRoute, durationMs: Int) async -> Double {
         await withCheckedContinuation { (cont: CheckedContinuation<Double, Never>) in
-            probe.run(route: route, durationMs: 800) { level in cont.resume(returning: level) }
+            probe.run(route: route, durationMs: durationMs) { level in cont.resume(returning: level) }
         }
     }
 }
@@ -92,23 +116,22 @@ private struct SpeakerTestView: View {
     var body: some View {
         TestScaffold(
             title: "Speaker",
-            instruction: "Hold the device still and keep quiet. The loudspeaker is tested automatically via the microphone.",
+            instruction: "Keep quiet and hold still. The loudspeaker then the earpiece are each tested automatically through the microphone.",
             hints: ["Ensure the volume is not muted"],
             allowManualPass: false,
             onPass: {},
             onFail: { model.cancel(); complete(diagnosticOutcome("speaker", "Speaker", .fail)) },
             onSkip: { model.cancel(); complete(diagnosticOutcome("speaker", "Speaker", .skip)) }
         ) {
-            VStack(spacing: 12) {
-                Image(systemName: "speaker.wave.3.fill").font(.system(size: 44)).foregroundStyle(Color.accentColor)
-                if !model.phase.isEmpty { ProgressView(model.phase) }
+            VStack(spacing: 16) {
+                speakerTile(icon: "speaker.wave.3.fill", title: "Loudspeaker", state: model.loudState)
+                speakerTile(icon: "phone.fill", title: "Earpiece", state: model.earState)
+                if !model.phase.isEmpty { Text(model.phase).font(.caption).foregroundStyle(.secondary) }
             }
             .task { await model.run() }
             .onAppear {
-                // Bounded watchdog: both routes measure ~800ms each (~1.6s); allow ~10s before a
-                // hung probe auto-fails (not skip). Single-shot via the model's own guards.
                 Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 10_000_000_000)   // ~10s
+                    try? await Task.sleep(nanoseconds: 12_000_000_000)   // ~12s watchdog
                     model.failIfUnresolved()
                 }
             }
@@ -116,6 +139,21 @@ private struct SpeakerTestView: View {
                 if let o = model.outcome { complete(o) }
             }
         }
+    }
+
+    private func speakerTile(icon: String, title: String, state: SpeakerViewModel.TileState) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon).font(.title2).foregroundStyle(Color.accentColor)
+            Text(title).font(.headline)
+            Spacer()
+            switch state {
+            case .pending: Image(systemName: "circle").foregroundStyle(.secondary)
+            case .testing: ProgressView()
+            case .pass: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+            case .fail: Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
+            }
+        }
+        .padding(12).background(Color.platformGray6).clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
