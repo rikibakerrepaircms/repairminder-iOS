@@ -150,12 +150,10 @@ struct CustomerReplyRequest: Encodable {
 }
 
 /// Response from POST /api/customer/orders/:orderId/reply
+/// Both fields are optional strings — the response is discarded by the caller,
+/// so no Date parsing is needed (and avoids `.iso8601` failure on fractional-
+/// second timestamps on iOS 17.6–25 where swift-foundation is not present).
 struct CustomerReplyResponse: Decodable {
-    let messageId: String
-    let createdAt: Date
-
-    enum CodingKeys: String, CodingKey {
-        case messageId = "message_id"
-        case createdAt = "created_at"
-    }
+    let messageId: String?
+    let createdAt: String?
 }
