@@ -321,13 +321,15 @@ struct ScannerView: View {
                 }
                 .buttonStyle(.bordered)
 
-                Button {
-                    navigateToDevice = true
-                } label: {
-                    Text("View Device")
-                        .frame(maxWidth: .infinity)
+                if device.orderId != nil {
+                    Button {
+                        navigateToDevice = true
+                    } label: {
+                        Text("View Device")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
-                .buttonStyle(.borderedProminent)
             }
         }
         .padding()
