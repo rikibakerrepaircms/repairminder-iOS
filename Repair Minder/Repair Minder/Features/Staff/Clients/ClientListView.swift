@@ -235,6 +235,8 @@ struct ClientRowView: View {
                 Label(client.email ?? "", systemImage: "envelope")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
 
                 if let phone = client.phone, !phone.isEmpty {
                     Label(phone, systemImage: "phone")
