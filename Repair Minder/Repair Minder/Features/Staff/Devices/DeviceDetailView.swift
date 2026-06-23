@@ -486,6 +486,14 @@ struct DeviceDetailView: View {
                 if let passcodeType = device.passcodeType {
                     LabeledContent("Passcode Type", value: passcodeType.capitalized)
                 }
+
+                if let health = device.batteryHealthPercent {
+                    LabeledContent("Battery Health", value: "\(health)%")
+                }
+
+                if let cycles = device.batteryCycleCount {
+                    LabeledContent("Battery Cycles", value: "\(cycles)")
+                }
             }
         }
     }
