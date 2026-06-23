@@ -193,8 +193,8 @@ struct TestSelectionView: View {
                 .frame(minHeight: 76)
                 .rmGlassTintedCard(
                     cornerRadius: 12,
-                    tint: isSelected ? Color.accentColor.opacity(0.6) : Color(.systemGray4).opacity(0.4),
-                    fallbackFill: isSelected ? Color.accentColor : Color(.systemGray6)
+                    tint: isSelected ? Color.accentColor.opacity(0.6) : Color.platformGray4.opacity(0.4),
+                    fallbackFill: isSelected ? Color.accentColor : Color.platformGray6
                 )
 
                 if isSelected {
