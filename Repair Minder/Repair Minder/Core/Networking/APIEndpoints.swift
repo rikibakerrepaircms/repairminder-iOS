@@ -148,7 +148,6 @@ enum APIEndpoint {
 
     case registerDeviceToken
     case unregisterDeviceToken
-    case deviceTokens
     case pushPreferences
     case updatePushPreferences
     case customerRegisterDeviceToken
@@ -445,8 +444,6 @@ enum APIEndpoint {
         // Push Notifications
         case .registerDeviceToken, .unregisterDeviceToken:
             return "/api/user/device-token"
-        case .deviceTokens:
-            return "/api/user/device-tokens"
         case .pushPreferences, .updatePushPreferences:
             return "/api/user/push-preferences"
         case .customerRegisterDeviceToken, .customerUnregisterDeviceToken:
@@ -547,7 +544,7 @@ enum APIEndpoint {
              .macros, .macro, .macroExecutions, .macroExecution,
              .productTypes, .productComponents,
              .locations, .deviceSearch, .deviceTypes, .companyPublicInfo, .aiReadiness,
-             .deviceTokens, .pushPreferences,
+             .pushPreferences,
              .posIntegrations, .posTerminals, .pollTerminalPayment, .paymentLinks,
              .boardColumns, .boardCardPositions,
              .schedule, .teamSchedule, .boardPinnedPreferences,

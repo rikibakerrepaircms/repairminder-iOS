@@ -50,16 +50,3 @@ struct DeviceTokenUnregistration: Codable {
     let deviceToken: String
 }
 
-// MARK: - Registered Device Token
-
-/// Device token info returned from GET /api/user/device-tokens
-struct RegisteredDeviceToken: Codable, Identifiable {
-    let id: String
-    let platform: String
-    let appType: String
-    let deviceName: String?
-    let osVersion: String?
-    let appVersion: String?
-    let lastUsedAt: String?
-    let createdAt: String?
-}
