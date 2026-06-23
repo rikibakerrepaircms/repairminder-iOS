@@ -15,22 +15,19 @@ struct StaffLoginRequest: Encodable {
     let password: String
 }
 
-/// Staff login response — either 2FA step or a magic-link-only redirect
+/// Staff login response — either 2FA step, magic-link redirect, or direct token
 struct StaffLoginResponse: Decodable {
     let requiresTwoFactor: Bool?
     let requiresMagicLink: Bool?
     let userId: String?
     let email: String?
-    let user: StaffLoginUser?
+    /// Full user object — present when no 2FA/magic-link is required (direct login)
+    let user: User?
 
-    /// Partial user info returned from initial login
-    struct StaffLoginUser: Decodable {
-        let id: String
-        let email: String
-        let firstName: String?
-        let lastName: String?
-        let companyId: String
-    }
+    // Direct-token success (no 2FA / no magic-link required)
+    let token: String?
+    let refreshToken: String?
+    let company: Company?
 }
 
 // MARK: - 2FA Request/Response
