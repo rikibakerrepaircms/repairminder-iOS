@@ -398,7 +398,7 @@ final class EnquiryDetailViewModel: ObservableObject {
 
         do {
             let body: [String: String] = ["status": status.rawValue]
-            let _: Ticket = try await APIClient.shared.request(
+            try await APIClient.shared.requestVoid(
                 .updateTicket(id: ticketId),
                 body: body
             )
