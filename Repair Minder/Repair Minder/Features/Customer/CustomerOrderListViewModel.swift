@@ -134,16 +134,9 @@ final class CustomerOrderListViewModel: ObservableObject {
 // MARK: - API Response Model
 
 /// Custom response model for orders endpoint
-private struct CustomerOrdersAPIResponse: Decodable {
+struct CustomerOrdersAPIResponse: Decodable {
     let success: Bool
     let data: [CustomerOrderSummary]?
     let currencyCode: String?
     let error: String?
-
-    enum CodingKeys: String, CodingKey {
-        case success
-        case data
-        case currencyCode = "currency_code"
-        case error
-    }
 }
