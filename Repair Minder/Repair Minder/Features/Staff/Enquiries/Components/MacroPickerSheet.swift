@@ -11,12 +11,12 @@ import SwiftUI
 struct MacroPickerSheet: View {
     let macros: [Macro]
     let onSelect: (Macro) -> Void
+    let previewMacro: (Macro) async -> PreviewMacroResponse?
 
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
     @State private var selectedCategory: String?
     @State private var selectedMacro: Macro?
-    @State private var showingPreview = false
 
     // MARK: - Computed Properties
 
@@ -64,7 +64,6 @@ struct MacroPickerSheet: View {
                             ForEach(groupedMacros[category] ?? []) { macro in
                                 MacroRow(macro: macro) {
                                     selectedMacro = macro
-                                    showingPreview = true
                                 }
                             }
                         }
@@ -83,7 +82,7 @@ struct MacroPickerSheet: View {
                 }
             }
             .sheet(item: $selectedMacro) { macro in
-                MacroPreviewSheet(macro: macro) {
+                MacroPreviewSheet(macro: macro, previewMacro: previewMacro) {
                     onSelect(macro)
                     dismiss()
                 }
@@ -200,9 +199,14 @@ private struct MacroRow: View {
 
 private struct MacroPreviewSheet: View {
     let macro: Macro
+    let previewMacro: (Macro) async -> PreviewMacroResponse?
     let onExecute: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @State private var subject = ""
+    @State private var content = ""
+    @State private var isLoading = true
+    @State private var error: String?
 
     var body: some View {
         NavigationStack {
@@ -216,24 +220,58 @@ private struct MacroPreviewSheet: View {
 
                     // Initial action
                     GroupBox("Initial Action") {
-                        VStack(alignment: .leading, spacing: 8) {
+                        if isLoading {
                             HStack {
-                                Image(systemName: macro.isEmailMacro ? "envelope" : "note.text")
-                                    .foregroundColor(.blue)
-                                Text(macro.isEmailMacro ? "Send Email" : "Add Note")
-                                    .font(.subheadline.weight(.medium))
+                                Spacer()
+                                ProgressView("Loading preview...")
+                                Spacer()
                             }
+                            .padding(.vertical, 12)
+                        } else if let errorMessage = error {
+                            VStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .font(.title2)
+                                    .foregroundStyle(.red)
+                                Text(errorMessage)
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                                Button("Try Again") {
+                                    isLoading = true
+                                    error = nil
+                                    Task {
+                                        if let result = await previewMacro(macro) {
+                                            subject = result.subject
+                                            content = result.content
+                                        } else {
+                                            error = "Couldn't load preview"
+                                        }
+                                        isLoading = false
+                                    }
+                                }
+                                .font(.caption)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                        } else {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Image(systemName: macro.isEmailMacro ? "envelope" : "note.text")
+                                        .foregroundColor(.blue)
+                                    Text(macro.isEmailMacro ? "Send Email" : "Add Note")
+                                        .font(.subheadline.weight(.medium))
+                                }
 
-                            if let subject = macro.initialSubject, macro.isEmailMacro {
-                                Text("Subject: \(subject)")
+                                if macro.isEmailMacro && !subject.isEmpty {
+                                    Text("Subject: \(subject)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                Text(content)
                                     .font(.caption)
                                     .foregroundColor(.secondary)
+                                    .lineLimit(5)
                             }
-
-                            Text(macro.initialContent)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .lineLimit(5)
                         }
                     }
 
@@ -272,6 +310,15 @@ private struct MacroPreviewSheet: View {
                     }
                     .fontWeight(.semibold)
                 }
+            }
+            .task {
+                if let result = await previewMacro(macro) {
+                    subject = result.subject
+                    content = result.content
+                } else {
+                    error = "Couldn't load preview"
+                }
+                isLoading = false
             }
         }
     }
@@ -342,6 +389,7 @@ private struct StageRow: View {
                 createdAt: nil
             )
         ],
-        onSelect: { _ in }
+        onSelect: { _ in },
+        previewMacro: { _ in PreviewMacroResponse(subject: "Preview subject", content: "Preview content") }
     )
 }

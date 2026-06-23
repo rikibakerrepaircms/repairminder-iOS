@@ -78,6 +78,9 @@ struct EnquiryDetailView: View {
                 macros: viewModel.macros,
                 onSelect: { macro in
                     viewModel.selectedWorkflowMacro = macro
+                },
+                previewMacro: { macro in
+                    await viewModel.previewMacro(macro)
                 }
             )
         }
