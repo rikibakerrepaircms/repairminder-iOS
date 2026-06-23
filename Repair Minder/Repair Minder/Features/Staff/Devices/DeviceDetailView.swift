@@ -16,6 +16,8 @@ struct DeviceDetailView: View {
     @State private var showingActionSheet = false
     @State private var selectedAction: DeviceAction?
     @State private var actionNotes = ""
+    /// Collected values keyed by the Worker field name (e.g. `"tracking_number"`).
+    @State private var collectedInputs: [String: String] = [:]
 
     // Edit state for notes fields
     @State private var editingDiagnosisNotes = false
@@ -70,26 +72,29 @@ struct DeviceDetailView: View {
                 Text(error)
             }
         }
-        .confirmationDialog(
-            selectedAction?.label ?? "Action",
-            isPresented: $showingActionSheet,
-            titleVisibility: .visible
-        ) {
+        .sheet(isPresented: $showingActionSheet) {
             if let action = selectedAction {
-                Button(action.label) {
-                    Task {
-                        await viewModel.executeAction(action, notes: actionNotes.isEmpty ? nil : actionNotes)
-                        actionNotes = ""
-                    }
-                }
-                Button("Cancel", role: .cancel) {
+                DeviceActionSheet(
+                    action: action,
+                    notes: $actionNotes,
+                    collectedInputs: $collectedInputs
+                ) {
+                    // Confirm
+                    let capturedNotes = actionNotes.isEmpty ? nil : actionNotes
+                    let capturedInputs = collectedInputs
+                    showingActionSheet = false
                     selectedAction = nil
                     actionNotes = ""
+                    collectedInputs = [:]
+                    Task {
+                        await viewModel.executeAction(action, notes: capturedNotes, inputs: capturedInputs)
+                    }
+                } onCancel: {
+                    showingActionSheet = false
+                    selectedAction = nil
+                    actionNotes = ""
+                    collectedInputs = [:]
                 }
-            }
-        } message: {
-            if let action = selectedAction, let message = action.confirmationMessage {
-                Text(message)
             }
         }
     }
@@ -383,8 +388,16 @@ struct DeviceDetailView: View {
             if !viewModel.devicePageActions.isEmpty {
                 ForEach(viewModel.devicePageActions) { action in
                     Button {
-                        selectedAction = action
-                        showingActionSheet = true
+                        if action.needsInputCollection {
+                            // Show sheet to gather confirmation / inputs / notes
+                            selectedAction = action
+                            actionNotes = ""
+                            collectedInputs = [:]
+                            showingActionSheet = true
+                        } else {
+                            // Execute directly — no user input required
+                            Task { await viewModel.executeAction(action) }
+                        }
                     } label: {
                         HStack {
                             Text(action.label)
@@ -912,6 +925,87 @@ struct DeviceDetailView: View {
         formatter.numberStyle = .currency
         formatter.currencyCode = "GBP"
         return formatter.string(from: amount as NSDecimalNumber) ?? "£0.00"
+    }
+}
+
+// MARK: - Device Action Sheet
+
+/// Modal sheet presented when an action requires confirmation, notes, or input fields.
+///
+/// For actions where `needsInputCollection` is false this sheet is never shown —
+/// those execute directly via `executeAction`.  For actions that DO need input,
+/// this sheet gathers the values, then calls `onConfirm` so the ViewModel can
+/// build and POST the `DeviceActionRequest` with the correct top-level keys.
+private struct DeviceActionSheet: View {
+    let action: DeviceAction
+    @Binding var notes: String
+    @Binding var collectedInputs: [String: String]
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    /// True when all `requiresInput` fields have non-empty values
+    private var canConfirm: Bool {
+        guard let required = action.requiresInput, !required.isEmpty else { return true }
+        return required.allSatisfy { key in
+            !(collectedInputs[key] ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                // Confirmation message (reserved — not yet emitted by Worker)
+                if let message = action.confirmationMessage {
+                    Section {
+                        Text(message)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                // Required input fields
+                if let inputKeys = action.requiresInput, !inputKeys.isEmpty {
+                    Section("Required Information") {
+                        ForEach(inputKeys, id: \.self) { key in
+                            LabeledContent(DeviceAction.label(forInputKey: key)) {
+                                TextField(
+                                    DeviceAction.label(forInputKey: key),
+                                    text: Binding(
+                                        get: { collectedInputs[key] ?? "" },
+                                        set: { collectedInputs[key] = $0 }
+                                    )
+                                )
+                                .multilineTextAlignment(.trailing)
+                            }
+                        }
+                    }
+                }
+
+                // Optional notes (reserved — not yet emitted by Worker)
+                if action.requiresNotes == true {
+                    Section("Notes") {
+                        TextEditor(text: $notes)
+                            .frame(minHeight: 80)
+                    }
+                }
+
+                // Confirm / danger zone
+                Section {
+                    Button(action.label) {
+                        onConfirm()
+                    }
+                    .disabled(!canConfirm)
+                    .foregroundStyle(canConfirm ? Color.accentColor : Color.secondary)
+                }
+            }
+            .navigationTitle(action.label)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", action: onCancel)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 
