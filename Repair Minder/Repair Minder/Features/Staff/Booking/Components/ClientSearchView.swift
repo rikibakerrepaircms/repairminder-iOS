@@ -117,7 +117,7 @@ struct ClientSearchResultRow: View {
                     .fontWeight(.medium)
                     .foregroundStyle(.primary)
 
-                Text(client.email)
+                Text(client.email ?? "")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

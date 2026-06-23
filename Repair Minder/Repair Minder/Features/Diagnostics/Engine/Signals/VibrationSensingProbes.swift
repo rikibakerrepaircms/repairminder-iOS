@@ -97,58 +97,40 @@ final class MicBandEnergyProbe {
     }
 }
 
-/// Streams device-motion samples relative to a start time, from a SINGLE CMMotionManager (Apple's
-/// guidance). Emits, per sample, (elapsed, magneticFieldDeviation, userAccelMagnitude):
-///  - magneticFieldDeviation: ‖calibrated field − baseline‖ — the channel that correlates with the
-///    actuator coil during the coded buzz.
-///  - userAccelMagnitude: ‖user acceleration‖ (gravity removed) — gross motion, used as a STILLNESS
-///    veto. A genuine buzz barely moves it (~0.05 g); shaking/handling spikes it, disqualifying the
-///    cycle so a moving phone can't fake a pass.
+/// Streams a STILLNESS signal from a SINGLE CMMotionManager. Emits, per sample,
+/// (elapsed, userAccelMagnitude): ‖user acceleration‖ with gravity removed — gross motion used as the
+/// anti-spoof STILLNESS veto. A genuine buzz barely moves it (~0.05 g); shaking/handling spikes it,
+/// disqualifying the cycle so a moving phone can't fake a pass.
+///
+/// Uses the `.xArbitraryZVertical` reference frame so device-motion never engages the magnetometer:
+/// the magnetometer was previously read here to "confirm the coil", but it physically cannot sample
+/// the ~230 Hz Taptic carrier and stays 0 / `.uncalibrated` on a still phone (it needs figure-8
+/// motion to calibrate, which our stillness requirement forbids). See
+/// docs/plans/device-diagnostics/33-vibration-detection-research.md.
 @MainActor
 final class DeviceMotionProbe {
     private let motionManager = CMMotionManager()
-    private var onSample: ((_ t: Double, _ magDeviation: Double, _ motion: Double) -> Void)?
+    private var onSample: ((_ t: Double, _ motion: Double) -> Void)?
     private var startTime: Double = 0
-    private var baseline: [(x: Double, y: Double, z: Double)] = []
-    private var baseX: Double = 0, baseY: Double = 0, baseZ: Double = 0
-    private var baselineSettled = false
-    private let baselineDuration: Double = 0.4
 
-    func start(startTime: Double, onSample: @escaping (Double, Double, Double) -> Void) {
+    func start(startTime: Double, onSample: @escaping (Double, Double) -> Void) {
         #if targetEnvironment(simulator)
         return
         #else
         self.startTime = startTime
         self.onSample = onSample
-        baseline = []
-        baselineSettled = false
 
         guard motionManager.isDeviceMotionAvailable else { return }
         motionManager.deviceMotionUpdateInterval = 1.0 / 100.0
 
         let queue = OperationQueue()
-        motionManager.startDeviceMotionUpdates(to: queue) { [weak self] motion, _ in
+        motionManager.startDeviceMotionUpdates(using: .xArbitraryZVertical, to: queue) { [weak self] motion, _ in
             guard let self, let m = motion else { return }
             let elapsed = CACurrentMediaTime() - startTime
-            let f = m.magneticField.field          // calibrated magnetic field (x,y,z)
-            let ua = m.userAcceleration            // gravity removed (g)
+            let ua = m.userAcceleration            // gravity removed (g); no magnetometer needed
             let motionMag = sqrt(ua.x*ua.x + ua.y*ua.y + ua.z*ua.z)
-
             Task { @MainActor in
-                if !self.baselineSettled {
-                    self.baseline.append((f.x, f.y, f.z))
-                    if elapsed >= self.baselineDuration {
-                        let n = Double(self.baseline.count)
-                        self.baseX = self.baseline.map { $0.x }.reduce(0, +) / n
-                        self.baseY = self.baseline.map { $0.y }.reduce(0, +) / n
-                        self.baseZ = self.baseline.map { $0.z }.reduce(0, +) / n
-                        self.baselineSettled = true
-                    }
-                } else {
-                    let dx = f.x - self.baseX, dy = f.y - self.baseY, dz = f.z - self.baseZ
-                    let magDeviation = sqrt(dx*dx + dy*dy + dz*dz)
-                    self.onSample?(elapsed, magDeviation, motionMag)
-                }
+                self.onSample?(elapsed, motionMag)
             }
         }
         #endif

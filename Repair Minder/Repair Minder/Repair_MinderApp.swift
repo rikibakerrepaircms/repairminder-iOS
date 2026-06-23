@@ -30,6 +30,9 @@ struct Repair_MinderApp: App {
                     .onOpenURL { url in
                         _ = DeepLinkHandler.shared.handleURL(url)
                     }
+                    #if os(iOS)
+                    .task { DiagnosticsPairingFile.consumeIfPresent() }
+                    #endif
                     #if os(macOS)
                     .frame(minWidth: 900, minHeight: 600)
                     #endif
@@ -446,6 +449,9 @@ private struct StaffMainView: View {
 
         case .clients:
             ClientListView()
+
+        case .devices:
+            DevicesView()
         }
     }
 

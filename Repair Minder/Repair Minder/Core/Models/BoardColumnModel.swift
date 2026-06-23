@@ -80,7 +80,6 @@ struct BoardCardPosition: Decodable, Identifiable, Sendable, Equatable {
     let id: String
     let deviceId: String
     let columnId: String
-    let sortOrder: Int?
 }
 
 // MARK: - API Response Wrappers
@@ -93,28 +92,6 @@ struct BoardColumnsData: Decodable, Sendable {
 /// Response from `GET /api/board/card-positions`
 struct BoardCardPositionsData: Decodable, Sendable {
     let positions: [BoardCardPosition]
-}
-
-// MARK: - Flexible Bool
-
-/// Handles `is_visible` which can be Int (0/1) or Bool from the API
-struct FlexibleBool: Decodable, Sendable, Equatable {
-    let value: Bool
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if let intValue = try? container.decode(Int.self) {
-            value = intValue != 0
-        } else if let boolValue = try? container.decode(Bool.self) {
-            value = boolValue
-        } else {
-            value = true
-        }
-    }
-
-    init(_ value: Bool) {
-        self.value = value
-    }
 }
 
 // MARK: - Single Column Response
@@ -149,7 +126,7 @@ struct ScheduleItemModel: Decodable, Identifiable, Sendable, Equatable {
     let id: String
     let deviceId: String
     let orderId: String?
-    let scheduleDate: String
+    let scheduleDate: String?
     let startMinutes: Int
     var duration: Int
     let deviceName: String?

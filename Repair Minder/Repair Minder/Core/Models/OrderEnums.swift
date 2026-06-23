@@ -10,7 +10,7 @@ import SwiftUI
 // MARK: - Order Status
 
 /// Order status - auto-calculated from device statuses, read-only in iOS
-enum OrderStatus: String, Codable, CaseIterable, Sendable {
+enum OrderStatus: String, Codable, CaseIterable, UnknownDefaultable, Sendable {
     case pending
     case onHold = "on_hold"
     case cancelled
@@ -19,6 +19,13 @@ enum OrderStatus: String, Codable, CaseIterable, Sendable {
     case serviceComplete = "service_complete"
     case awaitingCollection = "awaiting_collection"
     case collectedDespatched = "collected_despatched"
+    case unknown = "__unknown__"
+
+    static var unknownFallback: OrderStatus { .unknown }
+
+    static var allCases: [OrderStatus] {
+        [.pending, .onHold, .cancelled, .awaitingDevice, .inProgress, .serviceComplete, .awaitingCollection, .collectedDespatched]
+    }
 
     var label: String {
         switch self {
@@ -30,6 +37,7 @@ enum OrderStatus: String, Codable, CaseIterable, Sendable {
         case .serviceComplete: return "Service Complete"
         case .awaitingCollection: return "Awaiting Collection"
         case .collectedDespatched: return "Collected/Despatched"
+        case .unknown: return "Unknown"
         }
     }
 
@@ -43,6 +51,7 @@ enum OrderStatus: String, Codable, CaseIterable, Sendable {
         case .serviceComplete: return "Complete"
         case .awaitingCollection: return "Collection"
         case .collectedDespatched: return "Collected"
+        case .unknown: return "Unknown"
         }
     }
 
@@ -56,6 +65,7 @@ enum OrderStatus: String, Codable, CaseIterable, Sendable {
         case .serviceComplete: return .purple
         case .awaitingCollection: return .orange
         case .collectedDespatched: return .green
+        case .unknown: return .gray
         }
     }
 
@@ -73,6 +83,7 @@ enum OrderStatus: String, Codable, CaseIterable, Sendable {
         case .serviceComplete: return "checkmark.circle"
         case .awaitingCollection: return "shippingbox"
         case .collectedDespatched: return "checkmark.seal"
+        case .unknown: return "questionmark"
         }
     }
 }

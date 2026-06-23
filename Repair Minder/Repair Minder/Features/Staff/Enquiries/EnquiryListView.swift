@@ -199,6 +199,7 @@ struct EnquiryListView: View {
         case .pending: return counts.pending
         case .resolved: return counts.resolved
         case .closed: return counts.closed
+        case .unknown: return 0
         }
     }
 

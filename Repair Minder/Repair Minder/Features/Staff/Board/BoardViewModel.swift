@@ -51,7 +51,7 @@ struct BoardDeviceItem: Identifiable, Sendable, Equatable {
     init(from device: DeviceListItem) {
         self.id = device.id
         self.orderId = device.orderId
-        self.orderNumber = device.orderNumber
+        self.orderNumber = device.orderNumber?.value
         self.displayName = device.displayName
         self.status = device.status
         self.engineerId = device.assignedEngineer?.id

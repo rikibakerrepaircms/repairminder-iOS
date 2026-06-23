@@ -13,7 +13,7 @@ import Foundation
 /// Used for order list display
 struct CustomerOrderSummary: Codable, Identifiable, Sendable {
     let id: String
-    let ticketNumber: Int
+    let ticketNumber: FlexibleString
     let status: String
     let createdAt: Date
     let quoteSentAt: Date?
@@ -35,7 +35,7 @@ struct CustomerOrderSummary: Codable, Identifiable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
         id = try container.decode(String.self, forKey: .id)
-        ticketNumber = try container.decode(Int.self, forKey: .ticketNumber)
+        ticketNumber = try container.decode(FlexibleString.self, forKey: .ticketNumber)
         status = try container.decode(String.self, forKey: .status)
         devices = try container.decode([CustomerDeviceSummary].self, forKey: .devices)
         totals = try container.decode(CustomerOrderTotals.self, forKey: .totals)
@@ -115,7 +115,7 @@ struct CustomerOrderSummary: Codable, Identifiable, Sendable {
 
     /// Formatted order reference
     var orderReference: String {
-        "#\(ticketNumber)"
+        "#\(ticketNumber.value)"
     }
 }
 

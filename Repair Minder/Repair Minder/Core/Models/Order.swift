@@ -7,39 +7,6 @@
 
 import Foundation
 
-// MARK: - Order List Response
-
-/// Response wrapper for order list endpoint
-struct OrderListResponse: Decodable, Sendable {
-    let orders: [Order]
-    let pagination: Pagination
-    let filters: OrderFilters
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-
-        // Orders are at the root level as an array (data is the array itself)
-        // The response structure is { success, data: [orders], pagination, filters }
-        // But APIClient unwraps data for us, so we receive [Order] directly
-        // However, the filters come separately in the response
-
-        // Try to decode as if this is the full response envelope
-        if let ordersArray = try? container.decode([Order].self, forKey: .data) {
-            self.orders = ordersArray
-        } else {
-            // Fallback: we're receiving just the array
-            self.orders = []
-        }
-
-        self.pagination = try container.decode(Pagination.self, forKey: .pagination)
-        self.filters = try container.decode(OrderFilters.self, forKey: .filters)
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case data, pagination, filters
-    }
-}
-
 /// Filter options for order list
 struct OrderFilters: Decodable, Equatable, Sendable {
     let locations: [OrderFilterLocation]

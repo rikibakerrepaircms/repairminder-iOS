@@ -63,7 +63,7 @@ struct TicketMessage: Codable, Identifiable, Sendable, Equatable {
 
     /// Formatted creation date
     var formattedDate: String {
-        guard let date = ISO8601DateFormatter().date(from: createdAt) else {
+        guard let date = DateFormatters.parseDate(createdAt) else {
             return createdAt
         }
         let formatter = DateFormatter()
@@ -74,7 +74,7 @@ struct TicketMessage: Codable, Identifiable, Sendable, Equatable {
 
     /// Relative time since creation
     var relativeDate: String {
-        guard let date = ISO8601DateFormatter().date(from: createdAt) else {
+        guard let date = DateFormatters.parseDate(createdAt) else {
             return createdAt
         }
         let formatter = RelativeDateTimeFormatter()
@@ -198,7 +198,7 @@ struct MessageEvent: Codable, Identifiable, Equatable, Sendable {
 
     /// Formatted event date
     var formattedDate: String {
-        guard let date = ISO8601DateFormatter().date(from: createdAt) else {
+        guard let date = DateFormatters.parseDate(createdAt) else {
             return createdAt
         }
         let formatter = DateFormatter()

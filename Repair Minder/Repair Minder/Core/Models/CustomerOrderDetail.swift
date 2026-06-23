@@ -12,7 +12,7 @@ import Foundation
 /// Full order detail returned from GET /api/customer/orders/:orderId
 struct CustomerOrderDetail: Codable, Identifiable, Sendable {
     let id: String
-    let ticketNumber: Int
+    let ticketNumber: FlexibleString
     let status: String
     /// "walk_in", "mail_in", "courier", "counter_sale", "accessories_in_store"
     /// — used to surface the mail-in shipping banner.
@@ -44,7 +44,7 @@ struct CustomerOrderDetail: Codable, Identifiable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
         id = try container.decode(String.self, forKey: .id)
-        ticketNumber = try container.decode(Int.self, forKey: .ticketNumber)
+        ticketNumber = try container.decode(FlexibleString.self, forKey: .ticketNumber)
         status = try container.decode(String.self, forKey: .status)
         intakeMethod = try container.decodeIfPresent(String.self, forKey: .intakeMethod)
         quoteApprovedMethod = try container.decodeIfPresent(String.self, forKey: .quoteApprovedMethod)
@@ -128,7 +128,7 @@ struct CustomerOrderDetail: Codable, Identifiable, Sendable {
 
     /// Formatted order reference
     var orderReference: String {
-        "#\(ticketNumber)"
+        "#\(ticketNumber.value)"
     }
 
     /// Currency code from company or default

@@ -341,7 +341,7 @@ struct AccessoriesBookingView: View {
 
     private func selectClient(_ client: Client) {
         selectedClient = client
-        email = client.email
+        email = client.email ?? ""
         firstName = client.firstName ?? ""
         lastName = client.lastName ?? ""
         phone = client.phone ?? ""

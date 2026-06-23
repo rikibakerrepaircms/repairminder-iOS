@@ -54,7 +54,7 @@ struct MacroExecution: Codable, Identifiable, Sendable, Equatable {
 
     /// Formatted creation date
     var formattedCreatedAt: String {
-        guard let date = ISO8601DateFormatter().date(from: createdAt) else {
+        guard let date = DateFormatters.parseDate(createdAt) else {
             return createdAt
         }
         let formatter = DateFormatter()
@@ -65,7 +65,7 @@ struct MacroExecution: Codable, Identifiable, Sendable, Equatable {
 
     /// Relative time since creation
     var relativeCreatedAt: String {
-        guard let date = ISO8601DateFormatter().date(from: createdAt) else {
+        guard let date = DateFormatters.parseDate(createdAt) else {
             return createdAt
         }
         let formatter = RelativeDateTimeFormatter()
@@ -76,7 +76,7 @@ struct MacroExecution: Codable, Identifiable, Sendable, Equatable {
     /// Formatted completion date
     var formattedCompletedAt: String? {
         guard let completedAt else { return nil }
-        guard let date = ISO8601DateFormatter().date(from: completedAt) else {
+        guard let date = DateFormatters.parseDate(completedAt) else {
             return completedAt
         }
         let formatter = DateFormatter()
@@ -88,7 +88,7 @@ struct MacroExecution: Codable, Identifiable, Sendable, Equatable {
     /// Formatted cancellation date
     var formattedCancelledAt: String? {
         guard let cancelledAt else { return nil }
-        guard let date = ISO8601DateFormatter().date(from: cancelledAt) else {
+        guard let date = DateFormatters.parseDate(cancelledAt) else {
             return cancelledAt
         }
         let formatter = DateFormatter()
@@ -109,7 +109,7 @@ struct NextStage: Codable, Equatable, Sendable {
 
     /// Scheduled execution date
     var scheduledDate: Date? {
-        ISO8601DateFormatter().date(from: scheduledFor)
+        DateFormatters.parseDate(scheduledFor)
     }
 
     /// Human-readable scheduled time

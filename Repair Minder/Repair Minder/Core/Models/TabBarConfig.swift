@@ -17,6 +17,7 @@ enum FeatureTab: String, CaseIterable, Identifiable, Codable {
     case buyback
     case enquiries
     case clients
+    case devices
 
     var id: String { rawValue }
 
@@ -28,6 +29,7 @@ enum FeatureTab: String, CaseIterable, Identifiable, Codable {
         case .buyback: "Buyback"
         case .enquiries: "Enquiries"
         case .clients: "Clients"
+        case .devices: "Devices"
         }
     }
 
@@ -39,6 +41,7 @@ enum FeatureTab: String, CaseIterable, Identifiable, Codable {
         case .buyback: "arrow.triangle.2.circlepath"
         case .enquiries: "envelope.fill"
         case .clients: "person.2.fill"
+        case .devices: "magnifyingglass"
         }
     }
 
@@ -51,6 +54,7 @@ enum FeatureTab: String, CaseIterable, Identifiable, Codable {
         case .buyback: 3
         case .enquiries: 4
         case .clients: 5
+        case .devices: 6
         }
     }
 }

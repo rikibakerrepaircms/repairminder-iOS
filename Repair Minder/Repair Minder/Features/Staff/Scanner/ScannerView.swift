@@ -298,7 +298,7 @@ struct ScannerView: View {
                     Text(device.displayName)
                         .font(.headline)
                     if let orderNumber = device.orderNumber {
-                        Text(orderNumber)
+                        Text(orderNumber.value)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }

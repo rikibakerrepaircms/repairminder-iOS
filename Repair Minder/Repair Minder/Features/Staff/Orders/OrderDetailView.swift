@@ -741,6 +741,7 @@ struct OrderDetailView: View {
             case .failed: return ("Failed", .red)
             case .cancelled: return ("Cancelled", .gray)
             case .expired: return ("Expired", .gray)
+            case .unknown: return ("Unknown", .gray)
             }
         }()
 

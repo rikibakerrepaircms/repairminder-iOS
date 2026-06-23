@@ -262,7 +262,7 @@ final class BookingViewModel {
         // 1. Immediately populate with search result data (fast UX)
         formData.existingClientId = client.id
         formData.existingClient = client
-        formData.email = client.email
+        formData.email = client.email ?? ""
         formData.firstName = client.firstName ?? ""
         formData.lastName = client.lastName ?? ""
         formData.phone = client.phone ?? ""

@@ -18,6 +18,12 @@ private func hasTorch() -> Bool {
 
 // MARK: - Camera target constant
 
+/// Minimum frames a camera must have delivered for the QR watchdog to treat it as ALIVE. A live
+/// camera (delivering frames) that hasn't yet seen a QR is NOT failed — the technician may still be
+/// loading a code. Only a camera that produced fewer than this (≈ zero) is considered dead/blocked
+/// and auto-failed. A working camera streams ~30 fps, so it clears this within the first ~0.2 s.
+private let cameraLivenessFrameThreshold = 5
+
 /// Page that displays a large QR focus target; the technician opens it on a SECOND device,
 /// then points the device-under-test's camera at it. (Served by the RepairMinder Worker,
 /// Turnstile-gated + rate-limited.) Any QR/barcode works as a fallback if this page is unreachable.
@@ -214,13 +220,19 @@ struct CameraPreview: UIViewRepresentable {
         advance()
     }
 
-    /// Watchdog: if the lens at `index` is still the active, unresolved lens (dead hardware that
-    /// never recognised a QR), force-fail it and advance. No-op if it already passed/failed, if the
-    /// sequencer has already moved past it, or if the whole test already produced an outcome
-    /// (single-shot guards: `activeIndex == index`, `passed == nil`, `outcome == nil`).
+    /// Watchdog: if the lens at `index` is still the active, unresolved lens AND its camera is
+    /// genuinely dead (no frames delivered), force-fail it and advance. No-op if it already
+    /// passed/failed, if the sequencer has already moved past it, or if the whole test already
+    /// produced an outcome (single-shot guards: `activeIndex == index`, `passed == nil`,
+    /// `outcome == nil`).
+    ///
+    /// LIVENESS GATE: a lens that is delivering frames is a WORKING camera that simply hasn't been
+    /// shown a QR yet (the technician may still be loading one) — it is left pending, never
+    /// auto-failed. The lens then resolves only on an actual QR (auto-pass) or a manual Fail/Skip.
     func failCurrentLensIfUnresolved(index: Int) {
         guard outcome == nil, activeIndex == index, index < lenses.count,
               lenses[index].passed == nil else { return }
+        if (probe?.framesSeen ?? 0) >= cameraLivenessFrameThreshold { return }   // alive → keep waiting
         probe?.stop()
         probe = nil
         activeProbeSession = nil
@@ -281,10 +293,15 @@ struct CameraPreview: UIViewRepresentable {
     func fail() { probe.stop(); outcome = diagnosticOutcome("frontcamera", "Front Camera", .fail, nil) }
     func skip() { probe.stop(); outcome = diagnosticOutcome("frontcamera", "Front Camera", .skip, nil) }
 
-    /// Watchdog: auto-fail dead hardware that never emits a QR signal. No-op if the user already
-    /// passed/failed/skipped or the QR already fired (single-shot guard: `outcome == nil`).
+    /// Watchdog: auto-fail only a genuinely dead front camera (no frames delivered). No-op if the
+    /// user already passed/failed/skipped or the QR already fired (single-shot guard: `outcome == nil`).
+    ///
+    /// LIVENESS GATE (see RearCameraViewModel): a front camera that is delivering frames is alive and
+    /// just hasn't seen a QR yet — it is left pending, never auto-failed, so a technician still loading
+    /// a code isn't penalised. It then resolves on an actual QR (auto-pass) or a manual Fail/Skip.
     func failIfUnresolved() {
         guard outcome == nil else { return }
+        if ((probe as? CameraProbe)?.framesSeen ?? 0) >= cameraLivenessFrameThreshold { return }
         probe.stop()
         outcome = diagnosticOutcome("frontcamera", "Front Camera", .fail, ["reason": "no_front_camera_signal"])
     }

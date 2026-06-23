@@ -10,11 +10,15 @@ import SwiftUI
 // MARK: - Ticket Status
 
 /// Status of a support ticket
-enum TicketStatus: String, Codable, CaseIterable, Sendable {
+enum TicketStatus: String, Codable, CaseIterable, UnknownDefaultable, Sendable {
     case open
     case pending
     case resolved
     case closed
+    case unknown = "__unknown__"
+
+    static var unknownFallback: TicketStatus { .unknown }
+    static var allCases: [TicketStatus] { [.open, .pending, .resolved, .closed] }
 
     var label: String {
         switch self {
@@ -22,6 +26,7 @@ enum TicketStatus: String, Codable, CaseIterable, Sendable {
         case .pending: return "Pending"
         case .resolved: return "Resolved"
         case .closed: return "Closed"
+        case .unknown: return "Unknown"
         }
     }
 
@@ -31,6 +36,7 @@ enum TicketStatus: String, Codable, CaseIterable, Sendable {
         case .pending: return "Pending"
         case .resolved: return "Resolved"
         case .closed: return "Closed"
+        case .unknown: return "Unknown"
         }
     }
 
@@ -40,6 +46,7 @@ enum TicketStatus: String, Codable, CaseIterable, Sendable {
         case .pending: return .orange
         case .resolved: return .green
         case .closed: return .gray
+        case .unknown: return .gray
         }
     }
 
@@ -49,6 +56,7 @@ enum TicketStatus: String, Codable, CaseIterable, Sendable {
         case .pending: return "clock"
         case .resolved: return "checkmark.circle"
         case .closed: return "archivebox"
+        case .unknown: return "questionmark"
         }
     }
 }
@@ -56,16 +64,21 @@ enum TicketStatus: String, Codable, CaseIterable, Sendable {
 // MARK: - Ticket Type
 
 /// Type of ticket: lead (enquiry) or order-related
-enum TicketType: String, Codable, CaseIterable, Sendable {
+enum TicketType: String, Codable, CaseIterable, UnknownDefaultable, Sendable {
     case lead
     case order
     case enquiry
+    case unknown = "__unknown__"
+
+    static var unknownFallback: TicketType { .unknown }
+    static var allCases: [TicketType] { [.lead, .order, .enquiry] }
 
     var label: String {
         switch self {
         case .lead: return "Lead/Enquiry"
         case .order: return "Order"
         case .enquiry: return "Enquiry"
+        case .unknown: return "Unknown"
         }
     }
 
@@ -74,6 +87,7 @@ enum TicketType: String, Codable, CaseIterable, Sendable {
         case .lead: return "Lead"
         case .order: return "Order"
         case .enquiry: return "Enquiry"
+        case .unknown: return "Unknown"
         }
     }
 
@@ -82,6 +96,7 @@ enum TicketType: String, Codable, CaseIterable, Sendable {
         case .lead: return "envelope"
         case .order: return "bag"
         case .enquiry: return "questionmark.bubble"
+        case .unknown: return "questionmark"
         }
     }
 
@@ -90,6 +105,7 @@ enum TicketType: String, Codable, CaseIterable, Sendable {
         case .lead: return .purple
         case .order: return .blue
         case .enquiry: return .orange
+        case .unknown: return .gray
         }
     }
 }
@@ -97,18 +113,21 @@ enum TicketType: String, Codable, CaseIterable, Sendable {
 // MARK: - Message Type
 
 /// Type of message in a ticket conversation
-enum MessageType: String, Codable, Sendable {
+enum MessageType: String, Codable, UnknownDefaultable, Sendable {
     case inbound
     case outbound
     case note
     case outboundSms = "outbound_sms"
+    case unknown = "__unknown__"
+
+    static var unknownFallback: MessageType { .unknown }
 
     /// Whether this message is visible to customers
     var isPublic: Bool {
         switch self {
         case .inbound, .outbound, .outboundSms:
             return true
-        case .note:
+        case .note, .unknown:
             return false
         }
     }
@@ -124,6 +143,7 @@ enum MessageType: String, Codable, Sendable {
         case .outbound: return "Email"
         case .note: return "Internal Note"
         case .outboundSms: return "SMS"
+        case .unknown: return "Unknown"
         }
     }
 
@@ -133,6 +153,7 @@ enum MessageType: String, Codable, Sendable {
         case .outbound: return "paperplane"
         case .note: return "note.text"
         case .outboundSms: return "message"
+        case .unknown: return "questionmark"
         }
     }
 }
@@ -140,11 +161,15 @@ enum MessageType: String, Codable, Sendable {
 // MARK: - Macro Execution Status
 
 /// Status of a macro execution (workflow)
-enum ExecutionStatus: String, Codable, CaseIterable, Sendable {
+enum ExecutionStatus: String, Codable, CaseIterable, UnknownDefaultable, Sendable {
     case active
     case paused
     case completed
     case cancelled
+    case unknown = "__unknown__"
+
+    static var unknownFallback: ExecutionStatus { .unknown }
+    static var allCases: [ExecutionStatus] { [.active, .paused, .completed, .cancelled] }
 
     var label: String {
         switch self {
@@ -152,6 +177,7 @@ enum ExecutionStatus: String, Codable, CaseIterable, Sendable {
         case .paused: return "Paused"
         case .completed: return "Completed"
         case .cancelled: return "Cancelled"
+        case .unknown: return "Unknown"
         }
     }
 
@@ -161,6 +187,7 @@ enum ExecutionStatus: String, Codable, CaseIterable, Sendable {
         case .paused: return .orange
         case .completed: return .blue
         case .cancelled: return .gray
+        case .unknown: return .gray
         }
     }
 
@@ -170,6 +197,7 @@ enum ExecutionStatus: String, Codable, CaseIterable, Sendable {
         case .paused: return "pause.circle"
         case .completed: return "checkmark.circle"
         case .cancelled: return "xmark.circle"
+        case .unknown: return "questionmark.circle"
         }
     }
 

@@ -52,7 +52,7 @@ struct DeviceRow: View {
             // Identifiers row
             HStack(spacing: 12) {
                 if showOrderNumber, let orderNumber = device.orderNumber {
-                    Label(orderNumber, systemImage: "number")
+                    Label(orderNumber.value, systemImage: "number")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -232,7 +232,7 @@ struct CompactDeviceRow: View {
                     .lineLimit(1)
 
                 if let orderNumber = device.orderNumber {
-                    Text(orderNumber)
+                    Text(orderNumber.value)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -267,7 +267,7 @@ struct CompactDeviceRow: View {
                     id: "1",
                     orderId: "order-1",
                     ticketId: "ticket-1",
-                    orderNumber: "RM-12345",
+                    orderNumber: FlexibleString("RM-12345"),
                     clientFirstName: "John",
                     clientLastName: "Doe",
                     displayName: "iPhone 14 Pro",
@@ -296,7 +296,7 @@ struct CompactDeviceRow: View {
                     id: "2",
                     orderId: "order-2",
                     ticketId: nil,
-                    orderNumber: "RM-12346",
+                    orderNumber: FlexibleString("RM-12346"),
                     clientFirstName: "Jane",
                     clientLastName: "Smith",
                     displayName: "Samsung Galaxy S24",
