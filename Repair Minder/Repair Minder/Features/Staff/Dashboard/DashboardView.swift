@@ -91,6 +91,18 @@ struct DashboardView: View {
             .overlay {
                 if viewModel.isLoading && viewModel.stats == nil {
                     LottieLoadingView(size: 100)
+                } else if viewModel.stats == nil, let errorMessage = viewModel.error {
+                    VStack(spacing: 16) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.largeTitle).foregroundColor(.orange)
+                        Text("Couldn't load dashboard").font(.headline)
+                        Text(errorMessage).font(.subheadline).foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                        Button("Retry") { Task { await viewModel.loadDashboard() } }
+                            .buttonStyle(.borderedProminent)
+                    }
+                    .padding()
+                    .background(Color.platformGroupedBackground)
                 }
             }
             .navigationDestination(item: $deviceNavigation) { nav in
