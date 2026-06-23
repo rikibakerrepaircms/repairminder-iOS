@@ -872,7 +872,7 @@ struct PosCardPaymentSheet: View {
         case .timeout:
             state = .timeout
         default:
-            break
+            state = .failed(reason: "Payment status could not be confirmed. Check the terminal and try again.")
         }
     }
 
