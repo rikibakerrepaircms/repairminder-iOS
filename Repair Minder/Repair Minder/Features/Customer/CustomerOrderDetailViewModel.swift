@@ -230,12 +230,17 @@ final class CustomerOrderDetailViewModel: ObservableObject {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                errorMessage = "Failed to load purchase order documents (error \(code))"
+                return
+            }
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
             let apiResponse = try decoder.decode(APIResponse<[PoDocument]>.self, from: data)
             if let docs = apiResponse.data { self.poDocuments = docs }
         } catch {
+            errorMessage = "Failed to load purchase order documents"
             #if DEBUG
             print("[CustomerOrderDetailVM] fetchPoDocuments error: \(error)")
             #endif
@@ -250,7 +255,11 @@ final class CustomerOrderDetailViewModel: ObservableObject {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                errorMessage = "Failed to download \(doc.filename) (error \(code))"
+                return
+            }
             // Prefix with the doc id so distinct documents never collide in temp.
             let tmpURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(doc.id)-\(doc.filename)")
             try data.write(to: tmpURL, options: .atomic)
@@ -260,6 +269,7 @@ final class CustomerOrderDetailViewModel: ObservableObject {
             NSWorkspace.shared.open(tmpURL)
             #endif
         } catch {
+            errorMessage = "Failed to download \(doc.filename)"
             #if DEBUG
             print("[CustomerOrderDetailVM] openPoDocument error: \(error)")
             #endif
