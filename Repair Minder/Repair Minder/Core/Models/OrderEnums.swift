@@ -90,11 +90,14 @@ enum OrderStatus: String, Codable, CaseIterable, UnknownDefaultable, Sendable {
 
 // MARK: - Payment Status
 
-enum PaymentStatus: String, Codable, CaseIterable, Sendable {
+enum PaymentStatus: String, Codable, CaseIterable, UnknownDefaultable, Sendable {
     case unpaid
     case partial
     case paid
     case refunded
+    case unknown = "__unknown__"
+
+    static var unknownFallback: PaymentStatus { .unknown }
 
     var label: String {
         switch self {
@@ -102,6 +105,7 @@ enum PaymentStatus: String, Codable, CaseIterable, Sendable {
         case .partial: return "Partially Paid"
         case .paid: return "Paid"
         case .refunded: return "Refunded"
+        case .unknown: return "Unknown"
         }
     }
 
@@ -111,6 +115,7 @@ enum PaymentStatus: String, Codable, CaseIterable, Sendable {
         case .partial: return .orange
         case .paid: return .green
         case .refunded: return .purple
+        case .unknown: return .gray
         }
     }
 
@@ -124,6 +129,7 @@ enum PaymentStatus: String, Codable, CaseIterable, Sendable {
         case .partial: return "creditcard.trianglebadge.exclamationmark"
         case .paid: return "checkmark.circle"
         case .refunded: return "arrow.counterclockwise"
+        case .unknown: return "questionmark"
         }
     }
 }
