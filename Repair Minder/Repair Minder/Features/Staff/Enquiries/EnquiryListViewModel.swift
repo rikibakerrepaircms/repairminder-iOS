@@ -26,7 +26,7 @@ final class EnquiryListViewModel: ObservableObject {
     // MARK: - Filters
 
     @Published var selectedStatuses: Set<TicketStatus> = [.open]
-    @Published var selectedTypes: Set<TicketType> = [.lead]
+    @Published var selectedTypes: Set<TicketType> = [.lead, .order]
     @Published var selectedLocationId: String?
     @Published var selectedWorkflowStatus: WorkflowStatusFilter?
     @Published var sortBy: SortOption = .updatedAt
