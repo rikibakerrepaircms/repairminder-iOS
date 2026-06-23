@@ -27,6 +27,10 @@ final class NotificationSettingsViewModel: ObservableObject {
     /// Whether an update is in progress
     @Published var isUpdating: Bool = false
 
+    /// True while load() or an error-revert is writing to `preferences` programmatically.
+    /// The master-toggle .onChange handler skips the backend write during this window.
+    @Published var isApplyingServerState: Bool = false
+
     /// Error message
     @Published var errorMessage: String?
 
@@ -58,6 +62,8 @@ final class NotificationSettingsViewModel: ObservableObject {
         hasSystemPermission = pushService.isSystemEnabled
 
         // Fetch preferences from backend
+        isApplyingServerState = true
+        defer { isApplyingServerState = false }
         do {
             preferences = try await pushService.fetchPreferences()
         } catch {
@@ -89,8 +95,10 @@ final class NotificationSettingsViewModel: ObservableObject {
             }
         } catch {
             handleError(error)
-            // Revert local state
+            // Revert local state — suppress the spurious .onChange write-back
+            isApplyingServerState = true
             preferences.notificationsEnabled = !enabled
+            isApplyingServerState = false
         }
     }
 

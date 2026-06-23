@@ -97,6 +97,7 @@ struct NotificationSettingsView: View {
                 }
             }
             .onChange(of: viewModel.preferences.notificationsEnabled) { _, newValue in
+                guard !viewModel.isApplyingServerState else { return }
                 Task {
                     await viewModel.updateMasterToggle(newValue)
                 }
