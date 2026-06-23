@@ -44,6 +44,10 @@ final class CustomerOrderDetailViewModel: ObservableObject {
     @Published private(set) var poDocuments: [PoDocument] = []
     @Published var poPreviewItem: PoPreviewItem?
 
+    // Invoice state (iOS only — uses WKWebView)
+    @Published var invoiceHTML: String?
+    @Published private(set) var isLoadingInvoice: Bool = false
+
     // MARK: - Properties
 
     let orderId: String
@@ -272,6 +276,44 @@ final class CustomerOrderDetailViewModel: ObservableObject {
             errorMessage = "Failed to download \(doc.filename)"
             #if DEBUG
             print("[CustomerOrderDetailVM] openPoDocument error: \(error)")
+            #endif
+        }
+    }
+
+    /// Fetch the authed invoice HTML and surface it for the in-app web view.
+    func loadInvoice() async {
+        guard !isLoadingInvoice else { return }
+        guard let token = customerAuth.accessToken else {
+            errorMessage = "Please sign in to view your invoice"
+            return
+        }
+        isLoadingInvoice = true
+        defer { isLoadingInvoice = false }
+
+        let url = URL(string: "https://api.repairminder.com/api/customer/orders/\(orderId)/invoice")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                errorMessage = "Failed to load invoice"
+                return
+            }
+            guard http.statusCode == 200 else {
+                errorMessage = "Failed to load invoice (error \(http.statusCode))"
+                return
+            }
+            guard let html = String(data: data, encoding: .utf8), !html.isEmpty else {
+                errorMessage = "Invoice returned empty — please try again"
+                return
+            }
+            invoiceHTML = html
+        } catch {
+            errorMessage = "Failed to load invoice"
+            #if DEBUG
+            print("[CustomerOrderDetailVM] loadInvoice error: \(error)")
             #endif
         }
     }
