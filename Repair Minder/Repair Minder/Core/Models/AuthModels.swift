@@ -21,13 +21,21 @@ struct StaffLoginResponse: Decodable {
     let requiresMagicLink: Bool?
     let userId: String?
     let email: String?
-    /// Full user object — present when no 2FA/magic-link is required (direct login)
-    let user: User?
+    /// Slim user info from initial login (only id/email/company_id — NOT a full User)
+    let user: StaffLoginUser?
 
-    // Direct-token success (no 2FA / no magic-link required)
+    /// Partial user info returned from initial login
+    struct StaffLoginUser: Decodable {
+        let id: String
+        let email: String
+        let firstName: String?
+        let lastName: String?
+        let companyId: String
+    }
+
+    // Direct-token success (no 2FA / no magic-link required) — additive, optional.
     let token: String?
     let refreshToken: String?
-    let company: Company?
 }
 
 // MARK: - 2FA Request/Response
