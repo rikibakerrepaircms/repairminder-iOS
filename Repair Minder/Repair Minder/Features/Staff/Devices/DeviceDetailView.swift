@@ -17,6 +17,12 @@ struct DeviceDetailView: View {
     @State private var selectedAction: DeviceAction?
     @State private var actionNotes = ""
 
+    // Edit state for notes fields
+    @State private var editingDiagnosisNotes = false
+    @State private var diagnosisNotesText = ""
+    @State private var editingRepairNotes = false
+    @State private var repairNotesText = ""
+
     private var isRegularWidth: Bool {
         horizontalSizeClass == .regular
     }
@@ -129,15 +135,11 @@ struct DeviceDetailView: View {
                 issuesSection(device)
             }
 
-            // Diagnosis
-            if device.hasDiagnosticChecks || device.diagnosisNotes != nil {
-                diagnosisSection(device)
-            }
+            // Diagnosis — always shown (notes are editable)
+            diagnosisSection(device)
 
-            // Repair notes
-            if device.repairNotes != nil || device.status == "repairing" {
-                repairSection(device)
-            }
+            // Repair — always shown (notes are editable)
+            repairSection(device)
 
             // Line items
             if !device.lineItems.isEmpty {
@@ -179,13 +181,42 @@ struct DeviceDetailView: View {
     private func statusSection(_ device: DeviceDetail) -> some View {
         Section {
             if isRegularWidth {
+                let workflowStatuses = device.workflow == .buyback ? DeviceStatus.buybackStatuses : DeviceStatus.repairStatuses
                 Grid(alignment: .topLeading, horizontalSpacing: 32, verticalSpacing: 16) {
                     GridRow {
                         gridField("Status") {
-                            DeviceStatusBadge(status: device.deviceStatus, size: .large)
+                            Menu {
+                                ForEach(workflowStatuses, id: \.self) { s in
+                                    Button(s.label) {
+                                        Task { await viewModel.updateStatus(to: s) }
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    DeviceStatusBadge(status: device.deviceStatus, size: .large)
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .disabled(viewModel.isUpdating)
                         }
                         gridField("Priority") {
-                            PriorityBadge(priority: device.devicePriority)
+                            Menu {
+                                ForEach(DevicePriority.allCases, id: \.self) { p in
+                                    Button(p.displayName) {
+                                        Task { await viewModel.setPriority(p) }
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    PriorityBadge(priority: device.devicePriority)
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .disabled(viewModel.isUpdating)
                         }
                     }
                     GridRow {
@@ -223,16 +254,45 @@ struct DeviceDetailView: View {
                 }
                 .padding(.vertical, 4)
             } else {
-                HStack {
-                    Text("Status")
-                    Spacer()
-                    DeviceStatusBadge(status: device.deviceStatus, size: .large)
+                // Status — editable via Menu
+                let workflowStatuses = device.workflow == .buyback ? DeviceStatus.buybackStatuses : DeviceStatus.repairStatuses
+                Menu {
+                    ForEach(workflowStatuses, id: \.self) { s in
+                        Button(s.label) {
+                            Task { await viewModel.updateStatus(to: s) }
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text("Status")
+                        Spacer()
+                        DeviceStatusBadge(status: device.deviceStatus, size: .large)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                HStack {
-                    Text("Priority")
-                    Spacer()
-                    PriorityBadge(priority: device.devicePriority)
+                .disabled(viewModel.isUpdating)
+
+                // Priority — editable via Menu
+                Menu {
+                    ForEach(DevicePriority.allCases, id: \.self) { p in
+                        Button(p.displayName) {
+                            Task { await viewModel.setPriority(p) }
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text("Priority")
+                        Spacer()
+                        PriorityBadge(priority: device.devicePriority)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                .disabled(viewModel.isUpdating)
+
                 HStack {
                     Text("Workflow")
                     Spacer()
@@ -505,12 +565,46 @@ struct DeviceDetailView: View {
                 }
             }
 
-            if let notes = device.diagnosisNotes {
-                VStack(alignment: .leading, spacing: 4) {
+            // Diagnosis notes — always editable (even when nil, allows adding notes)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
                     Text("Notes")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Spacer()
+                    if !editingDiagnosisNotes {
+                        Button("Edit") {
+                            diagnosisNotesText = device.diagnosisNotes ?? ""
+                            editingDiagnosisNotes = true
+                        }
+                        .font(.caption)
+                    } else {
+                        Button("Save") {
+                            let text = diagnosisNotesText
+                            editingDiagnosisNotes = false
+                            Task { await viewModel.updateDiagnosisNotes(text) }
+                        }
+                        .font(.caption.weight(.semibold))
+                        Button("Cancel") {
+                            editingDiagnosisNotes = false
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                if editingDiagnosisNotes {
+                    TextEditor(text: $diagnosisNotesText)
+                        .frame(minHeight: 80)
+                        .font(.body)
+                        .scrollContentBackground(.hidden)
+                        .background(Color.platformGray6)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                } else if let notes = device.diagnosisNotes {
                     Text(notes)
+                } else {
+                    Text("No notes")
+                        .foregroundStyle(.tertiary)
+                        .italic()
                 }
             }
         }
@@ -520,12 +614,46 @@ struct DeviceDetailView: View {
 
     private func repairSection(_ device: DeviceDetail) -> some View {
         Section("Repair") {
-            if let notes = device.repairNotes {
-                VStack(alignment: .leading, spacing: 4) {
+            // Repair notes — always editable (even when nil, allows adding notes)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
                     Text("Repair Notes")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Spacer()
+                    if !editingRepairNotes {
+                        Button("Edit") {
+                            repairNotesText = device.repairNotes ?? ""
+                            editingRepairNotes = true
+                        }
+                        .font(.caption)
+                    } else {
+                        Button("Save") {
+                            let text = repairNotesText
+                            editingRepairNotes = false
+                            Task { await viewModel.updateRepairNotes(text) }
+                        }
+                        .font(.caption.weight(.semibold))
+                        Button("Cancel") {
+                            editingRepairNotes = false
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                if editingRepairNotes {
+                    TextEditor(text: $repairNotesText)
+                        .frame(minHeight: 80)
+                        .font(.body)
+                        .scrollContentBackground(.hidden)
+                        .background(Color.platformGray6)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                } else if let notes = device.repairNotes {
                     Text(notes)
+                } else {
+                    Text("No notes")
+                        .foregroundStyle(.tertiary)
+                        .italic()
                 }
             }
 
