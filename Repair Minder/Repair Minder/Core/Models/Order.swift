@@ -542,18 +542,6 @@ struct ManualPaymentRequest: Encodable {
     var isPayout: Bool?
 }
 
-// MARK: - Device Payment Breakdown
-
-struct DevicePaymentBreakdown: Decodable, Equatable, Sendable {
-    let deviceId: String
-    let displayName: String?
-    let lineTotal: Double?
-    let depositsPaid: Double?
-    let finalPaid: Double?
-    let totalPaid: Double?
-    let balanceDue: Double?
-}
-
 // MARK: - Product Type (Search Result)
 
 /// Lightweight product type for search-as-you-type in line item forms.
