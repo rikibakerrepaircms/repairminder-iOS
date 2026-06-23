@@ -50,6 +50,8 @@ struct CustomerProgressBar: View {
             return repairStages
         case .buyback:
             return buybackStages
+        case .unknown:
+            return repairStages
         }
     }
 
