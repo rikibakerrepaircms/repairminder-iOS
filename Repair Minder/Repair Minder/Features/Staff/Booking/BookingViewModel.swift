@@ -403,72 +403,99 @@ final class BookingViewModel {
                 )
                 : nil
 
-            // 5. Create order request
-            let orderRequest = CreateOrderRequest(
-                guestCheckout: nil,
-                clientEmail: formData.noEmail ? nil : formData.email,
-                noEmail: formData.noEmail ? true : nil,
-                clientFirstName: formData.firstName,
-                clientLastName: formData.lastName.isEmpty ? nil : formData.lastName,
-                clientPhone: formData.phone.isEmpty ? nil : formData.phone,
-                clientCountryCode: formData.countryCode,
-                addressLine1: formData.addressLine1.isEmpty ? nil : formData.addressLine1,
-                addressLine2: formData.addressLine2.isEmpty ? nil : formData.addressLine2,
-                city: formData.city.isEmpty ? nil : formData.city,
-                county: formData.county.isEmpty ? nil : formData.county,
-                postcode: formData.postcode.isEmpty ? nil : formData.postcode,
-                country: formData.country.isEmpty ? nil : formData.country,
-                locationId: formData.locationId.isEmpty ? nil : formData.locationId,
-                intakeMethod: intakeMethod,
-                readyBy: readyBy,
-                existingTicketId: formData.existingTicketId,
-                notes: formData.internalNotes.isEmpty ? nil : formData.internalNotes,
-                preAuthorization: preAuth,
-                signature: signaturePayload
-            )
+            // 5. Create order — skip if already created on a previous attempt
+            // (prevents duplicate orders when the user taps Submit after a device-POST failure).
+            let orderId: String
+            let orderNumber: Int
 
-            // 6. Create order
-            let orderResponse: OrderCreateResponse = try await APIClient.shared.request(
-                .createOrder, body: orderRequest
-            )
-
-            let orderId = orderResponse.id
-            let orderNumber = orderResponse.orderNumber
-
-            // 7. Add each device and capture IDs for line item creation
-            var deviceIdMap: [(device: BookingDeviceEntry, apiId: String)] = []
-
-            for device in formData.devices {
-                let deviceRequest = CreateOrderDeviceRequest(
-                    brandId: device.brandId,
-                    modelId: device.modelId,
-                    customBrand: device.customBrand,
-                    customModel: device.customModel,
-                    serialNumber: device.serialNumber.isEmpty ? nil : device.serialNumber,
-                    imei: device.imei.isEmpty ? nil : device.imei,
-                    colour: device.colour.isEmpty ? nil : device.colour,
-                    storageCapacity: device.storageCapacity.isEmpty ? nil : device.storageCapacity,
-                    passcode: device.passcode.isEmpty ? nil : device.passcode,
-                    passcodeType: device.passcodeType == .none ? nil : device.passcodeType.rawValue,
-                    findMyStatus: device.findMyStatus.rawValue,
-                    conditionGrade: device.conditionGrade.rawValue,
-                    customerReportedIssues: device.customerReportedIssues.isEmpty ? nil : device.customerReportedIssues,
-                    deviceTypeId: device.deviceTypeId,
-                    workflowType: device.workflowType.rawValue,
-                    accessories: device.accessories.isEmpty ? nil : device.accessories.map {
-                        AccessoryPayload(accessoryType: $0.accessoryType, description: $0.description)
-                    },
-                    aftermarketConsent: device.aftermarketConsent ? 1 : 0
+            if let existingId = formData.createdOrderId,
+               let existingNumber = formData.createdOrderNumber {
+                // Order already exists server-side — reuse its id/number.
+                orderId = existingId
+                orderNumber = existingNumber
+                logger.info("Reusing existing order \(existingNumber) for retry")
+            } else {
+                // 5a. Build order request
+                let orderRequest = CreateOrderRequest(
+                    guestCheckout: nil,
+                    clientEmail: formData.noEmail ? nil : formData.email,
+                    noEmail: formData.noEmail ? true : nil,
+                    clientFirstName: formData.firstName,
+                    clientLastName: formData.lastName.isEmpty ? nil : formData.lastName,
+                    clientPhone: formData.phone.isEmpty ? nil : formData.phone,
+                    clientCountryCode: formData.countryCode,
+                    addressLine1: formData.addressLine1.isEmpty ? nil : formData.addressLine1,
+                    addressLine2: formData.addressLine2.isEmpty ? nil : formData.addressLine2,
+                    city: formData.city.isEmpty ? nil : formData.city,
+                    county: formData.county.isEmpty ? nil : formData.county,
+                    postcode: formData.postcode.isEmpty ? nil : formData.postcode,
+                    country: formData.country.isEmpty ? nil : formData.country,
+                    locationId: formData.locationId.isEmpty ? nil : formData.locationId,
+                    intakeMethod: intakeMethod,
+                    readyBy: readyBy,
+                    existingTicketId: formData.existingTicketId,
+                    notes: formData.internalNotes.isEmpty ? nil : formData.internalNotes,
+                    preAuthorization: preAuth,
+                    signature: signaturePayload
                 )
 
-                let response: DeviceCreateResponse = try await APIClient.shared.request(
-                    .createOrderDevice(orderId: orderId),
-                    body: deviceRequest
+                // 5b. POST — throws to outer catch on failure (order not yet created)
+                let orderResponse: OrderCreateResponse = try await APIClient.shared.request(
+                    .createOrder, body: orderRequest
                 )
-                deviceIdMap.append((device: device, apiId: response.id))
+
+                orderId = orderResponse.id
+                orderNumber = orderResponse.orderNumber
+
+                // Persist immediately so a retry never re-posts the order.
+                formData.createdOrderId = orderId
+                formData.createdOrderNumber = orderNumber
+                formData.createdTicketId = orderResponse.ticketId
             }
 
-            // 8. Create line items per device (best-effort — order still valid if items fail)
+            // 6. Add each device and capture IDs for line item creation (best-effort —
+            // a device POST failure is non-fatal; staff can add devices from Order Detail).
+            var deviceIdMap: [(device: BookingDeviceEntry, apiId: String)] = []
+            var deviceWarnings: [String] = []
+
+            for device in formData.devices {
+                do {
+                    let deviceRequest = CreateOrderDeviceRequest(
+                        brandId: device.brandId,
+                        modelId: device.modelId,
+                        customBrand: device.customBrand,
+                        customModel: device.customModel,
+                        serialNumber: device.serialNumber.isEmpty ? nil : device.serialNumber,
+                        imei: device.imei.isEmpty ? nil : device.imei,
+                        colour: device.colour.isEmpty ? nil : device.colour,
+                        storageCapacity: device.storageCapacity.isEmpty ? nil : device.storageCapacity,
+                        passcode: device.passcode.isEmpty ? nil : device.passcode,
+                        passcodeType: device.passcodeType == .none ? nil : device.passcodeType.rawValue,
+                        findMyStatus: device.findMyStatus.rawValue,
+                        conditionGrade: device.conditionGrade.rawValue,
+                        customerReportedIssues: device.customerReportedIssues.isEmpty ? nil : device.customerReportedIssues,
+                        deviceTypeId: device.deviceTypeId,
+                        workflowType: device.workflowType.rawValue,
+                        accessories: device.accessories.isEmpty ? nil : device.accessories.map {
+                            AccessoryPayload(accessoryType: $0.accessoryType, description: $0.description)
+                        },
+                        aftermarketConsent: device.aftermarketConsent ? 1 : 0
+                    )
+
+                    let response: DeviceCreateResponse = try await APIClient.shared.request(
+                        .createOrderDevice(orderId: orderId),
+                        body: deviceRequest
+                    )
+                    deviceIdMap.append((device: device, apiId: response.id))
+                } catch {
+                    // Non-fatal — log and collect. Staff can add the device from Order Detail.
+                    let name = [device.customBrand, device.customModel].compactMap { $0 }.joined(separator: " ")
+                    logger.error("Failed to add device '\(name)' to order \(orderId): \(error)")
+                    deviceWarnings.append("Device '\(name.isEmpty ? "unknown" : name)' could not be added — add it from Order Detail.")
+                }
+            }
+
+            // 7. Create line items per device (best-effort — order still valid if items fail)
             for (device, apiDeviceId) in deviceIdMap {
                 for item in device.lineItems {
                     do {
@@ -497,12 +524,12 @@ final class BookingViewModel {
                 }
             }
 
-            // 9. Update form data with results
-            formData.createdOrderId = orderId
-            formData.createdOrderNumber = orderNumber
-            formData.createdTicketId = orderResponse.ticketId
+            // 8. Surface any device warnings as a non-fatal message, then confirm
+            if !deviceWarnings.isEmpty {
+                submitError = deviceWarnings.joined(separator: "\n")
+            }
 
-            // 10. Move to confirmation
+            // 9. Move to confirmation
             currentStep = .confirmation
 
             logger.info("Booking created successfully: Order #\(orderNumber)")
