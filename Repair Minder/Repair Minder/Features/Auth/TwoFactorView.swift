@@ -89,7 +89,7 @@ struct TwoFactorView: View {
                                 }
 
                             HStack(spacing: 8) {
-                                ForEach(0..<6, id: \.self) { index in
+                                ForEach(0..<(code.count > 6 ? 8 : 6), id: \.self) { index in
                                     CodeDigitBox(
                                         digit: index < code.count ? String(code[code.index(code.startIndex, offsetBy: index)]) : "",
                                         isFocused: hiddenFieldFocused && index == min(code.count, 5)
