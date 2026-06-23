@@ -298,7 +298,29 @@ struct DeviceDetailView: View {
                     Spacer()
                     WorkflowTypeBadge(workflowType: device.workflow)
                 }
-                if let engineer = device.assignedEngineer {
+                if let engineers = device.availableEngineers, !engineers.isEmpty {
+                    Menu {
+                        Button("Unassigned") {
+                            Task { await viewModel.assignEngineer(nil) }
+                        }
+                        ForEach(engineers) { e in
+                            Button(e.name) {
+                                Task { await viewModel.assignEngineer(e.id) }
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text("Assigned To")
+                            Spacer()
+                            Text(device.assignedEngineer?.name ?? "Unassigned")
+                                .foregroundStyle(.secondary)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .disabled(viewModel.isUpdating)
+                } else if let engineer = device.assignedEngineer {
                     HStack {
                         Text("Assigned To")
                         Spacer()
@@ -306,7 +328,34 @@ struct DeviceDetailView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                if let subLocation = device.subLocation {
+                if let subLocations = device.availableSubLocations, !subLocations.isEmpty {
+                    Menu {
+                        Button("Unassigned") {
+                            Task { await viewModel.setSubLocation(nil) }
+                        }
+                        ForEach(subLocations) { s in
+                            Button(s.name) {
+                                Task { await viewModel.setSubLocation(s.id) }
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text("Location")
+                            Spacer()
+                            if let subLocation = device.subLocation {
+                                Text(subLocation.code)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text("Unassigned")
+                                    .foregroundStyle(.secondary)
+                            }
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .disabled(viewModel.isUpdating)
+                } else if let subLocation = device.subLocation {
                     HStack {
                         Text("Location")
                         Spacer()
