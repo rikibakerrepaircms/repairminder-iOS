@@ -137,6 +137,10 @@ struct DeviceListFilter: Equatable, Sendable {
             items.append(URLQueryItem(name: "workflow_category", value: workflowCategory.rawValue))
         }
 
+        if workflowCategory == .buyback || workflowCategory == .refurb {
+            items.append(URLQueryItem(name: "include_buyback", value: "true"))
+        }
+
         if let period = period {
             items.append(URLQueryItem(name: "period", value: period.rawValue))
             items.append(URLQueryItem(name: "date_filter", value: dateFilter.rawValue))
