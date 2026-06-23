@@ -107,6 +107,19 @@ struct MyQueueView: View {
                         deviceNavigation = DeviceNavigation(orderId: orderId, deviceId: device.id)
                     }
                 }
+            } else if let errorMessage = viewModel.error, viewModel.devices.isEmpty {
+                VStack(spacing: 16) {
+                    Spacer()
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.largeTitle).foregroundColor(.orange)
+                    Text("Couldn't load your queue").font(.headline)
+                    Text(errorMessage).font(.subheadline).foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("Retry") { Task { await viewModel.loadQueue() } }
+                        .buttonStyle(.borderedProminent)
+                    Spacer()
+                }
+                .padding()
             } else if viewModel.isEmpty && !viewModel.isLoading {
                 emptyState
             } else {

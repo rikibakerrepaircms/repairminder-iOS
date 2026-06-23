@@ -152,7 +152,12 @@ final class DeviceDetailViewModel {
     }
 
     /// Execute a device action
-    func executeAction(_ action: DeviceAction, notes: String? = nil) async {
+    /// - Parameters:
+    ///   - action: The action to execute
+    ///   - notes: Optional free-text notes (sent as `notes` in body when present)
+    ///   - inputs: Values collected for `action.requiresInput` keys, keyed by the
+    ///             exact Worker field name (e.g. `["tracking_number": "TRK123"]`)
+    func executeAction(_ action: DeviceAction, notes: String? = nil, inputs: [String: String] = [:]) async {
         isUpdating = true
         error = nil
 
@@ -160,7 +165,8 @@ final class DeviceDetailViewModel {
             let request = DeviceActionRequest(
                 toStatus: action.toStatus,
                 notes: notes,
-                context: (action.isDevicePageAction ?? true) ? .devicePage : .orderPage
+                context: (action.isDevicePageAction ?? true) ? .devicePage : .orderPage,
+                inputs: inputs
             )
             try await APIClient.shared.requestVoid(
                 .executeDeviceAction(orderId: orderId, deviceId: deviceId),

@@ -7,14 +7,6 @@
 
 import Foundation
 
-// MARK: - Active Work Response
-
-/// Response from `/api/devices/my-active-work`
-/// Returns devices where the user has started but not completed diagnosis or repair
-struct ActiveWorkResponse: Decodable, Equatable, Sendable {
-    let data: [ActiveWorkItem]
-}
-
 // MARK: - Active Work Item
 
 /// Device with in-progress work (diagnosis or repair started but not completed)

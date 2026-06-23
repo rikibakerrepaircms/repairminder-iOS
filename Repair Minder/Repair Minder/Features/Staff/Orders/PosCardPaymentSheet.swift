@@ -94,7 +94,7 @@ struct PosCardPaymentSheet: View {
         return selected.reduce(0.0) { sum, device in
             let lineTotal = (order.items ?? [])
                 .filter { $0.deviceId == device.id }
-                .reduce(0.0) { $0 + $1.lineTotalIncVat }
+                .reduce(0.0) { $0 + ($1.lineTotalIncVat ?? 0) }
             let paid = (device.deposits ?? 0) + (device.finalPaid ?? 0)
             return sum + max(0, lineTotal - paid)
         }
@@ -872,7 +872,7 @@ struct PosCardPaymentSheet: View {
         case .timeout:
             state = .timeout
         default:
-            break
+            state = .failed(reason: "Payment status could not be confirmed. Check the terminal and try again.")
         }
     }
 

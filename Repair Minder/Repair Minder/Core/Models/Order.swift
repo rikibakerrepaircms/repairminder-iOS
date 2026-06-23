@@ -239,9 +239,9 @@ struct OrderItem: Decodable, Identifiable, Equatable, Sendable {
     let quantity: Int
     let unitPrice: Double
     let vatRate: Double
-    let lineTotal: Double
-    let vatAmount: Double
-    let lineTotalIncVat: Double
+    let lineTotal: Double?
+    let vatAmount: Double?
+    let lineTotalIncVat: Double?
     let deviceId: String?
     let createdAt: String?
     let authorizationStatus: String?
@@ -267,9 +267,9 @@ struct OrderItem: Decodable, Identifiable, Equatable, Sendable {
         quantity = try container.decode(Int.self, forKey: .quantity)
         unitPrice = try container.decode(Double.self, forKey: .unitPrice)
         vatRate = try container.decode(Double.self, forKey: .vatRate)
-        lineTotal = try container.decode(Double.self, forKey: .lineTotal)
-        vatAmount = try container.decode(Double.self, forKey: .vatAmount)
-        lineTotalIncVat = try container.decode(Double.self, forKey: .lineTotalIncVat)
+        lineTotal = try container.decodeIfPresent(Double.self, forKey: .lineTotal)
+        vatAmount = try container.decodeIfPresent(Double.self, forKey: .vatAmount)
+        lineTotalIncVat = try container.decodeIfPresent(Double.self, forKey: .lineTotalIncVat)
         deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
         createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
         authorizationStatus = try container.decodeIfPresent(String.self, forKey: .authorizationStatus)
@@ -285,7 +285,7 @@ struct OrderItem: Decodable, Identifiable, Equatable, Sendable {
     }
 
     var formattedLineTotal: String {
-        CurrencyFormatter.format(lineTotalIncVat)
+        CurrencyFormatter.format(lineTotalIncVat ?? 0)
     }
 }
 
@@ -540,18 +540,6 @@ struct ManualPaymentRequest: Encodable {
     var deviceId: String?
     var isDeposit: Bool?
     var isPayout: Bool?
-}
-
-// MARK: - Device Payment Breakdown
-
-struct DevicePaymentBreakdown: Decodable, Equatable, Sendable {
-    let deviceId: String
-    let displayName: String?
-    let lineTotal: Double?
-    let depositsPaid: Double?
-    let finalPaid: Double?
-    let totalPaid: Double?
-    let balanceDue: Double?
 }
 
 // MARK: - Product Type (Search Result)

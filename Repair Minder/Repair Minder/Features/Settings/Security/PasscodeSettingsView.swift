@@ -15,16 +15,26 @@ struct PasscodeSettingsView: View {
         List {
             // Passcode management
             Section("Passcode") {
-                Toggle(isOn: Binding(
-                    get: { passcodeService.passcodeEnabled },
-                    set: { newValue in viewModel.toggleEnabled(newValue) }
-                )) {
-                    Label("Passcode Lock", systemImage: "lock.fill")
-                }
+                if passcodeService.hasPasscode {
+                    // Passcode already set — show enable/disable toggle and change option
+                    Toggle(isOn: Binding(
+                        get: { passcodeService.passcodeEnabled },
+                        set: { newValue in viewModel.toggleEnabled(newValue) }
+                    )) {
+                        Label("Passcode Lock", systemImage: "lock.fill")
+                    }
 
-                if passcodeService.passcodeEnabled {
-                    Button("Change Passcode") {
-                        viewModel.showChangePasscode = true
+                    if passcodeService.passcodeEnabled {
+                        Button("Change Passcode") {
+                            viewModel.showChangePasscode = true
+                        }
+                    }
+                } else {
+                    // No passcode set yet — offer to create one
+                    Button {
+                        viewModel.showCreatePasscode = true
+                    } label: {
+                        Label("Set Passcode", systemImage: "lock.fill")
                     }
                 }
 
@@ -74,6 +84,10 @@ struct PasscodeSettingsView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .sheet(isPresented: $viewModel.showCreatePasscode) {
+            SetPasscodeView(mode: .create) { _ in }
+                .interactiveDismissDisabled()
+        }
         .sheet(isPresented: $viewModel.showChangePasscode) {
             SetPasscodeView(mode: .change) { _ in }
                 .interactiveDismissDisabled()

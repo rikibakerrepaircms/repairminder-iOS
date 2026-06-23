@@ -52,6 +52,25 @@ struct CustomerOrderDetailView: View {
         .sheet(item: $viewModel.poPreviewItem) { item in
             QuickLookPreview(url: item.url)
         }
+        .sheet(isPresented: Binding(
+            get: { viewModel.invoiceHTML != nil },
+            set: { if !$0 { viewModel.invoiceHTML = nil } }
+        )) {
+            if let html = viewModel.invoiceHTML {
+                NavigationStack {
+                    InvoiceWebView(html: html)
+                        .navigationTitle("Invoice")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") {
+                                    viewModel.invoiceHTML = nil
+                                }
+                            }
+                        }
+                }
+            }
+        }
         #endif
         .task {
             await viewModel.loadOrder()
@@ -65,6 +84,27 @@ struct CustomerOrderDetailView: View {
             LazyVStack(spacing: 16) {
                 // Order Header
                 orderHeader(order)
+
+                #if os(iOS)
+                // View Invoice button — fetches authed HTML and shows it in-app
+                Button {
+                    Task { await viewModel.loadInvoice() }
+                } label: {
+                    HStack {
+                        if viewModel.isLoadingInvoice {
+                            ProgressView()
+                                .padding(.trailing, 4)
+                        } else {
+                            Image(systemName: "doc.text")
+                        }
+                        Text(viewModel.isLoadingInvoice ? "Loading Invoice…" : "View Invoice")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(viewModel.isLoadingInvoice)
+                #endif
 
                 // Mail-in Shipping Banner: shown only when the order is
                 // awaiting its first device and was booked as mail-in. Same

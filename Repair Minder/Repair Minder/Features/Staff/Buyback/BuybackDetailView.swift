@@ -98,6 +98,22 @@ struct BuybackDetailView: View {
                     .onTapGesture { withAnimation(.easeInOut(duration: 0.2)) { showPurchasePrice.toggle() } }
                 costRow("Refurbishment", value: buyback.totals?.formattedRefurbishmentCost)
 
+                if let totals = buyback.totals, let labour = totals.labourCost, labour > 0 {
+                    costRow("Labour (\(totals.repairMinutes ?? 0)m)", value: CurrencyFormatter.format(labour))
+                }
+
+                if let salvage = buyback.salvageBudget {
+                    if let cap = salvage.cap {
+                        costRow("Salvage budget", value: CurrencyFormatter.format(cap))
+                    }
+                    if let booked = salvage.booked {
+                        costRow("Salvage booked", value: CurrencyFormatter.format(booked))
+                    }
+                    if let remaining = salvage.remaining {
+                        costRow("Salvage remaining", value: CurrencyFormatter.format(remaining))
+                    }
+                }
+
                 Divider()
 
                 costRow("Total Cost", value: buyback.totals?.formattedTotalCost, bold: true)

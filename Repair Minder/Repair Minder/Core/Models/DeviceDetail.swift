@@ -69,6 +69,11 @@ struct DeviceDetail: Decodable, Identifiable, Sendable {
     let checklist: [DeviceChecklistItem]
     let createdAt: String
     let updatedAt: String
+    let availableEngineers: [EngineerFilterInfo]?
+    let availableSubLocations: [SubLocationOption]?
+    let batteryHealthPercent: Int?
+    let batteryCycleCount: Int?
+    let aftermarketConsent: Int?
 
     // MARK: - Computed Properties
 
@@ -137,6 +142,15 @@ struct BrandInfo: Decodable, Sendable, Identifiable {
 }
 
 struct ModelInfo: Decodable, Sendable, Identifiable {
+    let id: String
+    let name: String
+}
+
+// MARK: - Sub-Location Option
+
+/// A selectable sub-location returned in `available_sub_locations` on the device-detail response.
+/// Distinct from `SubLocationInfo` (the currently-assigned sub-location object).
+struct SubLocationOption: Decodable, Equatable, Sendable, Identifiable {
     let id: String
     let name: String
 }

@@ -144,6 +144,21 @@ final class AuthManager: ObservableObject, TokenProvider {
                 try await requestMagicLink(email: email)
                 return
             }
+
+            // Direct-token success — company has no 2FA and no magic-link requirement.
+            // The login response carries only a slim user object (id/email/company_id),
+            // so we store the token then bootstrap via /api/auth/me to get the full
+            // User + Company — exactly the same path used by checkExistingSession().
+            if let token = response.token {
+                KeychainManager.shared.setAccessToken(token)
+                if let refreshToken = response.refreshToken {
+                    KeychainManager.shared.setRefreshToken(refreshToken)
+                }
+                clearPendingLogin()
+                await checkExistingSession()
+                return
+            }
+
             guard let userId = response.userId, let userEmail = response.email else {
                 throw APIError.serverError(message: "Unexpected login response", code: nil)
             }

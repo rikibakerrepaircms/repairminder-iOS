@@ -16,6 +16,14 @@ struct DeviceDetailView: View {
     @State private var showingActionSheet = false
     @State private var selectedAction: DeviceAction?
     @State private var actionNotes = ""
+    /// Collected values keyed by the Worker field name (e.g. `"tracking_number"`).
+    @State private var collectedInputs: [String: String] = [:]
+
+    // Edit state for notes fields
+    @State private var editingDiagnosisNotes = false
+    @State private var diagnosisNotesText = ""
+    @State private var editingRepairNotes = false
+    @State private var repairNotesText = ""
 
     private var isRegularWidth: Bool {
         horizontalSizeClass == .regular
@@ -64,26 +72,29 @@ struct DeviceDetailView: View {
                 Text(error)
             }
         }
-        .confirmationDialog(
-            selectedAction?.label ?? "Action",
-            isPresented: $showingActionSheet,
-            titleVisibility: .visible
-        ) {
+        .sheet(isPresented: $showingActionSheet) {
             if let action = selectedAction {
-                Button(action.label) {
-                    Task {
-                        await viewModel.executeAction(action, notes: actionNotes.isEmpty ? nil : actionNotes)
-                        actionNotes = ""
-                    }
-                }
-                Button("Cancel", role: .cancel) {
+                DeviceActionSheet(
+                    action: action,
+                    notes: $actionNotes,
+                    collectedInputs: $collectedInputs
+                ) {
+                    // Confirm
+                    let capturedNotes = actionNotes.isEmpty ? nil : actionNotes
+                    let capturedInputs = collectedInputs
+                    showingActionSheet = false
                     selectedAction = nil
                     actionNotes = ""
+                    collectedInputs = [:]
+                    Task {
+                        await viewModel.executeAction(action, notes: capturedNotes, inputs: capturedInputs)
+                    }
+                } onCancel: {
+                    showingActionSheet = false
+                    selectedAction = nil
+                    actionNotes = ""
+                    collectedInputs = [:]
                 }
-            }
-        } message: {
-            if let action = selectedAction, let message = action.confirmationMessage {
-                Text(message)
             }
         }
     }
@@ -129,15 +140,11 @@ struct DeviceDetailView: View {
                 issuesSection(device)
             }
 
-            // Diagnosis
-            if device.hasDiagnosticChecks || device.diagnosisNotes != nil {
-                diagnosisSection(device)
-            }
+            // Diagnosis — always shown (notes are editable)
+            diagnosisSection(device)
 
-            // Repair notes
-            if device.repairNotes != nil || device.status == "repairing" {
-                repairSection(device)
-            }
+            // Repair — always shown (notes are editable)
+            repairSection(device)
 
             // Line items
             if !device.lineItems.isEmpty {
@@ -179,13 +186,42 @@ struct DeviceDetailView: View {
     private func statusSection(_ device: DeviceDetail) -> some View {
         Section {
             if isRegularWidth {
+                let workflowStatuses = device.workflow == .buyback ? DeviceStatus.buybackStatuses : DeviceStatus.repairStatuses
                 Grid(alignment: .topLeading, horizontalSpacing: 32, verticalSpacing: 16) {
                     GridRow {
                         gridField("Status") {
-                            DeviceStatusBadge(status: device.deviceStatus, size: .large)
+                            Menu {
+                                ForEach(workflowStatuses, id: \.self) { s in
+                                    Button(s.label) {
+                                        Task { await viewModel.updateStatus(to: s) }
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    DeviceStatusBadge(status: device.deviceStatus, size: .large)
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .disabled(viewModel.isUpdating)
                         }
                         gridField("Priority") {
-                            PriorityBadge(priority: device.devicePriority)
+                            Menu {
+                                ForEach(DevicePriority.allCases, id: \.self) { p in
+                                    Button(p.displayName) {
+                                        Task { await viewModel.setPriority(p) }
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    PriorityBadge(priority: device.devicePriority)
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .disabled(viewModel.isUpdating)
                         }
                     }
                     GridRow {
@@ -223,22 +259,73 @@ struct DeviceDetailView: View {
                 }
                 .padding(.vertical, 4)
             } else {
-                HStack {
-                    Text("Status")
-                    Spacer()
-                    DeviceStatusBadge(status: device.deviceStatus, size: .large)
+                // Status — editable via Menu
+                let workflowStatuses = device.workflow == .buyback ? DeviceStatus.buybackStatuses : DeviceStatus.repairStatuses
+                Menu {
+                    ForEach(workflowStatuses, id: \.self) { s in
+                        Button(s.label) {
+                            Task { await viewModel.updateStatus(to: s) }
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text("Status")
+                        Spacer()
+                        DeviceStatusBadge(status: device.deviceStatus, size: .large)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                HStack {
-                    Text("Priority")
-                    Spacer()
-                    PriorityBadge(priority: device.devicePriority)
+                .disabled(viewModel.isUpdating)
+
+                // Priority — editable via Menu
+                Menu {
+                    ForEach(DevicePriority.allCases, id: \.self) { p in
+                        Button(p.displayName) {
+                            Task { await viewModel.setPriority(p) }
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text("Priority")
+                        Spacer()
+                        PriorityBadge(priority: device.devicePriority)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                .disabled(viewModel.isUpdating)
+
                 HStack {
                     Text("Workflow")
                     Spacer()
                     WorkflowTypeBadge(workflowType: device.workflow)
                 }
-                if let engineer = device.assignedEngineer {
+                if let engineers = device.availableEngineers, !engineers.isEmpty {
+                    Menu {
+                        Button("Unassigned") {
+                            Task { await viewModel.assignEngineer(nil) }
+                        }
+                        ForEach(engineers) { e in
+                            Button(e.name) {
+                                Task { await viewModel.assignEngineer(e.id) }
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text("Assigned To")
+                            Spacer()
+                            Text(device.assignedEngineer?.name ?? "Unassigned")
+                                .foregroundStyle(.secondary)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .disabled(viewModel.isUpdating)
+                } else if let engineer = device.assignedEngineer {
                     HStack {
                         Text("Assigned To")
                         Spacer()
@@ -246,7 +333,34 @@ struct DeviceDetailView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                if let subLocation = device.subLocation {
+                if let subLocations = device.availableSubLocations, !subLocations.isEmpty {
+                    Menu {
+                        Button("Unassigned") {
+                            Task { await viewModel.setSubLocation(nil) }
+                        }
+                        ForEach(subLocations) { s in
+                            Button(s.name) {
+                                Task { await viewModel.setSubLocation(s.id) }
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text("Location")
+                            Spacer()
+                            if let subLocation = device.subLocation {
+                                Text(subLocation.code)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text("Unassigned")
+                                    .foregroundStyle(.secondary)
+                            }
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .disabled(viewModel.isUpdating)
+                } else if let subLocation = device.subLocation {
                     HStack {
                         Text("Location")
                         Spacer()
@@ -274,8 +388,16 @@ struct DeviceDetailView: View {
             if !viewModel.devicePageActions.isEmpty {
                 ForEach(viewModel.devicePageActions) { action in
                     Button {
-                        selectedAction = action
-                        showingActionSheet = true
+                        if action.needsInputCollection {
+                            // Show sheet to gather confirmation / inputs / notes
+                            selectedAction = action
+                            actionNotes = ""
+                            collectedInputs = [:]
+                            showingActionSheet = true
+                        } else {
+                            // Execute directly — no user input required
+                            Task { await viewModel.executeAction(action) }
+                        }
                     } label: {
                         HStack {
                             Text(action.label)
@@ -376,6 +498,14 @@ struct DeviceDetailView: View {
 
                 if let passcodeType = device.passcodeType {
                     LabeledContent("Passcode Type", value: passcodeType.capitalized)
+                }
+
+                if let health = device.batteryHealthPercent {
+                    LabeledContent("Battery Health", value: "\(health)%")
+                }
+
+                if let cycles = device.batteryCycleCount {
+                    LabeledContent("Battery Cycles", value: "\(cycles)")
                 }
             }
         }
@@ -505,12 +635,46 @@ struct DeviceDetailView: View {
                 }
             }
 
-            if let notes = device.diagnosisNotes {
-                VStack(alignment: .leading, spacing: 4) {
+            // Diagnosis notes — always editable (even when nil, allows adding notes)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
                     Text("Notes")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Spacer()
+                    if !editingDiagnosisNotes {
+                        Button("Edit") {
+                            diagnosisNotesText = device.diagnosisNotes ?? ""
+                            editingDiagnosisNotes = true
+                        }
+                        .font(.caption)
+                    } else {
+                        Button("Save") {
+                            let text = diagnosisNotesText
+                            editingDiagnosisNotes = false
+                            Task { await viewModel.updateDiagnosisNotes(text) }
+                        }
+                        .font(.caption.weight(.semibold))
+                        Button("Cancel") {
+                            editingDiagnosisNotes = false
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                if editingDiagnosisNotes {
+                    TextEditor(text: $diagnosisNotesText)
+                        .frame(minHeight: 80)
+                        .font(.body)
+                        .scrollContentBackground(.hidden)
+                        .background(Color.platformGray6)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                } else if let notes = device.diagnosisNotes {
                     Text(notes)
+                } else {
+                    Text("No notes")
+                        .foregroundStyle(.tertiary)
+                        .italic()
                 }
             }
         }
@@ -520,12 +684,46 @@ struct DeviceDetailView: View {
 
     private func repairSection(_ device: DeviceDetail) -> some View {
         Section("Repair") {
-            if let notes = device.repairNotes {
-                VStack(alignment: .leading, spacing: 4) {
+            // Repair notes — always editable (even when nil, allows adding notes)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
                     Text("Repair Notes")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Spacer()
+                    if !editingRepairNotes {
+                        Button("Edit") {
+                            repairNotesText = device.repairNotes ?? ""
+                            editingRepairNotes = true
+                        }
+                        .font(.caption)
+                    } else {
+                        Button("Save") {
+                            let text = repairNotesText
+                            editingRepairNotes = false
+                            Task { await viewModel.updateRepairNotes(text) }
+                        }
+                        .font(.caption.weight(.semibold))
+                        Button("Cancel") {
+                            editingRepairNotes = false
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                if editingRepairNotes {
+                    TextEditor(text: $repairNotesText)
+                        .frame(minHeight: 80)
+                        .font(.body)
+                        .scrollContentBackground(.hidden)
+                        .background(Color.platformGray6)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                } else if let notes = device.repairNotes {
                     Text(notes)
+                } else {
+                    Text("No notes")
+                        .foregroundStyle(.tertiary)
+                        .italic()
                 }
             }
 
@@ -727,6 +925,87 @@ struct DeviceDetailView: View {
         formatter.numberStyle = .currency
         formatter.currencyCode = "GBP"
         return formatter.string(from: amount as NSDecimalNumber) ?? "£0.00"
+    }
+}
+
+// MARK: - Device Action Sheet
+
+/// Modal sheet presented when an action requires confirmation, notes, or input fields.
+///
+/// For actions where `needsInputCollection` is false this sheet is never shown —
+/// those execute directly via `executeAction`.  For actions that DO need input,
+/// this sheet gathers the values, then calls `onConfirm` so the ViewModel can
+/// build and POST the `DeviceActionRequest` with the correct top-level keys.
+private struct DeviceActionSheet: View {
+    let action: DeviceAction
+    @Binding var notes: String
+    @Binding var collectedInputs: [String: String]
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    /// True when all `requiresInput` fields have non-empty values
+    private var canConfirm: Bool {
+        guard let required = action.requiresInput, !required.isEmpty else { return true }
+        return required.allSatisfy { key in
+            !(collectedInputs[key] ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                // Confirmation message (reserved — not yet emitted by Worker)
+                if let message = action.confirmationMessage {
+                    Section {
+                        Text(message)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                // Required input fields
+                if let inputKeys = action.requiresInput, !inputKeys.isEmpty {
+                    Section("Required Information") {
+                        ForEach(inputKeys, id: \.self) { key in
+                            LabeledContent(DeviceAction.label(forInputKey: key)) {
+                                TextField(
+                                    DeviceAction.label(forInputKey: key),
+                                    text: Binding(
+                                        get: { collectedInputs[key] ?? "" },
+                                        set: { collectedInputs[key] = $0 }
+                                    )
+                                )
+                                .multilineTextAlignment(.trailing)
+                            }
+                        }
+                    }
+                }
+
+                // Optional notes (reserved — not yet emitted by Worker)
+                if action.requiresNotes == true {
+                    Section("Notes") {
+                        TextEditor(text: $notes)
+                            .frame(minHeight: 80)
+                    }
+                }
+
+                // Confirm / danger zone
+                Section {
+                    Button(action.label) {
+                        onConfirm()
+                    }
+                    .disabled(!canConfirm)
+                    .foregroundStyle(canConfirm ? Color.accentColor : Color.secondary)
+                }
+            }
+            .navigationTitle(action.label)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", action: onCancel)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 

@@ -149,85 +149,23 @@ final class OrderListViewModel: ObservableObject {
     // MARK: - Private Methods
 
     private func fetchOrders(page: Int) async throws -> (orders: [Order], pagination: Pagination, filters: OrderFilters) {
-        // For now, use URL building directly - additional filters would need URL modification
-        // The backend supports: status, payment_status, location_id, assigned_user_id, search
+        let endpoint = APIEndpoint.orders(
+            page: page,
+            limit: pageSize,
+            status: selectedStatus,
+            paymentStatus: selectedPaymentStatus,
+            locationId: selectedLocationId,
+            assignedUserId: selectedUserId,
+            search: searchText.isEmpty ? nil : searchText
+        )
 
-        // Perform request - note: the response structure is different
-        // Backend returns { success, data: [orders], pagination, filters }
-        // But our APIClient unwraps data, so we need to handle this specially
+        let (data, pagination, filters): ([Order], Pagination?, OrderFilters?) =
+            try await apiClient.requestWithFilters(endpoint)
 
-        let url = buildOrdersURL(page: page)
-        let request = try buildRequest(url: url)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw APIError.httpError(statusCode: (response as? HTTPURLResponse)?.statusCode ?? 500, message: nil)
-        }
-
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-
-        let apiResponse = try decoder.decode(OrdersAPIResponse.self, from: data)
-
-        guard apiResponse.success else {
-            throw APIError.serverError(message: apiResponse.error ?? "Unknown error", code: nil)
-        }
-
-        return (apiResponse.data, apiResponse.pagination, apiResponse.filters)
+        return (
+            data,
+            pagination ?? Pagination(page: page, limit: pageSize, total: 0, totalPages: 0),
+            filters ?? OrderFilters(locations: [], users: [], statuses: [], paymentStatuses: [], deviceTypes: [])
+        )
     }
-
-    private func buildOrdersURL(page: Int) -> URL {
-        var components = URLComponents(string: "https://api.repairminder.com/api/orders")!
-        var queryItems = [
-            URLQueryItem(name: "page", value: String(page)),
-            URLQueryItem(name: "limit", value: String(pageSize))
-        ]
-
-        if let status = selectedStatus, !status.isEmpty {
-            queryItems.append(URLQueryItem(name: "status", value: status))
-        }
-
-        if let paymentStatus = selectedPaymentStatus, !paymentStatus.isEmpty {
-            queryItems.append(URLQueryItem(name: "payment_status", value: paymentStatus))
-        }
-
-        if let locationId = selectedLocationId, !locationId.isEmpty {
-            queryItems.append(URLQueryItem(name: "location_id", value: locationId))
-        }
-
-        if let userId = selectedUserId, !userId.isEmpty {
-            queryItems.append(URLQueryItem(name: "assigned_user_id", value: userId))
-        }
-
-        if !searchText.isEmpty {
-            queryItems.append(URLQueryItem(name: "search", value: searchText))
-        }
-
-        components.queryItems = queryItems
-        return components.url!
-    }
-
-    private func buildRequest(url: URL) throws -> URLRequest {
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        if let token = apiClient.tokenProvider?.accessToken {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
-        return request
-    }
-}
-
-// MARK: - API Response Types
-
-private struct OrdersAPIResponse: Decodable {
-    let success: Bool
-    let data: [Order]
-    let pagination: Pagination
-    let filters: OrderFilters
-    let error: String?
 }

@@ -166,14 +166,18 @@ enum DeviceStatus: String, Codable, CaseIterable, Sendable {
 // MARK: - Device Workflow Type
 
 /// Type of workflow for a device
-enum DeviceWorkflowType: String, Codable, Sendable {
+enum DeviceWorkflowType: String, Codable, UnknownDefaultable, Sendable {
     case repair
     case buyback
+    case unknown = "__unknown__"
+
+    static var unknownFallback: DeviceWorkflowType { .unknown }
 
     var displayName: String {
         switch self {
         case .repair: return "Repair"
         case .buyback: return "Buyback"
+        case .unknown: return "Unknown"
         }
     }
 
@@ -181,6 +185,7 @@ enum DeviceWorkflowType: String, Codable, Sendable {
         switch self {
         case .repair: return "wrench.and.screwdriver"
         case .buyback: return "arrow.triangle.2.circlepath"
+        case .unknown: return "questionmark"
         }
     }
 }

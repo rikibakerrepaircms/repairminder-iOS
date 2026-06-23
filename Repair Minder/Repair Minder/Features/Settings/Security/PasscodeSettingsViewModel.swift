@@ -9,6 +9,7 @@ import SwiftUI
 
 @MainActor
 final class PasscodeSettingsViewModel: ObservableObject {
+    @Published var showCreatePasscode = false
     @Published var showChangePasscode = false
     @Published var showResetConfirmation = false
     @Published var showResetFlow = false

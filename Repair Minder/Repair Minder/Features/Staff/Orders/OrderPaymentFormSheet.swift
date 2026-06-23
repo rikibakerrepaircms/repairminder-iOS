@@ -66,10 +66,12 @@ struct OrderPaymentFormSheet: View {
 
     private var showDepositToggle: Bool {
         guard depositsEnabled else { return false }
+        // Whole-order payment (no specific device selected): always allow deposit toggle.
         guard let deviceId = selectedDeviceId,
               let device = order.devices?.first(where: { $0.id == deviceId }) else {
-            return false
+            return true
         }
+        // Per-device payment: keep existing rules (no buyback, not already complete).
         if device.workflowType == "buyback" { return false }
         return !repairCompleteStatuses.contains(device.status)
     }

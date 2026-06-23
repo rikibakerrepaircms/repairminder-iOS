@@ -29,11 +29,7 @@ struct ColumnActionPicker: View {
         ("clear_sub_location", "Clear Sub-Location"),
     ]
 
-    private let statusOptions = [
-        "device_received", "diagnosing", "repairing", "awaiting_parts",
-        "awaiting_customer", "quality_check", "repaired_ready",
-        "collected", "shipped",
-    ]
+    private let statusOptions: [DeviceStatus] = DeviceStatus.allCases
 
     private var needsValue: Bool {
         actionType == "set_status" || actionType == "set_engineer" || actionType == "set_sub_location"
@@ -63,9 +59,9 @@ struct ColumnActionPicker: View {
                     if actionType == "set_status" {
                         Picker("Status", selection: $actionValue) {
                             Text("Select a status…").tag("")
-                            ForEach(statusOptions, id: \.self) { status in
-                                Text(status.replacingOccurrences(of: "_", with: " ").capitalized)
-                                    .tag(status)
+                            ForEach(statusOptions, id: \.rawValue) { status in
+                                Text(status.label)
+                                    .tag(status.rawValue)
                             }
                         }
                         .pickerStyle(.inline)

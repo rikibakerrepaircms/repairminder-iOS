@@ -187,6 +187,8 @@ struct ClientDetailView: View {
 
                 Text(value)
                     .font(.subheadline)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
 
             Spacer()

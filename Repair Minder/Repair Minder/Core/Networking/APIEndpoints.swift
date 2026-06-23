@@ -82,7 +82,7 @@ enum APIEndpoint {
 
     // MARK: - Orders
 
-    case orders(page: Int, limit: Int, status: String?)
+    case orders(page: Int, limit: Int, status: String?, paymentStatus: String?, locationId: String?, assignedUserId: String?, search: String?)
     case createOrder
     case order(id: String)
     case updateOrder(id: String)
@@ -148,7 +148,6 @@ enum APIEndpoint {
 
     case registerDeviceToken
     case unregisterDeviceToken
-    case deviceTokens
     case pushPreferences
     case updatePushPreferences
     case customerRegisterDeviceToken
@@ -445,8 +444,6 @@ enum APIEndpoint {
         // Push Notifications
         case .registerDeviceToken, .unregisterDeviceToken:
             return "/api/user/device-token"
-        case .deviceTokens:
-            return "/api/user/device-tokens"
         case .pushPreferences, .updatePushPreferences:
             return "/api/user/push-preferences"
         case .customerRegisterDeviceToken, .customerUnregisterDeviceToken:
@@ -547,7 +544,7 @@ enum APIEndpoint {
              .macros, .macro, .macroExecutions, .macroExecution,
              .productTypes, .productComponents,
              .locations, .deviceSearch, .deviceTypes, .companyPublicInfo, .aiReadiness,
-             .deviceTokens, .pushPreferences,
+             .pushPreferences,
              .posIntegrations, .posTerminals, .pollTerminalPayment, .paymentLinks,
              .boardColumns, .boardCardPositions,
              .schedule, .teamSchedule, .boardPinnedPreferences,
@@ -655,13 +652,25 @@ enum APIEndpoint {
         case .devices(let filter):
             return filter.queryItems
 
-        case .orders(let page, let limit, let status):
+        case .orders(let page, let limit, let status, let paymentStatus, let locationId, let assignedUserId, let search):
             var items = [
                 URLQueryItem(name: "page", value: String(page)),
                 URLQueryItem(name: "limit", value: String(limit))
             ]
-            if let status = status {
+            if let status = status, !status.isEmpty {
                 items.append(URLQueryItem(name: "status", value: status))
+            }
+            if let paymentStatus = paymentStatus, !paymentStatus.isEmpty {
+                items.append(URLQueryItem(name: "payment_status", value: paymentStatus))
+            }
+            if let locationId = locationId, !locationId.isEmpty {
+                items.append(URLQueryItem(name: "location_id", value: locationId))
+            }
+            if let assignedUserId = assignedUserId, !assignedUserId.isEmpty {
+                items.append(URLQueryItem(name: "assigned_user_id", value: assignedUserId))
+            }
+            if let search = search, !search.isEmpty {
+                items.append(URLQueryItem(name: "search", value: search))
             }
             return items
 

@@ -70,12 +70,12 @@ final class EnquiryDetailViewModel: ObservableObject {
 
     /// Messages sorted chronologically (oldest first)
     var sortedMessages: [TicketMessage] {
-        ticket?.messages?.sorted { msg1, msg2 in
-            guard let date1 = ISO8601DateFormatter().date(from: msg1.createdAt),
-                  let date2 = ISO8601DateFormatter().date(from: msg2.createdAt) else {
-                return msg1.createdAt < msg2.createdAt
+        ticket?.messages?.sorted { m1, m2 in
+            guard let d1 = DateFormatters.parseDate(m1.createdAt),
+                  let d2 = DateFormatters.parseDate(m2.createdAt) else {
+                return m1.createdAt < m2.createdAt
             }
-            return date1 < date2
+            return d1 < d2
         } ?? []
     }
 
@@ -398,7 +398,7 @@ final class EnquiryDetailViewModel: ObservableObject {
 
         do {
             let body: [String: String] = ["status": status.rawValue]
-            let _: Ticket = try await APIClient.shared.request(
+            try await APIClient.shared.requestVoid(
                 .updateTicket(id: ticketId),
                 body: body
             )

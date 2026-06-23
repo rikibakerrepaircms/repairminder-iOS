@@ -222,11 +222,4 @@ final class PushNotificationService: ObservableObject {
         try await updatePreferences(request)
     }
 
-    // MARK: - Device Tokens List
-
-    /// Get all registered device tokens for the current user
-    func fetchRegisteredTokens() async throws -> [RegisteredDeviceToken] {
-        let response: [RegisteredDeviceToken] = try await APIClient.shared.request(.deviceTokens)
-        return response
-    }
 }
