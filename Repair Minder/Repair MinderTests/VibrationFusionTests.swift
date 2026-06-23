@@ -23,13 +23,13 @@ struct VibrationFusionTests {
         #expect(s[0] == 3)   // (2+4)/2 in slot 0 (0–0.3)
         #expect(s[1] == 10)  // slot 1 (0.3–0.6)
     }
-    // Both channels must correlate on the SAME cycle to pass (strong anti-spoof). Cases mirror real
-    // device data: only the cycle where mic AND mag both cleared (0.65/0.79) passes.
-    @Test func fusionRequiresBothChannels() {
-        #expect(VibrationFusion.passes(micScore: 0.65, magScore: 0.79))   // both ≥0.4 → pass
-        #expect(!VibrationFusion.passes(micScore: 1.63, magScore: -0.32)) // mag fails → no pass
-        #expect(!VibrationFusion.passes(micScore: 0.31, magScore: 1.30))  // mic 0.31<0.4 → no pass
-        #expect(!VibrationFusion.passes(micScore: -0.2, magScore: -0.14)) // both fail
+    // The mic-coded correlation is the gate (magnetometer dropped — it can't sample the 230 Hz
+    // carrier). A real buzz scores ~3+; flat noise <0.2; the 1.0 default sits well above noise.
+    @Test func micCodedGate() {
+        #expect(VibrationFusion.passes(micScore: 3.32))   // real buzz on a hard surface → pass
+        #expect(VibrationFusion.passes(micScore: 1.0))    // exactly at threshold → pass
+        #expect(!VibrationFusion.passes(micScore: 0.31))  // weak/ambient correlation → no pass
+        #expect(!VibrationFusion.passes(micScore: -0.2))  // anti-correlated noise → no pass
     }
 
     // Stillness veto: a resting phone (buzz ~0.05g) is still; a shaken phone (>0.08g) is not.

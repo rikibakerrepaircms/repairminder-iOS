@@ -13,6 +13,12 @@ final class CameraProbe: NSObject, LuminanceProbe, QRProbe {
     private var onSample: ((Double) -> Void)?
     private var onCode: ((String) -> Void)?
 
+    /// Number of video frames delivered since the session started — a hardware-liveness signal.
+    /// A camera that is delivering frames is provably ALIVE even before it recognises a QR, so the
+    /// QR watchdog must not fail it (the technician may still be loading/presenting a code). Only a
+    /// camera that produces zero frames is genuinely dead or permission-blocked.
+    private(set) var framesSeen: Int = 0
+
     init(device: AVCaptureDevice, lockExposureForMeasurement: Bool = false) {
         self.device = device
         self.lockExposureForMeasurement = lockExposureForMeasurement
@@ -126,7 +132,10 @@ extension CameraProbe: AVCaptureVideoDataOutputSampleBufferDelegate {
             for x in stride(from: 0, to: bpr, by: max(1, bpr / 20)) { total += Int(ptr[y * bpr + x]); n += 1 }
         }
         let avg = n > 0 ? Double(total) / Double(n) : 0
-        Task { @MainActor in self.onSample?(avg) }
+        Task { @MainActor in
+            self.framesSeen += 1            // liveness: every delivered frame proves the camera works
+            self.onSample?(avg)
+        }
     }
 }
 

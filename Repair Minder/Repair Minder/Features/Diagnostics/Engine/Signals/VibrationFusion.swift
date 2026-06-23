@@ -43,13 +43,17 @@ enum VibrationFusion {
         return (onMean - offMean) / (offMean + 1e-9)
     }
 
-    /// Auto-pass only when BOTH channels correlate with the coded buzz on the SAME cycle — the
-    /// magnetometer can't be faked by sound and the mic can't be faked off-frequency, so requiring
-    /// both simultaneously is the strong anti-spoof. The runner retries several cycles to find one
-    /// where both register (run-to-run sensor variance). Thresholds are on-device-tunable.
-    static func passes(micScore: Double, magScore: Double,
-                       micThreshold: Double = 0.4, magThreshold: Double = 0.4) -> Bool {
-        micScore >= micThreshold && magScore >= magThreshold
+    /// Auto-pass when the microphone band-energy correlates strongly with the SECRET, per-run coded
+    /// buzz. Correlation against a random ON/OFF code the device only knows at runtime IS the
+    /// anti-spoof: ambient noise is uncorrelated (averages out), a steady tone raises ON and OFF
+    /// slots equally (cancels in the score), and a replay can't match a code it can't predict. The
+    /// old magnetometer channel was removed — it physically cannot sample the ~230 Hz Taptic carrier
+    /// (magnetometer is ~50 Hz + low-passed) and reads 0 on a still phone; see
+    /// docs/plans/device-diagnostics/33-vibration-detection-research.md. The stillness veto (isStill)
+    /// now carries the anti-shake defence. Threshold is on-device-tunable: a real buzz scores ~3+,
+    /// flat noise <0.2, so 1.0 sits with wide margin above noise while tolerating per-cycle variance.
+    static func passes(micScore: Double, micThreshold: Double = 1.0) -> Bool {
+        micScore >= micThreshold
     }
 
     /// Stillness veto: a cycle only counts if the phone was resting still. A genuine buzz barely
