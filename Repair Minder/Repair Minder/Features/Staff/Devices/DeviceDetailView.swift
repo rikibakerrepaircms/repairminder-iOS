@@ -162,9 +162,7 @@ struct DeviceDetailView: View {
             }
 
             // Images
-            if !device.images.isEmpty {
-                imagesSection(device)
-            }
+            imagesSection(device)
 
             // Checklist
             if !device.checklist.isEmpty {
@@ -835,9 +833,16 @@ struct DeviceDetailView: View {
 
     private func imagesSection(_ device: DeviceDetail) -> some View {
         Section("Photos") {
+            #if os(iOS)
+            DeviceImageGalleryView(
+                orderId: device.orderId,
+                deviceId: device.id,
+                deviceStatus: device.status
+            )
+            #else
             Text("\(device.images.count) photo(s)")
                 .foregroundStyle(.secondary)
-            // Note: Full image gallery would go here
+            #endif
         }
     }
 
