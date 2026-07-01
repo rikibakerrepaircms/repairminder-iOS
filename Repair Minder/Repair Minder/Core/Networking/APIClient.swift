@@ -198,6 +198,72 @@ final class APIClient {
         }
     }
 
+    /// Upload a file via multipart/form-data and decode the JSON `data` payload.
+    /// Reuses Bearer-token auth and one 401 refresh+retry, mirroring `performRequest`.
+    func uploadMultipart<T: Decodable>(
+        _ endpoint: APIEndpoint,
+        fileData: Data,
+        fileName: String,
+        mimeType: String,
+        fields: [String: String],
+        skipAuthRefresh: Bool = false
+    ) async throws -> T {
+        let boundary = "Boundary-\(UUID().uuidString)"
+        let body = buildMultipartFormBody(
+            boundary: boundary,
+            fields: fields,
+            fileFieldName: "file",
+            fileName: fileName,
+            mimeType: mimeType,
+            fileData: fileData
+        )
+
+        var request = try buildRequest(endpoint) // no JSON body
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.networkError(URLError(.badServerResponse))
+            }
+
+            switch httpResponse.statusCode {
+            case 200...299:
+                let decoded: APIResponse<T> = try decodeResponse(data)
+                guard decoded.success, let payload = decoded.data else {
+                    throw APIError.serverError(message: decoded.error ?? "Upload failed", code: decoded.code)
+                }
+                return payload
+
+            case 401:
+                if !skipAuthRefresh && endpoint.requiresAuth {
+                    try await handleTokenRefresh()
+                    return try await uploadMultipart(
+                        endpoint, fileData: fileData, fileName: fileName,
+                        mimeType: mimeType, fields: fields, skipAuthRefresh: true
+                    )
+                }
+                throw APIError.unauthorized
+
+            case 404:
+                throw APIError.notFound
+
+            default:
+                let errorResponse = try? decodeResponse(data) as APIResponse<EmptyResponse>
+                throw APIError.httpError(statusCode: httpResponse.statusCode, message: errorResponse?.error)
+            }
+        } catch let error as APIError {
+            throw error
+        } catch let error as URLError where error.code == .cancelled {
+            throw APIError.cancelled
+        } catch let error as DecodingError {
+            throw APIError.decodingError(error)
+        } catch {
+            throw APIError.networkError(error)
+        }
+    }
+
     /// Perform the raw token refresh request
     /// This is used by AuthManager and should not be called directly
     func refreshAccessToken() async throws -> TokenRefreshResponse {
@@ -485,4 +551,33 @@ struct AnyEncodable: Encodable {
     func encode(to encoder: Encoder) throws {
         try _encode(encoder)
     }
+}
+
+// MARK: - Multipart Form Body
+
+/// Build a `multipart/form-data` body. Pure/nonisolated so it is unit-testable.
+func buildMultipartFormBody(
+    boundary: String,
+    fields: [String: String],
+    fileFieldName: String,
+    fileName: String,
+    mimeType: String,
+    fileData: Data
+) -> Data {
+    var body = Data()
+    let prefix = "--\(boundary)\r\n"
+
+    for (name, value) in fields {
+        body.append(Data(prefix.utf8))
+        body.append(Data("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".utf8))
+        body.append(Data("\(value)\r\n".utf8))
+    }
+
+    body.append(Data(prefix.utf8))
+    body.append(Data("Content-Disposition: form-data; name=\"\(fileFieldName)\"; filename=\"\(fileName)\"\r\n".utf8))
+    body.append(Data("Content-Type: \(mimeType)\r\n\r\n".utf8))
+    body.append(fileData)
+    body.append(Data("\r\n".utf8))
+    body.append(Data("--\(boundary)--\r\n".utf8))
+    return body
 }
