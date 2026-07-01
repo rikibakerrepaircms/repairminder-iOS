@@ -123,16 +123,22 @@ struct DeviceImageGalleryView: View {
         guard !payloads.isEmpty else { return }
         let type = DeviceImageService.imageType(forDeviceStatus: deviceStatus)
         errorMessage = nil
+        var failures = 0
         for (index, payload) in payloads.enumerated() {
             uploadProgress = "Uploading \(index + 1) of \(payloads.count)…"
             do {
                 _ = try await service.upload(image: payload, imageType: type, orderId: orderId, deviceId: deviceId)
             } catch {
-                errorMessage = "Upload failed for photo \(index + 1)"
+                failures += 1
             }
         }
         uploadProgress = nil
         await load()
+        // Surface upload failures AFTER reload so a successful load() doesn't hide them,
+        // and a load() error doesn't get masked by a per-photo message.
+        if failures > 0 && errorMessage == nil {
+            errorMessage = failures == 1 ? "1 photo failed to upload" : "\(failures) photos failed to upload"
+        }
     }
 
     private func delete(_ item: DeviceImageListItem) async {
@@ -152,11 +158,15 @@ struct AuthenticatedThumbnail: View {
     let imageId: String
 
     @State private var uiImage: UIImage?
+    @State private var failed = false
 
     var body: some View {
         Group {
             if let uiImage {
                 Image(uiImage: uiImage).resizable().scaledToFill()
+            } else if failed {
+                Rectangle().fill(.gray.opacity(0.15))
+                    .overlay { Image(systemName: "photo.slash").foregroundStyle(.secondary) }
             } else {
                 Rectangle().fill(.gray.opacity(0.15)).overlay { ProgressView() }
             }
@@ -174,10 +184,11 @@ struct AuthenticatedThumbnail: View {
                 if let image = UIImage(data: data) { uiImage = image; return }
             } catch {
                 if attempt < 2 {
-                    try? await Task.sleep(nanoseconds: UInt64((attempt + 1) * 400) * 1_000_000)
+                    try? await Task.sleep(nanoseconds: UInt64(attempt + 1) * 400 * 1_000_000)
                 }
             }
         }
+        failed = true
     }
 }
 #endif
