@@ -119,7 +119,8 @@ struct DevicesView: View {
                 deviceListContent(wideRows: wideRows)
             }
         }
-        .navigationTitle("Devices")
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 8) {
@@ -451,6 +452,15 @@ struct DeviceFilterSheet: View {
 
                 // Options
                 Section("Options") {
+                    // Reflects the Devices-list default: completed/collected devices are
+                    // hidden unless this is turned on (mirrors web /devices).
+                    Toggle("Show completed & collected", isOn: Binding(
+                        get: { viewModel.filterState.excludeStatus == nil },
+                        set: { showAll in
+                            viewModel.filterState.excludeStatus = showAll ? nil : DeviceListFilter.defaultExcludedStatuses
+                        }
+                    ))
+
                     Toggle("Show Archived", isOn: $viewModel.filterState.showArchived)
 
                     Toggle("Awaiting Collection", isOn: Binding(
