@@ -12,7 +12,6 @@ import UIKit
 /// UIKit camera wrapper (PhotosPicker cannot capture live camera).
 struct CameraPicker: UIViewControllerRepresentable {
     let onImage: (UIImage) -> Void
-    @Environment(\.dismiss) private var dismiss
 
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
@@ -34,11 +33,11 @@ struct CameraPicker: UIViewControllerRepresentable {
             if let image = info[.originalImage] as? UIImage {
                 parent.onImage(image)
             }
-            parent.dismiss()
+            picker.dismiss(animated: true)
         }
 
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            parent.dismiss()
+            picker.dismiss(animated: true)
         }
     }
 }

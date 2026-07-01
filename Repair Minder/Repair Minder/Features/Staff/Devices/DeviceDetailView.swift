@@ -840,8 +840,10 @@ struct DeviceDetailView: View {
                 deviceStatus: device.status
             )
             #else
-            Text("\(device.images.count) photo(s)")
-                .foregroundStyle(.secondary)
+            if !device.images.isEmpty {
+                Text("\(device.images.count) photo(s)")
+                    .foregroundStyle(.secondary)
+            }
             #endif
         }
     }
