@@ -105,6 +105,10 @@ struct DevicesView: View {
 
     private func devicesContent(wideRows: Bool) -> some View {
         VStack(spacing: 0) {
+            // Inline search (matches My Queue; avoids the system .searchable bar
+            // reserving a large empty band at the top).
+            searchBar
+
             // Category filter tabs
             categoryTabs
 
@@ -152,7 +156,6 @@ struct DevicesView: View {
                 }
             }
         }
-        .searchable(text: $searchText, prompt: "Search serial, IMEI, brand, model...")
         .onChange(of: searchText) { _, newValue in
             Task {
                 await viewModel.setSearch(newValue)
@@ -196,6 +199,32 @@ struct DevicesView: View {
     }
 
     // MARK: - Category Tabs
+
+    private var searchBar: some View {
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.secondary)
+            TextField("Search serial, IMEI, brand, model...", text: $searchText)
+                .textFieldStyle(.plain)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(Color.platformBackground)
+        .cornerRadius(8)
+        .padding(.horizontal, 10)
+        .padding(.top, 6)
+        .background(Color.platformGroupedBackground)
+    }
 
     private var categoryTabs: some View {
         ScrollView(.horizontal, showsIndicators: false) {
