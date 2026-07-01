@@ -17,6 +17,8 @@ struct DeviceImagePhotoViewer: View {
     let deviceId: String
     let imageId: String
     let fileName: String?
+    var imageType: String = "post_repair"
+    var onSaved: () -> Void = {}
 
     @Environment(\.dismiss) private var dismiss
 
@@ -32,6 +34,7 @@ struct DeviceImagePhotoViewer: View {
 
     @State private var shareURL: URL?
     @State private var showShare = false
+    @State private var showEditor = false
 
     private let minScale: CGFloat = 1
     private let maxScale: CGFloat = 5
@@ -58,6 +61,12 @@ struct DeviceImagePhotoViewer: View {
                     Button("Done") { dismiss() }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
+                    Button { showEditor = true } label: {
+                        Image(systemName: "pencil.tip.crop.circle")
+                    }
+                    .disabled(uiImage == nil)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     Button { prepareShare() } label: {
                         Image(systemName: "square.and.arrow.up")
                     }
@@ -72,6 +81,18 @@ struct DeviceImagePhotoViewer: View {
         .sheet(isPresented: $showShare) {
             if let shareURL {
                 DeviceImageActivityView(activityItems: [shareURL])
+            }
+        }
+        .fullScreenCover(isPresented: $showEditor) {
+            if let uiImage {
+                DeviceImagePhotoEditor(
+                    source: uiImage,
+                    orderId: orderId,
+                    deviceId: deviceId,
+                    imageType: imageType,
+                    baseFileName: fileName,
+                    onSaved: { onSaved(); dismiss() }
+                )
             }
         }
     }

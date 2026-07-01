@@ -75,7 +75,9 @@ struct DeviceImageGalleryView: View {
                 orderId: orderId,
                 deviceId: deviceId,
                 imageId: item.id,
-                fileName: item.filename
+                fileName: item.filename,
+                imageType: item.imageType,
+                onSaved: { Task { await load() } }
             )
         }
     }
