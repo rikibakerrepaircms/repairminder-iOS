@@ -123,28 +123,32 @@ struct DevicesView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 8) {
-                    // View mode toggle
+                // Single consolidated control: view mode + scan + filters.
+                Menu {
                     Picker("View", selection: $viewMode) {
-                        Image(systemName: "list.bullet").tag("list")
-                        Image(systemName: "rectangle.3.group").tag("board")
+                        Label("List", systemImage: "list.bullet").tag("list")
+                        Label("Board", systemImage: "rectangle.3.group").tag("board")
                     }
-                    .pickerStyle(.segmented)
-                    .frame(width: 80)
+                    .pickerStyle(.inline)
 
-                    // Scanner button
+                    Divider()
+
                     Button {
                         showingScanner = true
                     } label: {
-                        Image(systemName: "barcode.viewfinder")
+                        Label("Scan Barcode", systemImage: "barcode.viewfinder")
                     }
 
-                    // Filter button
                     Button {
                         showingFilterSheet = true
                     } label: {
-                        Image(systemName: viewModel.filterState.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        Label(viewModel.filterState.hasActiveFilters ? "Filters (active)" : "Filters…",
+                              systemImage: "line.3.horizontal.decrease.circle")
                     }
+                } label: {
+                    Image(systemName: viewModel.filterState.hasActiveFilters
+                          ? "line.3.horizontal.decrease.circle.fill"
+                          : "slider.horizontal.3")
                 }
             }
         }
@@ -370,6 +374,23 @@ struct DeviceFilterSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                // Active-view indicator (first thing shown): the list hides
+                // completed/collected devices by default — make that state obvious.
+                Section {
+                    Toggle("Show completed & collected", isOn: Binding(
+                        get: { viewModel.filterState.excludeStatus == nil },
+                        set: { showAll in
+                            viewModel.filterState.excludeStatus = showAll ? nil : DeviceListFilter.defaultExcludedStatuses
+                        }
+                    ))
+                } header: {
+                    Text("Showing")
+                } footer: {
+                    Text(viewModel.filterState.excludeStatus == nil
+                         ? "Showing all devices, including completed and collected."
+                         : "Completed and collected devices are hidden (default view).")
+                }
+
                 // Status filter
                 Section("Status") {
                     Picker("Status", selection: Binding(
@@ -452,15 +473,6 @@ struct DeviceFilterSheet: View {
 
                 // Options
                 Section("Options") {
-                    // Reflects the Devices-list default: completed/collected devices are
-                    // hidden unless this is turned on (mirrors web /devices).
-                    Toggle("Show completed & collected", isOn: Binding(
-                        get: { viewModel.filterState.excludeStatus == nil },
-                        set: { showAll in
-                            viewModel.filterState.excludeStatus = showAll ? nil : DeviceListFilter.defaultExcludedStatuses
-                        }
-                    ))
-
                     Toggle("Show Archived", isOn: $viewModel.filterState.showArchived)
 
                     Toggle("Awaiting Collection", isOn: Binding(
