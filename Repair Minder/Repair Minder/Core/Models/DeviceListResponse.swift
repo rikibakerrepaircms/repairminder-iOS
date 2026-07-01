@@ -133,11 +133,17 @@ struct DeviceListFilter: Equatable, Sendable {
             items.append(URLQueryItem(name: "search", value: search))
         }
 
-        // status and exclude_status are mutually exclusive (mirrors web /devices):
-        // an explicit status filter overrides the default completed-device exclusion.
+        // The default "hide paid/completed" exclusion (exclude_status) is only for
+        // the resting list. As soon as the user narrows by ANY match filter
+        // (status, engineer, device type, location, date, awaiting-collection),
+        // search ALL devices so the filter returns every match — including
+        // paid/collected/despatched ones. Otherwise the filter would only ever
+        // search the not-paid subset.
+        let hasMatchFilter = engineerId != nil || deviceTypeId != nil
+            || locationId != nil || collectionStatus != nil || period != nil
         if let status = status {
             items.append(URLQueryItem(name: "status", value: status))
-        } else if let excludeStatus = excludeStatus {
+        } else if let excludeStatus = excludeStatus, !hasMatchFilter {
             items.append(URLQueryItem(name: "exclude_status", value: excludeStatus))
         }
 
