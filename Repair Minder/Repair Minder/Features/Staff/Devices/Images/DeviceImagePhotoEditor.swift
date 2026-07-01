@@ -68,8 +68,8 @@ struct DeviceImagePhotoEditor: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                editorCanvas
                 controls
+                editorCanvas
             }
             .background(Color(.systemGray6))
             .navigationTitle("Edit Photo")
