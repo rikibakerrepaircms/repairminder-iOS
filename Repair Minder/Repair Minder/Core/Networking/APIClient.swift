@@ -246,8 +246,21 @@ final class APIClient {
                 }
                 throw APIError.unauthorized
 
+            case 403:
+                let errorResponse = try? decodeResponse(data) as APIResponse<EmptyResponse>
+                if errorResponse?.code == "CONSENT_REQUIRED" {
+                    NotificationCenter.default.post(name: .consentRequired, object: nil)
+                }
+                throw APIError.forbidden(
+                    message: errorResponse?.error,
+                    code: errorResponse?.code
+                )
+
             case 404:
                 throw APIError.notFound
+
+            case 429:
+                throw APIError.rateLimited
 
             default:
                 let errorResponse = try? decodeResponse(data) as APIResponse<EmptyResponse>
