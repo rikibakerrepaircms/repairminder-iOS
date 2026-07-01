@@ -13,6 +13,7 @@ import Foundation
 struct DeviceDetail: Decodable, Identifiable, Sendable {
     let id: String
     let orderId: String
+    let orderNumber: Int?
     let brand: BrandInfo?
     let model: ModelInfo?
     let customBrand: String?

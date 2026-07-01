@@ -15,6 +15,9 @@ struct DeviceImageGalleryView: View {
     let orderId: String
     let deviceId: String
     let deviceStatus: String
+    let orderNumber: Int?
+    let serialNumber: String?
+    let imei: String?
 
     @State private var images: [DeviceImageListItem] = []
     @State private var isLoading = false
@@ -119,15 +122,33 @@ struct DeviceImageGalleryView: View {
         await upload(payloads)
     }
 
+    /// Build a descriptive base filename: {order}_{serialOrImei}_{before|after}
+    private func baseFileName(imageType: String) -> String {
+        let tag = imageType == "pre_repair" ? "before" : "after"
+        func clean(_ s: String) -> String {
+            String(s.unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) || $0 == "-" })
+        }
+        var parts: [String] = []
+        if let orderNumber { parts.append(String(orderNumber)) }
+        if let serialNumber, !serialNumber.isEmpty { parts.append(clean(serialNumber)) }
+        else if let imei, !imei.isEmpty { parts.append(clean(imei)) }
+        parts.append(tag)
+        let base = parts.joined(separator: "_")
+        return base.isEmpty ? "device-photo" : base
+    }
+
     private func upload(_ payloads: [PlatformImageData]) async {
         guard !payloads.isEmpty else { return }
         let type = DeviceImageService.imageType(forDeviceStatus: deviceStatus)
+        let base = baseFileName(imageType: type)
         errorMessage = nil
         var failures = 0
         for (index, payload) in payloads.enumerated() {
             uploadProgress = "Uploading \(index + 1) of \(payloads.count)…"
+            let suffix = payloads.count > 1 ? "_\(index + 1)" : ""
+            let named = PlatformImageData(jpegData: payload.jpegData, fileName: "\(base)\(suffix).jpg")
             do {
-                _ = try await service.upload(image: payload, imageType: type, orderId: orderId, deviceId: deviceId)
+                _ = try await service.upload(image: named, imageType: type, orderId: orderId, deviceId: deviceId)
             } catch {
                 failures += 1
             }
@@ -179,7 +200,7 @@ struct AuthenticatedThumbnail: View {
         for attempt in 0..<3 {
             do {
                 let data = try await APIClient.shared.requestRawData(
-                    .deviceImageFile(orderId: orderId, deviceId: deviceId, imageId: imageId)
+                    .deviceImageFile(orderId: orderId, deviceId: deviceId, imageId: imageId, width: 240, height: 240)
                 )
                 if let image = UIImage(data: data) { uiImage = image; return }
             } catch {

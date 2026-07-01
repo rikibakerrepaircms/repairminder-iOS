@@ -84,7 +84,7 @@ enum APIEndpoint {
     case deviceImages(orderId: String, deviceId: String)
     case uploadDeviceImage(orderId: String, deviceId: String)
     case deleteDeviceImage(orderId: String, deviceId: String, imageId: String)
-    case deviceImageFile(orderId: String, deviceId: String, imageId: String)
+    case deviceImageFile(orderId: String, deviceId: String, imageId: String, width: Int?, height: Int?)
 
     // MARK: - Orders
 
@@ -347,7 +347,7 @@ enum APIEndpoint {
             return "/api/orders/\(orderId)/devices/\(deviceId)/images"
         case .deleteDeviceImage(let orderId, let deviceId, let imageId):
             return "/api/orders/\(orderId)/devices/\(deviceId)/images/\(imageId)"
-        case .deviceImageFile(let orderId, let deviceId, let imageId):
+        case .deviceImageFile(let orderId, let deviceId, let imageId, _, _):
             return "/api/orders/\(orderId)/devices/\(deviceId)/images/\(imageId)/file"
 
         // Orders
@@ -550,7 +550,7 @@ enum APIEndpoint {
              .dashboardStats, .commissionEstimate, .enquiryStats, .lifecycle, .categoryBreakdown, .activityLog,
              .bookingHeatmap, .buybackStats, .bookingsByTime,
              .devices, .myQueue, .myActiveWork, .orderDevices, .orderDevice, .deviceActions,
-             .deviceImages, .deviceImageFile,
+             .deviceImages, .deviceImageFile(_, _, _, _, _),
              .orders, .order, .orderItems, .orderPayments, .orderSignatures, .orderDocument,
              .clients, .client, .clientSearch, .clientsExport,
              .tickets, .ticket, .ticketMacroExecutions,
@@ -818,6 +818,14 @@ enum APIEndpoint {
             if let height = height {
                 items.append(URLQueryItem(name: "h", value: String(height)))
             }
+            items.append(URLQueryItem(name: "format", value: "auto"))
+            return items
+
+        case .deviceImageFile(_, _, _, let width, let height):
+            var items: [URLQueryItem] = []
+            if let width = width { items.append(URLQueryItem(name: "w", value: String(width))) }
+            if let height = height { items.append(URLQueryItem(name: "h", value: String(height))) }
+            guard !items.isEmpty else { return nil }
             items.append(URLQueryItem(name: "format", value: "auto"))
             return items
 

@@ -837,7 +837,10 @@ struct DeviceDetailView: View {
             DeviceImageGalleryView(
                 orderId: device.orderId,
                 deviceId: device.id,
-                deviceStatus: device.status
+                deviceStatus: device.status,
+                orderNumber: device.orderNumber,
+                serialNumber: device.serialNumber,
+                imei: device.imei
             )
             #else
             if !device.images.isEmpty {
