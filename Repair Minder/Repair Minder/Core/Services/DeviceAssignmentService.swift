@@ -29,22 +29,23 @@ enum DeviceAssignmentService {
     }
 
     /// Reassign the engineer (nil clears it). Buyback rows use the buyback endpoint.
-    static func updateEngineer(device: DeviceListItem, engineerId: String?) async throws {
+    /// Model-agnostic so both the Devices list and My Queue can call it.
+    static func updateEngineer(deviceId: String, source: String?, engineerId: String?) async throws {
         let body: [String: AnyEncodable] = ["assigned_engineer_id": AnyEncodable(engineerId)]
-        if device.source == "buyback" {
-            try await APIClient.shared.requestVoid(.updateBuyback(buybackId: device.id), body: body)
+        if source == "buyback" {
+            try await APIClient.shared.requestVoid(.updateBuyback(buybackId: deviceId), body: body)
         } else {
-            try await APIClient.shared.requestVoid(.updateDeviceEngineer(deviceId: device.id), body: body)
+            try await APIClient.shared.requestVoid(.updateDeviceEngineer(deviceId: deviceId), body: body)
         }
     }
 
     /// Reassign the sub-location (nil clears it). Buyback rows use the buyback endpoint.
-    static func updateSubLocation(device: DeviceListItem, subLocationId: String?) async throws {
+    static func updateSubLocation(deviceId: String, source: String?, subLocationId: String?) async throws {
         let body: [String: AnyEncodable] = ["sub_location_id": AnyEncodable(subLocationId)]
-        if device.source == "buyback" {
-            try await APIClient.shared.requestVoid(.updateBuyback(buybackId: device.id), body: body)
+        if source == "buyback" {
+            try await APIClient.shared.requestVoid(.updateBuyback(buybackId: deviceId), body: body)
         } else {
-            try await APIClient.shared.requestVoid(.updateDeviceSubLocation(deviceId: device.id), body: body)
+            try await APIClient.shared.requestVoid(.updateDeviceSubLocation(deviceId: deviceId), body: body)
         }
     }
 }

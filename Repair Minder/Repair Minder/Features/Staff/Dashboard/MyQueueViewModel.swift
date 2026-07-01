@@ -23,6 +23,10 @@ final class MyQueueViewModel {
     var isLoadingMore = false
     var error: String?
 
+    /// Sub-locations grouped by location id, eager-loaded for the inline
+    /// sub-location dropdown (mirrors the Devices page).
+    var subLocationsByLocation: [String: [SubLocationChoice]] = [:]
+
     var selectedCategory: QueueCategory = .all
     var searchText = ""
 
@@ -69,6 +73,16 @@ final class MyQueueViewModel {
         }
     }
 
+    /// Engineers for the inline assignment dropdown (mapped to the shared type).
+    var engineers: [EngineerFilterInfo] {
+        (filters?.engineers ?? []).map { EngineerFilterInfo(id: $0.id, name: $0.name) }
+    }
+
+    /// Locations for grouping the sub-location dropdown.
+    var locations: [LocationOption] {
+        filters?.locations ?? []
+    }
+
     // MARK: - Data Loading
 
     /// Load the initial queue data
@@ -81,6 +95,7 @@ final class MyQueueViewModel {
             devices = response.data
             pagination = response.pagination
             filters = response.filters
+            Task { await loadSubLocationsIfNeeded() }
         } catch {
             self.error = error.localizedDescription
             #if DEBUG
@@ -156,6 +171,59 @@ final class MyQueueViewModel {
     func clearSearch() async {
         searchText = ""
         await loadQueue()
+    }
+
+    // MARK: - Inline Assignment
+
+    /// Eager-load sub-locations for every known location (once each).
+    func loadSubLocationsIfNeeded() async {
+        for location in locations where subLocationsByLocation[location.id] == nil {
+            do {
+                subLocationsByLocation[location.id] =
+                    try await DeviceAssignmentService.subLocations(locationId: location.id)
+            } catch {
+                subLocationsByLocation[location.id] = []
+            }
+        }
+    }
+
+    private var allSubLocations: [SubLocationChoice] {
+        subLocationsByLocation.values.flatMap { $0 }
+    }
+
+    /// Reassign a device's engineer (nil clears). Optimistic; reverts on failure.
+    func reassignEngineer(_ device: DeviceQueueItem, to engineerId: String?) async {
+        guard let index = devices.firstIndex(where: { $0.id == device.id }) else { return }
+        let previous = devices[index].assignedEngineer
+        devices[index].assignedEngineer = engineerId.flatMap { id in
+            engineers.first(where: { $0.id == id }).map { AssignedEngineerInfo(id: $0.id, name: $0.name) }
+        }
+        do {
+            try await DeviceAssignmentService.updateEngineer(deviceId: device.id, source: device.source, engineerId: engineerId)
+        } catch {
+            devices[index].assignedEngineer = previous
+            self.error = "Couldn't update engineer"
+        }
+    }
+
+    /// Reassign a device's sub-location (nil clears). Optimistic; reverts on failure.
+    func reassignSubLocation(_ device: DeviceQueueItem, to subLocationId: String?) async {
+        guard let index = devices.firstIndex(where: { $0.id == device.id }) else { return }
+        let prevSub = devices[index].subLocation
+        let prevSubId = devices[index].subLocationId
+        let choice = subLocationId.flatMap { id in allSubLocations.first(where: { $0.id == id }) }
+        devices[index].subLocationId = subLocationId
+        devices[index].subLocation = choice.map {
+            SubLocationInfo(id: $0.id, code: $0.code, description: $0.description,
+                            type: $0.type, locationId: $0.locationId)
+        }
+        do {
+            try await DeviceAssignmentService.updateSubLocation(deviceId: device.id, source: device.source, subLocationId: subLocationId)
+        } catch {
+            devices[index].subLocation = prevSub
+            devices[index].subLocationId = prevSubId
+            self.error = "Couldn't update location"
+        }
     }
 
     // MARK: - Private Methods

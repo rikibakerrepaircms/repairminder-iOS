@@ -241,7 +241,7 @@ final class DevicesViewModel {
             engineers.first(where: { $0.id == id }).map { AssignedEngineerInfo(id: $0.id, name: $0.name) }
         }
         do {
-            try await DeviceAssignmentService.updateEngineer(device: device, engineerId: engineerId)
+            try await DeviceAssignmentService.updateEngineer(deviceId: device.id, source: device.source, engineerId: engineerId)
         } catch {
             devices[index].assignedEngineer = previous
             self.error = "Couldn't update engineer"
@@ -260,7 +260,7 @@ final class DevicesViewModel {
                             type: $0.type, locationId: $0.locationId)
         }
         do {
-            try await DeviceAssignmentService.updateSubLocation(device: device, subLocationId: subLocationId)
+            try await DeviceAssignmentService.updateSubLocation(deviceId: device.id, source: device.source, subLocationId: subLocationId)
         } catch {
             devices[index].subLocation = prevSub
             devices[index].subLocationId = prevSubId

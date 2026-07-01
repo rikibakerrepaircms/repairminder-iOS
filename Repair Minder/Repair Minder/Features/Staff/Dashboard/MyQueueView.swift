@@ -241,7 +241,15 @@ struct MyQueueView: View {
     private func deviceList(wideRows: Bool) -> some View {
         List {
             ForEach(viewModel.devices) { device in
-                DeviceQueueRow(device: device, isCompact: !wideRows) {
+                DeviceQueueRow(
+                    device: device,
+                    isCompact: !wideRows,
+                    engineers: viewModel.engineers,
+                    locations: viewModel.locations,
+                    subLocationsByLocation: viewModel.subLocationsByLocation,
+                    onAssignEngineer: { id in Task { await viewModel.reassignEngineer(device, to: id) } },
+                    onAssignSubLocation: { id in Task { await viewModel.reassignSubLocation(device, to: id) } }
+                ) {
                     if let orderId = device.orderId {
                         deviceNavigation = DeviceNavigation(orderId: orderId, deviceId: device.id)
                     }

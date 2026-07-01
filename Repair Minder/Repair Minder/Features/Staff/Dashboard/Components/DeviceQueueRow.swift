@@ -13,7 +13,32 @@ import SwiftUI
 struct DeviceQueueRow: View {
     let device: DeviceQueueItem
     var isCompact: Bool = true
+
+    // Inline assignment (mirrors the Devices page). Supplied only by My Queue;
+    // when the callbacks are nil the row shows the static sub-location label.
+    var engineers: [EngineerFilterInfo] = []
+    var locations: [LocationOption] = []
+    var subLocationsByLocation: [String: [SubLocationChoice]] = [:]
+    var onAssignEngineer: ((String?) -> Void)?
+    var onAssignSubLocation: ((String?) -> Void)?
+
+    // Declared last so existing trailing-closure call sites bind to `onTap`.
     let onTap: () -> Void
+
+    private var assignmentEnabled: Bool { onAssignEngineer != nil }
+
+    private var assignmentControls: some View {
+        DeviceAssignmentControls(
+            currentEngineer: device.assignedEngineer,
+            currentSubLocationId: device.subLocationId,
+            currentSubLocationCode: device.subLocation?.code,
+            engineers: engineers,
+            locations: locations,
+            subLocationsByLocation: subLocationsByLocation,
+            onAssignEngineer: { onAssignEngineer?($0) },
+            onAssignSubLocation: { onAssignSubLocation?($0) }
+        )
+    }
 
     var body: some View {
         Group {
@@ -76,7 +101,7 @@ struct DeviceQueueRow: View {
                             .lineLimit(1)
                     }
 
-                    if let subLocation = device.subLocation {
+                    if !assignmentEnabled, let subLocation = device.subLocation {
                         HStack(spacing: 2) {
                             Image(systemName: "mappin")
                                 .font(.system(size: 8))
@@ -86,6 +111,12 @@ struct DeviceQueueRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                     }
+                }
+
+                // Inline engineer + sub-location dropdowns (mirrors Devices page)
+                if assignmentEnabled {
+                    assignmentControls
+                        .padding(.top, 2)
                 }
             }
             .layoutPriority(1)
@@ -138,7 +169,9 @@ struct DeviceQueueRow: View {
                     .foregroundStyle(.secondary)
             }
 
-            if let subLocation = device.subLocation {
+            if assignmentEnabled {
+                assignmentControls
+            } else if let subLocation = device.subLocation {
                 HStack(spacing: 4) {
                     Image(systemName: "mappin")
                         .font(.caption2)

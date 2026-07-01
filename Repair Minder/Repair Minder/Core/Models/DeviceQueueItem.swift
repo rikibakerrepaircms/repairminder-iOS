@@ -76,10 +76,11 @@ struct DeviceQueueItem: Decodable, Equatable, Sendable, Identifiable {
     let status: String
     let workflowType: String
     let deviceType: DeviceTypeInfo?
-    let assignedEngineer: AssignedEngineerInfo?
+    // Mutable so inline reassignment can optimistically update the row.
+    var assignedEngineer: AssignedEngineerInfo?
     let locationId: String?
-    let subLocationId: String?
-    let subLocation: SubLocationInfo?
+    var subLocationId: String?
+    var subLocation: SubLocationInfo?
     let createdAt: String
     let dueDate: String?
     let receivedAt: String?
