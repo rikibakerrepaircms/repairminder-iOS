@@ -71,19 +71,22 @@ struct DeviceListFilter: Equatable, Sendable {
     var dateFilter: DateFilterType = .created
     var showArchived: Bool = false
     var collectionStatus: CollectionStatusFilter?
+    var includeBuyback: Bool = false
 
     /// Statuses hidden by default on the Devices LIST screen, matching the web
     /// /devices page (DEFAULT_EXCLUDED_STATUSES). Finished/gone devices are not
     /// shown unless an explicit status filter is applied.
     static let defaultExcludedStatuses = "collected,despatched,added_to_buyback"
 
-    /// Default filter for the Devices LIST screen: hides completed/collected
-    /// devices, mirroring web /devices. Scanner and serial/IMEI lookups must NOT
-    /// use this — they build a bare `DeviceListFilter()` so they can find a
-    /// device in any state.
+    /// Default filter for the Devices LIST screen, mirroring web /devices:
+    /// hides completed/collected devices AND includes buyback inventory items
+    /// (ready_to_repair). Scanner and serial/IMEI lookups must NOT use this —
+    /// they build a bare `DeviceListFilter()` so they can find a device in any
+    /// state without pulling in buyback stock.
     static var devicesListDefault: DeviceListFilter {
         var filter = DeviceListFilter()
         filter.excludeStatus = defaultExcludedStatuses
+        filter.includeBuyback = true
         return filter
     }
 
@@ -115,6 +118,7 @@ struct DeviceListFilter: Equatable, Sendable {
         dateFilter = .created
         showArchived = false
         collectionStatus = nil
+        includeBuyback = false
         page = 1
     }
 
@@ -153,7 +157,9 @@ struct DeviceListFilter: Equatable, Sendable {
             items.append(URLQueryItem(name: "workflow_category", value: workflowCategory.rawValue))
         }
 
-        if workflowCategory == .buyback || workflowCategory == .refurb {
+        // Match web /devices, which always requests buyback inventory alongside
+        // repair devices. The buyback/refurb category tabs also imply it.
+        if includeBuyback || workflowCategory == .buyback || workflowCategory == .refurb {
             items.append(URLQueryItem(name: "include_buyback", value: "true"))
         }
 

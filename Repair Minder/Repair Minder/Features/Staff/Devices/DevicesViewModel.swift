@@ -204,9 +204,8 @@ final class DevicesViewModel {
 
     /// Clear all filters
     func clearFilters() async {
-        filterState.reset()
-        // Return to the default list view, which still hides completed devices.
-        filterState.excludeStatus = DeviceListFilter.defaultExcludedStatuses
+        // Return to the default list view (hides completed devices, includes buyback).
+        filterState = DeviceListFilter.devicesListDefault
         await loadDevices()
     }
 

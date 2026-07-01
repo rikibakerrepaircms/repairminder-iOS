@@ -45,6 +45,18 @@ final class DeviceListFilterQueryTests: XCTestCase {
         f.excludeStatus = DeviceListFilter.defaultExcludedStatuses
         XCTAssertFalse(f.hasActiveFilters, "default exclusion should not count as an active filter")
     }
+
+    // The Devices list default must request buyback inventory, matching web /devices.
+    func testDevicesListDefaultRequestsBuyback() {
+        let items = DeviceListFilter.devicesListDefault.queryItems
+        XCTAssertEqual(value(items, "include_buyback"), "true")
+        XCTAssertEqual(value(items, "exclude_status"), "collected,despatched,added_to_buyback")
+    }
+
+    // Scanner/serial lookups must NOT pull in buyback stock.
+    func testBareFilterDoesNotRequestBuyback() {
+        XCTAssertNil(value(DeviceListFilter().queryItems, "include_buyback"))
+    }
 }
 
 /// The Devices LIST screen must default to the web's DEFAULT_EXCLUDED_STATUSES.
