@@ -290,6 +290,7 @@ struct DevicesView: View {
                 }
             }
             .listStyle(.plain)
+            .contentMargins(.top, 0, for: .scrollContent)
         }
     }
 
