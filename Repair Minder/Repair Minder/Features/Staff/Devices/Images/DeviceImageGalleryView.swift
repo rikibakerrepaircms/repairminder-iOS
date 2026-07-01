@@ -25,6 +25,7 @@ struct DeviceImageGalleryView: View {
     @State private var errorMessage: String?
     @State private var showCamera = false
     @State private var librarySelection: [PhotosPickerItem] = []
+    @State private var selectedItem: DeviceImageListItem?
 
     private let service = DeviceImageService()
 
@@ -69,6 +70,14 @@ struct DeviceImageGalleryView: View {
             guard !newItems.isEmpty else { return }
             Task { await handleLibrary(newItems) }
         }
+        .fullScreenCover(item: $selectedItem) { item in
+            DeviceImagePhotoViewer(
+                orderId: orderId,
+                deviceId: deviceId,
+                imageId: item.id,
+                fileName: item.filename
+            )
+        }
     }
 
     @ViewBuilder
@@ -84,6 +93,8 @@ struct DeviceImageGalleryView: View {
                             .overlay(alignment: .topLeading) {
                                 Circle().fill(badge).frame(width: 8, height: 8).padding(4)
                             }
+                            .contentShape(Rectangle())
+                            .onTapGesture { selectedItem = item }
                             .contextMenu {
                                 Button(role: .destructive) {
                                     Task { await delete(item) }
