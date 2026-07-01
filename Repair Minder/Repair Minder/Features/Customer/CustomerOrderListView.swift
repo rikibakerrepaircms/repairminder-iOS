@@ -285,7 +285,7 @@ struct CustomerOrderListView: View {
             if let client = customerAuth.currentCustomerClient {
                 Section {
                     Text(client.displayName)
-                    Text(client.email ?? "")
+                    Text(client.email)
                         .font(.caption)
                 }
             }

@@ -522,7 +522,7 @@ struct CustomerDeviceCard: View {
 
                         Spacer()
 
-                        Text(formatCurrency(item.lineTotalIncVat ?? 0))
+                        Text(formatCurrency(item.lineTotalIncVat))
                             .font(.subheadline)
                             .fontWeight(.medium)
                     }

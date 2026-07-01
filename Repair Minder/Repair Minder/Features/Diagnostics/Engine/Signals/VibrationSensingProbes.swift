@@ -20,7 +20,7 @@ final class MicBandEnergyProbe {
         self.onSample = onSample
 
         let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playAndRecord, options: [.defaultToSpeaker, .allowBluetooth])
+        try? session.setCategory(.playAndRecord, options: [.defaultToSpeaker, .allowBluetoothHFP])
         // A record session suppresses the Taptic Engine by default; explicitly re-permit haptics so
         // the vibration buzz can fire WHILE the mic records (Apple's documented fix for this conflict).
         try? session.setAllowHapticsAndSystemSoundsDuringRecording(true)

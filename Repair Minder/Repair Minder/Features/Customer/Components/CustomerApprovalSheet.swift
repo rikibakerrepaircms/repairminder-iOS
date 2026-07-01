@@ -120,7 +120,7 @@ struct CustomerApprovalSheet: View {
                             Text(item.description)
                                 .font(.subheadline)
                             Spacer()
-                            Text(formatCurrency(item.lineTotalIncVat ?? 0))
+                            Text(formatCurrency(item.lineTotalIncVat))
                                 .font(.subheadline)
                         }
                     }

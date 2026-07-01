@@ -11,8 +11,8 @@ import Foundation
 struct DeviceImageService {
     let client: APIClient
 
-    init(client: APIClient = .shared) {
-        self.client = client
+    init(client: APIClient? = nil) {
+        self.client = client ?? APIClient.shared
     }
 
     /// Device statuses that are pre-authorisation → photos tagged pre_repair.
