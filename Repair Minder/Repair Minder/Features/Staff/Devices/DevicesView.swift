@@ -401,35 +401,54 @@ struct DeviceFilterSheet: View {
     @Bindable var viewModel: DevicesViewModel
     @Environment(\.dismiss) private var dismiss
 
+    /// Status order shown in the multi-select, matching the web /devices page.
+    static let statusFilterOrder: [DeviceStatus] = [
+        .deviceReceived, .diagnosing, .readyToQuote, .companyRejected, .awaitingAuthorisation,
+        .authorisedSourceParts, .authorisedAwaitingParts, .readyToRepair, .repairing,
+        .awaitingRevisedQuote, .repairedQc, .repairedReady, .rejected, .rejectionQc,
+        .rejectionReady, .collected, .despatched, .readyToPay, .paymentMade, .addedToBuyback
+    ]
+
+    /// Whether a status is currently shown (i.e. NOT in the excluded set).
+    private func isStatusShown(_ status: String) -> Bool {
+        !viewModel.filterState.excludedStatusSet.contains(status)
+    }
+
+    /// Toggle a status in/out of the hidden (excluded) set.
+    private func toggleStatus(_ status: String) {
+        var set = viewModel.filterState.excludedStatusSet
+        if set.contains(status) { set.remove(status) } else { set.insert(status) }
+        viewModel.filterState.excludeStatus = set.isEmpty ? nil : set.sorted().joined(separator: ",")
+    }
+
     var body: some View {
         NavigationStack {
             Form {
-                // Active-view indicator (first thing shown): the list hides
-                // completed/collected devices by default — make that state obvious.
+                // Status multi-select — mirrors web /devices. Ticked = shown;
+                // unticked = hidden. By default the 3 completed statuses are hidden.
                 Section {
-                    Toggle("Show completed & collected", isOn: Binding(
-                        get: { viewModel.filterState.excludeStatus == nil },
-                        set: { showAll in
-                            viewModel.filterState.excludeStatus = showAll ? nil : DeviceListFilter.defaultExcludedStatuses
-                        }
-                    ))
+                    Button("Show All") {
+                        viewModel.filterState.excludeStatus = nil
+                    }
+                    Button("Hide Completed") {
+                        viewModel.filterState.excludeStatus = DeviceListFilter.defaultExcludedStatuses
+                    }
                 } header: {
-                    Text("Showing")
-                } footer: {
-                    Text(viewModel.filterState.excludeStatus == nil
-                         ? "Showing all devices, including completed and collected."
-                         : "Completed and collected devices are hidden (default view).")
+                    Text("Show devices with status")
                 }
 
-                // Status filter
-                Section("Status") {
-                    Picker("Status", selection: Binding(
-                        get: { viewModel.filterState.status ?? "" },
-                        set: { viewModel.filterState.status = $0.isEmpty ? nil : $0 }
-                    )) {
-                        Text("All").tag("")
-                        ForEach(DeviceStatus.allCases, id: \.rawValue) { status in
-                            Text(status.label).tag(status.rawValue)
+                Section {
+                    ForEach(Self.statusFilterOrder, id: \.rawValue) { status in
+                        Button {
+                            toggleStatus(status.rawValue)
+                        } label: {
+                            HStack {
+                                Image(systemName: isStatusShown(status.rawValue) ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(isStatusShown(status.rawValue) ? Color.accentColor : Color.secondary)
+                                Text(status.label)
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                            }
                         }
                     }
                 }

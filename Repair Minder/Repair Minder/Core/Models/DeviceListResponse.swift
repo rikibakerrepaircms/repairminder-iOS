@@ -78,6 +78,16 @@ struct DeviceListFilter: Equatable, Sendable {
     /// shown unless an explicit status filter is applied.
     static let defaultExcludedStatuses = "collected,despatched,added_to_buyback"
 
+    /// The default exclusion as an order-independent set (for comparisons).
+    static let defaultExcludedStatusSet: Set<String> =
+        Set(defaultExcludedStatuses.split(separator: ",").map(String.init))
+
+    /// Statuses currently hidden from the list, parsed from `excludeStatus`.
+    /// The status multi-select in the filter toggles membership of this set.
+    var excludedStatusSet: Set<String> {
+        Set((excludeStatus ?? "").split(separator: ",").map(String.init).filter { !$0.isEmpty })
+    }
+
     /// Default filter for the Devices LIST screen, mirroring web /devices:
     /// hides completed/collected devices AND includes buyback inventory items
     /// (ready_to_repair). Scanner and serial/IMEI lookups must NOT use this —
@@ -95,7 +105,7 @@ struct DeviceListFilter: Equatable, Sendable {
     var hasActiveFilters: Bool {
         !search.isEmpty ||
         status != nil ||
-        (excludeStatus != nil && excludeStatus != Self.defaultExcludedStatuses) ||
+        excludedStatusSet != Self.defaultExcludedStatusSet ||
         deviceTypeId != nil ||
         engineerId != nil ||
         locationId != nil ||
@@ -133,17 +143,12 @@ struct DeviceListFilter: Equatable, Sendable {
             items.append(URLQueryItem(name: "search", value: search))
         }
 
-        // The default "hide paid/completed" exclusion (exclude_status) is only for
-        // the resting list. As soon as the user narrows by ANY match filter
-        // (status, engineer, device type, location, date, awaiting-collection),
-        // search ALL devices so the filter returns every match — including
-        // paid/collected/despatched ones. Otherwise the filter would only ever
-        // search the not-paid subset.
-        let hasMatchFilter = engineerId != nil || deviceTypeId != nil
-            || locationId != nil || collectionStatus != nil || period != nil
+        // Mirrors web /devices: a single explicit `status` overrides; otherwise
+        // exclude whatever statuses are unticked in the status multi-select.
+        // An empty exclusion set (all statuses ticked on) sends nothing → all devices.
         if let status = status {
             items.append(URLQueryItem(name: "status", value: status))
-        } else if let excludeStatus = excludeStatus, !hasMatchFilter {
+        } else if let excludeStatus = excludeStatus, !excludeStatus.isEmpty {
             items.append(URLQueryItem(name: "exclude_status", value: excludeStatus))
         }
 
