@@ -80,6 +80,12 @@ enum APIEndpoint {
     case updateDeviceEngineer(deviceId: String)
     case updateDeviceSubLocation(deviceId: String)
 
+    // Device Images
+    case deviceImages(orderId: String, deviceId: String)
+    case uploadDeviceImage(orderId: String, deviceId: String)
+    case deleteDeviceImage(orderId: String, deviceId: String, imageId: String)
+    case deviceImageFile(orderId: String, deviceId: String, imageId: String)
+
     // MARK: - Orders
 
     case orders(page: Int, limit: Int, status: String?, paymentStatus: String?, locationId: String?, assignedUserId: String?, search: String?)
@@ -336,6 +342,13 @@ enum APIEndpoint {
             return "/api/devices/\(deviceId)/engineer"
         case .updateDeviceSubLocation(let deviceId):
             return "/api/devices/\(deviceId)/sub-location"
+        case .deviceImages(let orderId, let deviceId),
+             .uploadDeviceImage(let orderId, let deviceId):
+            return "/api/orders/\(orderId)/devices/\(deviceId)/images"
+        case .deleteDeviceImage(let orderId, let deviceId, let imageId):
+            return "/api/orders/\(orderId)/devices/\(deviceId)/images/\(imageId)"
+        case .deviceImageFile(let orderId, let deviceId, let imageId):
+            return "/api/orders/\(orderId)/devices/\(deviceId)/images/\(imageId)/file"
 
         // Orders
         case .orders, .createOrder:
@@ -537,6 +550,7 @@ enum APIEndpoint {
              .dashboardStats, .commissionEstimate, .enquiryStats, .lifecycle, .categoryBreakdown, .activityLog,
              .bookingHeatmap, .buybackStats, .bookingsByTime,
              .devices, .myQueue, .myActiveWork, .orderDevices, .orderDevice, .deviceActions,
+             .deviceImages, .deviceImageFile,
              .orders, .order, .orderItems, .orderPayments, .orderSignatures, .orderDocument,
              .clients, .client, .clientSearch, .clientsExport,
              .tickets, .ticket, .ticketMacroExecutions,
@@ -559,7 +573,7 @@ enum APIEndpoint {
              .customerMagicLinkRequest, .customerVerifyCode, .customerLogout,
              .setPasscode, .verifyPasscode, .changePasscode,
              .resetPasscodeRequest, .resetPasscode,
-             .createOrderDevice, .executeDeviceAction,
+             .createOrderDevice, .executeDeviceAction, .uploadDeviceImage,
              .createOrder, .createOrderItem, .createOrderPayment, .createOrderSignature,
              .sendQuote, .authorizeOrder, .despatchOrder, .collectOrder,
              .createClient, .clientsImport,
@@ -596,7 +610,8 @@ enum APIEndpoint {
              .deleteClient,
              .unregisterDeviceToken, .customerUnregisterDeviceToken,
              .cancelMacroExecution,
-             .boardDeleteColumn, .boardDeleteAction:
+             .boardDeleteColumn, .boardDeleteAction,
+             .deleteDeviceImage:
             return .delete
         }
     }
