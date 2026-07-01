@@ -168,6 +168,7 @@ enum APIEndpoint {
     // MARK: - Booking / Lookup
 
     case locations
+    case locationSubLocations(locationId: String)
     case deviceSearch(query: String)
     case deviceTypes
     case companyPublicInfo
@@ -196,6 +197,7 @@ enum APIEndpoint {
 
     case buybackList(page: Int, limit: Int, status: String?, search: String?, locationId: String?, engineerId: String?)
     case buybackDetail(id: String)
+    case updateBuyback(buybackId: String)
     case buybackImageFile(imageId: String, width: Int?, height: Int?)
 
     // MARK: - Board Config
@@ -445,6 +447,8 @@ enum APIEndpoint {
         // Booking / Lookup
         case .locations:
             return "/api/locations"
+        case .locationSubLocations(let locationId):
+            return "/api/locations/\(locationId)/sub-locations"
         case .deviceSearch:
             return "/api/device-search"
         case .deviceTypes:
@@ -487,6 +491,8 @@ enum APIEndpoint {
             return "/api/buyback"
         case .buybackDetail(let id):
             return "/api/buyback/\(id)"
+        case .updateBuyback(let buybackId):
+            return "/api/buyback/\(buybackId)"
         case .buybackImageFile(let imageId, _, _):
             return "/api/buyback/images/\(imageId)/file"
 
@@ -557,7 +563,7 @@ enum APIEndpoint {
              .ticketGenerateResponseStatus, .ticketRewriteResponseStatus,
              .macros, .macro, .macroExecutions, .macroExecution,
              .productTypes, .productComponents,
-             .locations, .deviceSearch, .deviceTypes, .companyPublicInfo, .aiReadiness,
+             .locations, .locationSubLocations, .deviceSearch, .deviceTypes, .companyPublicInfo, .aiReadiness,
              .pushPreferences,
              .posIntegrations, .posTerminals, .pollTerminalPayment, .paymentLinks,
              .boardColumns, .boardCardPositions,
@@ -591,7 +597,7 @@ enum APIEndpoint {
 
         // PATCH endpoints
         case .updateOrderDevice, .updateDeviceStatus, .updateDeviceBankDetails,
-             .updateDeviceEngineer, .updateDeviceSubLocation,
+             .updateDeviceEngineer, .updateDeviceSubLocation, .updateBuyback,
              .updateOrder, .updateOrderItem,
              .updateClient,
              .updateTicket,

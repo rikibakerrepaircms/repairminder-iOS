@@ -282,7 +282,15 @@ struct DevicesView: View {
                                 selectedDeviceNav = DeviceDetailNavigation(orderId: orderId, deviceId: device.id)
                             }
                         } label: {
-                            DeviceRow(device: device, isWide: true)
+                            DeviceRow(
+                                device: device,
+                                isWide: true,
+                                engineers: viewModel.engineers,
+                                locations: viewModel.locations,
+                                subLocationsByLocation: viewModel.subLocationsByLocation,
+                                onAssignEngineer: { id in Task { await viewModel.reassignEngineer(device, to: id) } },
+                                onAssignSubLocation: { id in Task { await viewModel.reassignSubLocation(device, to: id) } }
+                            )
                         }
                         .buttonStyle(.plain)
                         .listRowBackground(
@@ -298,7 +306,14 @@ struct DevicesView: View {
                     } else {
                         // iPhone: use NavigationLink
                         NavigationLink(value: device) {
-                            DeviceRow(device: device)
+                            DeviceRow(
+                                device: device,
+                                engineers: viewModel.engineers,
+                                locations: viewModel.locations,
+                                subLocationsByLocation: viewModel.subLocationsByLocation,
+                                onAssignEngineer: { id in Task { await viewModel.reassignEngineer(device, to: id) } },
+                                onAssignSubLocation: { id in Task { await viewModel.reassignSubLocation(device, to: id) } }
+                            )
                         }
                         .onAppear {
                             Task {

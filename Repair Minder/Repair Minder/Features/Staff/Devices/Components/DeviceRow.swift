@@ -16,11 +16,93 @@ struct DeviceRow: View {
     var showOrderNumber: Bool = true
     var isWide: Bool = false
 
+    // Inline assignment (mirrors web /devices). Supplied only by the Devices list;
+    // when the callbacks are nil the row shows static engineer/sub-location labels.
+    var engineers: [EngineerFilterInfo] = []
+    var locations: [LocationOption] = []
+    var subLocationsByLocation: [String: [SubLocationChoice]] = [:]
+    var onAssignEngineer: ((String?) -> Void)?
+    var onAssignSubLocation: ((String?) -> Void)?
+
+    private var assignmentEnabled: Bool { onAssignEngineer != nil }
+
+    private var locationsWithSubs: [LocationOption] {
+        locations.filter { !(subLocationsByLocation[$0.id] ?? []).isEmpty }
+    }
+
     var body: some View {
         if isWide {
             wideLayout
         } else {
             compactLayout
+        }
+    }
+
+    // MARK: - Inline Assignment Dropdowns
+
+    @ViewBuilder
+    private var engineerMenu: some View {
+        Menu {
+            Button { onAssignEngineer?(nil) } label: {
+                if device.assignedEngineer == nil { Label("Unassigned", systemImage: "checkmark") }
+                else { Text("Unassigned") }
+            }
+            ForEach(engineers) { eng in
+                Button { onAssignEngineer?(eng.id) } label: {
+                    if device.assignedEngineer?.id == eng.id { Label(eng.name, systemImage: "checkmark") }
+                    else { Text(eng.name) }
+                }
+            }
+        } label: {
+            assignmentChip(icon: "person",
+                           text: device.assignedEngineer?.name ?? "Unassigned",
+                           active: device.assignedEngineer != nil)
+        }
+    }
+
+    @ViewBuilder
+    private var subLocationMenu: some View {
+        Menu {
+            Button { onAssignSubLocation?(nil) } label: {
+                if device.subLocationId == nil { Label("None", systemImage: "checkmark") }
+                else { Text("None") }
+            }
+            ForEach(locationsWithSubs) { loc in
+                Section(loc.name) {
+                    ForEach(subLocationsByLocation[loc.id] ?? []) { sl in
+                        Button { onAssignSubLocation?(sl.id) } label: {
+                            if device.subLocationId == sl.id { Label(sl.code, systemImage: "checkmark") }
+                            else { Text(sl.code) }
+                        }
+                    }
+                }
+            }
+        } label: {
+            assignmentChip(icon: "mappin.circle",
+                           text: device.subLocation?.code ?? "Location",
+                           active: device.subLocation != nil)
+        }
+    }
+
+    private func assignmentChip(icon: String, text: String, active: Bool) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+            Text(text).lineLimit(1)
+            Image(systemName: "chevron.down").font(.system(size: 8, weight: .semibold))
+        }
+        .font(.caption2)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(active ? Color.accentColor.opacity(0.12) : Color.platformGray5)
+        .foregroundStyle(active ? Color.accentColor : Color.secondary)
+        .clipShape(Capsule())
+    }
+
+    private var assignmentRow: some View {
+        HStack(spacing: 8) {
+            engineerMenu
+            subLocationMenu
+            Spacer(minLength: 0)
         }
     }
 
@@ -84,8 +166,8 @@ struct DeviceRow: View {
                         .foregroundStyle(.secondary)
                 }
 
-                // Assigned engineer
-                if let engineer = device.assignedEngineer {
+                // Assigned engineer (static; replaced by the dropdown when enabled)
+                if !assignmentEnabled, let engineer = device.assignedEngineer {
                     Label(engineer.name, systemImage: "person")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -118,8 +200,8 @@ struct DeviceRow: View {
                 .padding(.top, 4)
             }
 
-            // Sub-location (if assigned)
-            if let subLocation = device.subLocation {
+            // Sub-location (static; replaced by the dropdown when enabled)
+            if !assignmentEnabled, let subLocation = device.subLocation {
                 HStack(spacing: 4) {
                     Image(systemName: "mappin.circle")
                         .font(.caption2)
@@ -137,6 +219,12 @@ struct DeviceRow: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+            }
+
+            // Inline engineer + sub-location dropdowns (mirrors web /devices)
+            if assignmentEnabled {
+                assignmentRow
+                    .padding(.top, 2)
             }
         }
         .padding(.vertical, 8)
@@ -177,7 +265,9 @@ struct DeviceRow: View {
             WorkflowTypeBadge(workflowType: device.workflow)
 
             // Assigned engineer
-            if let engineer = device.assignedEngineer {
+            if assignmentEnabled {
+                engineerMenu
+            } else if let engineer = device.assignedEngineer {
                 Label(engineer.name, systemImage: "person")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -187,7 +277,9 @@ struct DeviceRow: View {
             Spacer()
 
             // Sub-location
-            if let subLocation = device.subLocation {
+            if assignmentEnabled {
+                subLocationMenu
+            } else if let subLocation = device.subLocation {
                 HStack(spacing: 4) {
                     Image(systemName: "mappin")
                         .font(.caption2)
