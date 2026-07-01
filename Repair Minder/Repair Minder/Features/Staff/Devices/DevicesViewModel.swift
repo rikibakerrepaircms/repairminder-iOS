@@ -23,7 +23,9 @@ final class DevicesViewModel {
     var isLoadingMore = false
     var error: String?
 
-    var filterState = DeviceListFilter()
+    // Devices list mirrors web /devices: hide collected/despatched/added_to_buyback
+    // by default. (Scanner/serial lookups build their own bare DeviceListFilter.)
+    var filterState = DeviceListFilter.devicesListDefault
 
     // MARK: - Computed Properties
 
@@ -203,6 +205,8 @@ final class DevicesViewModel {
     /// Clear all filters
     func clearFilters() async {
         filterState.reset()
+        // Return to the default list view, which still hides completed devices.
+        filterState.excludeStatus = DeviceListFilter.defaultExcludedStatuses
         await loadDevices()
     }
 

@@ -72,11 +72,27 @@ struct DeviceListFilter: Equatable, Sendable {
     var showArchived: Bool = false
     var collectionStatus: CollectionStatusFilter?
 
-    /// Whether any filters are active (excluding pagination)
+    /// Statuses hidden by default on the Devices LIST screen, matching the web
+    /// /devices page (DEFAULT_EXCLUDED_STATUSES). Finished/gone devices are not
+    /// shown unless an explicit status filter is applied.
+    static let defaultExcludedStatuses = "collected,despatched,added_to_buyback"
+
+    /// Default filter for the Devices LIST screen: hides completed/collected
+    /// devices, mirroring web /devices. Scanner and serial/IMEI lookups must NOT
+    /// use this — they build a bare `DeviceListFilter()` so they can find a
+    /// device in any state.
+    static var devicesListDefault: DeviceListFilter {
+        var filter = DeviceListFilter()
+        filter.excludeStatus = defaultExcludedStatuses
+        return filter
+    }
+
+    /// Whether any filters are active (excluding pagination). The default
+    /// exclusion is the baseline list view, so it does not count as "active".
     var hasActiveFilters: Bool {
         !search.isEmpty ||
         status != nil ||
-        excludeStatus != nil ||
+        (excludeStatus != nil && excludeStatus != Self.defaultExcludedStatuses) ||
         deviceTypeId != nil ||
         engineerId != nil ||
         locationId != nil ||
@@ -113,11 +129,11 @@ struct DeviceListFilter: Equatable, Sendable {
             items.append(URLQueryItem(name: "search", value: search))
         }
 
+        // status and exclude_status are mutually exclusive (mirrors web /devices):
+        // an explicit status filter overrides the default completed-device exclusion.
         if let status = status {
             items.append(URLQueryItem(name: "status", value: status))
-        }
-
-        if let excludeStatus = excludeStatus {
+        } else if let excludeStatus = excludeStatus {
             items.append(URLQueryItem(name: "exclude_status", value: excludeStatus))
         }
 
