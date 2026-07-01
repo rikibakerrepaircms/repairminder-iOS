@@ -20,7 +20,7 @@ enum ImageCompressor {
     /// Resize + JPEG-encode. Returns nil only if encoding fails entirely.
     static func compress(_ image: UIImage) -> Data? {
         let resized = resize(image, longestSide: maxDimension)
-        var data = resized.jpegData(compressionQuality: qualitySteps[0])
+        var data: Data? = nil
         for quality in qualitySteps {
             guard let candidate = resized.jpegData(compressionQuality: quality) else { continue }
             data = candidate
