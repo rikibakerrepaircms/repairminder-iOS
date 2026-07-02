@@ -100,6 +100,17 @@ final class DeepLinkHandler: ObservableObject {
             return false
         }
 
+        // Passcode reset: repairminder://reset-passcode?token=<opaque token>
+        // Stashes the token so the app root can present the "set new passcode" sheet,
+        // even while the passcode lock overlay is showing.
+        if host == "reset-passcode" {
+            if let token = components.queryItems?.first(where: { $0.name == "token" })?.value, !token.isEmpty {
+                PasscodeService.shared.pendingResetToken = token
+                return true
+            }
+            return false
+        }
+
         let pathComponents = components.path.split(separator: "/").map(String.init)
 
         guard pathComponents.count >= 2 else {
