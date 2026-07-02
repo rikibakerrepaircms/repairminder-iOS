@@ -47,6 +47,15 @@ struct Repair_MinderApp: App {
             }
             .preferredColorScheme(appearanceManager.preferredColorScheme)
             .animation(passcodeService.isLocked ? nil : .easeInOut(duration: 0.25), value: passcodeService.isLocked)
+            .sheet(isPresented: Binding(
+                get: { passcodeService.pendingResetToken != nil },
+                set: { presented in if !presented { passcodeService.pendingResetToken = nil } }
+            )) {
+                if let token = passcodeService.pendingResetToken {
+                    ResetPasscodeView(resetToken: token)
+                        .interactiveDismissDisabled()
+                }
+            }
             .onChange(of: scenePhase) { _, newPhase in
                 handleScenePhaseChange(newPhase)
             }

@@ -100,10 +100,6 @@ struct PasscodeSettingsView: View {
         } message: {
             Text("We'll send a reset code to your registered email address.")
         }
-        .sheet(isPresented: $viewModel.showResetFlow) {
-            ResetPasscodeView()
-                .interactiveDismissDisabled()
-        }
         .alert("Disable Passcode Lock?", isPresented: $viewModel.showDisableConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Disable", role: .destructive) {

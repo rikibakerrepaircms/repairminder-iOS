@@ -75,9 +75,6 @@ struct PasscodeLockView: View {
         } message: {
             Text("We can send a reset code to your email, or you can logout and sign in again.")
         }
-        .sheet(isPresented: $viewModel.showResetFlow) {
-            ResetPasscodeView()
-        }
         .task {
             viewModel.attemptBiometricOnAppear()
         }

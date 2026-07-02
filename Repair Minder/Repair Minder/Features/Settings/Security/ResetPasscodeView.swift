@@ -8,9 +8,10 @@
 import SwiftUI
 
 struct ResetPasscodeView: View {
+    let resetToken: String
+
     @Environment(\.dismiss) private var dismiss
-    @State private var step: Step = .enterCode
-    @State private var resetCode: String = ""
+    @State private var step: Step = .enterNew
     @State private var newPasscode: String = ""
     @State private var confirmPasscode: String = ""
     @State private var errorMessage: String?
@@ -21,7 +22,6 @@ struct ResetPasscodeView: View {
     private let passcodeService = PasscodeService.shared
 
     enum Step: String {
-        case enterCode = "Enter reset code from email"
         case enterNew = "Enter new passcode"
         case confirmNew = "Confirm new passcode"
     }
@@ -74,7 +74,6 @@ struct ResetPasscodeView: View {
 
     private var currentInput: String {
         switch step {
-        case .enterCode: return resetCode
         case .enterNew: return newPasscode
         case .confirmNew: return confirmPasscode
         }
@@ -83,7 +82,6 @@ struct ResetPasscodeView: View {
     private func appendDigit(_ digit: String) {
         guard currentInput.count < passcodeLength, !isLoading else { return }
         switch step {
-        case .enterCode: resetCode += digit
         case .enterNew: newPasscode += digit
         case .confirmNew: confirmPasscode += digit
         }
@@ -94,7 +92,6 @@ struct ResetPasscodeView: View {
     private func deleteDigit() {
         guard !currentInput.isEmpty, !isLoading else { return }
         switch step {
-        case .enterCode: resetCode.removeLast()
         case .enterNew: newPasscode.removeLast()
         case .confirmNew: confirmPasscode.removeLast()
         }
@@ -102,9 +99,6 @@ struct ResetPasscodeView: View {
 
     private func handleComplete() {
         switch step {
-        case .enterCode:
-            step = .enterNew
-
         case .enterNew:
             step = .confirmNew
 
@@ -126,7 +120,8 @@ struct ResetPasscodeView: View {
         isLoading = true
         Task {
             do {
-                try await passcodeService.resetPasscode(code: resetCode, newPasscode: newPasscode)
+                try await passcodeService.resetPasscode(token: resetToken, newPasscode: newPasscode)
+                passcodeService.pendingResetToken = nil
                 passcodeService.unlockApp()
                 dismiss()
             } catch {
