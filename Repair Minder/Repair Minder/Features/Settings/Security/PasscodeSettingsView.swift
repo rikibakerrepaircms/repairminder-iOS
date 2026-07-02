@@ -94,11 +94,16 @@ struct PasscodeSettingsView: View {
         }
         .alert("Reset Passcode", isPresented: $viewModel.showResetConfirmation) {
             Button("Cancel", role: .cancel) {}
-            Button("Send Reset Email") {
+            Button("Send Reset Link") {
                 viewModel.requestReset()
             }
         } message: {
-            Text("We'll send a reset code to your registered email address.")
+            Text("We'll email you a link to set a new passcode. Open it on this device.")
+        }
+        .alert("Check Your Email", isPresented: $viewModel.showResetLinkSent) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("We've sent a link to set a new passcode. Open it on this device to continue.")
         }
         .alert("Disable Passcode Lock?", isPresented: $viewModel.showDisableConfirmation) {
             Button("Cancel", role: .cancel) {}

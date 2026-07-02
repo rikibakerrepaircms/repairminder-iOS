@@ -12,7 +12,7 @@ final class PasscodeSettingsViewModel: ObservableObject {
     @Published var showCreatePasscode = false
     @Published var showChangePasscode = false
     @Published var showResetConfirmation = false
-    @Published var showResetFlow = false
+    @Published var showResetLinkSent = false
     @Published var showDisableConfirmation = false
     @Published var showError = false
     @Published var errorMessage: String?
@@ -82,7 +82,7 @@ final class PasscodeSettingsViewModel: ObservableObject {
         Task {
             do {
                 try await passcodeService.requestPasscodeReset()
-                showResetFlow = true
+                showResetLinkSent = true
             } catch {
                 errorMessage = error.localizedDescription
                 showError = true

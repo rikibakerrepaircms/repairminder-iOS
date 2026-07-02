@@ -12,7 +12,7 @@ final class PasscodeLockViewModel: ObservableObject {
     @Published var enteredDigits: String = ""
     @Published var shakeCount: Int = 0
     @Published var showForgotAlert: Bool = false
-    @Published var showResetFlow: Bool = false
+    @Published var showResetEmailSent: Bool = false
     @Published var isAuthenticating: Bool = false
     @Published var errorMessage: String?
 
@@ -73,7 +73,7 @@ final class PasscodeLockViewModel: ObservableObject {
         Task {
             do {
                 try await passcodeService.requestPasscodeReset()
-                showResetFlow = true
+                showResetEmailSent = true
             } catch {
                 errorMessage = error.localizedDescription
             }

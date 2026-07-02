@@ -73,7 +73,12 @@ struct PasscodeLockView: View {
                 viewModel.forceLogout()
             }
         } message: {
-            Text("We can send a reset code to your email, or you can logout and sign in again.")
+            Text("We'll email you a link to set a new passcode, or you can logout and sign in again.")
+        }
+        .alert("Check Your Email", isPresented: $viewModel.showResetEmailSent) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("We've sent a link to set a new passcode. Open it on this device to continue.")
         }
         .task {
             viewModel.attemptBiometricOnAppear()
