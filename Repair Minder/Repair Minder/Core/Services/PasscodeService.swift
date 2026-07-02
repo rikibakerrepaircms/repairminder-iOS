@@ -27,6 +27,10 @@ final class PasscodeService: ObservableObject {
     /// until a correct passcode is entered. Survives force-quit (keychain-backed).
     static let maxFailedBeforeBiometricBlock = 5
 
+    /// Set by DeepLinkHandler when the user taps a reset link. Observed at the app
+    /// root to present the "set new passcode" sheet above the lock overlay.
+    @Published var pendingResetToken: String?
+
     // MARK: - Types
 
     enum BiometricType {
@@ -211,8 +215,8 @@ final class PasscodeService: ObservableObject {
         let _: ResetPasscodeRequestResponse = try await APIClient.shared.request(.resetPasscodeRequest, body: ResetPasscodeRequestBody())
     }
 
-    func resetPasscode(code: String, newPasscode: String) async throws {
-        let body = ResetPasscodeRequest(code: code, newPasscode: newPasscode)
+    func resetPasscode(token: String, newPasscode: String) async throws {
+        let body = ResetPasscodeRequest(token: token, newPasscode: newPasscode)
         let response: ResetPasscodeResponse = try await APIClient.shared.request(.resetPasscode, body: body)
         // Update local cache
         if let hash = response.passcodeHash, let salt = response.passcodeSalt {
@@ -220,6 +224,7 @@ final class PasscodeService: ObservableObject {
             keychain.setPasscodeSalt(salt)
         }
         hasPasscode = true
+        resetFailedAttempts()
     }
 
     // MARK: - Toggle Enabled

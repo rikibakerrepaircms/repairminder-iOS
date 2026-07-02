@@ -53,7 +53,7 @@ struct ResetPasscodeRequestResponse: Decodable {
 // MARK: - Reset Passcode
 
 struct ResetPasscodeRequest: Encodable {
-    let code: String
+    let token: String
     let newPasscode: String
 }
 
