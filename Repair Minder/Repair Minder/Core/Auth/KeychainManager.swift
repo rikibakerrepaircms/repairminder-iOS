@@ -30,6 +30,7 @@ final class KeychainManager {
         static let biometricEnabled = "com.repairminder.biometricEnabled"
         static let passcodeTimeout = "com.repairminder.passcodeTimeout"
         static let passcodeEnabled = "com.repairminder.passcodeEnabled"
+        static let passcodeFailedCount = "com.repairminder.passcodeFailedCount"
     }
 
     // MARK: - Initialization
@@ -137,12 +138,16 @@ final class KeychainManager {
         return Int(str)
     }
 
+    func setPasscodeFailedCount(_ count: Int) { set(String(count), forKey: Keys.passcodeFailedCount) }
+    func getPasscodeFailedCount() -> Int { Int(get(forKey: Keys.passcodeFailedCount) ?? "0") ?? 0 }
+
     func clearPasscodeData() {
         delete(forKey: Keys.passcodeHash)
         delete(forKey: Keys.passcodeSalt)
         delete(forKey: Keys.biometricEnabled)
         delete(forKey: Keys.passcodeTimeout)
         delete(forKey: Keys.passcodeEnabled)
+        delete(forKey: Keys.passcodeFailedCount)
     }
 
     // MARK: - Clear All
