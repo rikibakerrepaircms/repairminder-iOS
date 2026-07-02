@@ -109,6 +109,11 @@ final class PasscodeService: ObservableObject {
         self.hasPasscode = hasPasscode
         self.passcodeEnabled = passcodeEnabled
         keychain.setPasscodeEnabled(passcodeEnabled)
+        // The shared passcode may have been cleared elsewhere (e.g. from the web). Drop the
+        // stale cached credential so local verification doesn't use an old hash.
+        if !hasPasscode {
+            keychain.clearPasscodeCredential()
+        }
         // Preserve local "On App Close" (0) setting — it's not stored on the server
         let localTimeout = keychain.getPasscodeTimeout()
         if localTimeout == 0 {
@@ -250,9 +255,16 @@ final class PasscodeService: ObservableObject {
 
     func togglePasscodeEnabled(_ enabled: Bool) async throws {
         let body = TogglePasscodeEnabledRequest(enabled: enabled)
-        let _: TogglePasscodeEnabledResponse = try await APIClient.shared.request(.togglePasscodeEnabled, body: body)
+        let response: TogglePasscodeEnabledResponse = try await APIClient.shared.request(.togglePasscodeEnabled, body: body)
         passcodeEnabled = enabled
         keychain.setPasscodeEnabled(enabled)
+        // If the server cleared the shared passcode (both app + web locks now off),
+        // reflect it locally so this matches the web behaviour.
+        if response.hasPasscode == false {
+            hasPasscode = false
+            keychain.clearPasscodeCredential()
+            resetFailedAttempts()
+        }
     }
 
     // MARK: - Timeout

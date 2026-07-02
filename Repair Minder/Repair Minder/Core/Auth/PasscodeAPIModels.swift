@@ -71,6 +71,8 @@ struct TogglePasscodeEnabledRequest: Encodable {
 
 struct TogglePasscodeEnabledResponse: Decodable {
     let passcodeEnabled: Bool
+    // true unless the server cleared the shared passcode (both app + web locks now off)
+    let hasPasscode: Bool?
 }
 
 // MARK: - Passcode Timeout

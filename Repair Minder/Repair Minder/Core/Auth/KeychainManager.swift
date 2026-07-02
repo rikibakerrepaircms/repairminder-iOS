@@ -150,6 +150,15 @@ final class KeychainManager {
         delete(forKey: Keys.passcodeFailedCount)
     }
 
+    /// Removes only the cached passcode credential (hash/salt + failed-attempt count),
+    /// keeping Face ID / timeout preferences. Used when the shared passcode is cleared
+    /// server-side (both the app lock and the web lock turned off).
+    func clearPasscodeCredential() {
+        delete(forKey: Keys.passcodeHash)
+        delete(forKey: Keys.passcodeSalt)
+        delete(forKey: Keys.passcodeFailedCount)
+    }
+
     // MARK: - Clear All
 
     /// Clears all stored data (full logout)
