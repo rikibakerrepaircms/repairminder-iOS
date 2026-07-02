@@ -127,7 +127,11 @@ final class AppState: ObservableObject {
             await syncPasscodeState()
             // Re-arm the "On App Close" lock from authoritative server state — the local
             // keychain hash cache may be absent even when the user has an enabled passcode.
-            if PasscodeService.shared.passcodeEnabled && PasscodeService.shared.timeoutMinutes == 0 {
+            // Skip if the user already unlocked this launch, or we'd re-lock (and flicker)
+            // right after a successful Face ID / passcode unlock.
+            if PasscodeService.shared.passcodeEnabled
+                && PasscodeService.shared.timeoutMinutes == 0
+                && !PasscodeService.shared.hasUnlockedSinceLaunch {
                 PasscodeService.shared.lockApp()
             }
             if !PasscodeService.shared.hasPasscode && !hasSeenPasscodeSetup {

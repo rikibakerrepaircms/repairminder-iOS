@@ -21,6 +21,10 @@ final class PasscodeService: ObservableObject {
     @Published private(set) var biometricType: BiometricType = .none
     @Published private(set) var timeoutMinutes: Int = 15
     @Published var isLocked: Bool = false
+
+    /// True once the user has unlocked (Face ID or passcode) since this process launched.
+    /// Prevents the cold-launch re-arm in AppState from re-locking after a successful unlock.
+    private(set) var hasUnlockedSinceLaunch = false
     @Published private(set) var biometricBlocked: Bool = false
 
     /// Number of consecutive wrong passcode entries that disables biometric unlock
@@ -272,6 +276,7 @@ final class PasscodeService: ObservableObject {
 
     func unlockApp() {
         isLocked = false
+        hasUnlockedSinceLaunch = true
     }
 
     func shouldLockOnForeground(backgroundDuration: TimeInterval) -> Bool {
