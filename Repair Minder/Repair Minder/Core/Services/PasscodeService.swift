@@ -21,6 +21,11 @@ final class PasscodeService: ObservableObject {
     @Published private(set) var biometricType: BiometricType = .none
     @Published private(set) var timeoutMinutes: Int = 15
     @Published var isLocked: Bool = false
+    @Published private(set) var biometricBlocked: Bool = false
+
+    /// Number of consecutive wrong passcode entries that disables biometric unlock
+    /// until a correct passcode is entered. Survives force-quit (keychain-backed).
+    static let maxFailedBeforeBiometricBlock = 5
 
     // MARK: - Types
 
@@ -80,6 +85,7 @@ final class PasscodeService: ObservableObject {
         passcodeEnabled = keychain.isPasscodeEnabled()
         isBiometricEnabled = keychain.isBiometricEnabled()
         timeoutMinutes = keychain.getPasscodeTimeout() ?? 15
+        biometricBlocked = keychain.getPasscodeFailedCount() >= Self.maxFailedBeforeBiometricBlock
         // Auto-lock on cold launch when "On App Close" is set — but ONLY if a staff
         // session actually exists. A logged-out app must never show the passcode/Face ID
         // lock, even if stale passcode keychain data lingers (iOS keychain survives app
@@ -253,6 +259,17 @@ final class PasscodeService: ObservableObject {
         return hasPasscode && passcodeEnabled && backgroundDuration >= timeoutSeconds
     }
 
+    func recordFailedAttempt() {
+        let count = keychain.getPasscodeFailedCount() + 1
+        keychain.setPasscodeFailedCount(count)
+        biometricBlocked = count >= Self.maxFailedBeforeBiometricBlock
+    }
+
+    func resetFailedAttempts() {
+        keychain.setPasscodeFailedCount(0)
+        biometricBlocked = false
+    }
+
     // MARK: - Cleanup (logout)
 
     func clearLocalData() {
@@ -262,6 +279,7 @@ final class PasscodeService: ObservableObject {
         isBiometricEnabled = false
         isLocked = false
         timeoutMinutes = 15
+        biometricBlocked = false
     }
 
     // MARK: - Hashing (matches backend)
