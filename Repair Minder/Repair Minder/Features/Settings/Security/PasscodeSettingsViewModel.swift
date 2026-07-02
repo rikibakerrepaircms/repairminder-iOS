@@ -13,7 +13,7 @@ final class PasscodeSettingsViewModel: ObservableObject {
     @Published var showChangePasscode = false
     @Published var showResetConfirmation = false
     @Published var showResetLinkSent = false
-    @Published var showDisableConfirmation = false
+    @Published var showVerifyForDisable = false
     @Published var showError = false
     @Published var errorMessage: String?
     @Published var selectedTimeout: Int
@@ -51,29 +51,65 @@ final class PasscodeSettingsViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Passcode enable/disable
+
     func toggleEnabled(_ enabled: Bool) {
-        if !enabled {
-            // Disabling requires confirmation
-            showDisableConfirmation = true
+        if enabled {
+            Task {
+                do {
+                    try await passcodeService.togglePasscodeEnabled(true)
+                } catch {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
             return
         }
-        Task {
-            do {
-                try await passcodeService.togglePasscodeEnabled(true)
-            } catch {
-                errorMessage = error.localizedDescription
-                showError = true
+        // Turning the passcode lock OFF must be authenticated first.
+        if passcodeService.isBiometricEnabled && passcodeService.isBiometricAvailable {
+            Task {
+                let result = await passcodeService.authenticateWithBiometric()
+                if case .success = result {
+                    await disablePasscode()
+                } else {
+                    // Cancelled/failed — revert the toggle to its real (still-on) state.
+                    passcodeService.objectWillChange.send()
+                }
             }
+        } else {
+            showVerifyForDisable = true
         }
     }
 
-    func confirmDisable() {
+    /// Called by VerifyPasscodeView once the current passcode is confirmed.
+    func onDisableVerified() {
+        Task { await disablePasscode() }
+    }
+
+    private func disablePasscode() async {
+        do {
+            try await passcodeService.togglePasscodeEnabled(false)
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+    }
+
+    // MARK: - Biometric enable/disable
+
+    func setBiometricEnabled(_ enabled: Bool) {
+        if enabled {
+            passcodeService.setBiometric(enabled: true)
+            return
+        }
+        // Turning Face ID / Touch ID OFF requires a successful scan first.
         Task {
-            do {
-                try await passcodeService.togglePasscodeEnabled(false)
-            } catch {
-                errorMessage = error.localizedDescription
-                showError = true
+            let result = await passcodeService.authenticateWithBiometric()
+            if case .success = result {
+                passcodeService.setBiometric(enabled: false)
+            } else {
+                // Cancelled/failed — revert the toggle to its real (still-on) state.
+                passcodeService.objectWillChange.send()
             }
         }
     }

@@ -48,7 +48,7 @@ struct PasscodeSettingsView: View {
                 Section {
                     Toggle(isOn: Binding(
                         get: { passcodeService.isBiometricEnabled },
-                        set: { passcodeService.setBiometric(enabled: $0) }
+                        set: { viewModel.setBiometricEnabled($0) }
                     )) {
                         Label {
                             VStack(alignment: .leading, spacing: 2) {
@@ -92,6 +92,11 @@ struct PasscodeSettingsView: View {
             SetPasscodeView(mode: .change) { _ in }
                 .interactiveDismissDisabled()
         }
+        .sheet(isPresented: $viewModel.showVerifyForDisable) {
+            VerifyPasscodeView(reason: "Enter your passcode to turn off Passcode Lock") {
+                viewModel.onDisableVerified()
+            }
+        }
         .alert("Reset Passcode", isPresented: $viewModel.showResetConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Send Reset Link") {
@@ -104,14 +109,6 @@ struct PasscodeSettingsView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("We've sent a link to set a new passcode. Open it on this device to continue.")
-        }
-        .alert("Disable Passcode Lock?", isPresented: $viewModel.showDisableConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Disable", role: .destructive) {
-                viewModel.confirmDisable()
-            }
-        } message: {
-            Text("Your passcode will be kept but the lock screen will no longer appear.")
         }
         .alert("Error", isPresented: $viewModel.showError) {
             Button("OK") {}
