@@ -20,7 +20,9 @@ final class PasscodeLockViewModel: ObservableObject {
     private let passcodeService = PasscodeService.shared
 
     var canUseBiometric: Bool {
-        passcodeService.isBiometricEnabled && passcodeService.isBiometricAvailable
+        passcodeService.isBiometricEnabled
+            && passcodeService.isBiometricAvailable
+            && !passcodeService.biometricBlocked
     }
     var biometricIcon: String { passcodeService.biometricType.systemImage }
 
@@ -38,8 +40,10 @@ final class PasscodeLockViewModel: ObservableObject {
 
     private func verifyPasscode() {
         if passcodeService.verifyPasscode(enteredDigits) {
+            passcodeService.resetFailedAttempts()
             passcodeService.unlockApp()
         } else {
+            passcodeService.recordFailedAttempt()
             enteredDigits = ""
             errorMessage = "Incorrect passcode"
             withAnimation { shakeCount += 1 }
