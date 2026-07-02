@@ -39,14 +39,17 @@ final class PasscodeLockViewModel: ObservableObject {
     }
 
     private func verifyPasscode() {
-        if passcodeService.verifyPasscode(enteredDigits) {
-            passcodeService.resetFailedAttempts()
-            passcodeService.unlockApp()
-        } else {
-            passcodeService.recordFailedAttempt()
-            enteredDigits = ""
-            errorMessage = "Incorrect passcode"
-            withAnimation { shakeCount += 1 }
+        Task {
+            let ok = await passcodeService.verifyPasscodeAllowingServer(enteredDigits)
+            if ok {
+                passcodeService.resetFailedAttempts()
+                passcodeService.unlockApp()
+            } else {
+                passcodeService.recordFailedAttempt()
+                enteredDigits = ""
+                errorMessage = "Incorrect passcode"
+                withAnimation { shakeCount += 1 }
+            }
         }
     }
 

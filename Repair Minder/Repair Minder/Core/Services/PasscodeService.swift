@@ -95,7 +95,7 @@ final class PasscodeService: ObservableObject {
         // lock, even if stale passcode keychain data lingers (iOS keychain survives app
         // deletion, so leftover state can outlive a logout). See clearLocalData().
         let hasSession = keychain.getAccessToken() != nil
-        if hasSession && hasPasscode && passcodeEnabled && timeoutMinutes == 0 {
+        if hasSession && passcodeEnabled && timeoutMinutes == 0 {
             isLocked = true
         }
     }
@@ -197,6 +197,21 @@ final class PasscodeService: ObservableObject {
         }
     }
 
+    /// Verify an entered passcode. Uses the fast local hash when cached, otherwise
+    /// falls back to the server (which re-caches the hash on success).
+    func verifyPasscodeAllowingServer(_ passcode: String) async -> Bool {
+        if keychain.getPasscodeHash() != nil {
+            return verifyPasscode(passcode)
+        }
+        do {
+            try await verifyAndCachePasscode(passcode)
+            hasPasscode = true
+            return true
+        } catch {
+            return false
+        }
+    }
+
     // MARK: - Change Passcode
 
     func changePasscode(current: String, new: String) async throws {
@@ -251,7 +266,7 @@ final class PasscodeService: ObservableObject {
     // MARK: - Lock Management
 
     func lockApp() {
-        guard hasPasscode && passcodeEnabled else { return }
+        guard passcodeEnabled else { return }
         isLocked = true
     }
 
