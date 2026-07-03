@@ -21,9 +21,6 @@ final class InventoryListViewModel: ObservableObject {
     @Published var unassignedOnly = false
     @Published var noProductsOnly = false
 
-    /// Set when a mutation elsewhere signals the list is stale; consumed on next appear.
-    @Published var needsReload = false
-
     // MARK: Private
     private let service: InventoryServing
     private let pageSize: Int
@@ -35,18 +32,6 @@ final class InventoryListViewModel: ObservableObject {
     init(service: InventoryServing? = nil, pageSize: Int = 24) {
         self.service = service ?? InventoryService()
         self.pageSize = pageSize
-        NotificationCenter.default.addObserver(
-            forName: .inventoryAssetDidChange, object: nil, queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in self?.needsReload = true }
-        }
-    }
-
-    /// Reload if a mutation marked the list stale (call from the view's `.onAppear`).
-    func reloadIfNeeded() async {
-        guard needsReload else { return }
-        needsReload = false
-        await loadAssets()
     }
 
     var activeFilterCount: Int {

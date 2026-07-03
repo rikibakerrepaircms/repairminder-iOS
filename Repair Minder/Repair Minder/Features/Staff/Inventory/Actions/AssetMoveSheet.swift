@@ -9,6 +9,7 @@ struct AssetMoveSheet: View {
     @State private var subLocations: [AssetSubLocationOption] = []
     @State private var locationId: String?
     @State private var subLocationId: String?
+    @State private var seeded = false
 
     private var changed: Bool { locationId != asset.locationId || subLocationId != asset.subLocationId }
     private var canSubmit: Bool { locationId != nil && changed && !viewModel.isMutating }
@@ -22,6 +23,9 @@ struct AssetMoveSheet: View {
                         ForEach(locations) { Text($0.name).tag(String?.some($0.id)) }
                     }
                     .onChange(of: locationId) { _, new in
+                        // Ignore the initial programmatic seed — only clear the sub-location
+                        // on a user-driven location change.
+                        guard seeded else { return }
                         subLocationId = nil
                         subLocations = []
                         if let id = new { Task { await loadSubs(id) } }
@@ -33,13 +37,16 @@ struct AssetMoveSheet: View {
                         }
                     }
                 }
+                if let err = viewModel.actionError {
+                    Section { Text(err).font(.footnote).foregroundStyle(.red) }
+                }
             }
             .navigationTitle("Move Asset")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { viewModel.actionError = nil; dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Move") { Task { await submit() } }.disabled(!canSubmit)
                 }
@@ -49,6 +56,7 @@ struct AssetMoveSheet: View {
                 subLocationId = asset.subLocationId
                 locations = (try? await InventoryService().fetchLocations()) ?? []
                 if let id = asset.locationId { await loadSubs(id) }
+                seeded = true
             }
         }
     }

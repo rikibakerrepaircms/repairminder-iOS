@@ -38,13 +38,16 @@ struct ReturnToSupplierSheet: View {
                 Section("Notes") {
                     TextField("Notes", text: $notes, axis: .vertical).lineLimit(3...6)
                 }
+                if let err = viewModel.actionError {
+                    Section { Text(err).font(.footnote).foregroundStyle(.red) }
+                }
             }
             .navigationTitle("Return to Supplier")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { viewModel.actionError = nil; dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Return") { Task { await submit() } }
                         .disabled(reason.isEmpty || asset.supplierName == nil || viewModel.isMutating)

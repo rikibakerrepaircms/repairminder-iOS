@@ -83,6 +83,11 @@ struct InventoryDetailView: View {
                 .font(.caption).foregroundStyle(.blue)
                 .task { try? await Task.sleep(nanoseconds: 4_000_000_000); viewModel.lastSkuUpdatedCount = nil }
         }
+        if viewModel.readyToRepairPrompt {
+            Label("This asset's order is ready to repair.", systemImage: "wrench.and.screwdriver")
+                .font(.caption).foregroundStyle(.blue)
+                .task { try? await Task.sleep(nanoseconds: 5_000_000_000); viewModel.readyToRepairPrompt = false }
+        }
         if a.status == .pendingReturn { card("Pending Return") {
             row("Reason", a.supplierReturnReason); row("Notes", a.supplierReturnNotes); row("Initiated", a.supplierReturnInitiatedAt)
             HStack {

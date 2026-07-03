@@ -21,13 +21,16 @@ struct DeployExternalSheet: View {
                     DatePicker("Date", selection: $deploymentDate, displayedComponents: .date)
                     TextField("Notes", text: $notes, axis: .vertical).lineLimit(2...5)
                 }
+                if let err = viewModel.actionError {
+                    Section { Text(err).font(.footnote).foregroundStyle(.red) }
+                }
             }
             .navigationTitle("Deploy Externally")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { viewModel.actionError = nil; dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Deploy") { Task { await submit() } }.disabled(viewModel.isMutating)
                 }

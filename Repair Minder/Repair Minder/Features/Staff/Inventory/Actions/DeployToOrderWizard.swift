@@ -66,8 +66,10 @@ struct DeployToOrderWizard: View {
             if vm.isLoadingItems {
                 ProgressView()
             } else if vm.items.isEmpty {
-                Text("No line items on this order. Add one in the order first.")
-                    .foregroundStyle(.secondary)
+                Section {
+                    Text("This order has no line items.").foregroundStyle(.secondary)
+                    Button("Allocate without a line item") { selectedItem = nil; step = .confirm }
+                }
             } else {
                 Section("Select a line item (optional)") {
                     Button("No specific line item") { selectedItem = nil; step = .confirm }
