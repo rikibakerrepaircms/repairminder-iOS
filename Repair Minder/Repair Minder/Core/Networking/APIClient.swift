@@ -85,6 +85,21 @@ final class APIClient {
         return data
     }
 
+    /// Perform a request and decode the ENTIRE top-level JSON body as `R`,
+    /// without unwrapping `.data`. Use when you need envelope-level fields that
+    /// `APIResponse<T>` discards (e.g. `sku_updated_count`, `prompt_ready_to_repair`).
+    func requestFull<R: Decodable>(
+        _ endpoint: APIEndpoint,
+        body: Encodable? = nil
+    ) async throws -> R {
+        let data = try await performRequestData(endpoint, body: body)
+        do {
+            return try decoder.decode(R.self, from: data)
+        } catch {
+            throw APIError.decodingError(error)
+        }
+    }
+
     /// Perform a request that returns a response with pagination
     /// - Parameters:
     ///   - endpoint: The API endpoint to call
@@ -367,6 +382,60 @@ final class APIClient {
             throw APIError.cancelled
         } catch let error as DecodingError {
             throw APIError.decodingError(error)
+        } catch {
+            throw APIError.networkError(error)
+        }
+    }
+
+    /// Like `performRequest` but returns the validated raw `Data` (no `APIResponse<T>`
+    /// unwrap) so a caller can decode a custom top-level shape. Mirrors the same auth,
+    /// 401 refresh+retry, and error mapping.
+    private func performRequestData(
+        _ endpoint: APIEndpoint,
+        body: Encodable? = nil,
+        skipAuthRefresh: Bool = false
+    ) async throws -> Data {
+        let request = try buildRequest(endpoint, body: body)
+
+        do {
+            let (data, response) = try await session.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.networkError(URLError(.badServerResponse))
+            }
+
+            switch httpResponse.statusCode {
+            case 200...299:
+                return data
+
+            case 401:
+                if !skipAuthRefresh && endpoint.requiresAuth {
+                    try await handleTokenRefresh()
+                    return try await performRequestData(endpoint, body: body, skipAuthRefresh: true)
+                }
+                throw APIError.unauthorized
+
+            case 403:
+                let errorResponse = try? decodeResponse(data) as APIResponse<EmptyResponse>
+                if errorResponse?.code == "CONSENT_REQUIRED" {
+                    NotificationCenter.default.post(name: .consentRequired, object: nil)
+                }
+                throw APIError.forbidden(message: errorResponse?.error, code: errorResponse?.code)
+
+            case 404:
+                throw APIError.notFound
+
+            case 429:
+                throw APIError.rateLimited
+
+            default:
+                let errorResponse = try? decodeResponse(data) as APIResponse<EmptyResponse>
+                throw APIError.httpError(statusCode: httpResponse.statusCode, message: errorResponse?.error)
+            }
+        } catch let error as APIError {
+            throw error
+        } catch let error as URLError where error.code == .cancelled {
+            throw APIError.cancelled
         } catch {
             throw APIError.networkError(error)
         }
