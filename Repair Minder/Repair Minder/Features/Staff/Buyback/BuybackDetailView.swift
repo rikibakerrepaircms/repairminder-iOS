@@ -64,6 +64,14 @@ struct BuybackDetailView: View {
                     locationSection(buyback)
                 }
 
+                if buyback.status.lowercased() != "sold" {
+                    SalvageDeviceCard(
+                        buybackId: buyback.id,
+                        purchaseAmount: buyback.purchaseAmount ?? 0,
+                        salvaged: buyback.salvagedAssets ?? [],
+                        onChanged: { await viewModel.refresh() })
+                }
+
                 if let notes = buyback.notes, !notes.isEmpty {
                     notesSection(notes)
                 }

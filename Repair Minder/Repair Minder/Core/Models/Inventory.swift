@@ -162,7 +162,7 @@ struct CategoryCount: Decodable, Equatable, Sendable, Identifiable {
 
 // MARK: - Asset group list item (GET /api/asset-groups) — for the group filter picker
 
-struct AssetGroupListItem: Decodable, Identifiable, Equatable, Sendable {
+struct AssetGroupListItem: Decodable, Identifiable, Equatable, Hashable, Sendable {
     let id: String
     let name: String
     var sku: String?

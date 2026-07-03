@@ -53,4 +53,11 @@ class InventoryServingStub: InventoryServing {
         LowStockResponse(alerts: LowStockBuckets(parts: [], masters: [], services: []),
                          all: [], summary: LowStockSummary(total: 0, byCategory: LowStockByCategory(parts: 0, masters: 0, services: 0)))
     }
+    func salvageBuyback(id: String, items: [SalvageItemRequest]) async throws -> SalvageResponse {
+        SalvageResponse(assets: [], salvagedAssets: [], newStatus: "salvaged",
+                        salvageBudget: SalvageBudgetInfo(cap: nil, booked: nil, remaining: nil))
+    }
+    func deleteSalvageItem(buybackId: String, assetId: String) async throws -> DeleteSalvageResult {
+        DeleteSalvageResult(salvagedAssets: [], booked: 0, revertedTo: nil)
+    }
 }

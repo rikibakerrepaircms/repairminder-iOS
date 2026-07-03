@@ -47,6 +47,10 @@ protocol InventoryServing {
     func fetchStockSummary() async throws -> [StockSummaryItem]
     func fetchHierarchy(status: String?) async throws -> AssetHierarchyResponse
     func fetchLowStock() async throws -> LowStockResponse
+
+    // Phase 4 — salvage (buyback-scoped)
+    func salvageBuyback(id: String, items: [SalvageItemRequest]) async throws -> SalvageResponse
+    func deleteSalvageItem(buybackId: String, assetId: String) async throws -> DeleteSalvageResult
 }
 
 /// The filter parameters that vary per list request.
@@ -213,5 +217,13 @@ final class InventoryService: InventoryServing {
     }
     func fetchLowStock() async throws -> LowStockResponse {
         try await api.request(.lowStock)
+    }
+
+    // MARK: - Phase 4 salvage
+    func salvageBuyback(id: String, items: [SalvageItemRequest]) async throws -> SalvageResponse {
+        try await api.request(.salvageBuyback(id: id), body: SalvageRequest(items: items))
+    }
+    func deleteSalvageItem(buybackId: String, assetId: String) async throws -> DeleteSalvageResult {
+        try await api.request(.deleteSalvageItem(buybackId: buybackId, assetId: assetId))
     }
 }
