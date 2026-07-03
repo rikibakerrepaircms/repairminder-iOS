@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct OrderListView: View {
+    var isEmbedded: Bool = false
+
     @StateObject private var viewModel = OrderListViewModel()
     @State private var showingFilters = false
     @State private var selectedOrder: Order?
@@ -20,7 +22,9 @@ struct OrderListView: View {
 
     var body: some View {
         Group {
-            if isRegularWidth {
+            if isEmbedded {
+                embeddedBody
+            } else if isRegularWidth {
                 iPadLayout
             } else {
                 iPhoneLayout
@@ -28,6 +32,30 @@ struct OrderListView: View {
         }
         .task {
             await viewModel.loadOrders()
+        }
+    }
+
+    // MARK: - Embedded Layout (inside another NavigationStack — e.g. the More tab)
+
+    private var embeddedBody: some View {
+        VStack(spacing: 0) {
+            filterHeader
+            mainContent
+        }
+        .navigationTitle("Orders")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                filterButton
+            }
+        }
+        .sheet(isPresented: $showingFilters) {
+            OrderFilterSheet(viewModel: viewModel)
+        }
+        .navigationDestination(item: $selectedOrder) { order in
+            OrderDetailView(orderId: order.id)
         }
     }
 

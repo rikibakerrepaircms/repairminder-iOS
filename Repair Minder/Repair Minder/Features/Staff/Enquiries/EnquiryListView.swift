@@ -9,6 +9,8 @@ import SwiftUI
 
 /// Main list view for support tickets/enquiries
 struct EnquiryListView: View {
+    var isEmbedded: Bool = false
+
     @StateObject private var viewModel = EnquiryListViewModel()
     @State private var showingFilters = false
     @State private var showingSortOptions = false
@@ -28,11 +30,23 @@ struct EnquiryListView: View {
     private var isRegularWidth: Bool { horizontalSizeClass == .regular }
 
     var body: some View {
-        if isRegularWidth {
+        if isEmbedded {
+            embeddedBody
+        } else if isRegularWidth {
             iPadBody
         } else {
             iPhoneBody
         }
+    }
+
+    // MARK: - Embedded Layout (inside another NavigationStack — e.g. the More tab)
+
+    private var embeddedBody: some View {
+        enquiryListContent(isSidebar: false)
+            .navigationTitle("Enquiries")
+            .navigationDestination(for: Ticket.self) { ticket in
+                EnquiryDetailView(ticketId: ticket.id)
+            }
     }
 
     // MARK: - iPhone Layout

@@ -170,11 +170,9 @@ struct SettingsView: View {
             MyQueueView(isEmbedded: true)
                 .navigationTitle("My Queue")
         case .orders:
-            OrderListView()
-                .navigationTitle("Orders")
+            OrderListView(isEmbedded: true)
         case .enquiries:
-            EnquiryListView()
-                .navigationTitle("Enquiries")
+            EnquiryListView(isEmbedded: true)
         case .tabBar:
             TabBarSettingsView()
         case .notifications:
