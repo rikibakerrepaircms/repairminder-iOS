@@ -1,0 +1,115 @@
+import SwiftUI
+
+/// Loads the picker option lists for the filter sheet.
+@MainActor
+final class AssetFilterOptions: ObservableObject {
+    @Published var categories: [String] = []
+    @Published var locations: [Location] = []
+    @Published var subLocations: [AssetSubLocationOption] = []
+    @Published var groups: [AssetGroupListItem] = []
+    @Published var productTypes: [ProductTypeOption] = []
+
+    private let service: InventoryServing
+    // NB: InventoryService.init is @MainActor-isolated, so it cannot be a default
+    // arg value in a nonisolated context. Use optional + nil-coalesce instead.
+    init(service: InventoryServing? = nil) { self.service = service ?? InventoryService() }
+
+    func loadTopLevel() async {
+        async let cats = try? service.fetchCategories()
+        async let locs = try? service.fetchLocations()
+        async let grps = try? service.fetchGroups(search: nil)
+        categories = await cats ?? []
+        locations = await locs ?? []
+        groups = await grps ?? []
+    }
+
+    func loadSubLocations(locationId: String) async {
+        subLocations = (try? await service.fetchSubLocations(locationId: locationId)) ?? []
+    }
+
+    func searchProductTypes(_ query: String) async {
+        guard !query.isEmpty else { productTypes = []; return }
+        productTypes = (try? await service.fetchProductTypes(search: query)) ?? []
+    }
+}
+
+struct AssetFilterSheet: View {
+    @ObservedObject var viewModel: InventoryListViewModel
+    @StateObject private var options = AssetFilterOptions()
+    @Environment(\.dismiss) private var dismiss
+    @State private var productTypeQuery = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Category") {
+                    Picker("Category", selection: $viewModel.selectedCategory) {
+                        Text("Any").tag(String?.none)
+                        ForEach(options.categories, id: \.self) { Text($0).tag(String?.some($0)) }
+                    }
+                }
+                Section("Location") {
+                    Picker("Location", selection: $viewModel.selectedLocationId) {
+                        Text("Any").tag(String?.none)
+                        ForEach(options.locations) { Text($0.name).tag(String?.some($0.id)) }
+                    }
+                    .onChange(of: viewModel.selectedLocationId) { _, new in
+                        viewModel.selectedSubLocationId = nil
+                        if let id = new { Task { await options.loadSubLocations(locationId: id) } }
+                        else { options.subLocations = [] }
+                    }
+                    if !options.subLocations.isEmpty {
+                        Picker("Sub-location", selection: $viewModel.selectedSubLocationId) {
+                            Text("Any").tag(String?.none)
+                            ForEach(options.subLocations) { Text($0.code ?? $0.description ?? "—").tag(String?.some($0.id)) }
+                        }
+                    }
+                }
+                Section("Group") {
+                    Picker("Group", selection: $viewModel.selectedGroupId) {
+                        Text("Any").tag(String?.none)
+                        ForEach(options.groups) { Text($0.name).tag(String?.some($0.id)) }
+                    }
+                }
+                Section("Product Type") {
+                    TextField("Search product types…", text: $productTypeQuery)
+                        .onChange(of: productTypeQuery) { _, q in Task { await options.searchProductTypes(q) } }
+                    ForEach(options.productTypes) { pt in
+                        Button {
+                            viewModel.selectedProductTypeId = pt.id
+                            productTypeQuery = pt.name
+                        } label: {
+                            HStack {
+                                Text(pt.name)
+                                Spacer()
+                                if viewModel.selectedProductTypeId == pt.id { Image(systemName: "checkmark") }
+                            }
+                        }
+                    }
+                    if viewModel.selectedProductTypeId != nil {
+                        Button("Clear product type", role: .destructive) {
+                            viewModel.selectedProductTypeId = nil; productTypeQuery = ""
+                        }
+                    }
+                }
+                Section {
+                    Toggle("Unassigned (no groups)", isOn: $viewModel.unassignedOnly)
+                    Toggle("No products", isOn: $viewModel.noProductsOnly)
+                }
+            }
+            .navigationTitle("Filters")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Clear") { viewModel.clearFilters(); dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Apply") { viewModel.applyFilters(); dismiss() }
+                }
+            }
+            .task { await options.loadTopLevel() }
+        }
+    }
+}
