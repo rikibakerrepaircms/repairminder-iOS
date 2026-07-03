@@ -45,6 +45,10 @@ struct InventoryDetailView: View {
                     Text(g.name).font(.subheadline.weight(.medium))
                     if let sku = g.sku { Text(sku).font(.caption).foregroundStyle(.secondary) }
                     if let avg = g.avgCost { Text("Avg cost \(CurrencyFormatter.format(avg))").font(.caption).foregroundStyle(.secondary) }
+                    if let inStock = g.inStockCount { Text("In stock: \(inStock)").font(.caption).foregroundStyle(.secondary) }
+                    if let min = g.minCost, let max = g.maxCost {
+                        Text("Cost \(CurrencyFormatter.format(min))–\(CurrencyFormatter.format(max))").font(.caption).foregroundStyle(.secondary)
+                    }
                 }
             }
         } }
@@ -56,6 +60,10 @@ struct InventoryDetailView: View {
             }
             if let ext = viewModel.externalDeployment?.active {
                 row("Deployed to", ext.customerName); row("Reference", ext.externalReference); row("Deployed", ext.deploymentDate)
+                row("Deployed by", ext.deployedBy)
+                if let history = viewModel.externalDeployment?.history, !history.isEmpty {
+                    row("Previous deployments", String(history.count))
+                }
             }
         }
         card("Purchase Info") {
@@ -66,6 +74,9 @@ struct InventoryDetailView: View {
             row("Source", a.sourceType); row("Recovered", a.recoveredAt); row("Condition grade", a.conditionGrade)
             if let lcd = a.lcdWorkingBool { row("LCD working", lcd ? "Yes" : "No") }
             if let glass = a.glassCrackedBool { row("Glass cracked", glass ? "Yes" : "No") }
+            row("From buyback", a.recoveredFromBuybackId); row("From order", a.recoveredFromOrderId)
+            row("From source asset", a.recoveredFromAssetId); row("From device", a.recoveredFromDeviceId)
+            row("Recovered by", a.recoveredBy)
         } }
         if a.checkedOutToBuybackId != nil { card("Buyback Allocation") {
             row("Buyback", a.checkedOutToBuybackId)
@@ -76,6 +87,14 @@ struct InventoryDetailView: View {
         }
         card("Warranty") {
             row("Warranty months", a.warrantyMonths.map(String.init)); row("Expires", a.warrantyExpires)
+            if let chip = warrantyChip(a.warrantyExpires) {
+                Text(chip.text)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(chip.color)
+                    .padding(.horizontal, 8).padding(.vertical, 3)
+                    .background(chip.color.opacity(0.15))
+                    .clipShape(Capsule())
+            }
         }
         if let notes = a.notes, !notes.isEmpty { card("Notes") { Text(notes) } }
         if !viewModel.activity.isEmpty { card("Activity") {
@@ -115,5 +134,18 @@ struct InventoryDetailView: View {
                 Text(value).multilineTextAlignment(.trailing)
             }.font(.subheadline)
         }
+    }
+
+    private func warrantyChip(_ expires: String?) -> (text: String, color: Color)? {
+        guard let expires, let date = Self.parseDate(expires) else { return nil }
+        let days = Calendar.current.dateComponents([.day], from: Date(), to: date).day ?? 0
+        if days < 0 { return ("Expired", .red) }
+        if days == 0 { return ("Expires today", .orange) }
+        return ("\(days) day\(days == 1 ? "" : "s") left", days < 30 ? .orange : .green)
+    }
+    private static func parseDate(_ s: String) -> Date? {
+        let iso = ISO8601DateFormatter(); if let d = iso.date(from: s) { return d }
+        let f = DateFormatter(); f.calendar = Calendar(identifier: .iso8601); f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"; return f.date(from: s)
     }
 }

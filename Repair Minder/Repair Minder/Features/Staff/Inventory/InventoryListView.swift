@@ -9,6 +9,7 @@ struct InventoryListView: View {
     @State private var selectedAssetId: String?
     #if os(iOS)
     @State private var showScanner = false
+    @State private var scanError: String?
     // InventoryService.init is @MainActor-isolated; hold one instance on the view
     // (created on the MainActor) rather than constructing per-lookup.
     private let service = InventoryService()
@@ -82,6 +83,9 @@ struct InventoryListView: View {
                 Task { await lookupTag(tag) }
             }
         }
+        .alert("Not Found", isPresented: Binding(get: { scanError != nil }, set: { if !$0 { scanError = nil } }), presenting: scanError) { _ in
+            Button("OK", role: .cancel) {}
+        } message: { Text($0) }
         #endif
     }
 
@@ -170,7 +174,7 @@ struct InventoryListView: View {
             let asset = try await service.fetchAssetByTag(tag)
             selectedAssetId = asset.id
         } catch {
-            // Not found — no-op; a production build could show an alert.
+            scanError = "No asset found for tag \"\(tag)\"."
         }
     }
     #endif
@@ -189,6 +193,13 @@ private struct AssetRow: View {
             HStack(spacing: 8) {
                 if let cat = asset.category { Text(cat).font(.caption).foregroundStyle(.secondary) }
                 if let loc = asset.locationDisplay { Label(loc, systemImage: "mappin.and.ellipse").font(.caption).foregroundStyle(.secondary) }
+            }
+            if asset.status == .allocated || asset.status == .deployed,
+               asset.checkedOutOrderNumber != nil || asset.checkedOutDeviceName != nil {
+                HStack(spacing: 8) {
+                    if let order = asset.checkedOutOrderNumber { Text("Order \(order)").font(.caption).foregroundStyle(.secondary) }
+                    if let device = asset.checkedOutDeviceName { Text(device).font(.caption).foregroundStyle(.secondary) }
+                }
             }
             if !asset.groupNamesList.isEmpty {
                 HStack(spacing: 6) {
