@@ -76,3 +76,41 @@ struct ResolveReturnRequest: Encodable {
     var replacementAssetId: String? = nil
     var notes: String? = nil
 }
+
+// MARK: - Custom response shapes (envelope-level siblings of `data`, or nested)
+
+/// PUT /api/assets/:id — full body (sku_updated_count sits beside `data`).
+struct EditAssetResponse: Decodable {
+    let success: Bool
+    let data: Asset
+    let skuUpdatedCount: Int?
+}
+
+/// POST /api/assets/:id/allocate — full body.
+struct AllocateResponse: Decodable {
+    let success: Bool
+    let data: Asset
+    let promptReadyToRepair: Bool?
+    let allocatedParts: [AllocatedPart]?
+    let device: AllocateDevice?
+    let recoveredAsset: Asset?   // Asset already carries productTypeName/locationName/subLocationCode
+}
+
+struct AllocatedPart: Decodable, Identifiable, Equatable, Sendable {
+    let id: String
+    var assetName: String?
+    var assetTag: String?
+    var sourceStatus: String?
+}
+
+struct AllocateDevice: Decodable, Equatable, Sendable {
+    let id: String
+    var status: String?
+    var displayName: String?
+}
+
+/// POST /api/assets/:id/deploy-external — this shape sits UNDER `data`.
+struct DeployExternalData: Decodable, Equatable, Sendable {
+    let asset: Asset
+    let deployment: ExternalDeploymentRecord   // reused from Phase 1 (Core/Models/Inventory.swift)
+}

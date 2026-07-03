@@ -53,3 +53,48 @@ private struct AnyEncodable: Encodable {
     init(_ value: Encodable) { self.value = value }
     func encode(to encoder: Encoder) throws { try value.encode(to: encoder) }
 }
+
+extension InventoryWriteModelTests {
+    private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
+        let d = JSONDecoder(); d.keyDecodingStrategy = .convertFromSnakeCase
+        return try d.decode(T.self, from: Data(json.utf8))
+    }
+
+    func testEditAssetResponseDecodesSkuCount() throws {
+        let json = #"""
+        { "success": true,
+          "data": { "id":"a1","asset_tag":"AST1","name":"Screen","status":"in_stock","sku":"SKU9","category":"Screens" },
+          "sku_updated_count": 3 }
+        """#
+        let r = try decode(EditAssetResponse.self, json)
+        XCTAssertEqual(r.data.assetTag, "AST1")
+        XCTAssertEqual(r.skuUpdatedCount, 3)
+    }
+
+    func testAllocateResponseDecodes() throws {
+        let json = #"""
+        { "success": true,
+          "data": { "id":"a1","asset_tag":"AST1","name":"Part","status":"allocated" },
+          "prompt_ready_to_repair": true,
+          "allocated_parts": [ {"id":"p1","asset_name":"LCD","asset_tag":"AST2","source_status":"allocated"} ],
+          "device": { "id":"d1","status":"authorised_awaiting_parts","display_name":"iPhone 13" },
+          "recovered_asset": { "id":"r1","asset_tag":"AST3","name":"Recovered","status":"in_stock","location_name":"Main" } }
+        """#
+        let r = try decode(AllocateResponse.self, json)
+        XCTAssertEqual(r.data.status, .allocated)
+        XCTAssertEqual(r.promptReadyToRepair, true)
+        XCTAssertEqual(r.allocatedParts?.first?.assetTag, "AST2")
+        XCTAssertEqual(r.device?.displayName, "iPhone 13")
+        XCTAssertEqual(r.recoveredAsset?.assetTag, "AST3")
+    }
+
+    func testDeployExternalDataDecodesNested() throws {
+        let json = #"""
+        { "asset": { "id":"a1","asset_tag":"AST1","name":"n","status":"deployed" },
+          "deployment": { "id":"dep1","asset_id":"a1","customer_name":"Acme","status":"deployed","created_at":"2026-01-01" } }
+        """#
+        let r = try decode(DeployExternalData.self, json)
+        XCTAssertEqual(r.asset.status, .deployed)
+        XCTAssertEqual(r.deployment.customerName, "Acme")
+    }
+}
