@@ -45,6 +45,21 @@ final class InventoryWriteModelTests: XCTestCase {
         let r3 = MoveAssetRequest(locationId: "loc2", subLocationId: "sub2")
         XCTAssertEqual(try encodeToObject(r3)["sub_location_id"] as? String, "sub2")
     }
+
+    func testResolveWithReplacementAssetEncodes() throws {
+        let r = ResolveReturnRequest(resolution: "replacement_received", replacementAssetId: "rep1", notes: nil)
+        let obj = try encodeToObject(r)
+        XCTAssertEqual(obj["resolution"] as? String, "replacement_received")
+        XCTAssertEqual(obj["replacement_asset_id"] as? String, "rep1")
+    }
+
+    func testUpdateAssetSendsEmptyConditionGradeToClear() throws {
+        // Choosing "Not set" must send condition_grade:"" (present), not omit it, so the
+        // grade is actually cleared server-side (web parity).
+        let obj = try encodeToObject(UpdateAssetRequest(conditionGrade: ""))
+        XCTAssertTrue(obj.keys.contains("condition_grade"))
+        XCTAssertEqual(obj["condition_grade"] as? String, "")
+    }
 }
 
 /// Type-erasing wrapper so we can encode an `Encodable` existential in tests.

@@ -1,4 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 struct InventoryDetailView: View {
     let assetId: String
@@ -8,7 +13,9 @@ struct InventoryDetailView: View {
     @State private var showMove = false
     @State private var showDeploy = false
     @State private var showReturnSupplier = false
+    @State private var showResolveReplacement = false
     @State private var showDeleteConfirm = false
+    @State private var copiedTag = false
     @Environment(\.dismiss) private var dismiss
 
     init(assetId: String) {
@@ -41,6 +48,7 @@ struct InventoryDetailView: View {
         .sheet(isPresented: $showMove) { if let a = viewModel.asset { AssetMoveSheet(asset: a, viewModel: viewModel) } }
         .sheet(isPresented: $showDeploy) { if let a = viewModel.asset { DeployChooserSheet(asset: a, viewModel: viewModel) } }
         .sheet(isPresented: $showReturnSupplier) { if let a = viewModel.asset { ReturnToSupplierSheet(asset: a, viewModel: viewModel) } }
+        .sheet(isPresented: $showResolveReplacement) { if let a = viewModel.asset { ResolveReplacementSheet(asset: a, viewModel: viewModel) } }
         .confirmationDialog("Delete asset \(viewModel.asset?.assetTag ?? "")? This cannot be undone.",
                             isPresented: $showDeleteConfirm, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { Task { await viewModel.delete() } }
@@ -59,21 +67,37 @@ struct InventoryDetailView: View {
             Menu {
                 Button { showEdit = true } label: { Label("Edit", systemImage: "pencil") }
                 Button { showMove = true } label: { Label("Move", systemImage: "arrow.left.arrow.right") }
-                if a.status == .inStock {
+                if AssetActions.canDeploy(a) {
                     Button { showDeploy = true } label: { Label("Deploy", systemImage: "paperplane") }
                 }
-                Button { showReturnSupplier = true } label: { Label("Return to Supplier", systemImage: "arrow.uturn.backward") }
-                    .disabled(!canReturnToSupplier(a))
+                Button { showReturnSupplier = true } label: {
+                    if let reason = AssetActions.returnToSupplierDisabledReason(a) {
+                        Label {
+                            VStack(alignment: .leading) {
+                                Text("Return to Supplier")
+                                Text(reason).font(.caption2)
+                            }
+                        } icon: { Image(systemName: "arrow.uturn.backward") }
+                    } else {
+                        Label("Return to Supplier", systemImage: "arrow.uturn.backward")
+                    }
+                }
+                .disabled(!AssetActions.canReturnToSupplier(a))
                 Divider()
                 Button(role: .destructive) { showDeleteConfirm = true } label: { Label("Delete", systemImage: "trash") }
-                    .disabled(a.status == .allocated || a.status == .deployed)
+                    .disabled(!AssetActions.canDelete(a))
             } label: { Image(systemName: "ellipsis.circle") }
         }
     }
 
-    private func canReturnToSupplier(_ a: Asset) -> Bool {
-        [.inStock, .allocated, .deployed].contains(a.status)
-            && a.supplierName != nil && a.status != .pendingReturn
+    private func copyTag(_ tag: String) {
+        #if canImport(UIKit)
+        UIPasteboard.general.string = tag
+        #elseif canImport(AppKit)
+        NSPasteboard.general.clearContents(); NSPasteboard.general.setString(tag, forType: .string)
+        #endif
+        copiedTag = true
+        Task { try? await Task.sleep(nanoseconds: 2_000_000_000); copiedTag = false }
     }
 
     @ViewBuilder private func sections(_ a: Asset) -> some View {
@@ -94,9 +118,8 @@ struct InventoryDetailView: View {
                 Button("Credit Received") {
                     Task { await viewModel.resolveReturn(ResolveReturnRequest(resolution: "credit_received", replacementAssetId: nil, notes: nil)) }
                 }.buttonStyle(.bordered)
-                Button("Replacement Received") {
-                    Task { await viewModel.resolveReturn(ResolveReturnRequest(resolution: "replacement_received", replacementAssetId: nil, notes: nil)) }
-                }.buttonStyle(.bordered)
+                Button("Replacement Received") { showResolveReplacement = true }
+                    .buttonStyle(.bordered)
             }
             .disabled(viewModel.isMutating)
             .padding(.top, 4)
@@ -129,7 +152,7 @@ struct InventoryDetailView: View {
                 if let history = viewModel.externalDeployment?.history, !history.isEmpty {
                     row("Previous deployments", String(history.count))
                 }
-                if a.status == .deployed {
+                if AssetActions.canReturnToStock(a, hasActiveExternalDeployment: true) {
                     Button("Return to Stock") {
                         Task { await viewModel.returnToStock(
                             ReturnExternalRequest(deploymentId: ext.id, returnToStock: true, notes: nil)) }
@@ -184,7 +207,16 @@ struct InventoryDetailView: View {
 
     private func header(_ a: Asset) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack { Text(a.assetTag).font(.title3.weight(.bold).monospaced()); Spacer(); AssetStatusBadge(status: a.status) }
+            HStack(spacing: 6) {
+                Text(a.assetTag).font(.title3.weight(.bold).monospaced())
+                Button { copyTag(a.assetTag) } label: {
+                    Image(systemName: copiedTag ? "checkmark" : "doc.on.doc").font(.caption)
+                }
+                .buttonStyle(.plain).foregroundStyle(copiedTag ? .green : .secondary)
+                .accessibilityLabel("Copy asset tag")
+                Spacer()
+                AssetStatusBadge(status: a.status)
+            }
             Text(a.name).font(.title2.weight(.semibold))
         }
     }
