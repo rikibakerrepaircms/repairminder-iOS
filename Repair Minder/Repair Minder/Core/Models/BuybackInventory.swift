@@ -304,6 +304,7 @@ struct BuybackDetail: Decodable, Identifiable, Equatable, Sendable {
     let notes: [BuybackNote]?
     let totals: BuybackTotals?
     let salvageBudget: SalvageBudget?
+    let salvagedAssets: [SalvagedAssetSummary]?   // Phase 4 — existing salvage rows (detail endpoint)
 
     // MARK: - Computed Properties
 

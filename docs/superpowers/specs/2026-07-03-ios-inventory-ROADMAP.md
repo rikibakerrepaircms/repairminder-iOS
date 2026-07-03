@@ -156,7 +156,49 @@ Current `main` tip for this feature is at/after commit `2df09af`.
 
 ---
 
-## Phase 4 — Advanced (Bulk, Analytics, Book-in, Salvage) (NEXT)
+## Phase 4 — Advanced (Bulk, Analytics, Book-in, Salvage) ✅ SHIPPED 2026-07-04 (merged to `main` + pushed to `origin/main`, 008)
+
+**Delivered — full remaining web parity, nothing deferred.** Spec `docs/superpowers/specs/2026-07-03-ios-inventory-phase4-design.md`; plan `…/plans/2026-07-03-ios-inventory-phase4.md`. **Zero backend changes.**
+
+- **4a Bulk / multi-select:** edit-mode `Select` on the assets list (Select-All/Clear/Done) + a floating `BulkActionBar` → Move (per-item `/move` loop), Deploy (in-stock only; order/external loop), Return-to-Supplier (`POST /api/assets/bulk-return-to-supplier`), Export CSV (share sheet), camera **BulkScanSheet** accumulator. `BulkActions` gating. Files under `Features/Staff/Inventory/Bulk/`, `Core/Models/InventoryBulkModels.swift`.
+- **4b Analytics:** new `Stock` segment (Assets|Groups|Stock) → sub-tabs **Summary / Hierarchy / Low Stock** (`/stock-summary` array, `/hierarchy`, `/low-stock`), plus a collapsible **LowStockBanner** above the Assets list. Row taps cross-navigate to the filtered Assets list / asset detail. `Features/Staff/Inventory/Stock/`, `Core/Models/InventoryStockModels.swift`.
+- **4c Book-in + CSV import + Salvage:** full 4-step supplier-order **book-in wizard** (order details + invoice-PDF AI extract via `extract-invoice` + PDFKit → line items add/**edit**/delete → per-line receive w/ positional serials, chunked-at-20 `POST /api/supplier-orders/:id/receive` → success) from the Inventory toolbar; admin-gated **CSV import** (`POST /api/assets/import` multipart + validation-error report); **SalvageDeviceCard** on `BuybackDetailView` (`POST/DELETE /api/buyback/:id/salvage`, budget-capped, confirm-on-first). `Features/Staff/Inventory/BookIn/`, `Features/Staff/Buyback/Salvage*`, `Core/Models/{SupplierOrderModels,SalvageModels}.swift`. Added `APIClient.uploadMultipartFull` (configurable field name + whole-body decode + raw error body).
+
+**Confirmed exclusions (user-signed-off):** **bulk label printing** only — the web mechanism is a desktop popup + `window.print()` of a QR-label grid; iOS-can't-parity (consistent with the Phase-2 Dymo exclusion). **Non-parity skips (no web UI exists, confirmed unused in `src/`):** `POST /api/assets/bulk` (bulk create), `GET /api/assets/next-tag`, `GET /api/assets/stats`.
+
+**Verification (both mandates met):**
+- **Unit:** 97 inventory tests green (44 new Phase-4: encode per request struct; decode per model vs **real prod captures**; VM mutations; `BulkActions`/`SalvageBudgetMath` gating; serial-index regression). New files add **zero** Mac-scheme errors (only the pre-existing `Signals/` Diagnostics errors remain).
+- **Live prod E2E of EVERY write** (admin company `4b63c1e6…`): bulk-return-to-supplier, book-in (create order + line + receive), CSV import, salvage POST + DELETE — all decoded exactly into the Swift models; hard-deleted via D1 (assets, supplier_orders/lines, memberships, mappings, product_types, buyback). Verified **0** `ZZ-P4-` rows remain in admin AND demo companies. (Bulk move/deploy reuse the Phase-2 `/move`/`/allocate`/`/deploy-external` endpoints, already prod-verified.)
+- **XCUITest** `InventoryBulkUITest`: login → Inventory → tools menu → Book In → create supplier order → asserts advance to Line Items (real `POST /api/supplier-orders`); PASSED 48.8s; demo test order hard-deleted; `XCTSkip` when the toolbar is unreachable (CI-safe).
+
+**Final full-branch review (read-only) caught real issues, fixed before merge (commit `d8fff6f`):** receive `serial_numbers` must be POSITIONAL (was filtering interior blanks → serials landed on the wrong unit); salvage mutations weren't posting `.inventoryAssetDidChange`; bulk-return dismissed before surfacing the server's skipped-assets; extracted `invoice_file_key` was dropped (not attached to the order); `updateOrderLine` was dead (wired line-edit UI); `BulkScanViewModel.lastMessage` unsurfaced; `SupplierOrderLine.unitCost` hardened to `Double?`; CSV export now writes `status.displayName`.
+
+**NEW gotchas (for future work):**
+- `navigationDestination(item:)` requires the item be **`Hashable`** (not just `Identifiable`) — carry an id (String) in the route, not the whole model, to avoid a `Hashable` cascade through nested models.
+- A recursive SwiftUI tree (hierarchy) needs a **`View` struct that references itself** — a recursive `@ViewBuilder func` triggers "opaque return type defines the opaque type in terms of itself".
+- The existing `APIClient.uploadMultipart` hardcodes the file field name `"file"`; `extract-invoice` accepts `file` but `import` REQUIRES field name `csv` → added `uploadMultipartFull` (configurable field, whole-body decode, and it throws `httpError(status, rawBody)` on non-2xx so the CSV-import `validation_failed` body can be decoded).
+- Supplier-orders list uses `meta`; supplier-mappings list uses `pagination`; delete-line returns `{success,message}` (no `data`) → `requestVoid`; `extract-invoice` input errors are bare `{error}` (no `success:false`).
+- **New in-test mocks should subclass the shared `InventoryServingStub`** — 4 legacy direct conformers were converted to subclasses so adding a protocol method no longer churns every mock.
+- iOS is a **manual release** (code on `origin/main`, no build cut).
+
+---
+
+### 🏁 Inventory feature COMPLETE (all 4 phases)
+
+The iOS **Inventory** section is a **full-parity recreation of the web dashboard's `/assets` + `/assets/:id`** surface, delivered across four merged+pushed phases with zero backend changes:
+
+| Phase | Scope | Merge |
+|---|---|---|
+| 1 | Foundation + full browse (list/detail/filters/scan) | `main` (005/1.0.6) |
+| 2 | Per-asset write actions (edit/move/deploy/return/delete) | `1c4e004` (+ `9f2f721`) |
+| 3 | Inventory Groups (list/detail/promote/selector) | `7773e99` (007) |
+| 4 | Advanced (bulk/multi-select, analytics, book-in, salvage) | this phase (008) |
+
+The only intentionally-excluded web capability is **bulk label printing** (desktop popup-print of QR labels; iOS-can't-parity, user-signed-off in Phases 2 & 4). Everything else the web Inventory surface does is now on iPhone/iPad/Mac. There is no Phase 5.
+
+---
+
+<details><summary>Original Phase 4 planning notes (superseded by the shipped note above)</summary>
 
 > **Worker prompt:** `docs/superpowers/PHASE4-WORKER-PROMPT.md`. Carries BOTH standing mandates (nothing deferred; everything tested incl. live prod E2E of every write + an XCUITest). Phase 4 is the widest and LAST phase — it may sequence internal sub-parts (4a bulk/multi-select, 4b analytics, 4c book-in/salvage) as ordered work WITHIN the phase, but nothing may be punted to a later phase. No Phase 5 to chain.
 
@@ -178,6 +220,8 @@ Current `main` tip for this feature is at/after commit `2df09af`.
 **iOS work:** multi-select on the list (edit-mode) driving bulk sheets; a Stock Summary view (counts + total value by status/category, from `/stats` or `/stock-summary`); low-stock surfacing; book-in flow; salvage entry (likely surfaced from the Buyback detail, cross-linking to inventory). Scope carefully — Phase 4 is the widest; consider splitting into 4a (bulk + multi-select), 4b (analytics views), 4c (book-in + salvage) during its own brainstorm.
 
 **Verification:** decode tests for stats/summary; bulk request encoding tests; runtime with seeded data.
+
+</details>
 
 ---
 
