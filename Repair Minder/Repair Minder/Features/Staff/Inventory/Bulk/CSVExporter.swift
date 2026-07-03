@@ -13,7 +13,7 @@ enum CSVExporter {
             let fields = [
                 a.assetTag,
                 a.name,
-                a.status.rawValue,
+                a.status.displayName,
                 a.category ?? "",
                 a.locationName ?? "",
                 a.subLocationCode ?? "",

@@ -35,7 +35,7 @@ struct SupplierOrderLine: Decodable, Identifiable, Equatable, Sendable {
     var category: String?
     var quantityOrdered: Int
     var quantityReceived: Int
-    var unitCost: Double
+    var unitCost: Double?           // NOT NULL default 0 server-side; optional for decode safety
     var lineTotal: Double?
     var locationId: String?
     var subLocationId: String?

@@ -104,6 +104,7 @@ private struct LineItemsStep: View {
     @State private var newName = ""
     @State private var newQty = "1"
     @State private var newCost = "0"
+    @State private var editingLine: SupplierOrderLine?
 
     var body: some View {
         Form {
@@ -113,10 +114,11 @@ private struct LineItemsStep: View {
                     HStack {
                         VStack(alignment: .leading) {
                             Text(line.name).font(.subheadline)
-                            Text("qty \(line.quantityOrdered) · recv \(line.quantityReceived) · \(CurrencyFormatter.format(line.unitCost))").font(.caption).foregroundStyle(.secondary)
+                            Text("qty \(line.quantityOrdered) · recv \(line.quantityReceived) · \(CurrencyFormatter.format(line.unitCost ?? 0))").font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
                         if line.quantityReceived == 0 {
+                            Button { editingLine = line } label: { Image(systemName: "pencil") }.buttonStyle(.plain)
                             Button(role: .destructive) { Task { await viewModel.deleteLine(line.id) } } label: { Image(systemName: "trash") }.buttonStyle(.plain)
                         }
                     }
@@ -147,6 +149,55 @@ private struct LineItemsStep: View {
             .buttonStyle(.borderedProminent)
             .disabled(viewModel.lines.isEmpty)
             .padding()
+        }
+        .sheet(item: $editingLine) { line in
+            LineEditSheet(line: line) { body in
+                Task { await viewModel.updateLine(line.id, body); editingLine = nil }
+            }
+        }
+    }
+}
+
+/// Edit an unreceived line's name / quantity / unit cost (web allows this only when
+/// `quantity_received == 0`; the backend enforces the same guard).
+private struct LineEditSheet: View {
+    let line: SupplierOrderLine
+    let onSave: (SupplierOrderLineRequest) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var qty: String
+    @State private var cost: String
+
+    init(line: SupplierOrderLine, onSave: @escaping (SupplierOrderLineRequest) -> Void) {
+        self.line = line; self.onSave = onSave
+        _name = State(initialValue: line.name)
+        _qty = State(initialValue: String(line.quantityOrdered))
+        _cost = State(initialValue: String(line.unitCost ?? 0))
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Name", text: $name)
+                TextField("Quantity", text: $qty)
+                TextField("Unit cost", text: $cost)
+                #if os(iOS)
+                    .keyboardType(.decimalPad)
+                #endif
+            }
+            .navigationTitle("Edit Line")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        onSave(SupplierOrderLineRequest(name: name, quantityOrdered: Int(qty) ?? line.quantityOrdered, unitCost: Double(cost) ?? line.unitCost))
+                        dismiss()
+                    }.disabled(name.isEmpty)
+                }
+            }
         }
     }
 }

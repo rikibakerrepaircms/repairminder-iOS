@@ -41,7 +41,7 @@ final class BookInTests: XCTestCase {
         let line = o.lines!.first!
         XCTAssertEqual(line.quantityOrdered, 3)
         XCTAssertEqual(line.quantityReceived, 1)
-        XCTAssertEqual(line.unitCost, 10.0)
+        XCTAssertEqual(line.unitCost ?? 0, 10.0)   // Double? decodes the present value
         XCTAssertEqual(line.remaining, 2)
         XCTAssertFalse(line.isFullyReceived)
         XCTAssertEqual(line.productTypeName, "Screen PT")
@@ -197,6 +197,30 @@ final class BookInTests: XCTestCase {
         XCTAssertEqual(spy.receivedChunks.map(\.count), [20, 20, 5])
         XCTAssertEqual(vm.createdAssets.count, 45)
         XCTAssertEqual(vm.step, .success)
+    }
+
+    @MainActor
+    func testReceiveSerialsArePositionalNotFiltered() async {
+        let spy = BookInSpy(); spy.lineCount = 1
+        let vm = BookInWizardViewModel(order: SupplierOrder(id: "o1", supplierName: "S", status: "pending"), service: spy)
+        await vm.reloadOrder()
+        vm.prepareReceive()
+        vm.drafts["l0"]?.quantity = 3
+        // interior blank (unit 1 has no serial) + a stale 4th entry after quantity was lowered
+        vm.drafts["l0"]?.serials = ["S0", "", "S2", "STALE"]
+        let inputs = vm.buildReceiveInputs()
+        // Exactly `quantity` positional slots; interior blank preserved; stale entry truncated.
+        XCTAssertEqual(inputs.first?.serialNumbers, ["S0", "", "S2"])
+    }
+
+    @MainActor
+    func testReceiveOmitsSerialsWhenAllBlank() async {
+        let spy = BookInSpy(); spy.lineCount = 1
+        let vm = BookInWizardViewModel(order: SupplierOrder(id: "o1", supplierName: "S", status: "pending"), service: spy)
+        await vm.reloadOrder()
+        vm.prepareReceive()
+        vm.drafts["l0"]?.quantity = 2   // no serials typed
+        XCTAssertNil(vm.buildReceiveInputs().first?.serialNumbers)
     }
 
     @MainActor

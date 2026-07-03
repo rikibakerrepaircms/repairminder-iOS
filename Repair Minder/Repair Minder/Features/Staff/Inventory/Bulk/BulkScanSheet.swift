@@ -38,6 +38,12 @@ struct BulkScanSheet: View {
             }
             .navigationTitle("Bulk Scan")
             .navigationBarTitleDisplayMode(.inline)
+            .safeAreaInset(edge: .top) {
+                if let msg = viewModel.lastMessage {
+                    Text(msg).font(.caption).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity).padding(6).background(.thinMaterial)
+                }
+            }
             .safeAreaInset(edge: .bottom) {
                 HStack(spacing: 12) {
                     Button { showScanner = true } label: { Label("Scan", systemImage: "barcode.viewfinder").frame(maxWidth: .infinity) }

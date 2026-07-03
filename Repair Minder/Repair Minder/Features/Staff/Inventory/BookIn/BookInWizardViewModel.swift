@@ -33,6 +33,8 @@ final class BookInWizardViewModel: ObservableObject {
     // Lines (loaded from the order) + pending extraction lines (added on create)
     @Published var lines: [SupplierOrderLine] = []
     @Published var pendingLines: [SupplierOrderLineRequest] = []
+    /// R2 key of an uploaded/extracted invoice, attached to the order on create.
+    @Published var invoiceFileKey: String?
 
     // Receive
     @Published var drafts: [String: ReceiveDraft] = [:]
@@ -89,6 +91,7 @@ final class BookInWizardViewModel: ObservableObject {
     }
 
     func applyExtraction(_ resp: ExtractInvoiceResponse) {
+        invoiceFileKey = resp.invoiceFileKey
         let inv = resp.data
         if let s = inv.supplierName, !s.isEmpty { supplierName = s }
         if let r = inv.invoiceReference, !r.isEmpty { reference = r }
@@ -112,6 +115,7 @@ final class BookInWizardViewModel: ObservableObject {
                     orderDate: orderDate.isEmpty ? nil : orderDate,
                     expectedDate: stockInHand || expectedDate.isEmpty ? nil : expectedDate,
                     notes: notes.isEmpty ? nil : notes,
+                    invoiceFileKey: invoiceFileKey,
                     lines: pendingLines.isEmpty ? nil : pendingLines)
                 order = try await service.createSupplierOrder(body)
                 pendingLines = []
@@ -166,13 +170,21 @@ final class BookInWizardViewModel: ObservableObject {
     }
 
     /// Build the receive inputs from the drafts (only lines with quantity > 0).
+    /// Serial numbers are POSITIONAL (indexed per unit) — build exactly `quantity`
+    /// slots, preserving index (blank interior slots stay `""`), and only send the
+    /// array when at least one serial is non-empty. Never filter out interior blanks
+    /// (that would shift later serials onto the wrong unit) and truncate stale entries
+    /// left behind if the quantity was lowered after typing.
     func buildReceiveInputs() -> [ReceiveItemInput] {
         lines.compactMap { line in
             guard let d = drafts[line.id], d.quantity > 0 else { return nil }
-            let serials = d.serials.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            let positional = (0..<d.quantity).map { i -> String in
+                i < d.serials.count ? d.serials[i].trimmingCharacters(in: .whitespaces) : ""
+            }
+            let hasAnySerial = positional.contains { !$0.isEmpty }
             return ReceiveItemInput(
                 lineId: line.id, quantity: d.quantity,
-                serialNumbers: serials.isEmpty ? nil : serials,
+                serialNumbers: hasAnySerial ? positional : nil,
                 warrantyMonths: d.warrantyMonths, conditionGrade: d.conditionGrade,
                 locationId: d.locationId, subLocationId: d.subLocationId)
         }

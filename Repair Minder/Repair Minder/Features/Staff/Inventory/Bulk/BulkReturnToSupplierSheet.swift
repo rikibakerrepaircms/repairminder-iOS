@@ -42,6 +42,14 @@ struct BulkReturnToSupplierSheet: View {
                     }
                 }
 
+                if let result = viewModel.result {
+                    Section("Result") {
+                        Text(viewModel.summaryMessage ?? "Returned").font(.subheadline)
+                        ForEach(result.errors) { e in
+                            Text("Skipped \(e.assetId): \(e.error)").font(.caption).foregroundStyle(.orange)
+                        }
+                    }
+                }
                 if let err = viewModel.error {
                     Section { Text(err).font(.footnote).foregroundStyle(.red) }
                 }
@@ -51,14 +59,20 @@ struct BulkReturnToSupplierSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Return \(viewModel.validAssets.count)") {
-                        Task {
-                            if await viewModel.submit() { onDone(); dismiss() }
+                if viewModel.result == nil {
+                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Return \(viewModel.validAssets.count)") {
+                            Task { await viewModel.submit() }
                         }
+                        .disabled(!viewModel.canSubmit)
                     }
-                    .disabled(!viewModel.canSubmit)
+                } else {
+                    // After a successful return, show the outcome (incl. server-skipped assets)
+                    // and let the user dismiss.
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { onDone(); dismiss() }
+                    }
                 }
             }
             .overlay { if viewModel.isSubmitting { ProgressView().padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8)) } }

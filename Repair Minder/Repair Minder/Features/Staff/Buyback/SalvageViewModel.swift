@@ -100,6 +100,7 @@ final class SalvageViewModel: ObservableObject {
             let resp = try await service.salvageBuyback(id: buybackId, items: staged.map(\.request))
             salvaged = resp.salvagedAssets
             staged = []
+            NotificationCenter.default.post(name: .inventoryAssetDidChange, object: nil)
             return true
         } catch let e as APIError {
             error = salvageErrorMessage(e)
@@ -115,6 +116,7 @@ final class SalvageViewModel: ObservableObject {
         do {
             let resp = try await service.deleteSalvageItem(buybackId: buybackId, assetId: assetId)
             salvaged = resp.salvagedAssets
+            NotificationCenter.default.post(name: .inventoryAssetDidChange, object: nil)
         } catch let e as APIError {
             error = salvageErrorMessage(e)
         } catch {
