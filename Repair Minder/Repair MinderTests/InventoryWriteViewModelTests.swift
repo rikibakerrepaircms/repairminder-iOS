@@ -9,7 +9,7 @@ final class InventoryWriteViewModelTests: XCTestCase {
     /// Parks the FIRST fetch on a continuation so a load is genuinely in-flight when the
     /// second load request arrives — this deterministically exercises the coalescing path
     /// (a naive `guard !isLoading` would drop the second request under MainActor serialization).
-    final class GatedService: InventoryServing {
+    final class GatedService: InventoryServingStub {
         var queries: [AssetQuery] = []
         private var gate: CheckedContinuation<Void, Never>?
         private var fetchingSignal: CheckedContinuation<Void, Never>?
@@ -21,7 +21,7 @@ final class InventoryWriteViewModelTests: XCTestCase {
         }
         func release() { gate?.resume(); gate = nil }
 
-        func fetchAssets(page: Int, pageSize: Int, filters: AssetQuery) async throws -> [Asset] {
+        override func fetchAssets(page: Int, pageSize: Int, filters: AssetQuery) async throws -> [Asset] {
             queries.append(filters)
             if !firstStarted {
                 firstStarted = true
@@ -30,36 +30,6 @@ final class InventoryWriteViewModelTests: XCTestCase {
             }
             return []
         }
-        func fetchAsset(id: String) async throws -> Asset { Asset(id: id, assetTag: "T", name: "n", status: .inStock) }
-        func fetchAssetByTag(_ tag: String) async throws -> Asset { fatalError() }
-        func fetchActivity(id: String) async throws -> [AssetActivity] { [] }
-        func fetchAssetGroups(id: String) async throws -> [AssetGroupSummary] { [] }
-        func fetchExternalDeployment(id: String) async throws -> ExternalDeployment { .init() }
-        func fetchCategories() async throws -> [String] { [] }
-        func fetchGroups(search: String?) async throws -> [AssetGroupListItem] { [] }
-        func fetchProductTypes(search: String) async throws -> [ProductTypeOption] { [] }
-        func fetchLocations() async throws -> [Location] { [] }
-        func fetchSubLocations(locationId: String) async throws -> [AssetSubLocationOption] { [] }
-        func updateAsset(id: String, body: UpdateAssetRequest) async throws -> EditAssetResponse { fatalError() }
-        func moveAsset(id: String, body: MoveAssetRequest) async throws -> Asset { fatalError() }
-        func allocateAsset(id: String, body: AllocateRequest) async throws -> AllocateResponse { fatalError() }
-        func deployExternal(id: String, body: DeployExternalRequest) async throws -> DeployExternalData { fatalError() }
-        func returnExternal(id: String, body: ReturnExternalRequest) async throws -> Asset { fatalError() }
-        func returnToSupplier(id: String, body: ReturnToSupplierRequest) async throws -> Asset { fatalError() }
-        func resolveSupplierReturn(id: String, body: ResolveReturnRequest) async throws -> Asset { fatalError() }
-        func deleteAsset(id: String) async throws {}
-        func searchOrders(search: String) async throws -> [Order] { [] }
-        func fetchOrderItems(orderId: String) async throws -> [OrderItem] { [] }
-        func listGroups(page: Int, limit: Int, search: String?, category: String?, hasProducts: Bool?, unlinkedOnly: Bool?, sortBy: String?, sortOrder: String?) async throws -> [InventoryGroup] { [] }
-        func fetchGroup(id: String) async throws -> InventoryGroup { InventoryGroup(id: id, name: "n") }
-        func fetchGroupAssets(id: String, page: Int, limit: Int) async throws -> [Asset] { [] }
-        func fetchGroupProducts(id: String) async throws -> [LinkedProduct] { [] }
-        func addMembership(assetId: String, groupId: String) async throws -> GroupMembership { GroupMembership(id: "m") }
-        func removeMembership(id: String) async throws {}
-        func bulkAssignGroups(assetId: String, groupIds: [String]) async throws -> BulkAssignGroupsResult { BulkAssignGroupsResult(groupsAdded: 0, groupsRemoved: 0, assetsAffected: 1) }
-        func promoteGroup(_ body: PromoteGroupRequest) async throws -> PromoteResult { fatalError() }
-        func createGroup(_ body: GroupFormRequest) async throws -> InventoryGroup { InventoryGroup(id: "g", name: body.name) }
-        func updateGroup(id: String, body: GroupFormRequest) async throws -> InventoryGroup { InventoryGroup(id: id, name: body.name) }
     }
 
     func testFilterChangeDuringLoadIsCoalesced() async {
@@ -79,47 +49,25 @@ final class InventoryWriteViewModelTests: XCTestCase {
     // MARK: - Detail view-model mutations
 
     /// Canned-result service for the detail mutation tests.
-    final class MutatingService: InventoryServing {
+    final class MutatingService: InventoryServingStub {
         var deleted = false
-        func fetchAssets(page: Int, pageSize: Int, filters: AssetQuery) async throws -> [Asset] { [] }
-        func fetchAsset(id: String) async throws -> Asset { Asset(id: id, assetTag: "T", name: "n", status: .inStock) }
-        func fetchAssetByTag(_ tag: String) async throws -> Asset { fatalError() }
-        func fetchActivity(id: String) async throws -> [AssetActivity] { [] }
-        func fetchAssetGroups(id: String) async throws -> [AssetGroupSummary] { [] }
-        func fetchExternalDeployment(id: String) async throws -> ExternalDeployment { .init() }
-        func fetchCategories() async throws -> [String] { [] }
-        func fetchGroups(search: String?) async throws -> [AssetGroupListItem] { [] }
-        func fetchProductTypes(search: String) async throws -> [ProductTypeOption] { [] }
-        func fetchLocations() async throws -> [Location] { [] }
-        func fetchSubLocations(locationId: String) async throws -> [AssetSubLocationOption] { [] }
-        func updateAsset(id: String, body: UpdateAssetRequest) async throws -> EditAssetResponse {
+        override func fetchAsset(id: String) async throws -> Asset { Asset(id: id, assetTag: "T", name: "n", status: .inStock) }
+        override func updateAsset(id: String, body: UpdateAssetRequest) async throws -> EditAssetResponse {
             EditAssetResponse(success: true, data: Asset(id: id, assetTag: "T", name: "Edited", status: .inStock), skuUpdatedCount: 2)
         }
-        func moveAsset(id: String, body: MoveAssetRequest) async throws -> Asset { Asset(id: id, assetTag: "T", name: "Moved", status: .inStock) }
-        func allocateAsset(id: String, body: AllocateRequest) async throws -> AllocateResponse {
+        override func moveAsset(id: String, body: MoveAssetRequest) async throws -> Asset { Asset(id: id, assetTag: "T", name: "Moved", status: .inStock) }
+        override func allocateAsset(id: String, body: AllocateRequest) async throws -> AllocateResponse {
             AllocateResponse(success: true, data: Asset(id: id, assetTag: "T", name: "n", status: .allocated),
                              promptReadyToRepair: true, allocatedParts: nil, device: nil, recoveredAsset: nil)
         }
-        func deployExternal(id: String, body: DeployExternalRequest) async throws -> DeployExternalData {
+        override func deployExternal(id: String, body: DeployExternalRequest) async throws -> DeployExternalData {
             DeployExternalData(asset: Asset(id: id, assetTag: "T", name: "n", status: .deployed),
                                deployment: ExternalDeploymentRecord(id: "dep1"))
         }
-        func returnExternal(id: String, body: ReturnExternalRequest) async throws -> Asset { Asset(id: id, assetTag: "T", name: "n", status: .inStock) }
-        func returnToSupplier(id: String, body: ReturnToSupplierRequest) async throws -> Asset { Asset(id: id, assetTag: "T", name: "n", status: .pendingReturn) }
-        func resolveSupplierReturn(id: String, body: ResolveReturnRequest) async throws -> Asset { Asset(id: id, assetTag: "T", name: "n", status: .returned) }
-        func deleteAsset(id: String) async throws { deleted = true }
-        func searchOrders(search: String) async throws -> [Order] { [] }
-        func fetchOrderItems(orderId: String) async throws -> [OrderItem] { [] }
-        func listGroups(page: Int, limit: Int, search: String?, category: String?, hasProducts: Bool?, unlinkedOnly: Bool?, sortBy: String?, sortOrder: String?) async throws -> [InventoryGroup] { [] }
-        func fetchGroup(id: String) async throws -> InventoryGroup { InventoryGroup(id: id, name: "n") }
-        func fetchGroupAssets(id: String, page: Int, limit: Int) async throws -> [Asset] { [] }
-        func fetchGroupProducts(id: String) async throws -> [LinkedProduct] { [] }
-        func addMembership(assetId: String, groupId: String) async throws -> GroupMembership { GroupMembership(id: "m") }
-        func removeMembership(id: String) async throws {}
-        func bulkAssignGroups(assetId: String, groupIds: [String]) async throws -> BulkAssignGroupsResult { BulkAssignGroupsResult(groupsAdded: 0, groupsRemoved: 0, assetsAffected: 1) }
-        func promoteGroup(_ body: PromoteGroupRequest) async throws -> PromoteResult { fatalError() }
-        func createGroup(_ body: GroupFormRequest) async throws -> InventoryGroup { InventoryGroup(id: "g", name: body.name) }
-        func updateGroup(id: String, body: GroupFormRequest) async throws -> InventoryGroup { InventoryGroup(id: id, name: body.name) }
+        override func returnExternal(id: String, body: ReturnExternalRequest) async throws -> Asset { Asset(id: id, assetTag: "T", name: "n", status: .inStock) }
+        override func returnToSupplier(id: String, body: ReturnToSupplierRequest) async throws -> Asset { Asset(id: id, assetTag: "T", name: "n", status: .pendingReturn) }
+        override func resolveSupplierReturn(id: String, body: ResolveReturnRequest) async throws -> Asset { Asset(id: id, assetTag: "T", name: "n", status: .returned) }
+        override func deleteAsset(id: String) async throws { deleted = true }
     }
 
     func testEditUpdatesAssetAndSurfacesSkuCount() async {

@@ -39,6 +39,9 @@ protocol InventoryServing {
     func promoteGroup(_ body: PromoteGroupRequest) async throws -> PromoteResult
     func createGroup(_ body: GroupFormRequest) async throws -> InventoryGroup
     func updateGroup(id: String, body: GroupFormRequest) async throws -> InventoryGroup
+
+    // Phase 4 — bulk
+    func bulkReturnToSupplier(assetIds: [String], reason: String, notes: String?) async throws -> BulkReturnToSupplierResult
 }
 
 /// The filter parameters that vary per list request.
@@ -188,5 +191,11 @@ final class InventoryService: InventoryServing {
     }
     func updateGroup(id: String, body: GroupFormRequest) async throws -> InventoryGroup {
         try await api.request(.updateProductType(id: id), body: body)
+    }
+
+    // MARK: - Phase 4 bulk actions
+    func bulkReturnToSupplier(assetIds: [String], reason: String, notes: String?) async throws -> BulkReturnToSupplierResult {
+        try await api.request(.bulkReturnToSupplier,
+                              body: BulkReturnToSupplierRequest(assetIds: assetIds, supplierReturnReason: reason, supplierReturnNotes: notes))
     }
 }

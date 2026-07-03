@@ -44,4 +44,7 @@ class InventoryServingStub: InventoryServing {
     func promoteGroup(_ body: PromoteGroupRequest) async throws -> PromoteResult { fatalError("not stubbed") }
     func createGroup(_ body: GroupFormRequest) async throws -> InventoryGroup { InventoryGroup(id: "g", name: body.name) }
     func updateGroup(id: String, body: GroupFormRequest) async throws -> InventoryGroup { InventoryGroup(id: id, name: body.name) }
+    func bulkReturnToSupplier(assetIds: [String], reason: String, notes: String?) async throws -> BulkReturnToSupplierResult {
+        BulkReturnToSupplierResult(batches: [], totalReturned: assetIds.count, errors: [])
+    }
 }

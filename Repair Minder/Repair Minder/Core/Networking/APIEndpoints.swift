@@ -231,6 +231,25 @@ enum APIEndpoint {
     case resolveSupplierReturn(id: String)
     case deleteAsset(id: String)
 
+    // Inventory / Assets — Phase 4 (bulk, analytics, book-in, salvage)
+    case bulkReturnToSupplier
+    case stockSummary
+    case assetHierarchy(status: String?)
+    case lowStock
+    case importAssets
+    case supplierOrders(page: Int, limit: Int, supplier: String?, status: String?)
+    case supplierOrder(id: String)
+    case createSupplierOrder
+    case updateSupplierOrder(id: String)
+    case addSupplierOrderLine(orderId: String)
+    case updateSupplierOrderLine(orderId: String, lineId: String)
+    case deleteSupplierOrderLine(orderId: String, lineId: String)
+    case receiveSupplierOrder(id: String)
+    case extractInvoice
+    case supplierMappingsSuppliers
+    case salvageBuyback(id: String)
+    case deleteSalvageItem(buybackId: String, assetId: String)
+
     // MARK: - Board Config
 
     case boardColumns(scope: String)
@@ -553,6 +572,23 @@ enum APIEndpoint {
         case .returnToSupplierAsset(let id): return "/api/assets/\(id)/return-to-supplier"
         case .resolveSupplierReturn(let id): return "/api/assets/\(id)/resolve-supplier-return"
         case .deleteAsset(let id): return "/api/assets/\(id)"
+        case .bulkReturnToSupplier: return "/api/assets/bulk-return-to-supplier"
+        case .stockSummary: return "/api/assets/stock-summary"
+        case .assetHierarchy: return "/api/assets/hierarchy"
+        case .lowStock: return "/api/assets/low-stock"
+        case .importAssets: return "/api/assets/import"
+        case .supplierOrders: return "/api/supplier-orders"
+        case .supplierOrder(let id): return "/api/supplier-orders/\(id)"
+        case .createSupplierOrder: return "/api/supplier-orders"
+        case .updateSupplierOrder(let id): return "/api/supplier-orders/\(id)"
+        case .addSupplierOrderLine(let orderId): return "/api/supplier-orders/\(orderId)/lines"
+        case .updateSupplierOrderLine(let orderId, let lineId): return "/api/supplier-orders/\(orderId)/lines/\(lineId)"
+        case .deleteSupplierOrderLine(let orderId, let lineId): return "/api/supplier-orders/\(orderId)/lines/\(lineId)"
+        case .receiveSupplierOrder(let id): return "/api/supplier-orders/\(id)/receive"
+        case .extractInvoice: return "/api/supplier-orders/extract-invoice"
+        case .supplierMappingsSuppliers: return "/api/supplier-mappings/suppliers"
+        case .salvageBuyback(let id): return "/api/buyback/\(id)/salvage"
+        case .deleteSalvageItem(let buybackId, let assetId): return "/api/buyback/\(buybackId)/salvage/\(assetId)"
 
         // Board Config
         case .boardColumns:
@@ -630,6 +666,8 @@ enum APIEndpoint {
              .inventoryList, .inventoryDetail, .inventoryByTag, .inventoryActivity,
              .inventoryAssetGroups, .inventoryExternalDeployment, .productTypeCategories, .assetGroupsList,
              .assetGroup, .assetGroupAssets, .assetGroupProducts,
+             .stockSummary, .assetHierarchy, .lowStock,
+             .supplierOrders, .supplierOrder, .supplierMappingsSuppliers,
              .customerOrders, .customerOrder, .customerOrderInvoice, .customerDeviceImage:
             return .get
 
@@ -656,7 +694,10 @@ enum APIEndpoint {
              .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete,
              .moveAsset, .allocateAsset, .deployExternalAsset,
              .returnExternalAsset, .returnToSupplierAsset, .resolveSupplierReturn,
-             .addMembership, .bulkAssignGroups, .promoteGroup, .createProductType:
+             .addMembership, .bulkAssignGroups, .promoteGroup, .createProductType,
+             .bulkReturnToSupplier, .importAssets, .createSupplierOrder,
+             .addSupplierOrderLine, .receiveSupplierOrder, .extractInvoice,
+             .salvageBuyback:
             return .post
 
         // PATCH endpoints
@@ -667,12 +708,14 @@ enum APIEndpoint {
              .updateTicket,
              .pauseMacroExecution, .resumeMacroExecution,
              .boardUpdateColumn, .boardReorderColumns,
-             .boardUpdatePinnedPreference, .updateScheduleItem:
+             .boardUpdatePinnedPreference, .updateScheduleItem,
+             .updateSupplierOrder:
             return .patch
 
         // PUT endpoints
         case .togglePasscodeEnabled, .passcodeTimeout,
-             .updatePushPreferences, .updateAsset, .updateProductType:
+             .updatePushPreferences, .updateAsset, .updateProductType,
+             .updateSupplierOrderLine:
             return .put
 
         // DELETE endpoints
@@ -681,7 +724,8 @@ enum APIEndpoint {
              .unregisterDeviceToken, .customerUnregisterDeviceToken,
              .cancelMacroExecution,
              .boardDeleteColumn, .boardDeleteAction,
-             .deleteDeviceImage, .deleteAsset, .removeMembership:
+             .deleteDeviceImage, .deleteAsset, .removeMembership,
+             .deleteSupplierOrderLine, .deleteSalvageItem:
             return .delete
         }
     }
@@ -919,6 +963,19 @@ enum APIEndpoint {
         case .assetGroupAssets(_, let page, let limit):
             return [URLQueryItem(name: "page", value: String(page)),
                     URLQueryItem(name: "limit", value: String(limit))]
+
+        case .supplierOrders(let page, let limit, let supplier, let status):
+            var items = [
+                URLQueryItem(name: "page", value: String(page)),
+                URLQueryItem(name: "limit", value: String(limit))
+            ]
+            if let supplier = supplier, !supplier.isEmpty { items.append(URLQueryItem(name: "supplier", value: supplier)) }
+            if let status = status, !status.isEmpty { items.append(URLQueryItem(name: "status", value: status)) }
+            return items
+
+        case .assetHierarchy(let status):
+            guard let status = status, !status.isEmpty else { return nil }
+            return [URLQueryItem(name: "status", value: status)]
 
         case .buybackImageFile(_, let width, let height):
             var items: [URLQueryItem] = []
