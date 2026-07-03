@@ -46,7 +46,11 @@ struct AssetSubLocationOption: Decodable, Identifiable, Equatable, Sendable {
 @MainActor
 final class InventoryService: InventoryServing {
     private let api: APIClient
-    init(api: APIClient = .shared) { self.api = api }
+    // APIClient.shared is @MainActor-isolated, so it cannot be a default-arg
+    // value (default args are evaluated in a nonisolated context — an error in
+    // Swift 6 mode). Use optional + nil-coalesce; the init body runs on the
+    // MainActor (this class is @MainActor), where `.shared` is valid.
+    init(api: APIClient? = nil) { self.api = api ?? APIClient.shared }
 
     func fetchAssets(page: Int, pageSize: Int, filters q: AssetQuery) async throws -> [Asset] {
         try await api.request(.inventoryList(
