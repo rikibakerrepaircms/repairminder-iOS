@@ -21,3 +21,50 @@ final class InventoryModelTests: XCTestCase {
         XCTAssertEqual(AssetStatus.allCases.first, .inStock)
     }
 }
+
+extension InventoryModelTests {
+    func testAssetDecodesQuirks() throws {
+        let json = #"""
+        {
+          "id": "a1", "asset_tag": "AST000000001", "name": "iPhone 13 Screen",
+          "status": "in_stock", "is_oem": 1, "is_refurbished": 0,
+          "cost": 42.5, "cost_inc_vat": null,
+          "location_name": "Main Store", "sub_location_code": "A1",
+          "group_names": "Screens, Genuine", "group_ids": "g1,g2",
+          "lcd_working": 1, "glass_cracked": null
+        }
+        """#
+        let a = try decode(Asset.self, json)
+        XCTAssertEqual(a.assetTag, "AST000000001")
+        XCTAssertEqual(a.status, .inStock)
+        XCTAssertTrue(a.isOemBool)
+        XCTAssertFalse(a.isRefurbishedBool)
+        XCTAssertEqual(a.cost, 42.5)
+        XCTAssertNil(a.costIncVat)
+        XCTAssertEqual(a.groupNamesList, ["Screens", "Genuine"])
+        XCTAssertEqual(a.groupIdsList, ["g1", "g2"])
+        XCTAssertEqual(a.lcdWorking, 1)
+    }
+
+    func testAssetListIgnoresMetaEnvelope() throws {
+        // The list endpoint returns { success, data: [Asset], meta: {...} }.
+        // APIResponse<[Asset]> must decode data and ignore meta.
+        let json = #"""
+        { "success": true, "data": [ {"id":"a1","asset_tag":"T1","name":"n","status":"sold"} ],
+          "meta": { "page": 1, "limit": 24, "total": 1, "totalPages": 1 } }
+        """#
+        let env = try decode(APIResponse<[Asset]>.self, json)
+        XCTAssertEqual(env.data?.count, 1)
+        XCTAssertEqual(env.data?.first?.status, .sold)
+    }
+
+    func testExternalDeploymentDecodes() throws {
+        let json = #"""
+        { "active": {"id":"d1","asset_id":"a1","customer_name":"Acme","status":"deployed","created_at":"2026-01-01"},
+          "history": [] }
+        """#
+        let ed = try decode(ExternalDeployment.self, json)
+        XCTAssertEqual(ed.active?.customerName, "Acme")
+        XCTAssertEqual(ed.history?.count, 0)
+    }
+}
