@@ -22,6 +22,8 @@ struct InventoryListView: View {
     @State private var mode: InventoryMode = .assets
     @State private var bulkSheet: BulkSheet?
     @State private var exportFile: ExportFile?
+    @State private var showBookIn = false
+    @State private var showImport = false
     #if os(iOS)
     @State private var showScanner = false
     @State private var scanError: String?
@@ -113,6 +115,8 @@ struct InventoryListView: View {
             AssetFilterSheet(viewModel: viewModel)
         }
         .sheet(item: $bulkSheet) { bulkSheetView($0) }
+        .sheet(isPresented: $showBookIn) { SupplierOrderListView() }
+        .sheet(isPresented: $showImport) { AssetImportSheet() }
         #if os(iOS)
         .sheet(item: $exportFile) { ShareSheet(url: $0.url) }
         .sheet(isPresented: $showScanner) {
@@ -311,9 +315,18 @@ struct InventoryListView: View {
                     Button("Select") { selection.isEditing = true }.accessibilityIdentifier("bulk-select")
                 }
             }
-            ToolbarItem(placement: .primaryAction) {
-                Button { showFilters = true } label: {
-                    Image(systemName: viewModel.activeFilterCount > 0 ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+            ToolbarItem(placement: .automatic) {
+                Menu {
+                    Button { showBookIn = true } label: { Label("Book In Stock", systemImage: "tray.and.arrow.down") }
+                    Button { showImport = true } label: { Label("Import CSV", systemImage: "square.and.arrow.down.on.square") }
+                } label: { Image(systemName: "tray.and.arrow.down") }
+                .accessibilityIdentifier("inventory-tools-menu")
+            }
+            if mode == .assets {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { showFilters = true } label: {
+                        Image(systemName: viewModel.activeFilterCount > 0 ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                    }
                 }
             }
         }

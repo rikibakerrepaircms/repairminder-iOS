@@ -131,4 +131,97 @@ final class BookInTests: XCTestCase {
         XCTAssertEqual(dict["status"] as? String, "cancelled")
         XCTAssertNil(dict["supplier_name"])
     }
+
+    // MARK: - Wizard + list view models
+
+    @MainActor
+    final class BookInSpy: InventoryServingStub {
+        var created: CreateSupplierOrderRequest?
+        var receivedChunks: [[ReceiveItemInput]] = []
+        var cancelledId: String?
+        var lineCount = 2
+        override func createSupplierOrder(_ body: CreateSupplierOrderRequest) async throws -> SupplierOrder {
+            created = body
+            return SupplierOrder(id: "o1", supplierName: body.supplierName, status: "pending")
+        }
+        override func getSupplierOrder(id: String) async throws -> SupplierOrder {
+            var o = SupplierOrder(id: id, supplierName: "S", status: "pending")
+            o.lines = (0..<lineCount).map { SupplierOrderLine(id: "l\($0)", name: "Line\($0)", quantityOrdered: 3, quantityReceived: 0, unitCost: 5) }
+            return o
+        }
+        override func receiveItems(orderId: String, items: [ReceiveItemInput]) async throws -> ReceiveItemsResult {
+            receivedChunks.append(items)
+            let assets = items.map { Asset(id: $0.lineId, assetTag: "AST\($0.lineId)", name: "n", status: .inStock) }
+            return ReceiveItemsResult(order: SupplierOrder(id: orderId, supplierName: "S", status: "received"), createdAssets: assets, assetsCreatedCount: assets.count)
+        }
+        override func updateSupplierOrder(id: String, body: UpdateSupplierOrderRequest) async throws -> SupplierOrder {
+            if body.status == "cancelled" { cancelledId = id }
+            return SupplierOrder(id: id, supplierName: "S", status: body.status ?? "pending")
+        }
+    }
+
+    @MainActor
+    func testSubmitOrderDetailsCreatesAndAdvances() async {
+        let spy = BookInSpy()
+        let vm = BookInWizardViewModel(service: spy)
+        vm.supplierName = "Acme"; vm.reference = "INV-1"
+        await vm.submitOrderDetails()
+        XCTAssertEqual(spy.created?.supplierName, "Acme")
+        XCTAssertEqual(vm.order?.id, "o1")
+        XCTAssertEqual(vm.lines.count, 2)          // reloaded
+        XCTAssertEqual(vm.step, .lineItems)
+    }
+
+    @MainActor
+    func testApplyExtractionPrefillsAndStagesLines() {
+        let vm = BookInWizardViewModel(service: BookInSpy())
+        let resp = ExtractInvoiceResponse(success: true, data: ExtractedInvoice(
+            supplierName: "Acme", invoiceReference: "INV-9", invoiceDate: "2026-07-01",
+            lineItems: [ExtractedInvoiceLine(name: "Screen", quantity: 2, unitCost: 10)]), invoiceFileKey: nil, fileType: nil)
+        vm.applyExtraction(resp)
+        XCTAssertEqual(vm.supplierName, "Acme")
+        XCTAssertEqual(vm.reference, "INV-9")
+        XCTAssertEqual(vm.pendingLines.count, 1)
+        XCTAssertEqual(vm.pendingLines.first?.quantityOrdered, 2)
+    }
+
+    @MainActor
+    func testReceiveBuildsInputsAndChunks() async {
+        let spy = BookInSpy(); spy.lineCount = 45   // > chunk size 20
+        let vm = BookInWizardViewModel(order: SupplierOrder(id: "o1", supplierName: "S", status: "pending"), service: spy)
+        await vm.reloadOrder()
+        vm.prepareReceive()
+        XCTAssertEqual(vm.drafts.count, 45)
+        await vm.receive()
+        // 45 inputs -> chunks of 20 -> 3 receive calls (20,20,5)
+        XCTAssertEqual(spy.receivedChunks.map(\.count), [20, 20, 5])
+        XCTAssertEqual(vm.createdAssets.count, 45)
+        XCTAssertEqual(vm.step, .success)
+    }
+
+    @MainActor
+    func testReceiveSkipsZeroQuantityLines() async {
+        let spy = BookInSpy(); spy.lineCount = 2
+        let vm = BookInWizardViewModel(order: SupplierOrder(id: "o1", supplierName: "S", status: "pending"), service: spy)
+        await vm.reloadOrder()
+        vm.prepareReceive()
+        vm.drafts["l0"]?.quantity = 0
+        let inputs = vm.buildReceiveInputs()
+        XCTAssertEqual(inputs.count, 1)   // only l1
+        XCTAssertEqual(inputs.first?.lineId, "l1")
+    }
+
+    @MainActor
+    func testSupplierListStatusFilterAndCancel() async {
+        let spy = BookInSpy()
+        let vm = SupplierOrderListViewModel(service: spy)
+        vm.orders = [SupplierOrder(id: "1", supplierName: "A", status: "pending"),
+                     SupplierOrder(id: "2", supplierName: "B", status: "received"),
+                     SupplierOrder(id: "3", supplierName: "C", status: "cancelled")]
+        XCTAssertEqual(vm.filtered.map(\.id), ["1"])       // default hides received/cancelled
+        vm.toggleStatus("received")
+        XCTAssertEqual(Set(vm.filtered.map(\.id)), ["1", "2"])
+        await vm.cancel(vm.orders[0])
+        XCTAssertEqual(spy.cancelledId, "1")
+    }
 }
