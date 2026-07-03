@@ -97,7 +97,9 @@ struct AssetEditSheet: View {
         body.serialNumber = serialNumber.isEmpty ? nil : serialNumber
         body.sku = sku.isEmpty ? nil : sku
         body.category = category.isEmpty ? nil : category
-        body.conditionGrade = conditionGrade.isEmpty ? nil : conditionGrade
+        // Always send condition_grade (incl. "" to clear it) — matches web, whose select
+        // submits the value directly so choosing "Not set" actually clears the grade.
+        body.conditionGrade = conditionGrade
         body.isOem = isOem ? 1 : 0
         body.isRefurbished = isRefurbished ? 1 : 0
         body.warrantyMonths = Int(warrantyMonths)

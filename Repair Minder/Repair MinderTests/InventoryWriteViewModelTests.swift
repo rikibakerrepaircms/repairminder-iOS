@@ -128,4 +128,40 @@ final class InventoryWriteViewModelTests: XCTestCase {
         XCTAssertTrue(mock.deleted)
         XCTAssertTrue(vm.didDelete)
     }
+
+    func testMoveUpdatesAsset() async {
+        let vm = InventoryDetailViewModel(assetId: "a1", service: MutatingService())
+        await vm.load()
+        await vm.move(MoveAssetRequest(locationId: "loc"))
+        XCTAssertEqual(vm.asset?.name, "Moved")
+        XCTAssertNil(vm.actionError)
+    }
+
+    func testReturnToSupplierUpdatesStatus() async {
+        let vm = InventoryDetailViewModel(assetId: "a1", service: MutatingService())
+        await vm.load()
+        await vm.returnToSupplier(ReturnToSupplierRequest(supplierReturnReason: "defective"))
+        XCTAssertEqual(vm.asset?.status, .pendingReturn)
+    }
+
+    func testResolveReturnUpdatesStatus() async {
+        let vm = InventoryDetailViewModel(assetId: "a1", service: MutatingService())
+        await vm.load()
+        await vm.resolveReturn(ResolveReturnRequest(resolution: "credit_received"))
+        XCTAssertEqual(vm.asset?.status, .returned)
+    }
+
+    func testDeployExternalUpdatesStatus() async {
+        let vm = InventoryDetailViewModel(assetId: "a1", service: MutatingService())
+        await vm.load()
+        await vm.deployExternal(DeployExternalRequest())
+        XCTAssertEqual(vm.asset?.status, .deployed)
+    }
+
+    func testReturnToStockUpdatesStatus() async {
+        let vm = InventoryDetailViewModel(assetId: "a1", service: MutatingService())
+        await vm.load()
+        await vm.returnToStock(ReturnExternalRequest(deploymentId: "dep1", returnToStock: true))
+        XCTAssertEqual(vm.asset?.status, .inStock)
+    }
 }
