@@ -300,10 +300,14 @@ struct Asset: Decodable, Identifiable, Equatable, Sendable, Hashable {
 struct AssetActivity: Decodable, Identifiable, Equatable, Sendable {
     let id: String
     var assetId: String?
-    var action: String?
+    var activityType: String?   // backend column is activity_type
     var description: String?
+    var fromStatus: String?
+    var toStatus: String?
+    var performedBy: String?
     var performedByEmail: String?
-    var createdAt: String?
+    var performedByName: String?
+    var performedAt: String?     // backend column is performed_at
 }
 
 // MARK: - Asset group summary (GET /api/assets/:id/groups)
@@ -340,22 +344,16 @@ struct ExternalDeploymentRecord: Decodable, Identifiable, Equatable, Sendable {
     var createdAt: String?
 }
 
-// MARK: - Category filter option (GET /api/product-types/categories)
-
-/// The endpoint may return an array of plain strings OR of objects with a
-/// `category` field. `AssetFilterOptions` (Task 8) normalises this.
-struct CategoryOption: Decodable, Equatable, Sendable {
+// MARK: - Categories (GET /api/product-types/categories)
+// Verified backend shape: data: { categories: [{category, count}], suggested: [String] }
+struct CategoriesResponse: Decodable, Equatable, Sendable {
+    let categories: [CategoryCount]
+    var suggested: [String]?
+}
+struct CategoryCount: Decodable, Equatable, Sendable, Identifiable {
     let category: String
-    init(from decoder: Decoder) throws {
-        if let s = try? decoder.singleValueContainer().decode(String.self) {
-            category = s
-        } else {
-            let c = try decoder.container(keyedBy: CodingKeys.self)
-            category = (try? c.decode(String.self, forKey: .category))
-                ?? (try? c.decode(String.self, forKey: .name)) ?? ""
-        }
-    }
-    private enum CodingKeys: String, CodingKey { case category, name }
+    var count: Int?
+    var id: String { category }
 }
 
 // MARK: - Asset group list item (GET /api/asset-groups) — for the group filter picker
@@ -565,8 +563,8 @@ final class InventoryService: InventoryServing {
         try await api.request(.inventoryExternalDeployment(id: id))
     }
     func fetchCategories() async throws -> [String] {
-        let opts: [CategoryOption] = try await api.request(.productTypeCategories)
-        return opts.map(\.category).filter { !$0.isEmpty }
+        let resp: CategoriesResponse = try await api.request(.productTypeCategories)
+        return resp.categories.map(\.category).filter { !$0.isEmpty }
     }
     func fetchGroups(search: String?) async throws -> [AssetGroupListItem] {
         try await api.request(.assetGroupsList(page: 1, limit: 100, search: search))
@@ -1466,9 +1464,9 @@ struct InventoryDetailView: View {
         if !viewModel.activity.isEmpty { card("Activity") {
             ForEach(viewModel.activity) { act in
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(act.action ?? act.description ?? "Activity").font(.subheadline)
-                    if let who = act.performedByEmail { Text(who).font(.caption).foregroundStyle(.secondary) }
-                    if let when = act.createdAt { Text(when).font(.caption2).foregroundStyle(.tertiary) }
+                    Text(act.activityType ?? act.description ?? "Activity").font(.subheadline)
+                    if let who = act.performedByName ?? act.performedByEmail { Text(who).font(.caption).foregroundStyle(.secondary) }
+                    if let when = act.performedAt { Text(when).font(.caption2).foregroundStyle(.tertiary) }
                 }
             }
         } }
