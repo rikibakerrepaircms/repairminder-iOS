@@ -95,6 +95,8 @@ Current `main` tip for this feature is at/after commit `2df09af`.
 
 ## Phase 3 — Inventory Groups (NEXT)
 
+> **Worker prompt:** `docs/superpowers/PHASE3-WORKER-PROMPT.md`. **Two hard mandates (from Phase 2's lesson of deferring work then circling back): (1) NOTHING DEFERRED — full web-parity for the Groups subsystem in this phase, including making the read-only groups card editable (`GroupSelector`); the only acceptable exclusion is a capability iOS physically can't do, called out and user-confirmed. (2) EVERYTHING TESTED — unit (encode + decode-vs-real-JSON + VM + gating) AND a live prod E2E of EVERY write (seed → verify real response → hard-delete cleanup via D1; API delete is soft) AND at least one XCUITest driving a new Groups write flow. Then merge to `main` and `git push origin main`.**
+
 **Delivers:** the Groups subsystem from the web `InventoryGroupsView` / `InventoryGroupDetailModal` / `PromoteToProductModal` / `GroupSelector`.
 
 **Features & endpoints (in `asset_group_handlers.js`):**
@@ -116,7 +118,7 @@ Current `main` tip for this feature is at/after commit `2df09af`.
 - Views: a **Groups** entry (either a segmented mode on the Inventory list or a row in the More/Inventory area) → `InventoryGroupsListView` → `InventoryGroupDetailView` (member assets + linked products tabs, add/remove members) → `PromoteToProductSheet`; and a `GroupSelectorSheet` reachable from `InventoryDetailView`'s Inventory Groups card (Phase 1 shows groups read-only — Phase 3 makes it editable via assign).
 - Wire the detail-view "manage groups" affordance to `POST /api/assets/:id/groups`.
 
-**Verification:** model decode tests; group-assign request/response tests; runtime needs seeded assets+groups.
+**Verification (mandatory, no shortcuts):** unit tests (request encoding + response decoding against REAL captured JSON + view-model mutations + gating); a LIVE prod E2E of EVERY write (create group, add/remove membership, bulk assign, promote — perform → assert real response shape → clean up, hard-deleting via D1 since API delete is soft, and never deleting a row you didn't create — verify by `created_at`); at least one XCUITest driving a new Groups write flow (reuse the Phase-2 harness: demo `demo-company-001`/code `123456`, prime the FAB overlay, tap by precise element, `XCTSkip` when empty; seed then delete). Confirm zero test artifacts remain in admin AND demo companies.
 
 ---
 
@@ -145,4 +147,10 @@ Current `main` tip for this feature is at/after commit `2df09af`.
 
 ## Handoff protocol (how workers chain)
 
-Each phase is executed by a fresh worker using **brainstorming → writing-plans → subagent-driven-development**, on its own branch `feat/ios-inventory-phaseN`, branched from the previous phase's merged result on `main`. At the END of each phase, the worker appends a "Phase N complete" note here (commits touched, what shipped, any new gotchas) and hands off by producing the next phase's worker prompt (same shape as the Phase 2 prompt in the session that created this file). Update the `project_ios_inventory_phase1` memory (or add `project_ios_inventory_phaseN`) with outcomes.
+Each phase is executed by a fresh worker using **brainstorming → writing-plans → subagent-driven-development**, on its own branch `feat/ios-inventory-phaseN`, branched from the previous phase's merged result on `main`.
+
+**Every phase MUST satisfy the two standing mandates (adopted after Phase 2 deferred work and had to be reopened):**
+1. **NOTHING DEFERRED** — deliver full web parity for that phase's surface. Scope questions in brainstorming are HOW, never WHETHER to include a web feature. The only acceptable exclusion is a capability iOS physically cannot do, explicitly called out and user-confirmed. Internal sequencing of a wide phase (e.g. 4a/4b/4c) is fine; punting a feature to a later phase is not.
+2. **EVERYTHING TESTED** — before merge: unit tests (request encoding + response decoding against REAL captured JSON + view-model + gating); a LIVE prod E2E of EVERY write in the phase (perform → assert real response shape → clean up; API delete is SOFT so hard-delete via D1, and never delete a row you didn't create — verify by `created_at`); and at least one XCUITest driving a new write flow (demo `demo-company-001`/code `123456`; prime the FAB overlay; tap by precise element; `XCTSkip` when empty; seed then delete). Confirm zero test artifacts remain in admin AND demo companies.
+
+At the END of each phase the worker: appends a "Phase N complete" note here (commits, what shipped, live-E2E + XCUITest results, new gotchas) and flips Phase N+1's heading to `(NEXT)`; adds/updates memory `project_ios_inventory_phaseN`; **merges to `main` and pushes `origin/main`** (bump `CURRENT_PROJECT_VERSION`); and produces the next phase's worker prompt (same shape, carrying BOTH mandates forward).
