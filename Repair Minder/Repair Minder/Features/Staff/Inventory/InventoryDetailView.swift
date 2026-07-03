@@ -86,7 +86,7 @@ struct InventoryDetailView: View {
                 Divider()
                 Button(role: .destructive) { showDeleteConfirm = true } label: { Label("Delete", systemImage: "trash") }
                     .disabled(!AssetActions.canDelete(a))
-            } label: { Image(systemName: "ellipsis.circle") }
+            } label: { Image(systemName: "ellipsis.circle").accessibilityIdentifier("asset-actions-menu") }
         }
     }
 
