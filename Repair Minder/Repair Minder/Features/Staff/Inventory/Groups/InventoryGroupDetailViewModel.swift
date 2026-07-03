@@ -47,13 +47,15 @@ final class InventoryGroupDetailViewModel: ObservableObject {
         } catch { /* keep existing list on pagination failure */ }
     }
 
-    func addMember(assetId: String) async {
+    @discardableResult
+    func addMember(assetId: String) async -> Bool {
         isMutating = true; defer { isMutating = false }
         do {
             _ = try await service.addMembership(assetId: assetId, groupId: groupId)
             NotificationCenter.default.post(name: .inventoryAssetDidChange, object: nil)
             await load()
-        } catch { errorMessage = error.localizedDescription }
+            return true
+        } catch { errorMessage = error.localizedDescription; return false }
     }
 
     /// Two-step remove (group-assets rows carry no membership_id): look up this asset's

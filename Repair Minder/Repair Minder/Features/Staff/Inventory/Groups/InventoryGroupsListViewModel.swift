@@ -19,6 +19,7 @@ final class InventoryGroupsListViewModel: ObservableObject {
     @Published var isLoadingMore = false
     @Published private(set) var hasMore = false
     @Published var errorMessage: String?
+    @Published private(set) var knownCategories: [String] = []
 
     @Published var search = ""
     @Published var category: String?
@@ -44,6 +45,8 @@ final class InventoryGroupsListViewModel: ObservableObject {
         do {
             let result = try await fetch(page: 1)
             groups = result
+            let cats = result.compactMap { $0.category }.filter { !$0.isEmpty }
+            knownCategories = Array(Set(knownCategories + cats)).sorted()
             hasMore = result.count == pageSize
         } catch {
             errorMessage = error.localizedDescription

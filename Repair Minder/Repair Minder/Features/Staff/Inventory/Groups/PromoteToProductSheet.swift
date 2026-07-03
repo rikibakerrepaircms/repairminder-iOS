@@ -35,10 +35,13 @@ final class PromoteSheetModel: ObservableObject {
             _ = try await service.promoteGroup(req)
             return true
         } catch {
-            if case let APIError.serverError(message, _) = error, message.lowercased().contains("sku") {
+            let message = error.localizedDescription
+            let is409: Bool
+            if case APIError.httpError(let status, _) = error { is409 = (status == 409) } else { is409 = false }
+            if is409 || message.lowercased().contains("sku") {
                 skuError = "This SKU is already in use. Choose a different one."
             } else {
-                errorMessage = error.localizedDescription
+                errorMessage = message
             }
             return false
         }

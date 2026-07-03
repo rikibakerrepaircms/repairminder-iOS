@@ -3,7 +3,7 @@ import SwiftUI
 struct GroupSelectorSheet: View {
     let assetId: String
     let initialSelection: [String]
-    let onSave: ([String]) async -> Void
+    let onSave: ([String]) async -> Bool
 
     @Environment(\.dismiss) private var dismiss
     @State private var selected: Set<String> = []
@@ -12,6 +12,7 @@ struct GroupSelectorSheet: View {
     @State private var isCreating = false
     @State private var isSaving = false
     @State private var errorMessage: String?
+    @State private var didLoadSelection = false
     private let service = InventoryService()
 
     var body: some View {
@@ -44,16 +45,28 @@ struct GroupSelectorSheet: View {
             }
             .searchable(text: $search)
             .task(id: search) { await loadGroups() }
+            .task { await loadCurrentSelection() }
             .navigationTitle("Manage Groups")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { Task { await save() } }.disabled(isSaving)
+                    Button("Save") { Task { await save() } }.disabled(isSaving || !didLoadSelection)
                         .accessibilityIdentifier("group-selector-save")
                 }
             }
             .onAppear { selected = Set(initialSelection) }
+        }
+    }
+
+    private func loadCurrentSelection() async {
+        do {
+            let current = try await service.fetchAssetGroups(id: assetId)
+            selected = Set(current.map(\.id))
+            didLoadSelection = true
+        } catch {
+            errorMessage = "Couldn't load this asset's current groups. Close and try again."
+            // didLoadSelection stays false → Save disabled → cannot accidentally clear groups
         }
     }
 
@@ -80,7 +93,10 @@ struct GroupSelectorSheet: View {
 
     private func save() async {
         isSaving = true; defer { isSaving = false }
-        await onSave(Array(selected))
-        dismiss()
+        if await onSave(Array(selected)) {
+            dismiss()
+        } else {
+            errorMessage = "Couldn't update groups. Please try again."
+        }
     }
 }

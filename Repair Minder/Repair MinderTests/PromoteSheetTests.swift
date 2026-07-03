@@ -32,7 +32,7 @@ final class PromoteSheetTests: XCTestCase {
     }
     func testDuplicateSkuMapsToFieldError() async {
         let g = InventoryGroup(id: "g1", name: "Screen")
-        let mock = Mock(); mock.error = APIError.serverError(message: "A product with that SKU already exists", code: nil)
+        let mock = Mock(); mock.error = APIError.httpError(statusCode: 409, message: "A product with that SKU already exists")
         let m = PromoteSheetModel(group: g, service: mock)
         let ok = await m.submit()
         XCTAssertFalse(ok)

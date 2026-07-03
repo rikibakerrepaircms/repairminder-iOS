@@ -66,6 +66,20 @@ struct InventoryDetailView: View {
             set: { if !$0 { viewModel.actionError = nil } })) {
             Button("OK") { viewModel.actionError = nil }
         } message: { Text(viewModel.actionError ?? "") }
+        .overlay(alignment: .bottom) {
+            if let msg = viewModel.groupActionMessage {
+                Text(msg)
+                    .font(.subheadline)
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .background(.thinMaterial, in: Capsule())
+                    .padding(.bottom, 24)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .task {
+                        try? await Task.sleep(nanoseconds: 2_500_000_000)
+                        viewModel.groupActionMessage = nil
+                    }
+            }
+        }
         .onChange(of: viewModel.didDelete) { _, deleted in if deleted { dismiss() } }
     }
 

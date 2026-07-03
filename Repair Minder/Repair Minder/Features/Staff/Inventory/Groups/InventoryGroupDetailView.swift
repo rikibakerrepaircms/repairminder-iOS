@@ -109,6 +109,7 @@ struct GroupAddAssetsSheet: View {
     @State private var search = ""
     @State private var results: [Asset] = []
     @State private var isSearching = false
+    @State private var searchFailed = false
     private let service = InventoryService()
 
     var body: some View {
@@ -124,14 +125,16 @@ struct GroupAddAssetsSheet: View {
                         Spacer()
                         Button("Add") {
                             Task {
-                                await vm.addMember(assetId: asset.id)
-                                results.removeAll { $0.id == asset.id }
+                                if await vm.addMember(assetId: asset.id) {
+                                    results.removeAll { $0.id == asset.id }
+                                }
                             }
                         }.disabled(vm.isMutating)
                     }
                 }
                 if isSearching { ProgressView() }
-                if !search.isEmpty && !isSearching && results.isEmpty { Text("No matching in-stock assets").foregroundStyle(.secondary) }
+                else if searchFailed { Text("Couldn't search assets. Try again.").foregroundStyle(.red) }
+                else if !search.isEmpty && results.isEmpty { Text("No matching in-stock assets").foregroundStyle(.secondary) }
             }
             .searchable(text: $search)
             .task(id: search) { await runSearch() }
@@ -142,6 +145,7 @@ struct GroupAddAssetsSheet: View {
     }
 
     private func runSearch() async {
+        searchFailed = false
         let term = search.trimmingCharacters(in: .whitespaces)
         guard !term.isEmpty else { results = []; return }
         isSearching = true; defer { isSearching = false }
@@ -151,6 +155,7 @@ struct GroupAddAssetsSheet: View {
             let found = try await service.fetchAssets(page: 1, pageSize: 10, filters: query)
             let existing = Set(vm.assets.map(\.id))
             results = found.filter { !existing.contains($0.id) }
-        } catch { results = [] }
+            searchFailed = false
+        } catch { results = []; searchFailed = true }
     }
 }

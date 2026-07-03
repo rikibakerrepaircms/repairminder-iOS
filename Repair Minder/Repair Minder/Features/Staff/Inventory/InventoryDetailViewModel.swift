@@ -126,15 +126,19 @@ final class InventoryDetailViewModel: ObservableObject {
 
     // MARK: - Groups (Phase 3)
 
-    func manageGroups(groupIds: [String]) async {
-        isMutating = true; actionError = nil
+    @discardableResult
+    func manageGroups(groupIds: [String]) async -> Bool {
+        isMutating = true; actionError = nil; defer { isMutating = false }
         do {
             let result = try await service.bulkAssignGroups(assetId: assetId, groupIds: groupIds)
             groupActionMessage = Self.siblingMessage(result)
             NotificationCenter.default.post(name: .inventoryAssetDidChange, object: nil)
             await refresh()
-        } catch { actionError = error.localizedDescription }
-        isMutating = false
+            return true
+        } catch {
+            actionError = error.localizedDescription
+            return false
+        }
     }
 
     static func siblingMessage(_ r: BulkAssignGroupsResult) -> String {

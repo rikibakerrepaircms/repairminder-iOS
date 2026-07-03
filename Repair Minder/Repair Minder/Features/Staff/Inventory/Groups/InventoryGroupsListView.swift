@@ -15,6 +15,13 @@ struct InventoryGroupsListView: View {
     var body: some View {
         List {
             Section {
+                Picker("Category", selection: Binding(
+                    get: { vm.category ?? "" },
+                    set: { vm.category = $0.isEmpty ? nil : $0 }
+                )) {
+                    Text("All categories").tag("")
+                    ForEach(vm.knownCategories, id: \.self) { Text($0).tag($0) }
+                }
                 Toggle("Has products", isOn: $vm.hasProducts)
                 Toggle("Empty groups", isOn: $vm.emptyGroups)
                 Picker("Sort by", selection: $vm.sortField) {
