@@ -223,11 +223,19 @@ struct DashboardView: View {
                         changePercent: viewModel.deviceComparison?.changePercent
                     )
 
-                    StatCard.revenue(
-                        stats.revenue.current.total,
-                        change: viewModel.revenueComparison?.change,
-                        changePercent: viewModel.revenueComparison?.changePercent
-                    )
+                    VStack(spacing: 4) {
+                        StatCard.revenue(
+                            stats.revenue.current.total,
+                            change: viewModel.revenueComparison?.change,
+                            changePercent: viewModel.revenueComparison?.changePercent
+                        )
+
+                        RevenueSparkline(
+                            totals: stats.revenue.comparisons.map { $0.total ?? 0 }.reversed()
+                                + [stats.revenue.current.total]
+                        )
+                        .padding(.horizontal, 8)
+                    }
 
                     StatCard.clients(
                         stats.clients.current.count,
@@ -256,6 +264,23 @@ struct DashboardView: View {
                         changePercent: stats.refunds.comparisons.first?.changePercent,
                         icon: "arrow.uturn.backward",
                         iconColor: .red
+                    )
+
+                    if viewModel.selectedScope == .company, let aov = stats.avgOrderValue {
+                        StatCard(
+                            title: "Avg Order Value",
+                            value: CurrencyFormatter.format(aov.current.total),
+                            changePercent: aov.comparisons.first?.changePercent,
+                            icon: "cart",
+                            iconColor: .green
+                        )
+                    }
+
+                    StatCard(
+                        title: "Repeat Rate",
+                        value: String(format: "%.0f%%", stats.repeatRate?.current ?? 0),
+                        icon: "arrow.triangle.2.circlepath",
+                        iconColor: .blue
                     )
                 }
             } else {

@@ -285,7 +285,7 @@ final class AppState: ObservableObject {
             // Try a lightweight non-exempt API call. If consent is required,
             // the backend middleware blocks it with 403/CONSENT_REQUIRED.
             let _: EmptyResponse = try await APIClient.shared.request(
-                .dashboardStats(scope: "personal", period: "today")
+                .dashboardStats(scope: "personal", period: "today", comparePeriods: nil)
             )
             return false
         } catch let error as APIError {

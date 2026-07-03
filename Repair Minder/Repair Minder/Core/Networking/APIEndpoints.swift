@@ -53,7 +53,7 @@ enum APIEndpoint {
 
     // MARK: - Dashboard
 
-    case dashboardStats(scope: String?, period: String?)
+    case dashboardStats(scope: String?, period: String?, comparePeriods: Int?)
     case commissionEstimate(scope: String?, period: String?)
     case enquiryStats(scope: String?, includeBreakdown: Bool?)
     case lifecycle(scope: String?, groupBy: String?)
@@ -627,13 +627,16 @@ enum APIEndpoint {
     /// Query parameters for GET requests
     var queryItems: [URLQueryItem]? {
         switch self {
-        case .dashboardStats(let scope, let period):
+        case .dashboardStats(let scope, let period, let comparePeriods):
             var items: [URLQueryItem] = []
             if let scope = scope {
                 items.append(URLQueryItem(name: "scope", value: scope))
             }
             if let period = period {
                 items.append(URLQueryItem(name: "period", value: period))
+            }
+            if let comparePeriods {
+                items.append(URLQueryItem(name: "compare_periods", value: String(comparePeriods)))
             }
             return items.isEmpty ? nil : items
 

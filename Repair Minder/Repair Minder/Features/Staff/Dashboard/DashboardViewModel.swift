@@ -91,7 +91,7 @@ final class DashboardViewModel {
             print("📊 [Dashboard] Loading stats - scope: \(selectedScope.rawValue), period: \(selectedPeriod.rawValue)")
             #endif
             stats = try await APIClient.shared.request(
-                .dashboardStats(scope: selectedScope.rawValue, period: selectedPeriod.rawValue)
+                .dashboardStats(scope: selectedScope.rawValue, period: selectedPeriod.rawValue, comparePeriods: 6)
             )
             #if DEBUG
             print("📊 [Dashboard] Stats loaded - devices: \(stats?.devices.current.count ?? -1), revenue: \(stats?.revenue.current.total ?? -1)")
