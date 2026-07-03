@@ -93,7 +93,41 @@ Current `main` tip for this feature is at/after commit `2df09af`.
 
 ---
 
-## Phase 3 — Inventory Groups (NEXT)
+## Phase 3 — Inventory Groups ✅ SHIPPED 2026-07-03 (merged to `main` + pushed to `origin/main`, 007)
+
+**Delivered:** the ENTIRE web Groups subsystem at full parity — Groups list (search + **category filter** + has-products/empty-groups toggles + 6-field sort), group detail (member-assets + linked-products tabs, add-member search, two-step remove), bulk asset↔group assignment (the Phase-1 read-only Inventory Groups card is now **editable** via a Manage → `GroupSelectorSheet`), inline create-group, promote-to-product, and full group metadata edit. **Zero backend changes** (9 pre-existing endpoints). Spec: `docs/superpowers/specs/2026-07-03-ios-inventory-phase3-design.md`; plan: `docs/superpowers/plans/2026-07-03-ios-inventory-phase3.md`.
+
+**Files:** `Core/Models/InventoryGroupModels.swift`; 9 `APIEndpoint` cases + richer `assetGroupsList`; extended `InventoryServing`/`InventoryService` (10 methods); `Features/Staff/Inventory/Groups/` (`GroupActions`, `InventoryGroupsListView(Model)`, `InventoryGroupDetailView(Model)` + `GroupAddAssetsSheet`, `GroupSelectorSheet`, `PromoteToProductSheet`, `GroupEditSheet`); segmented `Assets`/`Groups` toggle on `InventoryListView`; editable card + `manageGroups`/`siblingMessage` on `InventoryDetailView(Model)`. Shared test double `InventoryServingStub`.
+
+**Commits (branch `feat/ios-inventory-phase3`):** `537db8d` models · `aad5fff` endpoints · `e087d75` service+gating · `dbb5be6` promote sheet · `ed55e14` edit sheet · `8871dca` detail view · `88c4b01` list+toggle · `0275af8` selector+editable card · `3bfc861` **final-review fixes** · `c552c66` XCUITest · `ab6b9e2` version 007.
+
+**Verification (both mandates met):**
+- **Unit:** 47 tests green (encode per request struct; decode per model; VM mutations per action; `GroupActions` gating; regression). Models validated against **real prod captures** (list row, detail row w/o aggregates, `/products` superset, membership 201, bulk-assign, promote 201) — shapes matched exactly.
+- **Live prod E2E of EVERY write** (admin company `4b63c1e6…`): create group → bulk-assign add/remove (`affected=2, match=sku`) → add membership → **409 duplicate** → promote (`{product,component}`) → edit (PUT, reorder_level persisted) → remove membership. All decoded into the Swift models; **hard-deleted via D1** (memberships, components, mappings, product_types), verified **0** `ZZ-P3-` rows remain in admin AND demo companies. Additive-only (always preserved the asset's existing groups) so no real membership was ever removed.
+- **XCUITest** `InventoryGroupsUITest` drove login → Inventory → open asset → **Manage Groups → toggle → Save → back on detail**, PASSED (55.5s) with a seeded demo asset+group; seed deleted; `XCTSkip` when the demo company is empty (CI-safe).
+- iOS build green (007); new Phase-3 files add **zero** errors under the Mac scheme (only the pre-existing `Signals/` Diagnostics errors remain).
+
+**Final-review fixes folded in (a read-only reviewer caught these before merge — take the final review seriously):**
+- **Category filter** was dead plumbing (VM `category` + `.onChange` existed, no UI) → added a category `Picker` populated from accumulated `knownCategories`.
+- **Sibling-propagation toast** (`groupActionMessage`) was computed but never shown → transient bottom toast on the detail view.
+- **Promote SKU-clash** matched only `APIError.serverError`, but a real HTTP-409 surfaces as `APIError.httpError(statusCode:409,…)` → now matches `.httpError`/message; the test injected the wrong case (false confidence) → fixed.
+- **Group-wipe data-loss guard:** `GroupSelectorSheet` now authoritatively loads the asset's current memberships (`fetchAssetGroups`) and **disables Save until loaded**, so an empty/failed snapshot can never clear an asset's groups (empty `group_ids` = clear-all). Save reports failure inline and only dismisses on success.
+- Add-member row only removed on success; search failures no longer masquerade as "no results".
+
+**NEW gotchas (for Phase 4):**
+- **`APIError.serverError(message: String, code: String?)`** — `code` is a semantic STRING (e.g. `ACCOUNT_PENDING_APPROVAL`), NOT an HTTP status. Non-2xx HTTP → **`APIError.httpError(statusCode: Int, message: String?)`**. There is NO `userMessage` property — use `error.localizedDescription` (APIError is `LocalizedError`; `serverError`/`httpError` return the server message).
+- **`POST /api/assets/:id/groups` bulk-assign returns its result NESTED under `data`** → plain `request<BulkAssignGroupsResult>` (NO `requestFull` this phase). It treats the sent array as the ABSOLUTE desired set (empty clears all) and **propagates add/remove across all SKU-siblings** — never send a partial set built from a possibly-unloaded snapshot.
+- **`POST /api/product-types` requires a non-empty `category`** (`if (!body.name || !body.category)` → 400); the web GroupSelector sends `''` (latent bug). iOS inline create sends `category: "General"`.
+- `GET /api/asset-groups/:id/assets` rows are `a.*` with **no `membership_id`** → remove-from-group needs the two-step `GET /api/assets/:id/groups` → `membershipId` → DELETE.
+- Group **detail** omits `min/avg/max_cost` + `is_active` (list-only) and adds `linked_products[]` → model all as optional.
+- Project uses **file-system-synchronized Xcode groups** — new `.swift` files under the source/test roots are auto-included; NO `project.pbxproj` edits needed.
+- SwiftUI: a `ForEach` closure with nested `if let` inside `HStack`/`VStack` triggers a phantom "cannot convert […] to Binding" — extract a small row `View` struct.
+- Same-stack `navigationDestination(item:)` collisions: the Groups list pushes detail via a DISTINCT `Identifiable` wrapper (`GroupRoute`) so it can't clash with the String-keyed asset-detail destination.
+- iOS is a **manual release** — code is on `origin/main` but no build was cut.
+
+---
+
+## Phase 3 — Inventory Groups (original planning)
 
 > **Worker prompt:** `docs/superpowers/PHASE3-WORKER-PROMPT.md`. **Two hard mandates (from Phase 2's lesson of deferring work then circling back): (1) NOTHING DEFERRED — full web-parity for the Groups subsystem in this phase, including making the read-only groups card editable (`GroupSelector`); the only acceptable exclusion is a capability iOS physically can't do, called out and user-confirmed. (2) EVERYTHING TESTED — unit (encode + decode-vs-real-JSON + VM + gating) AND a live prod E2E of EVERY write (seed → verify real response → hard-delete cleanup via D1; API delete is soft) AND at least one XCUITest driving a new Groups write flow. Then merge to `main` and `git push origin main`.**
 
@@ -122,7 +156,9 @@ Current `main` tip for this feature is at/after commit `2df09af`.
 
 ---
 
-## Phase 4 — Advanced (Bulk, Analytics, Book-in, Salvage)
+## Phase 4 — Advanced (Bulk, Analytics, Book-in, Salvage) (NEXT)
+
+> **Worker prompt:** `docs/superpowers/PHASE4-WORKER-PROMPT.md`. Carries BOTH standing mandates (nothing deferred; everything tested incl. live prod E2E of every write + an XCUITest). Phase 4 is the widest and LAST phase — it may sequence internal sub-parts (4a bulk/multi-select, 4b analytics, 4c book-in/salvage) as ordered work WITHIN the phase, but nothing may be punted to a later phase. No Phase 5 to chain.
 
 **Delivers:** the remaining web surface — bulk actions, rollup views, supplier book-in, salvage.
 
