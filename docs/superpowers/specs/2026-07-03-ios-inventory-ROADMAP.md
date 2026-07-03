@@ -38,7 +38,33 @@ Current `main` tip for this feature is at/after commit `2df09af`.
 
 ---
 
-## Phase 2 — Per-Asset Write Actions (NEXT)
+## Phase 2 — Per-Asset Write Actions ✅ SHIPPED 2026-07-03 (merged to `main`, merge commit `1c4e004`)
+
+**Delivered:** every single-asset mutation from web `AssetDetailPage`, on `InventoryDetailView`. Spec: `docs/superpowers/specs/2026-07-03-ios-inventory-phase2-design.md`; plan: `docs/superpowers/plans/2026-07-03-ios-inventory-phase2.md`. **Zero backend changes.**
+
+- **Actions:** Edit (PUT, with SKU/category-propagation warning + `sku_updated_count` toast), Move (POST /move), Deploy chooser → **full To-Order wizard** (order search → line-item → confirm → optional `PartRecoveryForm`, via /allocate) + External deploy (/deploy-external), Return-to-Stock (/return-external), Return-to-Supplier (/return-to-supplier) + Resolve on the pending-return banner (/resolve-supplier-return, credit/replacement), guarded Delete (DELETE). Toolbar `Menu` + contextual controls; guarded trailing swipe-delete on list rows. Gating mirrors web exactly.
+- **Decision (differs from the table below):** **status-change (PATCH /status) was intentionally OMITTED** to match web (web detail has no status control — status changes flow through allocate/deploy/return). Resolve lives on the detail banner (no separate Returns screen). Smart prompts are informational only (SKU-count toast + ready-to-repair note; no order deep-linking).
+- **Networking:** added `APIClient.requestFull<R>` (+ private `performRequestData`) to capture envelope-sidecar fields (`sku_updated_count`, `prompt_ready_to_repair`) that the shared `APIResponse<T>` drops. Everything else uses `request`/`requestVoid`. New `Core/Models/InventoryWriteModels.swift` (request + custom response structs + `.inventoryAssetDidChange` name). Extended `InventoryServing`/`InventoryService`, `InventoryDetailView(Model)`, `InventoryListView(Model)`, `APIEndpoints`.
+- **Phase-1 follow-up folded in:** `InventoryListViewModel.loadAssets()` now coalesces a filter/search change made during an in-flight load (was dropped by `guard !isLoading`), with a deterministic gated test.
+- **List invalidation:** any mutation posts `.inventoryAssetDidChange`; the list's `.onReceive` reloads.
+
+**Commits (on `main` via merge `1c4e004`):** `5e9d957` request structs, `36995aa` response structs, `76ffed7` endpoints, `41425d0` requestFull, `32847aa` service methods, `083aa77` detail-VM + coalescing, `020f0db` write-action UI, `31afc38` review fixes.
+
+**Verification:** iOS build green (iPhone 17 Pro); **22 inventory unit tests pass** (encode + decode-against-real-contract + VM mutations + gated coalescing); runtime smoke against **prod** (admin company `4b63c1e6…`) confirmed the edit envelope decodes as `EditAssetResponse` (`{data, sku_updated_count:Int, success}`), and move/delete contracts (`{success,data}` / `{success,message}`); Mac scheme — new files compile clean (only the pre-existing `Signals/` Diagnostics errors remain, untouched).
+
+**NEW gotchas (for later phases):**
+- `sku_updated_count` / `prompt_ready_to_repair` / `prompt_view_order` are **envelope siblings of `data`** — the shared `APIResponse<T>` silently drops them; use `APIClient.requestFull<R>` (decodes the whole body) for those endpoints.
+- SKU-category propagation only fires when the category actually **changes** AND the asset has a non-null SKU (`sku_updated_count` is 0 otherwise).
+- **`Order` model uses `orderNumber` (Int, non-optional), NOT `ticketNumber`; `OrderStatus` display is `.label` NOT `.displayName`; `OrderItem.description` is non-optional and there is NO `name` field.** The `.orderItems` endpoint is unused/unverified — load line items via the verified `request<Order>(.order(id:))` path and read `order.items`.
+- Delete blocks with **HTTP 400** (not 409) when `checked_out_to_order_id`/`checked_out_to_device_id` is set.
+- Swift's synthesized memberwise init defaults **optionals to nil**, but request structs still need explicit `= nil` so partial-argument call sites compile; struct field order must match the labeled-argument order used at call sites.
+- SwiftUI: a parent `.alert` won't present over an active `.sheet` — sheets must show their own inline error (fixed in review).
+
+**Remaining (deferred, non-blocking):** condition-grade can't be *cleared* to empty via edit (Codable omits nil rather than sending `""`); Return-to-Supplier menu item has no disabled-reason text (iOS menus lack tooltips). `main` is ahead of `origin/main` (not pushed — iOS ships via manual release).
+
+---
+
+## Phase 2 (original planning table)
 
 **Delivers:** every single-asset mutation from the web `AssetDetailPage`, surfaced as toolbar buttons / action sheets on `InventoryDetailView` (and where sensible, swipe actions on list rows). All refresh the detail/list on success.
 
@@ -67,7 +93,7 @@ Current `main` tip for this feature is at/after commit `2df09af`.
 
 ---
 
-## Phase 3 — Inventory Groups
+## Phase 3 — Inventory Groups (NEXT)
 
 **Delivers:** the Groups subsystem from the web `InventoryGroupsView` / `InventoryGroupDetailModal` / `PromoteToProductModal` / `GroupSelector`.
 
