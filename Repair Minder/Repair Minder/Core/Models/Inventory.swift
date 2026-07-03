@@ -66,7 +66,7 @@ struct Asset: Decodable, Identifiable, Equatable, Sendable, Hashable {
     var locationName: String?
     var subLocationCode: String?
     var subLocationDescription: String?
-    var checkedOutOrderNumber: String?
+    var checkedOutOrderNumber: Int?   // API returns the linked order's ticket_number as an Int, not a String
     var checkedOutDeviceName: String?
     var createdByEmail: String?
     var updatedByEmail: String?

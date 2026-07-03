@@ -56,7 +56,7 @@ struct InventoryDetailView: View {
             HStack { Text("Status").foregroundStyle(.secondary); Spacer(); AssetStatusBadge(status: a.status) }
             row("Location", a.locationName); row("Sub-location", a.subLocationCode)
             if a.status == .allocated || a.status == .deployed {
-                row("Order #", a.checkedOutOrderNumber); row("Device", a.checkedOutDeviceName)
+                row("Order #", a.checkedOutOrderNumber.map(String.init)); row("Device", a.checkedOutDeviceName)
             }
             if let ext = viewModel.externalDeployment?.active {
                 row("Deployed to", ext.customerName); row("Reference", ext.externalReference); row("Deployed", ext.deploymentDate)

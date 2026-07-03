@@ -81,4 +81,17 @@ extension InventoryModelTests {
         XCTAssertEqual(a.performedByEmail, "e@x.com")
         XCTAssertEqual(a.performedAt, "2026-01-01")
     }
+
+    // Regression: an allocated asset returns checked_out_order_number as an Int
+    // (the linked order's ticket_number). It was previously typed String? which
+    // failed to decode any real list containing an allocated/deployed asset.
+    func testAllocatedAssetDecodesIntOrderNumber() throws {
+        let json = #"""
+        {"id":"a1","asset_tag":"AST1","name":"Screen","status":"allocated",
+         "checked_out_to_order_id":"o1","checked_out_order_number":100000021}
+        """#
+        let a = try decode(Asset.self, json)
+        XCTAssertEqual(a.status, .allocated)
+        XCTAssertEqual(a.checkedOutOrderNumber, 100000021)
+    }
 }
