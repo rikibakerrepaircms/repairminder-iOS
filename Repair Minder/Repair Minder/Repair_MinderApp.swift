@@ -461,6 +461,11 @@ private struct StaffMainView: View {
 
         case .devices:
             DevicesView()
+
+        case .inventory:
+            NavigationStack {
+                InventoryListView()
+            }
         }
     }
 

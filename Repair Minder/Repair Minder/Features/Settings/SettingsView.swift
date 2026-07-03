@@ -19,6 +19,7 @@ enum SettingsDestination: Hashable {
     case tabBar
     case notifications
     case security
+    case inventory
 }
 
 extension SettingsDestination {
@@ -32,6 +33,7 @@ extension SettingsDestination {
         case .enquiries: .enquiries
         case .clients: .clients
         case .devices: .devices
+        case .inventory: .inventory
         }
     }
 }
@@ -179,6 +181,8 @@ struct SettingsView: View {
             NotificationSettingsView()
         case .security:
             PasscodeSettingsView()
+        case .inventory:
+            InventoryListView(isEmbedded: true)
         }
     }
 
