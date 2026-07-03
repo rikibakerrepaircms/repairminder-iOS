@@ -88,6 +88,111 @@ final class InventoryBulkTests: XCTestCase {
 
     // MARK: - CSV export
 
+    // MARK: - Selection state
+
+    @MainActor
+    func testSelectionToggleSelectAllClear() {
+        let sel = BulkSelectionState()
+        sel.toggle("a"); sel.toggle("b")
+        XCTAssertEqual(sel.count, 2)
+        sel.toggle("a")
+        XCTAssertFalse(sel.isSelected("a"))
+        sel.selectAll(["a", "b", "c"])
+        XCTAssertEqual(sel.count, 3)
+        sel.clear()
+        XCTAssertEqual(sel.count, 0)
+    }
+
+    // MARK: - Bulk view models (mock service)
+
+    @MainActor
+    final class SpyService: InventoryServingStub {
+        var returnedIds: [String]?
+        var moveCalls: [String] = []
+        var failMoveFor: String?
+        var allocateCalls: [String] = []
+        override func bulkReturnToSupplier(assetIds: [String], reason: String, notes: String?) async throws -> BulkReturnToSupplierResult {
+            returnedIds = assetIds
+            return BulkReturnToSupplierResult(batches: [], totalReturned: assetIds.count, errors: [])
+        }
+        override func moveAsset(id: String, body: MoveAssetRequest) async throws -> Asset {
+            moveCalls.append(id)
+            if id == failMoveFor { throw APIError.httpError(statusCode: 400, message: "nope") }
+            return Asset(id: id, assetTag: id, name: id, status: .inStock)
+        }
+        override func allocateAsset(id: String, body: AllocateRequest) async throws -> AllocateResponse {
+            allocateCalls.append(id)
+            return AllocateResponse(success: true, data: Asset(id: id, assetTag: id, name: id, status: .allocated),
+                                    promptReadyToRepair: nil, allocatedParts: nil, device: nil, recoveredAsset: nil)
+        }
+    }
+
+    @MainActor
+    func testBulkReturnSubmitsOnlyValidIds() async {
+        let spy = SpyService()
+        let vm = BulkReturnViewModel(assets: [asset("1", status: .inStock, supplier: "S"),
+                                              asset("2", status: .inStock, supplier: nil)],  // invalid: no supplier
+                                     service: spy)
+        vm.reason = .warrantyClaim
+        XCTAssertEqual(vm.invalidCount, 1)
+        let ok = await vm.submit()
+        XCTAssertTrue(ok)
+        XCTAssertEqual(spy.returnedIds, ["1"])
+        XCTAssertEqual(vm.result?.totalReturned, 1)
+    }
+
+    @MainActor
+    func testBulkReturnDisabledWhenNoValidAssets() async {
+        let vm = BulkReturnViewModel(assets: [asset("1", status: .sold, supplier: "S")], service: SpyService())
+        XCTAssertFalse(vm.canSubmit)
+    }
+
+    @MainActor
+    func testBulkMoveContinuesPastFailure() async {
+        let spy = SpyService(); spy.failMoveFor = "2"
+        let vm = BulkMoveViewModel(assets: [asset("1", status: .inStock, supplier: nil),
+                                            asset("2", status: .inStock, supplier: nil),
+                                            asset("3", status: .inStock, supplier: nil)],
+                                   service: spy)
+        await vm.run(locationId: "L", subLocationId: nil)
+        XCTAssertEqual(spy.moveCalls, ["1", "2", "3"])
+        XCTAssertEqual(vm.successCount, 2)
+        XCTAssertEqual(vm.failureCount, 1)
+        XCTAssertTrue(vm.finished)
+    }
+
+    @MainActor
+    func testBulkDeployOrderOnlyInStock() async {
+        let spy = SpyService()
+        let vm = BulkDeployViewModel(assets: [asset("1", status: .inStock, supplier: nil),
+                                              asset("2", status: .allocated, supplier: nil)],  // excluded
+                                     service: spy)
+        await vm.runOrder(orderId: "o1", orderItemId: nil)
+        XCTAssertEqual(spy.allocateCalls, ["1"])
+        XCTAssertEqual(vm.successCount, 1)
+    }
+
+    @MainActor
+    func testBulkScanAddsOnlyInStockAndDedups() async {
+        @MainActor final class ScanSpy: InventoryServingStub {
+            override func fetchAssetByTag(_ tag: String) async throws -> Asset {
+                if tag == "MISS" { throw APIError.notFound }
+                return Asset(id: tag, assetTag: tag, name: tag, status: tag == "ALLOC" ? .allocated : .inStock)
+            }
+        }
+        let vm = BulkScanViewModel(service: ScanSpy())
+        await vm.onScan(tag: "T1")
+        await vm.onScan(tag: "T1")          // dup
+        await vm.onScan(tag: "ALLOC")       // not in stock
+        await vm.onScan(tag: "MISS")        // not found
+        XCTAssertEqual(vm.readyCount, 1)
+        XCTAssertEqual(vm.entries.count, 3) // T1, ALLOC, MISS (dup ignored)
+        vm.remove("ALLOC")
+        XCTAssertEqual(vm.entries.count, 2)
+        vm.clear()
+        XCTAssertTrue(vm.entries.isEmpty)
+    }
+
     func testCSVStringHeaderAndEscaping() {
         var a = Asset(id: "1", assetTag: "AST1", name: "Screen, OLED", status: .inStock)
         a.category = "Screens"; a.serialNumber = "SN\"1"; a.sku = "SKU1"; a.conditionGrade = "A"; a.cost = 12.5

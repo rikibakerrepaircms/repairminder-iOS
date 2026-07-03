@@ -4,15 +4,24 @@ enum InventoryMode: String, CaseIterable {
     case assets = "Assets", groups = "Groups"
 }
 
+/// Which bulk-action sheet is presented from the multi-select bottom bar.
+enum BulkSheet: String, Identifiable {
+    case move, deploy, returnSupplier, scan
+    var id: String { rawValue }
+}
+
 struct InventoryListView: View {
     var isEmbedded: Bool = false
     var onBack: (() -> Void)? = nil
 
     @StateObject private var viewModel = InventoryListViewModel()
+    @StateObject private var selection = BulkSelectionState()
     @State private var showFilters = false
     @State private var selectedAssetId: String?
     @State private var pendingDelete: Asset?
     @State private var mode: InventoryMode = .assets
+    @State private var bulkSheet: BulkSheet?
+    @State private var exportFile: ExportFile?
     #if os(iOS)
     @State private var showScanner = false
     @State private var scanError: String?
@@ -99,7 +108,9 @@ struct InventoryListView: View {
         .sheet(isPresented: $showFilters) {
             AssetFilterSheet(viewModel: viewModel)
         }
+        .sheet(item: $bulkSheet) { bulkSheetView($0) }
         #if os(iOS)
+        .sheet(item: $exportFile) { ShareSheet(url: $0.url) }
         .sheet(isPresented: $showScanner) {
             InventoryScannerSheet { tag in
                 showScanner = false
@@ -110,6 +121,20 @@ struct InventoryListView: View {
             Button("OK", role: .cancel) {}
         } message: { Text($0) }
         #endif
+        .safeAreaInset(edge: .bottom) {
+            if mode == .assets && selection.isEditing {
+                let picked = selection.selectedAssets(from: viewModel.assets)
+                if !picked.isEmpty {
+                    BulkActionBar(
+                        selectedAssets: picked,
+                        onMove: { bulkSheet = .move },
+                        onDeploy: { bulkSheet = .deploy },
+                        onReturn: { bulkSheet = .returnSupplier },
+                        onExport: exportSelectedCSV,
+                        onScan: { bulkSheet = .scan })
+                }
+            }
+        }
     }
 
     #if os(iOS)
@@ -160,11 +185,10 @@ struct InventoryListView: View {
         } else {
             List {
                 ForEach(viewModel.assets) { asset in
-                    Button { selectedAssetId = asset.id } label: { AssetRow(asset: asset) }
-                        .buttonStyle(.plain)
+                    assetRow(asset)
                         .task { await viewModel.loadMoreIfNeeded(currentItem: asset) }
                         .swipeActions(edge: .trailing) {
-                            if asset.status != .allocated && asset.status != .deployed {
+                            if !selection.isEditing, asset.status != .allocated && asset.status != .deployed {
                                 Button(role: .destructive) { pendingDelete = asset } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
@@ -178,6 +202,48 @@ struct InventoryListView: View {
             .listStyle(.plain)
             .refreshable { await viewModel.refresh() }
         }
+    }
+
+    @ViewBuilder private func assetRow(_ asset: Asset) -> some View {
+        if selection.isEditing {
+            Button {
+                selection.toggle(asset.id)
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: selection.isSelected(asset.id) ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(selection.isSelected(asset.id) ? Color.accentColor : .secondary)
+                    AssetRow(asset: asset)
+                }
+            }
+            .buttonStyle(.plain)
+        } else {
+            Button { selectedAssetId = asset.id } label: { AssetRow(asset: asset) }
+                .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder private func bulkSheetView(_ sheet: BulkSheet) -> some View {
+        let picked = selection.selectedAssets(from: viewModel.assets)
+        switch sheet {
+        case .move:
+            BulkMoveSheet(assets: picked) { selection.exit() }
+        case .deploy:
+            BulkDeploySheet(assets: picked) { selection.exit() }
+        case .returnSupplier:
+            BulkReturnToSupplierSheet(assets: picked) { selection.exit() }
+        case .scan:
+            #if os(iOS)
+            BulkScanSheet { selection.exit() }
+            #else
+            EmptyView()
+            #endif
+        }
+    }
+
+    private func exportSelectedCSV() {
+        let picked = selection.selectedAssets(from: viewModel.assets)
+        guard !picked.isEmpty, let url = try? CSVExporter.writeTempFile(picked) else { return }
+        exportFile = ExportFile(url: url)
     }
 
     private func deleteFromList(_ asset: Asset) async {
@@ -204,14 +270,31 @@ struct InventoryListView: View {
     }
 
     @ToolbarContentBuilder private var filterToolbar: some ToolbarContent {
-        #if os(iOS)
-        ToolbarItem(placement: .topBarTrailing) {
-            Button { showScanner = true } label: { Image(systemName: "barcode.viewfinder") }
-        }
-        #endif
-        ToolbarItem(placement: .primaryAction) {
-            Button { showFilters = true } label: {
-                Image(systemName: viewModel.activeFilterCount > 0 ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+        if mode == .assets && selection.isEditing {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Done") { selection.exit() }.accessibilityIdentifier("bulk-done")
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Button("Select All") { selection.selectAll(viewModel.assets.map(\.id)) }
+                    Button("Clear Selection") { selection.clear() }
+                } label: { Image(systemName: "checklist") }
+            }
+        } else {
+            #if os(iOS)
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { showScanner = true } label: { Image(systemName: "barcode.viewfinder") }
+            }
+            #endif
+            if mode == .assets {
+                ToolbarItem(placement: .automatic) {
+                    Button("Select") { selection.isEditing = true }.accessibilityIdentifier("bulk-select")
+                }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button { showFilters = true } label: {
+                    Image(systemName: viewModel.activeFilterCount > 0 ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                }
             }
         }
     }
@@ -266,3 +349,20 @@ private struct AssetRow: View {
         .padding(.vertical, 4)
     }
 }
+
+/// Identifiable wrapper so an exported CSV URL can drive `.sheet(item:)`.
+struct ExportFile: Identifiable {
+    let url: URL
+    var id: String { url.path }
+}
+
+#if os(iOS)
+/// Minimal share-sheet wrapper for exporting a file via `UIActivityViewController`.
+struct ShareSheet: UIViewControllerRepresentable {
+    let url: URL
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
+#endif
