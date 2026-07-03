@@ -94,7 +94,7 @@ final class InventoryService: InventoryServing {
         return resp.categories.map(\.category).filter { !$0.isEmpty }
     }
     func fetchGroups(search: String?) async throws -> [AssetGroupListItem] {
-        try await api.request(.assetGroupsList(page: 1, limit: 100, search: search))
+        try await api.request(.assetGroupsList(page: 1, limit: 100, search: search, category: nil, hasProducts: nil, unlinkedOnly: nil, sortBy: nil, sortOrder: nil))
     }
     func fetchProductTypes(search: String) async throws -> [ProductTypeOption] {
         try await api.request(.productTypes(search: search))
