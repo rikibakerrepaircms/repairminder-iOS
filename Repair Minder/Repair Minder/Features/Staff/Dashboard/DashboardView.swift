@@ -43,6 +43,18 @@ struct DashboardView: View {
                     // Main stats grid
                     statsSection
 
+                    // Company-only: devices/orders awaiting collection
+                    awaitingCollectionSection
+
+                    // Company-only: unpaid collected + payment mismatch flags
+                    financialFlagsSection
+
+                    // Company-only: revenue split by category
+                    revenueBreakdownSection
+
+                    // User-only: booked-in vs repaired attribution split
+                    attributionSection
+
                     // Commission estimate (if user has rules)
                     if let commission = viewModel.commissionEstimate,
                        commission.hasRules {
@@ -220,6 +232,22 @@ struct DashboardView: View {
                         change: viewModel.newClientComparison?.change,
                         changePercent: viewModel.newClientComparison?.changePercent
                     )
+
+                    StatCard.clients(
+                        stats.returningClients.current.count,
+                        title: "Returning",
+                        change: stats.returningClients.comparisons.first?.change,
+                        changePercent: stats.returningClients.comparisons.first?.changePercent
+                    )
+
+                    StatCard(
+                        title: "Refunds",
+                        value: CurrencyFormatter.format(stats.refunds.current.total),
+                        change: stats.refunds.comparisons.first?.change,
+                        changePercent: stats.refunds.comparisons.first?.changePercent,
+                        icon: "arrow.uturn.backward",
+                        iconColor: .red
+                    )
                 }
             } else {
                 StatGrid(columns: isRegularWidth ? 4 : 2) {
@@ -227,9 +255,133 @@ struct DashboardView: View {
                     StatCardPlaceholder()
                     StatCardPlaceholder()
                     StatCardPlaceholder()
+                    StatCardPlaceholder()
+                    StatCardPlaceholder()
                 }
             }
         }
+    }
+
+    // MARK: - Awaiting Collection Section
+
+    @ViewBuilder
+    private var awaitingCollectionSection: some View {
+        if viewModel.selectedScope == .company, let ac = viewModel.stats?.awaitingCollection {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Awaiting Collection")
+                    .font(.headline)
+                HStack(spacing: 12) {
+                    metricTile("Outstanding", CurrencyFormatter.format(ac.outstandingBalance), "\(ac.orderCount) orders")
+                    metricTile("Devices Ready", "\(ac.deviceCount)", nil)
+                    metricTile("Avg Wait", formatHours(ac.avgWaitHours), nil)
+                }
+            }
+            .padding()
+            .background(Color(.secondarySystemGroupedBackground))
+            .cornerRadius(12)
+        }
+    }
+
+    // MARK: - Financial Flags Section
+
+    @ViewBuilder
+    private var financialFlagsSection: some View {
+        if viewModel.selectedScope == .company,
+           let stats = viewModel.stats,
+           stats.unpaidCollected != nil || stats.paymentMismatch != nil {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Needs Attention")
+                    .font(.headline)
+                HStack(spacing: 12) {
+                    if let u = stats.unpaidCollected {
+                        metricTile("Unpaid Collected", CurrencyFormatter.format(u.total), "\(u.count) orders")
+                    }
+                    if let m = stats.paymentMismatch {
+                        metricTile("Payment Mismatch", CurrencyFormatter.format(m.totalDiscrepancy), "\(m.count) orders")
+                    }
+                }
+            }
+            .padding()
+            .background(Color(.secondarySystemGroupedBackground))
+            .cornerRadius(12)
+        }
+    }
+
+    // MARK: - Revenue Breakdown Section
+
+    @ViewBuilder
+    private var revenueBreakdownSection: some View {
+        if viewModel.selectedScope == .company, let rb = viewModel.stats?.revenueBreakdown {
+            let rows: [(String, Double?)] = [
+                ("Repair", rb.repair),
+                ("Accessories", rb.accessories),
+                ("Device Sale", rb.deviceSale),
+                ("Buyback", rb.buybackSales),
+                ("Other", rb.other),
+            ]
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Revenue by Category")
+                    .font(.headline)
+                ForEach(rows.filter { ($0.1 ?? 0) > 0 }, id: \.0) { row in
+                    HStack {
+                        Text(row.0)
+                            .font(.subheadline)
+                        Spacer()
+                        Text(CurrencyFormatter.format(row.1 ?? 0))
+                            .font(.subheadline.weight(.semibold))
+                    }
+                }
+                Divider()
+                HStack {
+                    Text("Total")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text(CurrencyFormatter.format(rb.total))
+                        .font(.subheadline.weight(.semibold))
+                }
+            }
+            .padding()
+            .background(Color(.secondarySystemGroupedBackground))
+            .cornerRadius(12)
+        }
+    }
+
+    // MARK: - Attribution Section
+
+    @ViewBuilder
+    private var attributionSection: some View {
+        if let a = viewModel.stats?.attribution {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Your Attribution")
+                    .font(.headline)
+                HStack(spacing: 12) {
+                    metricTile("Booked In", CurrencyFormatter.format(a.bookedIn.revenue), "\(a.bookedIn.count) orders")
+                    metricTile("Repaired", CurrencyFormatter.format(a.repaired.revenue), "\(a.repaired.count) devices")
+                }
+            }
+            .padding()
+            .background(Color(.secondarySystemGroupedBackground))
+            .cornerRadius(12)
+        }
+    }
+
+    // MARK: - Metric Tile
+
+    @ViewBuilder
+    private func metricTile(_ label: String, _ value: String, _ sub: String?) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.title3.weight(.bold))
+            if let sub {
+                Text(sub)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Lifecycle Section
