@@ -473,7 +473,7 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var attributionSection: some View {
-        if let a = viewModel.stats?.attribution {
+        if viewModel.selectedScope == .user, let a = viewModel.stats?.attribution {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Your Attribution")
                     .font(.headline)
