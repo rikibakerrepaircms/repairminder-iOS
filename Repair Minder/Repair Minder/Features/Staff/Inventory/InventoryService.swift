@@ -51,6 +51,19 @@ protocol InventoryServing {
     // Phase 4 — salvage (buyback-scoped)
     func salvageBuyback(id: String, items: [SalvageItemRequest]) async throws -> SalvageResponse
     func deleteSalvageItem(buybackId: String, assetId: String) async throws -> DeleteSalvageResult
+
+    // Phase 4 — book-in (supplier orders) + CSV import
+    func listSupplierOrders(page: Int, limit: Int, supplier: String?, status: String?) async throws -> [SupplierOrder]
+    func getSupplierOrder(id: String) async throws -> SupplierOrder
+    func createSupplierOrder(_ body: CreateSupplierOrderRequest) async throws -> SupplierOrder
+    func updateSupplierOrder(id: String, body: UpdateSupplierOrderRequest) async throws -> SupplierOrder
+    func addOrderLine(orderId: String, body: SupplierOrderLineRequest) async throws -> SupplierOrderLine
+    func updateOrderLine(orderId: String, lineId: String, body: SupplierOrderLineRequest) async throws -> SupplierOrderLine
+    func deleteOrderLine(orderId: String, lineId: String) async throws
+    func receiveItems(orderId: String, items: [ReceiveItemInput]) async throws -> ReceiveItemsResult
+    func extractInvoice(fileData: Data, fileName: String, mimeType: String) async throws -> ExtractInvoiceResponse
+    func listSuppliers() async throws -> [SupplierNameOption]
+    func importAssets(csvData: Data, fileName: String, createMissing: Bool) async throws -> AssetImportResponse
 }
 
 /// The filter parameters that vary per list request.
@@ -225,5 +238,43 @@ final class InventoryService: InventoryServing {
     }
     func deleteSalvageItem(buybackId: String, assetId: String) async throws -> DeleteSalvageResult {
         try await api.request(.deleteSalvageItem(buybackId: buybackId, assetId: assetId))
+    }
+
+    // MARK: - Phase 4 book-in (supplier orders) + CSV import
+    func listSupplierOrders(page: Int, limit: Int, supplier: String?, status: String?) async throws -> [SupplierOrder] {
+        try await api.request(.supplierOrders(page: page, limit: limit, supplier: supplier, status: status))
+    }
+    func getSupplierOrder(id: String) async throws -> SupplierOrder {
+        try await api.request(.supplierOrder(id: id))
+    }
+    func createSupplierOrder(_ body: CreateSupplierOrderRequest) async throws -> SupplierOrder {
+        try await api.request(.createSupplierOrder, body: body)
+    }
+    func updateSupplierOrder(id: String, body: UpdateSupplierOrderRequest) async throws -> SupplierOrder {
+        try await api.request(.updateSupplierOrder(id: id), body: body)
+    }
+    func addOrderLine(orderId: String, body: SupplierOrderLineRequest) async throws -> SupplierOrderLine {
+        try await api.request(.addSupplierOrderLine(orderId: orderId), body: body)
+    }
+    func updateOrderLine(orderId: String, lineId: String, body: SupplierOrderLineRequest) async throws -> SupplierOrderLine {
+        try await api.request(.updateSupplierOrderLine(orderId: orderId, lineId: lineId), body: body)
+    }
+    func deleteOrderLine(orderId: String, lineId: String) async throws {
+        try await api.requestVoid(.deleteSupplierOrderLine(orderId: orderId, lineId: lineId))
+    }
+    func receiveItems(orderId: String, items: [ReceiveItemInput]) async throws -> ReceiveItemsResult {
+        try await api.request(.receiveSupplierOrder(id: orderId), body: ReceiveItemsRequest(items: items))
+    }
+    func extractInvoice(fileData: Data, fileName: String, mimeType: String) async throws -> ExtractInvoiceResponse {
+        try await api.uploadMultipartFull(.extractInvoice, fileData: fileData, fileName: fileName,
+                                          mimeType: mimeType, fileFieldName: "invoice", fields: [:])
+    }
+    func listSuppliers() async throws -> [SupplierNameOption] {
+        try await api.request(.supplierMappingsSuppliers)
+    }
+    func importAssets(csvData: Data, fileName: String, createMissing: Bool) async throws -> AssetImportResponse {
+        try await api.uploadMultipartFull(.importAssets, fileData: csvData, fileName: fileName,
+                                          mimeType: "text/csv", fileFieldName: "csv",
+                                          fields: createMissing ? ["createMissing": "true"] : [:])
     }
 }

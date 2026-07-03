@@ -60,4 +60,31 @@ class InventoryServingStub: InventoryServing {
     func deleteSalvageItem(buybackId: String, assetId: String) async throws -> DeleteSalvageResult {
         DeleteSalvageResult(salvagedAssets: [], booked: 0, revertedTo: nil)
     }
+    func listSupplierOrders(page: Int, limit: Int, supplier: String?, status: String?) async throws -> [SupplierOrder] { [] }
+    func getSupplierOrder(id: String) async throws -> SupplierOrder {
+        SupplierOrder(id: id, supplierName: "S", status: "pending")
+    }
+    func createSupplierOrder(_ body: CreateSupplierOrderRequest) async throws -> SupplierOrder {
+        SupplierOrder(id: "so1", supplierName: body.supplierName, status: "pending")
+    }
+    func updateSupplierOrder(id: String, body: UpdateSupplierOrderRequest) async throws -> SupplierOrder {
+        SupplierOrder(id: id, supplierName: body.supplierName ?? "S", status: body.status ?? "pending")
+    }
+    func addOrderLine(orderId: String, body: SupplierOrderLineRequest) async throws -> SupplierOrderLine {
+        SupplierOrderLine(id: "line1", name: body.name, quantityOrdered: body.quantityOrdered ?? 1, quantityReceived: 0, unitCost: body.unitCost ?? 0)
+    }
+    func updateOrderLine(orderId: String, lineId: String, body: SupplierOrderLineRequest) async throws -> SupplierOrderLine {
+        SupplierOrderLine(id: lineId, name: body.name, quantityOrdered: body.quantityOrdered ?? 1, quantityReceived: 0, unitCost: body.unitCost ?? 0)
+    }
+    func deleteOrderLine(orderId: String, lineId: String) async throws {}
+    func receiveItems(orderId: String, items: [ReceiveItemInput]) async throws -> ReceiveItemsResult {
+        ReceiveItemsResult(order: SupplierOrder(id: orderId, supplierName: "S", status: "received"), createdAssets: [], assetsCreatedCount: 0)
+    }
+    func extractInvoice(fileData: Data, fileName: String, mimeType: String) async throws -> ExtractInvoiceResponse {
+        ExtractInvoiceResponse(success: true, data: ExtractedInvoice(lineItems: []), invoiceFileKey: nil, fileType: nil)
+    }
+    func listSuppliers() async throws -> [SupplierNameOption] { [] }
+    func importAssets(csvData: Data, fileName: String, createMissing: Bool) async throws -> AssetImportResponse {
+        AssetImportResponse(success: true, message: "ok", data: AssetImportCounts(imported: 0))
+    }
 }

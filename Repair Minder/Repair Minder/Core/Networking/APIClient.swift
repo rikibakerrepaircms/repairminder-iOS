@@ -292,6 +292,59 @@ final class APIClient {
         }
     }
 
+    /// Multipart upload that decodes the ENTIRE top-level body as `R` (like `requestFull`),
+    /// with a configurable file field name. On a non-2xx status it throws
+    /// `APIError.httpError(statusCode:message:)` where `message` is the raw response body,
+    /// so callers can decode structured error payloads (e.g. CSV-import validation errors).
+    func uploadMultipartFull<R: Decodable>(
+        _ endpoint: APIEndpoint,
+        fileData: Data,
+        fileName: String,
+        mimeType: String,
+        fileFieldName: String,
+        fields: [String: String],
+        skipAuthRefresh: Bool = false
+    ) async throws -> R {
+        let boundary = "Boundary-\(UUID().uuidString)"
+        let body = buildMultipartFormBody(
+            boundary: boundary, fields: fields, fileFieldName: fileFieldName,
+            fileName: fileName, mimeType: mimeType, fileData: fileData)
+
+        var request = try buildRequest(endpoint)
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.networkError(URLError(.badServerResponse))
+            }
+            switch httpResponse.statusCode {
+            case 200...299:
+                do { return try decoder.decode(R.self, from: data) }
+                catch { throw APIError.decodingError(error) }
+            case 401:
+                if !skipAuthRefresh && endpoint.requiresAuth {
+                    try await handleTokenRefresh()
+                    return try await uploadMultipartFull(
+                        endpoint, fileData: fileData, fileName: fileName, mimeType: mimeType,
+                        fileFieldName: fileFieldName, fields: fields, skipAuthRefresh: true)
+                }
+                throw APIError.unauthorized
+            default:
+                // Surface the raw body so callers can decode structured error payloads.
+                let bodyString = String(data: data, encoding: .utf8)
+                throw APIError.httpError(statusCode: httpResponse.statusCode, message: bodyString)
+            }
+        } catch let error as APIError {
+            throw error
+        } catch let error as URLError where error.code == .cancelled {
+            throw APIError.cancelled
+        } catch {
+            throw APIError.networkError(error)
+        }
+    }
+
     /// Perform the raw token refresh request
     /// This is used by AuthManager and should not be called directly
     func refreshAccessToken() async throws -> TokenRefreshResponse {
