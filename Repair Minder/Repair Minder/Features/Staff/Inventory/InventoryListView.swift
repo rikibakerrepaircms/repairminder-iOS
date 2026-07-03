@@ -73,6 +73,9 @@ struct InventoryListView: View {
         }
         .searchable(text: $viewModel.searchText, placement: searchPlacement, prompt: "Search tag, name, serial, SKU")
         .onChange(of: viewModel.searchText) { _, _ in viewModel.searchChanged() }
+        .onReceive(NotificationCenter.default.publisher(for: .inventoryAssetDidChange)) { _ in
+            Task { await viewModel.loadAssets() }
+        }
         .sheet(isPresented: $showFilters) {
             AssetFilterSheet(viewModel: viewModel)
         }

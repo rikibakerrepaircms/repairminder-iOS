@@ -15,6 +15,16 @@ final class InventoryDetailViewModelTests: XCTestCase {
         func fetchProductTypes(search: String) async throws -> [ProductTypeOption] { [] }
         func fetchLocations() async throws -> [Location] { [] }
         func fetchSubLocations(locationId: String) async throws -> [AssetSubLocationOption] { [] }
+        func updateAsset(id: String, body: UpdateAssetRequest) async throws -> EditAssetResponse { fatalError() }
+        func moveAsset(id: String, body: MoveAssetRequest) async throws -> Asset { fatalError() }
+        func allocateAsset(id: String, body: AllocateRequest) async throws -> AllocateResponse { fatalError() }
+        func deployExternal(id: String, body: DeployExternalRequest) async throws -> DeployExternalData { fatalError() }
+        func returnExternal(id: String, body: ReturnExternalRequest) async throws -> Asset { fatalError() }
+        func returnToSupplier(id: String, body: ReturnToSupplierRequest) async throws -> Asset { fatalError() }
+        func resolveSupplierReturn(id: String, body: ResolveReturnRequest) async throws -> Asset { fatalError() }
+        func deleteAsset(id: String) async throws {}
+        func searchOrders(search: String) async throws -> [Order] { [] }
+        func fetchOrderItems(orderId: String) async throws -> [OrderItem] { [] }
     }
 
     func testLoadDetailPopulatesAllSections() async {

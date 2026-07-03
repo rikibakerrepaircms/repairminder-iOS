@@ -21,15 +21,32 @@ final class InventoryListViewModel: ObservableObject {
     @Published var unassignedOnly = false
     @Published var noProductsOnly = false
 
+    /// Set when a mutation elsewhere signals the list is stale; consumed on next appear.
+    @Published var needsReload = false
+
     // MARK: Private
     private let service: InventoryServing
     private let pageSize: Int
     private var currentPage = 1
     private var searchTask: Task<Void, Never>?
+    /// A filter/search change arrived while a load was in flight — reload once it finishes.
+    private var pendingReload = false
 
     init(service: InventoryServing? = nil, pageSize: Int = 24) {
         self.service = service ?? InventoryService()
         self.pageSize = pageSize
+        NotificationCenter.default.addObserver(
+            forName: .inventoryAssetDidChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.needsReload = true }
+        }
+    }
+
+    /// Reload if a mutation marked the list stale (call from the view's `.onAppear`).
+    func reloadIfNeeded() async {
+        guard needsReload else { return }
+        needsReload = false
+        await loadAssets()
     }
 
     var activeFilterCount: Int {
@@ -53,16 +70,20 @@ final class InventoryListViewModel: ObservableObject {
 
     // MARK: Loading
     func loadAssets() async {
-        guard !isLoading else { return }
-        isLoading = true; error = nil; currentPage = 1
-        do {
-            let page = try await service.fetchAssets(page: 1, pageSize: pageSize, filters: query)
-            assets = page
-            hasMore = page.count == pageSize
-        } catch {
-            self.error = error.localizedDescription
-        }
-        isLoading = false
+        // Coalesce: a change requested mid-load is not dropped — it reloads after.
+        if isLoading { pendingReload = true; return }
+        repeat {
+            pendingReload = false
+            isLoading = true; error = nil; currentPage = 1
+            do {
+                let page = try await service.fetchAssets(page: 1, pageSize: pageSize, filters: query)
+                assets = page
+                hasMore = page.count == pageSize
+            } catch {
+                self.error = error.localizedDescription
+            }
+            isLoading = false
+        } while pendingReload
     }
 
     func loadMoreIfNeeded(currentItem: Asset) async {

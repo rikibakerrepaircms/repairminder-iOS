@@ -1,5 +1,10 @@
 import Foundation
 
+extension Notification.Name {
+    /// Posted after any single-asset mutation so the inventory list refreshes.
+    static let inventoryAssetDidChange = Notification.Name("inventoryAssetDidChange")
+}
+
 // MARK: - Request bodies (encoded with .convertToSnakeCase)
 
 /// PUT /api/assets/:id — send only the fields being edited (all optional).
