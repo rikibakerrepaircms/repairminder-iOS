@@ -15,4 +15,28 @@ struct DashboardStatsDecodeTests {
         let stats = try RMDecode.decode(DashboardStats.self, json)
         #expect(stats.revenue.current.total >= 0)
     }
+
+    @Test func testDecodesCompanyScopePayload() throws {
+        let json = #"""
+        {
+          "period":"this_month",
+          "devices":{"current":{"count":3},"comparisons":[]},
+          "revenue":{"current":{"total":1000},"comparisons":[]},
+          "clients":{"current":{"count":5},"comparisons":[]},
+          "new_clients":{"current":{"count":2},"comparisons":[]},
+          "returning_clients":{"current":{"count":3},"comparisons":[]},
+          "refunds":{"current":{"total":50,"count":1},"comparisons":[]},
+          "company_comparison":{"user_avg_lifecycle_hours":null,"company_avg_lifecycle_hours":4.2},
+          "awaiting_collection":{"outstanding_balance":120,"order_count":2,"device_count":2,"avg_wait_hours":6.5},
+          "unpaid_collected":{"total":80,"count":1,"order_ids":["o1"]},
+          "payment_mismatch":{"count":1,"order_ids":["o2"],"total_discrepancy":5},
+          "revenue_breakdown":{"repair":600,"accessories":50,"device_sale":200,"buyback_sales":150,"buyback_purchases":100,"other":0,"total":1000}
+        }
+        """#
+        let stats = try RMDecode.decode(DashboardStats.self, json)
+        #expect(stats.awaitingCollection?.deviceCount == 2)
+        #expect(stats.unpaidCollected?.total == 80)
+        #expect(stats.paymentMismatch?.totalDiscrepancy == 5)
+        #expect(stats.revenueBreakdown?.buybackSales == 150)
+    }
 }
