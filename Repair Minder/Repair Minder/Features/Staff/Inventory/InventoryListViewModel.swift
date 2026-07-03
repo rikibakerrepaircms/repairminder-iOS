@@ -1,0 +1,125 @@
+import Foundation
+
+@MainActor
+final class InventoryListViewModel: ObservableObject {
+
+    // MARK: Published state
+    @Published private(set) var assets: [Asset] = []
+    @Published private(set) var isLoading = false
+    @Published private(set) var isLoadingMore = false
+    @Published private(set) var hasMore = false
+    @Published private(set) var error: String?
+
+    // Filter state (bound to UI)
+    @Published var searchText = ""
+    @Published var selectedStatus: AssetStatus?
+    @Published var selectedCategory: String?
+    @Published var selectedLocationId: String?
+    @Published var selectedSubLocationId: String?
+    @Published var selectedProductTypeId: String?
+    @Published var selectedGroupId: String?
+    @Published var unassignedOnly = false
+    @Published var noProductsOnly = false
+
+    // MARK: Private
+    private let service: InventoryServing
+    private let pageSize: Int
+    private var currentPage = 1
+    private var searchTask: Task<Void, Never>?
+
+    init(service: InventoryServing? = nil, pageSize: Int = 24) {
+        self.service = service ?? InventoryService()
+        self.pageSize = pageSize
+    }
+
+    var activeFilterCount: Int {
+        [selectedCategory != nil, selectedLocationId != nil, selectedSubLocationId != nil,
+         selectedProductTypeId != nil, selectedGroupId != nil, unassignedOnly, noProductsOnly]
+            .filter { $0 }.count
+    }
+
+    private var query: AssetQuery {
+        AssetQuery(
+            status: selectedStatus?.apiValue,
+            category: selectedCategory,
+            locationId: selectedLocationId,
+            subLocationId: selectedSubLocationId,
+            productTypeId: selectedProductTypeId,
+            groupId: selectedGroupId,
+            hasGroups: unassignedOnly ? false : nil,
+            hasProducts: noProductsOnly ? false : nil,
+            search: searchText.isEmpty ? nil : searchText)
+    }
+
+    // MARK: Loading
+    func loadAssets() async {
+        guard !isLoading else { return }
+        isLoading = true; error = nil; currentPage = 1
+        do {
+            let page = try await service.fetchAssets(page: 1, pageSize: pageSize, filters: query)
+            assets = page
+            hasMore = page.count == pageSize
+        } catch {
+            self.error = error.localizedDescription
+        }
+        isLoading = false
+    }
+
+    func loadMoreIfNeeded(currentItem: Asset) async {
+        guard hasMore, !isLoadingMore, currentItem.id == assets.last?.id else { return }
+        await loadMore()
+    }
+
+    func loadMore() async {
+        guard hasMore, !isLoadingMore else { return }
+        isLoadingMore = true
+        do {
+            let next = currentPage + 1
+            let page = try await service.fetchAssets(page: next, pageSize: pageSize, filters: query)
+            assets.append(contentsOf: page)
+            currentPage = next
+            hasMore = page.count == pageSize
+        } catch {
+            #if DEBUG
+            print("[InventoryList] pagination error: \(error)")
+            #endif
+        }
+        isLoadingMore = false
+    }
+
+    func refresh() async {
+        currentPage = 1
+        do {
+            let page = try await service.fetchAssets(page: 1, pageSize: pageSize, filters: query)
+            assets = page
+            hasMore = page.count == pageSize
+            error = nil
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    // MARK: Filtering
+    func selectStatus(_ status: AssetStatus?) {
+        selectedStatus = (selectedStatus == status) ? nil : status
+        Task { await loadAssets() }
+    }
+
+    func applyFilters() { Task { await loadAssets() } }
+
+    func clearFilters() {
+        selectedCategory = nil; selectedLocationId = nil; selectedSubLocationId = nil
+        selectedProductTypeId = nil; selectedGroupId = nil
+        unassignedOnly = false; noProductsOnly = false
+        Task { await loadAssets() }
+    }
+
+    func searchChanged() {
+        searchTask?.cancel()
+        searchTask = Task {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
+            await loadAssets()
+        }
+    }
+}
