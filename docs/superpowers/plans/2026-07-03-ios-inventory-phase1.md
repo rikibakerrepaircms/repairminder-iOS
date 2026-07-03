@@ -503,7 +503,7 @@ protocol InventoryServing {
     func fetchGroups(search: String?) async throws -> [AssetGroupListItem]
     func fetchProductTypes(search: String) async throws -> [ProductTypeOption]
     func fetchLocations() async throws -> [Location]
-    func fetchSubLocations(locationId: String) async throws -> [SubLocationOption]
+    func fetchSubLocations(locationId: String) async throws -> [AssetSubLocationOption]
 }
 
 /// The filter parameters that vary per list request.
@@ -527,7 +527,7 @@ struct ProductTypeOption: Decodable, Identifiable, Equatable, Sendable {
 }
 
 /// Minimal sub-location row for the filter picker.
-struct SubLocationOption: Decodable, Identifiable, Equatable, Sendable {
+struct AssetSubLocationOption: Decodable, Identifiable, Equatable, Sendable {
     let id: String
     var code: String?
     var description: String?
@@ -575,7 +575,7 @@ final class InventoryService: InventoryServing {
     func fetchLocations() async throws -> [Location] {
         try await api.request(.locations)
     }
-    func fetchSubLocations(locationId: String) async throws -> [SubLocationOption] {
+    func fetchSubLocations(locationId: String) async throws -> [AssetSubLocationOption] {
         try await api.request(.locationSubLocations(locationId: locationId))
     }
 }
@@ -628,7 +628,7 @@ final class InventoryListViewModelTests: XCTestCase {
         func fetchGroups(search: String?) async throws -> [AssetGroupListItem] { [] }
         func fetchProductTypes(search: String) async throws -> [ProductTypeOption] { [] }
         func fetchLocations() async throws -> [Location] { [] }
-        func fetchSubLocations(locationId: String) async throws -> [SubLocationOption] { [] }
+        func fetchSubLocations(locationId: String) async throws -> [AssetSubLocationOption] { [] }
     }
 
     private func asset(_ id: String) -> Asset {
@@ -1108,12 +1108,14 @@ import SwiftUI
 final class AssetFilterOptions: ObservableObject {
     @Published var categories: [String] = []
     @Published var locations: [Location] = []
-    @Published var subLocations: [SubLocationOption] = []
+    @Published var subLocations: [AssetSubLocationOption] = []
     @Published var groups: [AssetGroupListItem] = []
     @Published var productTypes: [ProductTypeOption] = []
 
     private let service: InventoryServing
-    init(service: InventoryServing = InventoryService()) { self.service = service }
+    // NB: InventoryService.init is @MainActor-isolated, so it cannot be a default
+    // arg value in a nonisolated context. Use optional + nil-coalesce instead.
+    init(service: InventoryServing? = nil) { self.service = service ?? InventoryService() }
 
     func loadTopLevel() async {
         async let cats = try? service.fetchCategories()
@@ -1300,7 +1302,7 @@ final class InventoryDetailViewModelTests: XCTestCase {
         func fetchGroups(search: String?) async throws -> [AssetGroupListItem] { [] }
         func fetchProductTypes(search: String) async throws -> [ProductTypeOption] { [] }
         func fetchLocations() async throws -> [Location] { [] }
-        func fetchSubLocations(locationId: String) async throws -> [SubLocationOption] { [] }
+        func fetchSubLocations(locationId: String) async throws -> [AssetSubLocationOption] { [] }
     }
 
     func testLoadDetailPopulatesAllSections() async {
@@ -1334,9 +1336,10 @@ final class InventoryDetailViewModel: ObservableObject {
 
     let assetId: String
     private let service: InventoryServing
-    init(assetId: String, service: InventoryServing = InventoryService()) {
+    // InventoryService.init is @MainActor-isolated — use optional + nil-coalesce (not a default arg value).
+    init(assetId: String, service: InventoryServing? = nil) {
+        self.service = service ?? InventoryService()
         self.assetId = assetId
-        self.service = service
     }
 
     func load() async {
@@ -1652,7 +1655,7 @@ git commit -m "test(inventory): browse smoke test (More → Inventory → detail
 
 - **Spec coverage:** models (T1–T2), API layer incl. new endpoints (T3–T4), list with status pills/search/full filter set/paging (T5–T8), scan-to-find (T9), detail with all sections + 3 sub-resources (T10–T11), opt-in tab + overflow via `isEmbedded` (T12), tests (T1/T2/T5/T10/T13). All spec §3–§10 items map to a task.
 - **Placeholder scan:** the two tolerant decoders (`CategoryOption`, `AssetActivity`) and the scanner wrapper are the only "verify against live" spots; each has an explicit verification step, not a blank TODO.
-- **Type consistency:** `AssetQuery`, `Asset`, `AssetStatus`, `InventoryServing`, `InventoryListViewModel`, `InventoryDetailViewModel`, `AssetFilterOptions`, `AssetStatusBadge`/`assetStatusColor`, `InventoryScannerSheet`, `SubLocationOption`/`ProductTypeOption` are defined once and referenced consistently across tasks.
+- **Type consistency:** `AssetQuery`, `Asset`, `AssetStatus`, `InventoryServing`, `InventoryListViewModel`, `InventoryDetailViewModel`, `AssetFilterOptions`, `AssetStatusBadge`/`assetStatusColor`, `InventoryScannerSheet`, `AssetSubLocationOption`/`ProductTypeOption` are defined once and referenced consistently across tasks.
 - **Known cross-task compile coupling:** Tasks 7–11 reference each other; build-verify after Task 11 (noted in T7/T11).
 
 ## Deferred to later phases (not this plan)
