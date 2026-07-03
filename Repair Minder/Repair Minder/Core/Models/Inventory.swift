@@ -104,10 +104,14 @@ struct Asset: Decodable, Identifiable, Equatable, Sendable, Hashable {
 struct AssetActivity: Decodable, Identifiable, Equatable, Sendable {
     let id: String
     var assetId: String?
-    var action: String?
+    var activityType: String?
     var description: String?
+    var fromStatus: String?
+    var toStatus: String?
+    var performedBy: String?
     var performedByEmail: String?
-    var createdAt: String?
+    var performedByName: String?
+    var performedAt: String?
 }
 
 // MARK: - Asset group summary (GET /api/assets/:id/groups)
@@ -144,22 +148,16 @@ struct ExternalDeploymentRecord: Decodable, Identifiable, Equatable, Sendable {
     var createdAt: String?
 }
 
-// MARK: - Category filter option (GET /api/product-types/categories)
-
-/// The endpoint may return an array of plain strings OR of objects with a
-/// `category` field. `AssetFilterOptions` (Task 8) normalises this.
-struct CategoryOption: Decodable, Equatable, Sendable {
+// MARK: - Categories (GET /api/product-types/categories)
+// data: { categories: [{category, count}], suggested: [String] }
+struct CategoriesResponse: Decodable, Equatable, Sendable {
+    let categories: [CategoryCount]
+    var suggested: [String]?
+}
+struct CategoryCount: Decodable, Equatable, Sendable, Identifiable {
     let category: String
-    init(from decoder: Decoder) throws {
-        if let s = try? decoder.singleValueContainer().decode(String.self) {
-            category = s
-        } else {
-            let c = try decoder.container(keyedBy: CodingKeys.self)
-            category = (try? c.decode(String.self, forKey: .category))
-                ?? (try? c.decode(String.self, forKey: .name)) ?? ""
-        }
-    }
-    private enum CodingKeys: String, CodingKey { case category, name }
+    var count: Int?
+    var id: String { category }
 }
 
 // MARK: - Asset group list item (GET /api/asset-groups) — for the group filter picker

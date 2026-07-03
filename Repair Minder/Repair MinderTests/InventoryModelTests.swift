@@ -67,4 +67,18 @@ extension InventoryModelTests {
         XCTAssertEqual(ed.active?.customerName, "Acme")
         XCTAssertEqual(ed.history?.count, 0)
     }
+
+    func testCategoriesResponseDecodes() throws {
+        let json = #"{"categories":[{"category":"Screens","count":5},{"category":"Batteries","count":2}],"suggested":["X"]}"#
+        let r = try decode(CategoriesResponse.self, json)
+        XCTAssertEqual(r.categories.map(\.category), ["Screens", "Batteries"])
+        XCTAssertEqual(r.categories.first?.count, 5)
+    }
+    func testAssetActivityDecodesRealColumns() throws {
+        let json = #"{"id":"al1","asset_id":"a1","activity_type":"moved","performed_by_email":"e@x.com","performed_at":"2026-01-01"}"#
+        let a = try decode(AssetActivity.self, json)
+        XCTAssertEqual(a.activityType, "moved")
+        XCTAssertEqual(a.performedByEmail, "e@x.com")
+        XCTAssertEqual(a.performedAt, "2026-01-01")
+    }
 }
