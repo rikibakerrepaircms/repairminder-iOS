@@ -20,6 +20,9 @@ final class DashboardViewModel {
     var enquiryStats: EnquiryStats?
     var commissionEstimate: CommissionEstimate?
     var activeWork: [ActiveWorkItem] = []
+    var lifecycle: DashboardLifecycle?
+    var categoryBreakdown: DashboardCategoryBreakdown?
+    var heatmap: DashboardHeatmap?
     var isLoading = false
     var error: String?
 
@@ -60,14 +63,17 @@ final class DashboardViewModel {
         isLoading = true
         error = nil
 
-        // Load stats, enquiry stats, commission, and active work in parallel
+        // Load stats, enquiry stats, commission, active work, and parity endpoints in parallel
         async let statsTask: Void = loadStats()
         async let enquiryTask: Void = loadEnquiryStats()
         async let commissionTask: Void = loadCommissionEstimate()
         async let activeWorkTask: Void = loadActiveWork()
+        async let lifecycleTask: Void = loadLifecycle()
+        async let categoryBreakdownTask: Void = loadCategoryBreakdown()
+        async let heatmapTask: Void = loadHeatmap()
 
         // Await all tasks
-        _ = await (statsTask, enquiryTask, commissionTask, activeWorkTask)
+        _ = await (statsTask, enquiryTask, commissionTask, activeWorkTask, lifecycleTask, categoryBreakdownTask, heatmapTask)
 
         isLoading = false
     }
@@ -145,6 +151,45 @@ final class DashboardViewModel {
             print("Failed to load active work: \(error)")
             #endif
             // Don't set error for active work - it's supplementary
+        }
+    }
+
+    private func loadLifecycle() async {
+        do {
+            let groupBy = selectedScope == .company ? "engineer" : nil
+            lifecycle = try await APIClient.shared.request(
+                .lifecycle(scope: selectedScope.rawValue, groupBy: groupBy)
+            )
+        } catch {
+            #if DEBUG
+            print("📈 [Lifecycle] Failed: \(error)")
+            #endif
+            // Don't set error for lifecycle - it's supplementary
+        }
+    }
+
+    private func loadCategoryBreakdown() async {
+        do {
+            categoryBreakdown = try await APIClient.shared.request(
+                .categoryBreakdown(scope: selectedScope.rawValue, period: selectedPeriod.rawValue)
+            )
+        } catch {
+            #if DEBUG
+            print("🥧 [Category] Failed: \(error)")
+            #endif
+            // Don't set error for category breakdown - it's supplementary
+        }
+    }
+
+    private func loadHeatmap() async {
+        guard selectedScope == .company else { return }
+        do {
+            heatmap = try await APIClient.shared.request(.bookingHeatmap(period: "last_90_days"))
+        } catch {
+            #if DEBUG
+            print("🗓️ [Heatmap] Failed: \(error)")
+            #endif
+            // Don't set error for heatmap - it's supplementary
         }
     }
 

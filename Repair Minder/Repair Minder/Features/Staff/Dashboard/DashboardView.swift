@@ -52,6 +52,15 @@ struct DashboardView: View {
                     // Company-only: revenue split by category
                     revenueBreakdownSection
 
+                    // Company-only: turnaround time by engineer
+                    engineerLifecycleSection
+
+                    // Work by category (both scopes)
+                    categoryBreakdownSection
+
+                    // Company-only: booking heatmap (last 90 days)
+                    heatmapSection
+
                     // User-only: booked-in vs repaired attribution split
                     attributionSection
 
@@ -338,6 +347,95 @@ struct DashboardView: View {
                     Spacer()
                     Text(CurrencyFormatter.format(rb.total))
                         .font(.subheadline.weight(.semibold))
+                }
+            }
+            .padding()
+            .background(Color(.secondarySystemGroupedBackground))
+            .cornerRadius(12)
+        }
+    }
+
+    // MARK: - Engineer Lifecycle Section
+
+    @ViewBuilder
+    private var engineerLifecycleSection: some View {
+        if viewModel.selectedScope == .company, let engineers = viewModel.lifecycle?.byEngineer, !engineers.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Engineer Performance")
+                    .font(.headline)
+                ForEach(engineers) { e in
+                    HStack {
+                        Text(e.name)
+                            .font(.subheadline)
+                        Spacer()
+                        Text("\(e.count) devices")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(formatHours(e.avgHours))
+                            .font(.subheadline.weight(.semibold))
+                    }
+                }
+            }
+            .padding()
+            .background(Color(.secondarySystemGroupedBackground))
+            .cornerRadius(12)
+        }
+    }
+
+    // MARK: - Category Breakdown Section
+
+    @ViewBuilder
+    private var categoryBreakdownSection: some View {
+        if let cb = viewModel.categoryBreakdown, !cb.categories.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Work by Category")
+                    .font(.headline)
+                ForEach(cb.categories) { c in
+                    HStack {
+                        Text(c.type.capitalized)
+                            .font(.subheadline)
+                        Spacer()
+                        Text(CurrencyFormatter.format(c.total))
+                            .font(.subheadline.weight(.semibold))
+                        if let p = c.percent {
+                            Text("\(Int(p))%")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .padding()
+            .background(Color(.secondarySystemGroupedBackground))
+            .cornerRadius(12)
+        }
+    }
+
+    // MARK: - Heatmap Section
+
+    @ViewBuilder
+    private var heatmapSection: some View {
+        if viewModel.selectedScope == .company, let hm = viewModel.heatmap, !hm.heatmap.isEmpty {
+            let byKey = Dictionary(uniqueKeysWithValues: hm.heatmap.map { ("\($0.day)-\($0.hour)", $0.count) })
+            let days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Booking Patterns")
+                    .font(.headline)
+                Text("last 90 days, shop-local time")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                ForEach(0..<7, id: \.self) { day in
+                    HStack(spacing: 2) {
+                        Text(days[day])
+                            .font(.system(size: 9))
+                            .frame(width: 26, alignment: .leading)
+                        ForEach(0..<24, id: \.self) { hour in
+                            let c = byKey["\(day)-\(hour)"] ?? 0
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color.blue.opacity(hm.maxCount > 0 ? Double(c) / Double(hm.maxCount) * 0.9 + (c > 0 ? 0.1 : 0) : 0))
+                                .frame(height: 10)
+                        }
+                    }
                 }
             }
             .padding()
