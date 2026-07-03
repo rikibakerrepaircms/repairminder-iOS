@@ -30,6 +30,12 @@
 
 **Key files:** `InventoryService.swift` (`InventoryServing` protocol — extend it per phase), `InventoryListView.swift`/`InventoryDetailView.swift` (add actions here), `InventoryListViewModel.swift`/`InventoryDetailViewModel.swift`.
 
+**Post-merge fixes (already on `main`):**
+- `fix(inventory): Swift 6 — InventoryService.init avoids @MainActor .shared default arg` — `init(api: APIClient? = nil)` (default-arg couldn't reference `@MainActor` `.shared`).
+- `fix(inventory): checked_out_order_number is Int, not String` — the real `/api/assets` decode crashed on any allocated/deployed asset (invisible on the empty demo account; user hit it on real data). Now `Int?` + regression test.
+
+Current `main` tip for this feature is at/after commit `2df09af`.
+
 ---
 
 ## Phase 2 — Per-Asset Write Actions (NEXT)
