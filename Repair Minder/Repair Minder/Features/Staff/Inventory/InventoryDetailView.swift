@@ -4,6 +4,13 @@ struct InventoryDetailView: View {
     let assetId: String
     @StateObject private var viewModel: InventoryDetailViewModel
 
+    @State private var showEdit = false
+    @State private var showMove = false
+    @State private var showDeploy = false
+    @State private var showReturnSupplier = false
+    @State private var showDeleteConfirm = false
+    @Environment(\.dismiss) private var dismiss
+
     init(assetId: String) {
         self.assetId = assetId
         _viewModel = StateObject(wrappedValue: InventoryDetailViewModel(assetId: assetId))
@@ -29,12 +36,70 @@ struct InventoryDetailView: View {
         #endif
         .task { if viewModel.asset == nil { await viewModel.load() } }
         .refreshable { await viewModel.refresh() }
+        .toolbar { if let asset = viewModel.asset { toolbarMenu(asset) } }
+        .sheet(isPresented: $showEdit) { if let a = viewModel.asset { AssetEditSheet(asset: a, viewModel: viewModel) } }
+        .sheet(isPresented: $showMove) { if let a = viewModel.asset { AssetMoveSheet(asset: a, viewModel: viewModel) } }
+        .sheet(isPresented: $showDeploy) { if let a = viewModel.asset { DeployChooserSheet(asset: a, viewModel: viewModel) } }
+        .sheet(isPresented: $showReturnSupplier) { if let a = viewModel.asset { ReturnToSupplierSheet(asset: a, viewModel: viewModel) } }
+        .confirmationDialog("Delete asset \(viewModel.asset?.assetTag ?? "")? This cannot be undone.",
+                            isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) { Task { await viewModel.delete() } }
+            Button("Cancel", role: .cancel) {}
+        }
+        .alert("Action failed", isPresented: Binding(
+            get: { viewModel.actionError != nil },
+            set: { if !$0 { viewModel.actionError = nil } })) {
+            Button("OK") { viewModel.actionError = nil }
+        } message: { Text(viewModel.actionError ?? "") }
+        .onChange(of: viewModel.didDelete) { _, deleted in if deleted { dismiss() } }
+    }
+
+    @ToolbarContentBuilder private func toolbarMenu(_ a: Asset) -> some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            Menu {
+                Button { showEdit = true } label: { Label("Edit", systemImage: "pencil") }
+                Button { showMove = true } label: { Label("Move", systemImage: "arrow.left.arrow.right") }
+                if a.status == .inStock {
+                    Button { showDeploy = true } label: { Label("Deploy", systemImage: "paperplane") }
+                }
+                Button { showReturnSupplier = true } label: { Label("Return to Supplier", systemImage: "arrow.uturn.backward") }
+                    .disabled(!canReturnToSupplier(a))
+                Divider()
+                Button(role: .destructive) { showDeleteConfirm = true } label: { Label("Delete", systemImage: "trash") }
+                    .disabled(a.status == .allocated || a.status == .deployed)
+            } label: { Image(systemName: "ellipsis.circle") }
+        }
+    }
+
+    private func canReturnToSupplier(_ a: Asset) -> Bool {
+        [.inStock, .allocated, .deployed].contains(a.status)
+            && a.supplierName != nil && a.status != .pendingReturn
     }
 
     @ViewBuilder private func sections(_ a: Asset) -> some View {
         header(a)
+        if let n = viewModel.lastSkuUpdatedCount {
+            Text("Category also applied to \(n) other asset\(n == 1 ? "" : "s") with the same SKU")
+                .font(.caption).foregroundStyle(.blue)
+                .task { try? await Task.sleep(nanoseconds: 4_000_000_000); viewModel.lastSkuUpdatedCount = nil }
+        }
+        if viewModel.readyToRepairPrompt {
+            Label("This asset's order is ready to repair.", systemImage: "wrench.and.screwdriver")
+                .font(.caption).foregroundStyle(.blue)
+                .task { try? await Task.sleep(nanoseconds: 5_000_000_000); viewModel.readyToRepairPrompt = false }
+        }
         if a.status == .pendingReturn { card("Pending Return") {
             row("Reason", a.supplierReturnReason); row("Notes", a.supplierReturnNotes); row("Initiated", a.supplierReturnInitiatedAt)
+            HStack {
+                Button("Credit Received") {
+                    Task { await viewModel.resolveReturn(ResolveReturnRequest(resolution: "credit_received", replacementAssetId: nil, notes: nil)) }
+                }.buttonStyle(.bordered)
+                Button("Replacement Received") {
+                    Task { await viewModel.resolveReturn(ResolveReturnRequest(resolution: "replacement_received", replacementAssetId: nil, notes: nil)) }
+                }.buttonStyle(.bordered)
+            }
+            .disabled(viewModel.isMutating)
+            .padding(.top, 4)
         } }
         card("Identification") {
             row("Serial", a.serialNumber); row("SKU", a.sku); row("Category", a.category); row("Product Type", a.productTypeName)
@@ -63,6 +128,15 @@ struct InventoryDetailView: View {
                 row("Deployed by", ext.deployedBy)
                 if let history = viewModel.externalDeployment?.history, !history.isEmpty {
                     row("Previous deployments", String(history.count))
+                }
+                if a.status == .deployed {
+                    Button("Return to Stock") {
+                        Task { await viewModel.returnToStock(
+                            ReturnExternalRequest(deploymentId: ext.id, returnToStock: true, notes: nil)) }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(viewModel.isMutating)
+                    .padding(.top, 4)
                 }
             }
         }

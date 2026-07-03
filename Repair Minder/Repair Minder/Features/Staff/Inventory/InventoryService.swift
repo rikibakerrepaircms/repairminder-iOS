@@ -14,6 +14,19 @@ protocol InventoryServing {
     func fetchProductTypes(search: String) async throws -> [ProductTypeOption]
     func fetchLocations() async throws -> [Location]
     func fetchSubLocations(locationId: String) async throws -> [AssetSubLocationOption]
+
+    // Phase 2 write actions
+    func updateAsset(id: String, body: UpdateAssetRequest) async throws -> EditAssetResponse
+    func moveAsset(id: String, body: MoveAssetRequest) async throws -> Asset
+    func allocateAsset(id: String, body: AllocateRequest) async throws -> AllocateResponse
+    func deployExternal(id: String, body: DeployExternalRequest) async throws -> DeployExternalData
+    func returnExternal(id: String, body: ReturnExternalRequest) async throws -> Asset
+    func returnToSupplier(id: String, body: ReturnToSupplierRequest) async throws -> Asset
+    func resolveSupplierReturn(id: String, body: ResolveReturnRequest) async throws -> Asset
+    func deleteAsset(id: String) async throws
+    // Deploy wizard support
+    func searchOrders(search: String) async throws -> [Order]
+    func fetchOrderItems(orderId: String) async throws -> [OrderItem]
 }
 
 /// The filter parameters that vary per list request.
@@ -91,5 +104,45 @@ final class InventoryService: InventoryServing {
     }
     func fetchSubLocations(locationId: String) async throws -> [AssetSubLocationOption] {
         try await api.request(.locationSubLocations(locationId: locationId))
+    }
+
+    // MARK: - Phase 2 write actions
+
+    func updateAsset(id: String, body: UpdateAssetRequest) async throws -> EditAssetResponse {
+        try await api.requestFull(.updateAsset(id: id), body: body)
+    }
+    func moveAsset(id: String, body: MoveAssetRequest) async throws -> Asset {
+        try await api.request(.moveAsset(id: id), body: body)
+    }
+    func allocateAsset(id: String, body: AllocateRequest) async throws -> AllocateResponse {
+        try await api.requestFull(.allocateAsset(id: id), body: body)
+    }
+    func deployExternal(id: String, body: DeployExternalRequest) async throws -> DeployExternalData {
+        try await api.request(.deployExternalAsset(id: id), body: body)
+    }
+    func returnExternal(id: String, body: ReturnExternalRequest) async throws -> Asset {
+        try await api.request(.returnExternalAsset(id: id), body: body)
+    }
+    func returnToSupplier(id: String, body: ReturnToSupplierRequest) async throws -> Asset {
+        try await api.request(.returnToSupplierAsset(id: id), body: body)
+    }
+    func resolveSupplierReturn(id: String, body: ResolveReturnRequest) async throws -> Asset {
+        try await api.request(.resolveSupplierReturn(id: id), body: body)
+    }
+    func deleteAsset(id: String) async throws {
+        try await api.requestVoid(.deleteAsset(id: id))
+    }
+
+    // MARK: - Deploy wizard support
+
+    func searchOrders(search: String) async throws -> [Order] {
+        try await api.request(.orders(page: 1, limit: 10, status: nil, paymentStatus: nil,
+                                       locationId: nil, assignedUserId: nil, search: search))
+    }
+    /// Line items come from the order-detail endpoint (verified `request<Order>` path);
+    /// the standalone `.orderItems` endpoint is unused/unverified, so we read `order.items`.
+    func fetchOrderItems(orderId: String) async throws -> [OrderItem] {
+        let order: Order = try await api.request(.order(id: orderId))
+        return order.items ?? []
     }
 }
