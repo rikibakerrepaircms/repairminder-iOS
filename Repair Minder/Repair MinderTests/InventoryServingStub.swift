@@ -47,4 +47,10 @@ class InventoryServingStub: InventoryServing {
     func bulkReturnToSupplier(assetIds: [String], reason: String, notes: String?) async throws -> BulkReturnToSupplierResult {
         BulkReturnToSupplierResult(batches: [], totalReturned: assetIds.count, errors: [])
     }
+    func fetchStockSummary() async throws -> [StockSummaryItem] { [] }
+    func fetchHierarchy(status: String?) async throws -> AssetHierarchyResponse { AssetHierarchyResponse(grouped: [], unlinked: []) }
+    func fetchLowStock() async throws -> LowStockResponse {
+        LowStockResponse(alerts: LowStockBuckets(parts: [], masters: [], services: []),
+                         all: [], summary: LowStockSummary(total: 0, byCategory: LowStockByCategory(parts: 0, masters: 0, services: 0)))
+    }
 }

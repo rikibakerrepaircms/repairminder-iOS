@@ -42,6 +42,11 @@ protocol InventoryServing {
 
     // Phase 4 — bulk
     func bulkReturnToSupplier(assetIds: [String], reason: String, notes: String?) async throws -> BulkReturnToSupplierResult
+
+    // Phase 4 — analytics (read-only)
+    func fetchStockSummary() async throws -> [StockSummaryItem]
+    func fetchHierarchy(status: String?) async throws -> AssetHierarchyResponse
+    func fetchLowStock() async throws -> LowStockResponse
 }
 
 /// The filter parameters that vary per list request.
@@ -197,5 +202,16 @@ final class InventoryService: InventoryServing {
     func bulkReturnToSupplier(assetIds: [String], reason: String, notes: String?) async throws -> BulkReturnToSupplierResult {
         try await api.request(.bulkReturnToSupplier,
                               body: BulkReturnToSupplierRequest(assetIds: assetIds, supplierReturnReason: reason, supplierReturnNotes: notes))
+    }
+
+    // MARK: - Phase 4 analytics (read-only)
+    func fetchStockSummary() async throws -> [StockSummaryItem] {
+        try await api.request(.stockSummary)                 // `data` is an array
+    }
+    func fetchHierarchy(status: String?) async throws -> AssetHierarchyResponse {
+        try await api.request(.assetHierarchy(status: status))
+    }
+    func fetchLowStock() async throws -> LowStockResponse {
+        try await api.request(.lowStock)
     }
 }

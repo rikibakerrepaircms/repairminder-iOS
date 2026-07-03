@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum InventoryMode: String, CaseIterable {
-    case assets = "Assets", groups = "Groups"
+    case assets = "Assets", groups = "Groups", stock = "Stock"
 }
 
 /// Which bulk-action sheet is presented from the multi-select bottom bar.
@@ -84,15 +84,19 @@ struct InventoryListView: View {
     private var content: some View {
         VStack(spacing: 0) {
             modePicker
-            if mode == .assets {
+            switch mode {
+            case .assets:
+                if !selection.isEditing { LowStockBanner(onView: filterByProductType) }
                 statusPills
                 mainList
-            } else {
+            case .groups:
                 InventoryGroupsListView(externalSearch: viewModel.searchText)
+            case .stock:
+                InventoryStockView(onFilterByProductType: filterByProductType, onSelectAsset: { selectedAssetId = $0 })
             }
         }
         .searchable(text: $viewModel.searchText, placement: searchPlacement,
-                    prompt: mode == .assets ? "Search tag, name, serial, SKU" : "Search groups")
+                    prompt: searchPrompt)
         .onChange(of: viewModel.searchText) { _, _ in if mode == .assets { viewModel.searchChanged() } }
         .onReceive(NotificationCenter.default.publisher(for: .inventoryAssetDidChange)) { _ in
             Task { await viewModel.loadAssets() }
@@ -135,6 +139,22 @@ struct InventoryListView: View {
                 }
             }
         }
+    }
+
+    private var searchPrompt: String {
+        switch mode {
+        case .assets: return "Search tag, name, serial, SKU"
+        case .groups: return "Search groups"
+        case .stock: return "Stock analytics"
+        }
+    }
+
+    /// Jump from an analytics view to the filtered Assets list.
+    private func filterByProductType(_ productTypeId: String) {
+        viewModel.selectedProductTypeId = productTypeId
+        selection.exit()
+        mode = .assets
+        viewModel.applyFilters()
     }
 
     #if os(iOS)
