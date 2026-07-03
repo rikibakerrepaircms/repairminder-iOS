@@ -200,6 +200,17 @@ enum APIEndpoint {
     case updateBuyback(buybackId: String)
     case buybackImageFile(imageId: String, width: Int?, height: Int?)
 
+    // MARK: - Inventory / Assets
+
+    case inventoryList(page: Int, limit: Int, status: String?, category: String?, locationId: String?, subLocationId: String?, productTypeId: String?, groupId: String?, hasGroups: Bool?, hasProducts: Bool?, search: String?)
+    case inventoryDetail(id: String)
+    case inventoryByTag(tag: String)
+    case inventoryActivity(id: String, limit: Int?)
+    case inventoryAssetGroups(id: String)
+    case inventoryExternalDeployment(id: String)
+    case productTypeCategories
+    case assetGroupsList(page: Int, limit: Int, search: String?)
+
     // MARK: - Board Config
 
     case boardColumns(scope: String)
@@ -496,6 +507,16 @@ enum APIEndpoint {
         case .buybackImageFile(let imageId, _, _):
             return "/api/buyback/images/\(imageId)/file"
 
+        // Inventory / Assets
+        case .inventoryList: return "/api/assets"
+        case .inventoryDetail(let id): return "/api/assets/\(id)"
+        case .inventoryByTag(let tag): return "/api/assets/tag/\(tag)"
+        case .inventoryActivity(let id, _): return "/api/assets/\(id)/activity"
+        case .inventoryAssetGroups(let id): return "/api/assets/\(id)/groups"
+        case .inventoryExternalDeployment(let id): return "/api/assets/\(id)/external-deployment"
+        case .productTypeCategories: return "/api/product-types/categories"
+        case .assetGroupsList: return "/api/asset-groups"
+
         // Board Config
         case .boardColumns:
             return "/api/board/columns"
@@ -569,6 +590,8 @@ enum APIEndpoint {
              .boardColumns, .boardCardPositions,
              .schedule, .teamSchedule, .boardPinnedPreferences,
              .buybackList, .buybackDetail, .buybackImageFile,
+             .inventoryList, .inventoryDetail, .inventoryByTag, .inventoryActivity,
+             .inventoryAssetGroups, .inventoryExternalDeployment, .productTypeCategories, .assetGroupsList,
              .customerOrders, .customerOrder, .customerOrderInvoice, .customerDeviceImage:
             return .get
 
@@ -814,6 +837,37 @@ enum APIEndpoint {
             if let engineerId = engineerId {
                 items.append(URLQueryItem(name: "engineer_id", value: engineerId))
             }
+            return items
+
+        case .inventoryList(let page, let limit, let status, let category, let locationId, let subLocationId, let productTypeId, let groupId, let hasGroups, let hasProducts, let search):
+            var items = [
+                URLQueryItem(name: "page", value: String(page)),
+                URLQueryItem(name: "limit", value: String(limit))
+            ]
+            if let status = status { items.append(URLQueryItem(name: "status", value: status)) }
+            if let category = category { items.append(URLQueryItem(name: "category", value: category)) }
+            if let locationId = locationId { items.append(URLQueryItem(name: "location_id", value: locationId)) }
+            if let subLocationId = subLocationId { items.append(URLQueryItem(name: "sub_location_id", value: subLocationId)) }
+            if let productTypeId = productTypeId { items.append(URLQueryItem(name: "product_type_id", value: productTypeId)) }
+            if let groupId = groupId { items.append(URLQueryItem(name: "group_id", value: groupId)) }
+            if let hasGroups = hasGroups { items.append(URLQueryItem(name: "has_groups", value: hasGroups ? "true" : "false")) }
+            if let hasProducts = hasProducts { items.append(URLQueryItem(name: "has_products", value: hasProducts ? "true" : "false")) }
+            if let search = search, !search.isEmpty { items.append(URLQueryItem(name: "search", value: search)) }
+            return items
+
+        case .inventoryActivity(_, let limit):
+            if let limit = limit { return [URLQueryItem(name: "limit", value: String(limit))] }
+            return nil
+
+        case .inventoryExternalDeployment:
+            return [URLQueryItem(name: "include_history", value: "true")]
+
+        case .assetGroupsList(let page, let limit, let search):
+            var items = [
+                URLQueryItem(name: "page", value: String(page)),
+                URLQueryItem(name: "limit", value: String(limit))
+            ]
+            if let search = search, !search.isEmpty { items.append(URLQueryItem(name: "search", value: search)) }
             return items
 
         case .buybackImageFile(_, let width, let height):
