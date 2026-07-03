@@ -50,6 +50,16 @@ final class InventoryWriteViewModelTests: XCTestCase {
         func deleteAsset(id: String) async throws {}
         func searchOrders(search: String) async throws -> [Order] { [] }
         func fetchOrderItems(orderId: String) async throws -> [OrderItem] { [] }
+        func listGroups(page: Int, limit: Int, search: String?, category: String?, hasProducts: Bool?, unlinkedOnly: Bool?, sortBy: String?, sortOrder: String?) async throws -> [InventoryGroup] { [] }
+        func fetchGroup(id: String) async throws -> InventoryGroup { InventoryGroup(id: id, name: "n") }
+        func fetchGroupAssets(id: String, page: Int, limit: Int) async throws -> [Asset] { [] }
+        func fetchGroupProducts(id: String) async throws -> [LinkedProduct] { [] }
+        func addMembership(assetId: String, groupId: String) async throws -> GroupMembership { GroupMembership(id: "m") }
+        func removeMembership(id: String) async throws {}
+        func bulkAssignGroups(assetId: String, groupIds: [String]) async throws -> BulkAssignGroupsResult { BulkAssignGroupsResult(groupsAdded: 0, groupsRemoved: 0, assetsAffected: 1) }
+        func promoteGroup(_ body: PromoteGroupRequest) async throws -> PromoteResult { fatalError() }
+        func createGroup(_ body: GroupFormRequest) async throws -> InventoryGroup { InventoryGroup(id: "g", name: body.name) }
+        func updateGroup(id: String, body: GroupFormRequest) async throws -> InventoryGroup { InventoryGroup(id: id, name: body.name) }
     }
 
     func testFilterChangeDuringLoadIsCoalesced() async {
@@ -100,6 +110,16 @@ final class InventoryWriteViewModelTests: XCTestCase {
         func deleteAsset(id: String) async throws { deleted = true }
         func searchOrders(search: String) async throws -> [Order] { [] }
         func fetchOrderItems(orderId: String) async throws -> [OrderItem] { [] }
+        func listGroups(page: Int, limit: Int, search: String?, category: String?, hasProducts: Bool?, unlinkedOnly: Bool?, sortBy: String?, sortOrder: String?) async throws -> [InventoryGroup] { [] }
+        func fetchGroup(id: String) async throws -> InventoryGroup { InventoryGroup(id: id, name: "n") }
+        func fetchGroupAssets(id: String, page: Int, limit: Int) async throws -> [Asset] { [] }
+        func fetchGroupProducts(id: String) async throws -> [LinkedProduct] { [] }
+        func addMembership(assetId: String, groupId: String) async throws -> GroupMembership { GroupMembership(id: "m") }
+        func removeMembership(id: String) async throws {}
+        func bulkAssignGroups(assetId: String, groupIds: [String]) async throws -> BulkAssignGroupsResult { BulkAssignGroupsResult(groupsAdded: 0, groupsRemoved: 0, assetsAffected: 1) }
+        func promoteGroup(_ body: PromoteGroupRequest) async throws -> PromoteResult { fatalError() }
+        func createGroup(_ body: GroupFormRequest) async throws -> InventoryGroup { InventoryGroup(id: "g", name: body.name) }
+        func updateGroup(id: String, body: GroupFormRequest) async throws -> InventoryGroup { InventoryGroup(id: id, name: body.name) }
     }
 
     func testEditUpdatesAssetAndSurfacesSkuCount() async {

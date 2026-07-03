@@ -15,6 +15,7 @@ struct InventoryDetailView: View {
     @State private var showReturnSupplier = false
     @State private var showResolveReplacement = false
     @State private var showDeleteConfirm = false
+    @State private var showManageGroups = false
     @State private var copiedTag = false
     @Environment(\.dismiss) private var dismiss
 
@@ -49,6 +50,12 @@ struct InventoryDetailView: View {
         .sheet(isPresented: $showDeploy) { if let a = viewModel.asset { DeployChooserSheet(asset: a, viewModel: viewModel) } }
         .sheet(isPresented: $showReturnSupplier) { if let a = viewModel.asset { ReturnToSupplierSheet(asset: a, viewModel: viewModel) } }
         .sheet(isPresented: $showResolveReplacement) { if let a = viewModel.asset { ResolveReplacementSheet(asset: a, viewModel: viewModel) } }
+        .sheet(isPresented: $showManageGroups) {
+            GroupSelectorSheet(
+                assetId: assetId,
+                initialSelection: viewModel.groups.map(\.id)
+            ) { desired in await viewModel.manageGroups(groupIds: desired) }
+        }
         .confirmationDialog("Delete asset \(viewModel.asset?.assetTag ?? "")? This cannot be undone.",
                             isPresented: $showDeleteConfirm, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { Task { await viewModel.delete() } }
@@ -59,6 +66,20 @@ struct InventoryDetailView: View {
             set: { if !$0 { viewModel.actionError = nil } })) {
             Button("OK") { viewModel.actionError = nil }
         } message: { Text(viewModel.actionError ?? "") }
+        .overlay(alignment: .bottom) {
+            if let msg = viewModel.groupActionMessage {
+                Text(msg)
+                    .font(.subheadline)
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .background(.thinMaterial, in: Capsule())
+                    .padding(.bottom, 24)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .task {
+                        try? await Task.sleep(nanoseconds: 2_500_000_000)
+                        viewModel.groupActionMessage = nil
+                    }
+            }
+        }
         .onChange(of: viewModel.didDelete) { _, deleted in if deleted { dismiss() } }
     }
 
@@ -127,19 +148,26 @@ struct InventoryDetailView: View {
         card("Identification") {
             row("Serial", a.serialNumber); row("SKU", a.sku); row("Category", a.category); row("Product Type", a.productTypeName)
         }
-        if !viewModel.groups.isEmpty { card("Inventory Groups") {
-            ForEach(viewModel.groups) { g in
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(g.name).font(.subheadline.weight(.medium))
-                    if let sku = g.sku { Text(sku).font(.caption).foregroundStyle(.secondary) }
-                    if let avg = g.avgCost { Text("Avg cost \(CurrencyFormatter.format(avg))").font(.caption).foregroundStyle(.secondary) }
-                    if let inStock = g.inStockCount { Text("In stock: \(inStock)").font(.caption).foregroundStyle(.secondary) }
-                    if let min = g.minCost, let max = g.maxCost {
-                        Text("Cost \(CurrencyFormatter.format(min))–\(CurrencyFormatter.format(max))").font(.caption).foregroundStyle(.secondary)
+        card("Inventory Groups") {
+            if viewModel.groups.isEmpty {
+                Text("No groups assigned").font(.caption).foregroundStyle(.secondary)
+            } else {
+                ForEach(viewModel.groups) { g in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(g.name).font(.subheadline.weight(.medium))
+                        if let sku = g.sku { Text(sku).font(.caption).foregroundStyle(.secondary) }
+                        if let avg = g.avgCost { Text("Avg cost \(CurrencyFormatter.format(avg))").font(.caption).foregroundStyle(.secondary) }
+                        if let inStock = g.inStockCount { Text("In stock: \(inStock)").font(.caption).foregroundStyle(.secondary) }
+                        if let min = g.minCost, let max = g.maxCost {
+                            Text("Cost \(CurrencyFormatter.format(min))–\(CurrencyFormatter.format(max))").font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
-        } }
+            Button { showManageGroups = true } label: { Label("Manage", systemImage: "square.and.pencil") }
+                .buttonStyle(.bordered).padding(.top, 4)
+                .accessibilityIdentifier("manage-groups")
+        }
         card("Status & Location") {
             HStack { Text("Status").foregroundStyle(.secondary); Spacer(); AssetStatusBadge(status: a.status) }
             row("Location", a.locationName); row("Sub-location", a.subLocationCode)

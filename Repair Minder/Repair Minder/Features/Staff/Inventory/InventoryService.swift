@@ -27,6 +27,18 @@ protocol InventoryServing {
     // Deploy wizard support
     func searchOrders(search: String) async throws -> [Order]
     func fetchOrderItems(orderId: String) async throws -> [OrderItem]
+
+    // Phase 3 — Groups
+    func listGroups(page: Int, limit: Int, search: String?, category: String?, hasProducts: Bool?, unlinkedOnly: Bool?, sortBy: String?, sortOrder: String?) async throws -> [InventoryGroup]
+    func fetchGroup(id: String) async throws -> InventoryGroup
+    func fetchGroupAssets(id: String, page: Int, limit: Int) async throws -> [Asset]
+    func fetchGroupProducts(id: String) async throws -> [LinkedProduct]
+    func addMembership(assetId: String, groupId: String) async throws -> GroupMembership
+    func removeMembership(id: String) async throws
+    func bulkAssignGroups(assetId: String, groupIds: [String]) async throws -> BulkAssignGroupsResult
+    func promoteGroup(_ body: PromoteGroupRequest) async throws -> PromoteResult
+    func createGroup(_ body: GroupFormRequest) async throws -> InventoryGroup
+    func updateGroup(id: String, body: GroupFormRequest) async throws -> InventoryGroup
 }
 
 /// The filter parameters that vary per list request.
@@ -94,7 +106,7 @@ final class InventoryService: InventoryServing {
         return resp.categories.map(\.category).filter { !$0.isEmpty }
     }
     func fetchGroups(search: String?) async throws -> [AssetGroupListItem] {
-        try await api.request(.assetGroupsList(page: 1, limit: 100, search: search))
+        try await api.request(.assetGroupsList(page: 1, limit: 100, search: search, category: nil, hasProducts: nil, unlinkedOnly: nil, sortBy: nil, sortOrder: nil))
     }
     func fetchProductTypes(search: String) async throws -> [ProductTypeOption] {
         try await api.request(.productTypes(search: search))
@@ -144,5 +156,37 @@ final class InventoryService: InventoryServing {
     func fetchOrderItems(orderId: String) async throws -> [OrderItem] {
         let order: Order = try await api.request(.order(id: orderId))
         return order.items ?? []
+    }
+
+    // MARK: - Phase 3 group actions
+    func listGroups(page: Int, limit: Int, search: String?, category: String?, hasProducts: Bool?, unlinkedOnly: Bool?, sortBy: String?, sortOrder: String?) async throws -> [InventoryGroup] {
+        try await api.request(.assetGroupsList(page: page, limit: limit, search: search, category: category, hasProducts: hasProducts, unlinkedOnly: unlinkedOnly, sortBy: sortBy, sortOrder: sortOrder))
+    }
+    func fetchGroup(id: String) async throws -> InventoryGroup {
+        try await api.request(.assetGroup(id: id))
+    }
+    func fetchGroupAssets(id: String, page: Int, limit: Int) async throws -> [Asset] {
+        try await api.request(.assetGroupAssets(id: id, page: page, limit: limit))
+    }
+    func fetchGroupProducts(id: String) async throws -> [LinkedProduct] {
+        try await api.request(.assetGroupProducts(id: id))
+    }
+    func addMembership(assetId: String, groupId: String) async throws -> GroupMembership {
+        try await api.request(.addMembership, body: AddMembershipRequest(assetId: assetId, groupId: groupId))
+    }
+    func removeMembership(id: String) async throws {
+        try await api.requestVoid(.removeMembership(id: id))
+    }
+    func bulkAssignGroups(assetId: String, groupIds: [String]) async throws -> BulkAssignGroupsResult {
+        try await api.request(.bulkAssignGroups(assetId: assetId), body: BulkAssignGroupsRequest(groupIds: groupIds))
+    }
+    func promoteGroup(_ body: PromoteGroupRequest) async throws -> PromoteResult {
+        try await api.request(.promoteGroup, body: body)
+    }
+    func createGroup(_ body: GroupFormRequest) async throws -> InventoryGroup {
+        try await api.request(.createProductType, body: body)
+    }
+    func updateGroup(id: String, body: GroupFormRequest) async throws -> InventoryGroup {
+        try await api.request(.updateProductType(id: id), body: body)
     }
 }

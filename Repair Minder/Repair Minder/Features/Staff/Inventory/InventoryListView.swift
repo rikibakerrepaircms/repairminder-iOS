@@ -1,5 +1,9 @@
 import SwiftUI
 
+enum InventoryMode: String, CaseIterable {
+    case assets = "Assets", groups = "Groups"
+}
+
 struct InventoryListView: View {
     var isEmbedded: Bool = false
     var onBack: (() -> Void)? = nil
@@ -8,6 +12,7 @@ struct InventoryListView: View {
     @State private var showFilters = false
     @State private var selectedAssetId: String?
     @State private var pendingDelete: Asset?
+    @State private var mode: InventoryMode = .assets
     #if os(iOS)
     @State private var showScanner = false
     @State private var scanError: String?
@@ -69,11 +74,17 @@ struct InventoryListView: View {
     // Shared content
     private var content: some View {
         VStack(spacing: 0) {
-            statusPills
-            mainList
+            modePicker
+            if mode == .assets {
+                statusPills
+                mainList
+            } else {
+                InventoryGroupsListView(externalSearch: viewModel.searchText)
+            }
         }
-        .searchable(text: $viewModel.searchText, placement: searchPlacement, prompt: "Search tag, name, serial, SKU")
-        .onChange(of: viewModel.searchText) { _, _ in viewModel.searchChanged() }
+        .searchable(text: $viewModel.searchText, placement: searchPlacement,
+                    prompt: mode == .assets ? "Search tag, name, serial, SKU" : "Search groups")
+        .onChange(of: viewModel.searchText) { _, _ in if mode == .assets { viewModel.searchChanged() } }
         .onReceive(NotificationCenter.default.publisher(for: .inventoryAssetDidChange)) { _ in
             Task { await viewModel.loadAssets() }
         }
@@ -106,6 +117,15 @@ struct InventoryListView: View {
     #else
     private var searchPlacement: SearchFieldPlacement { .automatic }
     #endif
+
+    private var modePicker: some View {
+        Picker("", selection: $mode) {
+            ForEach(InventoryMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal, 12).padding(.top, 8)
+        .accessibilityIdentifier("inventory-mode-picker")
+    }
 
     private var statusPills: some View {
         ScrollView(.horizontal, showsIndicators: false) {

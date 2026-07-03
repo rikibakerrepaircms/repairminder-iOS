@@ -209,7 +209,17 @@ enum APIEndpoint {
     case inventoryAssetGroups(id: String)
     case inventoryExternalDeployment(id: String)
     case productTypeCategories
-    case assetGroupsList(page: Int, limit: Int, search: String?)
+    case assetGroupsList(page: Int, limit: Int, search: String?, category: String?, hasProducts: Bool?, unlinkedOnly: Bool?, sortBy: String?, sortOrder: String?)
+    // Phase 3 — Inventory Groups
+    case assetGroup(id: String)
+    case assetGroupAssets(id: String, page: Int, limit: Int)
+    case assetGroupProducts(id: String)
+    case addMembership
+    case removeMembership(id: String)
+    case bulkAssignGroups(assetId: String)
+    case promoteGroup
+    case createProductType
+    case updateProductType(id: String)
 
     // Inventory / Assets — write actions (Phase 2)
     case updateAsset(id: String)
@@ -526,6 +536,15 @@ enum APIEndpoint {
         case .inventoryExternalDeployment(let id): return "/api/assets/\(id)/external-deployment"
         case .productTypeCategories: return "/api/product-types/categories"
         case .assetGroupsList: return "/api/asset-groups"
+        case .assetGroup(let id): return "/api/asset-groups/\(id)"
+        case .assetGroupAssets(let id, _, _): return "/api/asset-groups/\(id)/assets"
+        case .assetGroupProducts(let id): return "/api/asset-groups/\(id)/products"
+        case .addMembership: return "/api/asset-groups/memberships"
+        case .removeMembership(let id): return "/api/asset-groups/memberships/\(id)"
+        case .bulkAssignGroups(let assetId): return "/api/assets/\(assetId)/groups"
+        case .promoteGroup: return "/api/asset-groups/promote"
+        case .createProductType: return "/api/product-types"
+        case .updateProductType(let id): return "/api/product-types/\(id)"
         case .updateAsset(let id): return "/api/assets/\(id)"
         case .moveAsset(let id): return "/api/assets/\(id)/move"
         case .allocateAsset(let id): return "/api/assets/\(id)/allocate"
@@ -610,6 +629,7 @@ enum APIEndpoint {
              .buybackList, .buybackDetail, .buybackImageFile,
              .inventoryList, .inventoryDetail, .inventoryByTag, .inventoryActivity,
              .inventoryAssetGroups, .inventoryExternalDeployment, .productTypeCategories, .assetGroupsList,
+             .assetGroup, .assetGroupAssets, .assetGroupProducts,
              .customerOrders, .customerOrder, .customerOrderInvoice, .customerDeviceImage:
             return .get
 
@@ -635,7 +655,8 @@ enum APIEndpoint {
              .quickCreateProductType,
              .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete,
              .moveAsset, .allocateAsset, .deployExternalAsset,
-             .returnExternalAsset, .returnToSupplierAsset, .resolveSupplierReturn:
+             .returnExternalAsset, .returnToSupplierAsset, .resolveSupplierReturn,
+             .addMembership, .bulkAssignGroups, .promoteGroup, .createProductType:
             return .post
 
         // PATCH endpoints
@@ -651,7 +672,7 @@ enum APIEndpoint {
 
         // PUT endpoints
         case .togglePasscodeEnabled, .passcodeTimeout,
-             .updatePushPreferences, .updateAsset:
+             .updatePushPreferences, .updateAsset, .updateProductType:
             return .put
 
         // DELETE endpoints
@@ -660,7 +681,7 @@ enum APIEndpoint {
              .unregisterDeviceToken, .customerUnregisterDeviceToken,
              .cancelMacroExecution,
              .boardDeleteColumn, .boardDeleteAction,
-             .deleteDeviceImage, .deleteAsset:
+             .deleteDeviceImage, .deleteAsset, .removeMembership:
             return .delete
         }
     }
@@ -882,13 +903,22 @@ enum APIEndpoint {
         case .inventoryExternalDeployment:
             return [URLQueryItem(name: "include_history", value: "true")]
 
-        case .assetGroupsList(let page, let limit, let search):
+        case .assetGroupsList(let page, let limit, let search, let category, let hasProducts, let unlinkedOnly, let sortBy, let sortOrder):
             var items = [
                 URLQueryItem(name: "page", value: String(page)),
                 URLQueryItem(name: "limit", value: String(limit))
             ]
             if let search = search, !search.isEmpty { items.append(URLQueryItem(name: "search", value: search)) }
+            if let category = category, !category.isEmpty { items.append(URLQueryItem(name: "category", value: category)) }
+            if let hasProducts = hasProducts, hasProducts { items.append(URLQueryItem(name: "has_products", value: "true")) }
+            if let unlinkedOnly = unlinkedOnly, unlinkedOnly { items.append(URLQueryItem(name: "unlinked_only", value: "true")) }
+            if let sortBy = sortBy { items.append(URLQueryItem(name: "sort_by", value: sortBy)) }
+            if let sortOrder = sortOrder { items.append(URLQueryItem(name: "sort_order", value: sortOrder)) }
             return items
+
+        case .assetGroupAssets(_, let page, let limit):
+            return [URLQueryItem(name: "page", value: String(page)),
+                    URLQueryItem(name: "limit", value: String(limit))]
 
         case .buybackImageFile(_, let width, let height):
             var items: [URLQueryItem] = []

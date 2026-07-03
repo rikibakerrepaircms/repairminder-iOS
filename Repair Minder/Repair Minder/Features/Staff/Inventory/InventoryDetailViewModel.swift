@@ -15,6 +15,7 @@ final class InventoryDetailViewModel: ObservableObject {
     @Published var readyToRepairPrompt = false
     @Published private(set) var didDelete = false
     @Published private(set) var isMutating = false
+    @Published var groupActionMessage: String?
 
     let assetId: String
     private let service: InventoryServing
@@ -121,5 +122,30 @@ final class InventoryDetailViewModel: ObservableObject {
         do { applyUpdated(try await op()); await refreshSubResources() }
         catch { actionError = error.localizedDescription }
         isMutating = false
+    }
+
+    // MARK: - Groups (Phase 3)
+
+    @discardableResult
+    func manageGroups(groupIds: [String]) async -> Bool {
+        isMutating = true; actionError = nil; defer { isMutating = false }
+        do {
+            let result = try await service.bulkAssignGroups(assetId: assetId, groupIds: groupIds)
+            groupActionMessage = Self.siblingMessage(result)
+            NotificationCenter.default.post(name: .inventoryAssetDidChange, object: nil)
+            await refresh()
+            return true
+        } catch {
+            actionError = error.localizedDescription
+            return false
+        }
+    }
+
+    static func siblingMessage(_ r: BulkAssignGroupsResult) -> String {
+        guard r.assetsAffected > 1 else { return "Groups updated" }
+        if r.siblingMatch == "sku", let sku = r.skuValue {
+            return "Groups updated across \(r.assetsAffected) assets with SKU \"\(sku)\""
+        }
+        return "Groups updated across \(r.assetsAffected) assets with same name"
     }
 }
