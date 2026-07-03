@@ -211,6 +211,16 @@ enum APIEndpoint {
     case productTypeCategories
     case assetGroupsList(page: Int, limit: Int, search: String?)
 
+    // Inventory / Assets — write actions (Phase 2)
+    case updateAsset(id: String)
+    case moveAsset(id: String)
+    case allocateAsset(id: String)
+    case deployExternalAsset(id: String)
+    case returnExternalAsset(id: String)
+    case returnToSupplierAsset(id: String)
+    case resolveSupplierReturn(id: String)
+    case deleteAsset(id: String)
+
     // MARK: - Board Config
 
     case boardColumns(scope: String)
@@ -516,6 +526,14 @@ enum APIEndpoint {
         case .inventoryExternalDeployment(let id): return "/api/assets/\(id)/external-deployment"
         case .productTypeCategories: return "/api/product-types/categories"
         case .assetGroupsList: return "/api/asset-groups"
+        case .updateAsset(let id): return "/api/assets/\(id)"
+        case .moveAsset(let id): return "/api/assets/\(id)/move"
+        case .allocateAsset(let id): return "/api/assets/\(id)/allocate"
+        case .deployExternalAsset(let id): return "/api/assets/\(id)/deploy-external"
+        case .returnExternalAsset(let id): return "/api/assets/\(id)/return-external"
+        case .returnToSupplierAsset(let id): return "/api/assets/\(id)/return-to-supplier"
+        case .resolveSupplierReturn(let id): return "/api/assets/\(id)/resolve-supplier-return"
+        case .deleteAsset(let id): return "/api/assets/\(id)"
 
         // Board Config
         case .boardColumns:
@@ -615,7 +633,9 @@ enum APIEndpoint {
              .createPaymentLink, .cancelPaymentLink, .resendPaymentLinkEmail,
              .customerApproveQuote, .customerOrderReply,
              .quickCreateProductType,
-             .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete:
+             .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete,
+             .moveAsset, .allocateAsset, .deployExternalAsset,
+             .returnExternalAsset, .returnToSupplierAsset, .resolveSupplierReturn:
             return .post
 
         // PATCH endpoints
@@ -631,7 +651,7 @@ enum APIEndpoint {
 
         // PUT endpoints
         case .togglePasscodeEnabled, .passcodeTimeout,
-             .updatePushPreferences:
+             .updatePushPreferences, .updateAsset:
             return .put
 
         // DELETE endpoints
@@ -640,7 +660,7 @@ enum APIEndpoint {
              .unregisterDeviceToken, .customerUnregisterDeviceToken,
              .cancelMacroExecution,
              .boardDeleteColumn, .boardDeleteAction,
-             .deleteDeviceImage:
+             .deleteDeviceImage, .deleteAsset:
             return .delete
         }
     }
