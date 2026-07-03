@@ -7,6 +7,7 @@ struct InventoryListView: View {
     @StateObject private var viewModel = InventoryListViewModel()
     @State private var showFilters = false
     @State private var selectedAssetId: String?
+    @State private var pendingDelete: Asset?
     #if os(iOS)
     @State private var showScanner = false
     @State private var scanError: String?
@@ -76,6 +77,14 @@ struct InventoryListView: View {
         .onReceive(NotificationCenter.default.publisher(for: .inventoryAssetDidChange)) { _ in
             Task { await viewModel.loadAssets() }
         }
+        .confirmationDialog("Delete asset \(pendingDelete?.assetTag ?? "")?",
+                            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+                            titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                if let a = pendingDelete { Task { await deleteFromList(a) } }
+            }
+            Button("Cancel", role: .cancel) { pendingDelete = nil }
+        }
         .sheet(isPresented: $showFilters) {
             AssetFilterSheet(viewModel: viewModel)
         }
@@ -134,6 +143,13 @@ struct InventoryListView: View {
                     Button { selectedAssetId = asset.id } label: { AssetRow(asset: asset) }
                         .buttonStyle(.plain)
                         .task { await viewModel.loadMoreIfNeeded(currentItem: asset) }
+                        .swipeActions(edge: .trailing) {
+                            if asset.status != .allocated && asset.status != .deployed {
+                                Button(role: .destructive) { pendingDelete = asset } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                        }
                 }
                 if viewModel.isLoadingMore {
                     HStack { Spacer(); ProgressView(); Spacer() }.listRowSeparator(.hidden)
@@ -141,6 +157,16 @@ struct InventoryListView: View {
             }
             .listStyle(.plain)
             .refreshable { await viewModel.refresh() }
+        }
+    }
+
+    private func deleteFromList(_ asset: Asset) async {
+        defer { pendingDelete = nil }
+        do {
+            try await InventoryService().deleteAsset(id: asset.id)
+            NotificationCenter.default.post(name: .inventoryAssetDidChange, object: nil)
+        } catch {
+            // List stays as-is; the detail screen surfaces mutation errors.
         }
     }
 
