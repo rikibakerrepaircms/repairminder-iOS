@@ -86,6 +86,10 @@ enum APIEndpoint {
     case deviceQCRequirements(deviceId: String)
     case deviceQC(deviceId: String)
     case staffAuthorizeDevice(deviceId: String)
+    case collectDevice(deviceId: String)
+    case despatchDevice(deviceId: String)
+    case deviceReadyForCollection(deviceId: String)
+    case addDeviceAccessory(orderId: String, deviceId: String)
 
     // Device Images
     case deviceImages(orderId: String, deviceId: String)
@@ -454,6 +458,14 @@ enum APIEndpoint {
             return "/api/devices/\(deviceId)/qc"
         case .staffAuthorizeDevice(let deviceId):
             return "/api/devices/\(deviceId)/staff-authorize"
+        case .collectDevice(let deviceId):
+            return "/api/devices/\(deviceId)/collect"
+        case .despatchDevice(let deviceId):
+            return "/api/devices/\(deviceId)/despatch"
+        case .deviceReadyForCollection(let deviceId):
+            return "/api/devices/\(deviceId)/ready-for-collection"
+        case .addDeviceAccessory(let orderId, let deviceId):
+            return "/api/orders/\(orderId)/devices/\(deviceId)/accessories"
         case .deviceImages(let orderId, let deviceId),
              .uploadDeviceImage(let orderId, let deviceId):
             return "/api/orders/\(orderId)/devices/\(deviceId)/images"
@@ -815,7 +827,8 @@ enum APIEndpoint {
              .addBuybackNote, .sellBuyback, .sellBuybackBulk, .addDeviceToBuyback,
              .createKioskOrder, .staffAuthorizeDevice,
              .addRefurbishmentItem, .generateBuybackListing,
-             .uploadBuybackSourceImage, .generateBuybackProductPhotos, .setBuybackImageFinal:
+             .uploadBuybackSourceImage, .generateBuybackProductPhotos, .setBuybackImageFinal,
+             .collectDevice, .despatchDevice, .deviceReadyForCollection, .addDeviceAccessory:
             return .post
 
         // PATCH endpoints

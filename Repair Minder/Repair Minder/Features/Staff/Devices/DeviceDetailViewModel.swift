@@ -405,6 +405,97 @@ final class DeviceDetailViewModel {
         }
     }
 
+    // MARK: - Collect / Despatch / Ready for Collection
+
+    /// Collect this device (with signature or typed name). Returns nil on
+    /// success (device is refreshed), or a human-readable error message on
+    /// failure (e.g. wrong status, missing signature/typed name).
+    func collectDevice(_ req: DeviceCollectRequest) async -> String? {
+        isUpdating = true
+        defer { isUpdating = false }
+
+        do {
+            let _: DeviceCollectResponse = try await APIClient.shared.request(
+                .collectDevice(deviceId: deviceId),
+                body: req
+            )
+            await loadDevice()
+            await loadActions()
+            return nil
+        } catch {
+            #if DEBUG
+            print("Failed to collect device: \(error)")
+            #endif
+            return error.localizedDescription
+        }
+    }
+
+    /// Despatch this device to the customer (carrier + optional tracking).
+    /// Returns nil on success (device is refreshed), or a human-readable
+    /// error message on failure.
+    func despatchDevice(_ req: DespatchOrderRequest) async -> String? {
+        isUpdating = true
+        defer { isUpdating = false }
+
+        do {
+            let _: DeviceDespatchResponse = try await APIClient.shared.request(
+                .despatchDevice(deviceId: deviceId),
+                body: req
+            )
+            await loadDevice()
+            await loadActions()
+            return nil
+        } catch {
+            #if DEBUG
+            print("Failed to despatch device: \(error)")
+            #endif
+            return error.localizedDescription
+        }
+    }
+
+    /// Mark this device ready for collection. Returns nil on success (device
+    /// is refreshed), or a human-readable error message on failure.
+    func markReadyForCollection() async -> String? {
+        isUpdating = true
+        defer { isUpdating = false }
+
+        do {
+            let _: DeviceReadyResponse = try await APIClient.shared.request(
+                .deviceReadyForCollection(deviceId: deviceId),
+                body: DeviceReadyRequest(collectionLocationId: nil)
+            )
+            await loadDevice()
+            await loadActions()
+            return nil
+        } catch {
+            #if DEBUG
+            print("Failed to mark device ready for collection: \(error)")
+            #endif
+            return error.localizedDescription
+        }
+    }
+
+    /// Add an accessory record for this device. Returns nil on success
+    /// (device is refreshed), or a human-readable error message on failure.
+    func addAccessory(_ req: AddAccessoryRequest) async -> String? {
+        isUpdating = true
+        defer { isUpdating = false }
+
+        do {
+            let _: AddAccessoryResponse = try await APIClient.shared.request(
+                .addDeviceAccessory(orderId: orderId, deviceId: deviceId),
+                body: req
+            )
+            await loadDevice()
+            return nil
+        } catch {
+            #if DEBUG
+            print("Failed to add accessory: \(error)")
+            #endif
+            return error.localizedDescription
+        }
+    }
+
     // MARK: - Message Handling
 
     /// Clear success message
