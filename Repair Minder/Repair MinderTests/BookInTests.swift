@@ -195,6 +195,26 @@ final class BookInTests: XCTestCase {
         XCTAssertEqual(vm.step, .lineItems)
     }
 
+    /// Task 29 gap: the R2 key the invoice was uploaded/extracted to must carry all the way
+    /// through to the create-order request — the worker attaches it to the order it creates
+    /// (`CreateSupplierOrderRequest.invoiceFileKey` -> `invoice_file_key`).
+    @MainActor
+    func testExtractedInvoiceFileKeyCarriesIntoCreateRequest() async {
+        let spy = BookInSpy()
+        let vm = BookInWizardViewModel(service: spy)
+        let resp = ExtractInvoiceResponse(success: true, data: ExtractedInvoice(
+            supplierName: "Acme", invoiceReference: "INV-9", invoiceDate: "2026-07-01",
+            lineItems: [ExtractedInvoiceLine(name: "Screen", quantity: 2, unitCost: 10)]),
+            invoiceFileKey: "invoices/known-key.pdf", fileType: "pdf")
+
+        vm.applyExtraction(resp)
+        XCTAssertEqual(vm.invoiceFileKey, "invoices/known-key.pdf")
+
+        await vm.submitOrderDetails()
+
+        XCTAssertEqual(spy.created?.invoiceFileKey, "invoices/known-key.pdf")
+    }
+
     @MainActor
     func testApplyExtractionPrefillsAndStagesLines() {
         let vm = BookInWizardViewModel(service: BookInSpy())

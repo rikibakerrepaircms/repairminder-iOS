@@ -199,4 +199,74 @@ final class InventoryWriteViewModelTests: XCTestCase {
         XCTAssertEqual(vm.asset?.name, "Moved")
         XCTAssertNil(vm.actionError)
     }
+
+    // MARK: - Task 29: `.inventoryAssetDidChange` posted exactly once per write
+
+    /// Every detail-VM write path must post `.inventoryAssetDidChange` — and exactly once,
+    /// not zero (a silent list/groups-list desync, since both `InventoryListView` and
+    /// `InventoryGroupsListView` reload `onReceive` of this notification) and not more than
+    /// once (redundant reloads). `InventoryGroupSelectorTests.testManageGroupsSendsDesiredSetAndPostsNotification`
+    /// already covers `manageGroups`; this covers the rest of the write surface.
+    func testEachDetailMutationPostsChangeNotificationExactlyOnce() async {
+        var count = 0
+        let token = NotificationCenter.default.addObserver(forName: .inventoryAssetDidChange, object: nil, queue: nil) { _ in count += 1 }
+        defer { NotificationCenter.default.removeObserver(token) }
+
+        let vm = InventoryDetailViewModel(assetId: "a1", service: MutatingService())
+        await vm.load()
+
+        count = 0
+        await vm.edit(UpdateAssetRequest(name: "Edited"))
+        XCTAssertEqual(count, 1, "edit")
+
+        count = 0
+        await vm.move(MoveAssetRequest(locationId: "loc"))
+        XCTAssertEqual(count, 1, "move")
+
+        count = 0
+        _ = await vm.allocate(AllocateRequest(deploy: false))
+        XCTAssertEqual(count, 1, "allocate")
+
+        count = 0
+        await vm.deployExternal(DeployExternalRequest())
+        XCTAssertEqual(count, 1, "deployExternal")
+
+        count = 0
+        await vm.returnToStock(ReturnExternalRequest(deploymentId: "dep1", returnToStock: true))
+        XCTAssertEqual(count, 1, "returnToStock")
+
+        count = 0
+        await vm.returnToSupplier(ReturnToSupplierRequest(supplierReturnReason: "defective"))
+        XCTAssertEqual(count, 1, "returnToSupplier")
+
+        count = 0
+        await vm.resolveReturn(ResolveReturnRequest(resolution: "credit_received"))
+        XCTAssertEqual(count, 1, "resolveReturn")
+
+        count = 0
+        await vm.delete()
+        XCTAssertEqual(count, 1, "delete")
+    }
+
+    /// Same coverage for `SalvageViewModel`'s two write paths (book + remove).
+    func testSalvageBookAndRemovePostChangeNotificationExactlyOnce() async {
+        var count = 0
+        let token = NotificationCenter.default.addObserver(forName: .inventoryAssetDidChange, object: nil, queue: nil) { _ in count += 1 }
+        defer { NotificationCenter.default.removeObserver(token) }
+
+        let spy = SalvageTests.SalvageSpy()
+        let vm = SalvageViewModel(buybackId: "b1", purchaseAmount: 100, salvaged: [], service: spy)
+        vm.selectedGroup = AssetGroupListItem(id: "g1", name: "Battery")   // non-screen, no lcd/glass needed
+        vm.locationId = "l1"; vm.value = "10"
+        vm.addToBatch()
+
+        count = 0
+        let booked = await vm.book()
+        XCTAssertTrue(booked)
+        XCTAssertEqual(count, 1, "book")
+
+        count = 0
+        await vm.removeSalvaged("new0")
+        XCTAssertEqual(count, 1, "removeSalvaged")
+    }
 }
