@@ -12,8 +12,15 @@ struct DeployToOrderWizard: View {
     @State private var step: Step = .search
     @State private var selectedOrder: Order?
     @State private var selectedItem: OrderItem?
-    @State private var recovery = PartRecoveryState()
+    @State private var recovery: PartRecoveryState
     @State private var recoveredAsset: Asset?
+
+    init(asset: Asset, detailVM: InventoryDetailViewModel, onFinished: @escaping () -> Void) {
+        self.asset = asset
+        self.detailVM = detailVM
+        self.onFinished = onFinished
+        _recovery = State(initialValue: PartRecoveryState(category: asset.category))
+    }
 
     var body: some View {
         NavigationStack {

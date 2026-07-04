@@ -37,6 +37,31 @@ final class InventoryWriteModelTests: XCTestCase {
         XCTAssertEqual(rec?["lcd_working"] as? Int, 1)
     }
 
+    func testPartRecoveryScreenRequiresBothAnswers() throws {
+        var f = PartRecoveryState(category: "screen")
+        f.enabled = true
+        f.locationId = "loc1"
+        XCTAssertFalse(f.isValid)          // screen — lcdWorking/glassCracked unanswered
+        XCTAssertNil(f.toInput())
+        f.lcdWorking = true
+        f.glassCracked = false
+        XCTAssertTrue(f.isValid)
+        let input = f.toInput()
+        XCTAssertEqual(input?.lcdWorking, 1)
+        XCTAssertEqual(input?.glassCracked, 0)
+    }
+
+    func testPartRecoveryNonScreenOmitsScreenFields() throws {
+        var f = PartRecoveryState(category: "battery")
+        f.enabled = true
+        f.locationId = "loc1"
+        XCTAssertTrue(f.isValid)           // non-screen — no screen answers needed
+        let input = f.toInput()
+        XCTAssertNotNil(input)
+        XCTAssertNil(input?.lcdWorking)
+        XCTAssertNil(input?.glassCracked)
+    }
+
     func testReturnToSupplierAndResolveEncode() throws {
         let r1 = ReturnToSupplierRequest(supplierReturnReason: "defective", supplierReturnNotes: nil)
         XCTAssertEqual(try encodeToObject(r1)["supplier_return_reason"] as? String, "defective")
