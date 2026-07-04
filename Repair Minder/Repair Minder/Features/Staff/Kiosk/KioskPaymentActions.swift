@@ -43,7 +43,8 @@ struct KioskPaymentActions: View {
 
                 Button { onSubmitPayment("cash", balanceDue, nil) } label: {
                     HStack(spacing: 8) {
-                        Image(systemName: "banknote.fill")
+                        if processing { ProgressView().tint(.white) }
+                        else { Image(systemName: "banknote.fill") }
                         Text("Cash — \(money(balanceDue))").fontWeight(.semibold)
                     }
                     .frame(maxWidth: .infinity, minHeight: 52)
@@ -51,6 +52,7 @@ struct KioskPaymentActions: View {
                     .background(Color.green, in: RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
+                .disabled(processing)
 
                 HStack(spacing: 8) {
                     secondaryButton(posProvider != nil ? "Manual Card" : "Card", "creditcard") { openOther("card") }
@@ -86,11 +88,21 @@ struct KioskPaymentActions: View {
                     showOtherForm = false
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled((Double(otherAmountText) ?? 0) <= 0)
+                .disabled(!otherAmountIsValid || processing)
+            }
+            if !otherAmountText.isEmpty && !otherAmountIsValid {
+                Text("Enter an amount between £0.01 and \(money(balanceDue)).")
+                    .font(.caption2).foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding()
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var otherAmountIsValid: Bool {
+        let amount = Double(otherAmountText) ?? 0
+        return amount > 0 && amount <= balanceDue + 0.001
     }
 
     private func secondaryButton(_ title: String, _ icon: String, _ action: @escaping () -> Void) -> some View {

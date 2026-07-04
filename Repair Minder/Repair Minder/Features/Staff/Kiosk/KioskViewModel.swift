@@ -63,6 +63,9 @@ final class KioskViewModel: ObservableObject {
     @Published var globalDiscountReason: String?
     @Published var completedOrder: KioskOrderResponse?
     @Published var errorMessage: String?
+    /// True while a cash/manual order submission is in flight — drives button
+    /// disabling so a same-frame double-tap can't create two orders/payments.
+    @Published private(set) var isSubmitting = false
     @Published var posProvider: String?     // "revolut" | "square" | "sumup" | "dojo" | nil
     let locationId: String?
 
@@ -150,7 +153,8 @@ final class KioskViewModel: ObservableObject {
     // MARK: - Payment orchestration
 
     func submitCashOrManual(method: String, amount: Double, notes: String?) async {
-        guard !items.isEmpty else { return }
+        guard !items.isEmpty, !isSubmitting else { return }
+        isSubmitting = true
         mode = .processing
         do {
             let order = try await service.createOrder(
@@ -161,6 +165,7 @@ final class KioskViewModel: ObservableObject {
             errorMessage = Self.message(for: error)
             mode = .shopping
         }
+        isSubmitting = false
     }
 
     func createUnpaidOrderForCard() async -> KioskOrderResponse? {
@@ -219,6 +224,7 @@ final class KioskViewModel: ObservableObject {
         globalDiscountReason = nil
         completedOrder = nil
         errorMessage = nil
+        isSubmitting = false
         mode = .shopping
     }
 

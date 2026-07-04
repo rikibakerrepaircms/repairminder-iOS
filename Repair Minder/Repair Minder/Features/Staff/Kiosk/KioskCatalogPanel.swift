@@ -16,6 +16,7 @@ struct KioskCatalogPanel: View {
     @State private var scanError: String?
     @State private var showScanner = false
     @State private var searchTask: Task<Void, Never>?
+    @State private var loadGeneration = 0
 
     enum ViewMode { case grid, list }
 
@@ -169,15 +170,22 @@ struct KioskCatalogPanel: View {
     private func resetAndReload() { page = 1; reload() }
     private func reload() { Task { await reloadAsync() } }
     private func reloadAsync() async {
+        // Monotonic generation guard: category/pagination/search each start a load;
+        // only the most-recently-started one is allowed to write results, so a slow
+        // earlier response can't clobber a newer selection (stale-response race).
+        loadGeneration += 1
+        let gen = loadGeneration
         isLoading = true
-        defer { isLoading = false }
+        defer { if gen == loadGeneration { isLoading = false } }
         do {
             let resp = try await viewModel.loadProducts(page: page, category: selectedCategory,
                                                         search: searchText.isEmpty ? nil : searchText)
+            guard gen == loadGeneration else { return }
             products = resp.data
             totalPages = max(1, resp.meta.totalPages)
             total = resp.meta.total
         } catch {
+            guard gen == loadGeneration else { return }
             products = []; totalPages = 1; total = 0
         }
     }

@@ -121,7 +121,7 @@ struct KioskCartPanel: View {
                 hasItems: !viewModel.items.isEmpty,
                 balanceDue: t.grandTotal,
                 posProvider: viewModel.posProvider,
-                processing: false,
+                processing: viewModel.isSubmitting,
                 onCardPayment: onPayCard,
                 onSubmitPayment: onSubmitPayment)
         }
