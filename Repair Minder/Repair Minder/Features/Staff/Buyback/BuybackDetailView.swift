@@ -17,6 +17,7 @@ struct BuybackDetailView: View {
     @State private var editingRefurbItem: RefurbishmentItem?
     @State private var pendingDeleteRefurbItem: RefurbishmentItem?
     @State private var showListingEdit = false
+    @State private var showImageManager = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var isRegularWidth: Bool {
@@ -81,6 +82,13 @@ struct BuybackDetailView: View {
                 }
             }
         }
+        .sheet(isPresented: $showImageManager) {
+            if let buyback = viewModel.buyback {
+                BuybackImagesView(buybackId: buyback.id) {
+                    Task { await viewModel.refresh() }
+                }
+            }
+        }
         .confirmationDialog(
             "Delete this refurbishment item?",
             isPresented: Binding(
@@ -111,9 +119,7 @@ struct BuybackDetailView: View {
                 listingSection(buyback)
                 costSummarySection(buyback)
 
-                if let images = buyback.images, !images.isEmpty {
-                    imagesSection(images)
-                }
+                imagesSection(buyback.images ?? [])
 
                 deviceDetailsSection(buyback)
                 purchaseInfoSection(buyback)
@@ -363,18 +369,32 @@ struct BuybackDetailView: View {
 
     private func imagesSection(_ images: [BuybackImage]) -> some View {
         SectionCard(title: "Photos (\(images.count))", icon: "photo.on.rectangle") {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(images) { image in
-                        AuthenticatedImageView(
-                            imageId: image.id,
-                            width: 80,
-                            height: 80
-                        )
-                        .frame(width: 80, height: 80)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+            VStack(alignment: .leading, spacing: 10) {
+                if images.isEmpty {
+                    Text("No photos yet").font(.caption).foregroundStyle(.secondary)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(images) { image in
+                                AuthenticatedImageView(
+                                    imageId: image.id,
+                                    width: 80,
+                                    height: 80
+                                )
+                                .frame(width: 80, height: 80)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                        }
                     }
                 }
+
+                Button {
+                    showImageManager = true
+                } label: {
+                    Label("Manage Images", systemImage: "photo.stack")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
             }
         }
     }
