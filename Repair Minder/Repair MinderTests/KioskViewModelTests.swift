@@ -6,6 +6,24 @@ final class KioskViewModelTests: XCTestCase {
 
     func makeVM() -> KioskViewModel { KioskViewModel(service: StubKioskService()) }
 
+    func testCardPaymentSuccessMarksReceiptPaid() throws {
+        let vm = makeVM()
+        let unpaid = KioskOrderResponse(
+            id: "o", orderNumber: 5, ticketId: "t",
+            client: KioskClient(id: "c", email: nil, firstName: nil, lastName: nil, phone: nil),
+            items: [],
+            totals: KioskResponseTotals(subtotal: 100, vatTotal: 20, grandTotal: 120,
+                discountTotal: 0, globalDiscount: 0, amountPaid: 0, balanceDue: 120),
+            payment: nil, globalDiscountPercent: nil, globalDiscountAmount: nil, globalDiscountReason: nil,
+            company: nil, location: nil, dates: KioskDates(createdAt: "2026-07-04T00:00:00Z"))
+        vm.cardPaymentSucceeded(order: unpaid)
+        XCTAssertEqual(vm.mode, .receipt)
+        let totals = try XCTUnwrap(vm.completedOrder?.totals)
+        XCTAssertEqual(totals.amountPaid, 120, accuracy: 0.001)
+        XCTAssertEqual(totals.balanceDue, 0, accuracy: 0.001)
+        XCTAssertEqual(vm.completedOrder?.payment?.paymentMethod, "card")
+    }
+
     func testAddAndRemoveItem() {
         let vm = makeVM()
         vm.addItem(KioskCartItem(description: "A", unitPrice: 10))

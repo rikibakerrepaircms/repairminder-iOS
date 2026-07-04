@@ -155,7 +155,27 @@ final class KioskViewModel: ObservableObject {
     }
 
     func cardPaymentSucceeded(order: KioskOrderResponse) {
-        completedOrder = order
+        // The create response was UNPAID (the card is charged out-of-band on the POS
+        // terminal, so `POST /api/orders/kiosk` was sent with no payment block). Patch the
+        // snapshot to reflect the completed card payment before showing the receipt —
+        // mirrors the web kiosk (`KioskPage.tsx`), otherwise the receipt reads "Paid £0.00".
+        let paidTotals = KioskResponseTotals(
+            subtotal: order.totals.subtotal,
+            vatTotal: order.totals.vatTotal,
+            grandTotal: order.totals.grandTotal,
+            discountTotal: order.totals.discountTotal,
+            globalDiscount: order.totals.globalDiscount,
+            amountPaid: order.totals.grandTotal,
+            balanceDue: 0)
+        let cardPayment = KioskResponsePayment(
+            id: "card", amount: order.totals.grandTotal, paymentMethod: "card", paymentDate: "")
+        completedOrder = KioskOrderResponse(
+            id: order.id, orderNumber: order.orderNumber, ticketId: order.ticketId,
+            client: order.client, items: order.items, totals: paidTotals, payment: cardPayment,
+            globalDiscountPercent: order.globalDiscountPercent,
+            globalDiscountAmount: order.globalDiscountAmount,
+            globalDiscountReason: order.globalDiscountReason,
+            company: order.company, location: order.location, dates: order.dates)
         mode = .receipt
     }
 

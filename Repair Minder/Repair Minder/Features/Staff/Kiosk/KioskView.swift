@@ -21,6 +21,7 @@ struct KioskView: View {
     @State private var cardFullOrder: Order?           // Order is Identifiable — drives .sheet(item:)
     @State private var cardTerminals: [PosTerminal] = []
     @State private var cardPaymentSucceeded = false
+    @State private var isStartingCardPayment = false
 
     @State private var showExitConfirm = false
     #if os(iOS)
@@ -270,6 +271,11 @@ struct KioskView: View {
 
     @MainActor
     private func startCardPayment() async {
+        // Guard against a double-tap on "Card": without this, a second tap during the async
+        // window creates a second unpaid order that is never cancelled (orphaned order).
+        guard !isStartingCardPayment else { return }
+        isStartingCardPayment = true
+        defer { isStartingCardPayment = false }
         guard let kioskOrder = await viewModel.createUnpaidOrderForCard() else { return }
         cardKioskOrder = kioskOrder
         cardPaymentSucceeded = false
