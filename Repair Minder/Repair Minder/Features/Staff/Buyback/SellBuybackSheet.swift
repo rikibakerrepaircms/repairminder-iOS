@@ -11,7 +11,8 @@ import SwiftUI
 /// Parses a user-entered decimal amount using the current locale (handles
 /// locales where `,` is the decimal separator), falling back to a plain
 /// `Double(_:)` parse for inputs like a bare ".".
-private func parseDecimal(_ s: String) -> Double? {
+/// Internal (not private) so `BulkSellSheet` can reuse it.
+func parseDecimal(_ s: String) -> Double? {
     let t = s.trimmingCharacters(in: .whitespaces)
     if t.isEmpty { return nil }
     let f = NumberFormatter()
@@ -19,6 +20,16 @@ private func parseDecimal(_ s: String) -> Double? {
     f.locale = Locale.current
     if let n = f.number(from: t) { return n.doubleValue }
     return Double(t)
+}
+
+/// Formats a decimal amount for editing in a locale-aware way, matching what
+/// `parseDecimal` expects back — avoids `String(Double)`'s fixed "."
+/// separator corrupting the value in comma-decimal locales.
+/// Internal (not private) so `BulkSellSheet` and `RefurbishmentEditSheet` can reuse it.
+func formatDecimalForEditing(_ value: Double) -> String {
+    let f = NumberFormatter(); f.numberStyle = .decimal; f.locale = Locale.current
+    f.minimumFractionDigits = 0; f.maximumFractionDigits = 2; f.usesGroupingSeparator = false
+    return f.string(from: NSNumber(value: value)) ?? String(value)
 }
 
 private enum SaleChannelOption: String, CaseIterable, Identifiable {

@@ -16,18 +16,8 @@ private let purchaseDateFormatter: DateFormatter = {
     return formatter
 }()
 
-/// Parses a user-entered decimal amount using the current locale (handles
-/// locales where `,` is the decimal separator), falling back to a plain
-/// `Double(_:)` parse for inputs like a bare ".".
-private func parseDecimal(_ s: String) -> Double? {
-    let t = s.trimmingCharacters(in: .whitespaces)
-    if t.isEmpty { return nil }
-    let f = NumberFormatter()
-    f.numberStyle = .decimal
-    f.locale = Locale.current
-    if let n = f.number(from: t) { return n.doubleValue }
-    return Double(t)
-}
+// `parseDecimal` is defined in SellBuybackSheet.swift (internal, shared
+// across the Buyback feature).
 
 /// Edits `purchase_date`, `purchase_amount`, `purchase_payment_method`,
 /// `purchase_order_reference`, and `purchase_notes` via PATCH /api/buyback/:id.

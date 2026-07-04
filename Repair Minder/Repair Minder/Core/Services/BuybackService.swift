@@ -37,8 +37,30 @@ final class BuybackService {
         try await api.request(.sellBuyback(id: id), body: request)
     }
 
+    /// POST /api/buyback/sell-bulk — sell up to 20 `for_sale` items together in one order.
+    func sellBulk(_ request: BulkSellRequest) async throws -> BulkSellResponse {
+        try await api.request(.sellBuybackBulk, body: request)
+    }
+
     /// POST /api/devices/:deviceId/add-to-buyback
     func addDeviceToBuyback(deviceId: String) async throws -> AddToBuybackResponse {
         try await api.request(.addDeviceToBuyback(deviceId: deviceId))
+    }
+
+    // MARK: - Refurbishment Items
+
+    /// POST /api/buyback/:id/refurbishment
+    func addRefurbishment(id: String, request: AddRefurbishmentRequest) async throws -> RefurbishmentMutationResponse {
+        try await api.request(.addRefurbishmentItem(id: id), body: request)
+    }
+
+    /// PATCH /api/buyback/:id/refurbishment/:itemId
+    func updateRefurbishment(id: String, itemId: String, request: UpdateRefurbishmentRequest) async throws {
+        try await api.requestVoid(.updateRefurbishmentItem(id: id, itemId: itemId), body: request)
+    }
+
+    /// DELETE /api/buyback/:id/refurbishment/:itemId
+    func deleteRefurbishment(id: String, itemId: String) async throws {
+        try await api.requestVoid(.deleteRefurbishmentItem(id: id, itemId: itemId))
     }
 }
