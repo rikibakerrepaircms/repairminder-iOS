@@ -68,6 +68,18 @@ final class StockViewModel: ObservableObject {
         }
         isLoading = false
     }
+
+    /// Loads low-stock alerts once, regardless of which sub-tab is active — shared by the
+    /// Low Stock sub-tab and the banner shown above Summary/Hierarchy, so opening the Stock
+    /// segment never fires two independent `fetchLowStock()` calls.
+    func loadLowStockIfNeeded() async {
+        guard lowStock == nil else { return }
+        do {
+            lowStock = try await service.fetchLowStock()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
 }
 
 /// The `Stock` segment: sub-tabbed analytics (Summary / Hierarchy / Low Stock).
@@ -86,6 +98,13 @@ struct InventoryStockView: View {
             .padding(.horizontal, 12).padding(.vertical, 8)
             .accessibilityIdentifier("stock-tab-picker")
 
+            // Mirrors web: the low-stock banner surfaces above Summary/Hierarchy too, not just
+            // the Assets list. The dedicated Low Stock sub-tab already shows the full list, so
+            // skip the banner there. Reuses StockViewModel.lowStock — no duplicate fetch.
+            if tab != .lowStock {
+                LowStockBanner(onView: onFilterByProductType, preloadedAlerts: viewModel.lowStock?.all, usesExternalSource: true)
+            }
+
             Group {
                 switch tab {
                 case .summary:
@@ -98,5 +117,6 @@ struct InventoryStockView: View {
             }
         }
         .task(id: tab) { await viewModel.load(tab) }
+        .task { await viewModel.loadLowStockIfNeeded() }
     }
 }
