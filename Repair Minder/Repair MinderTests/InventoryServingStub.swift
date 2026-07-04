@@ -65,7 +65,7 @@ class InventoryServingStub: InventoryServing {
     }
     func salvageBuyback(id: String, items: [SalvageItemRequest]) async throws -> SalvageResponse {
         SalvageResponse(assets: [], salvagedAssets: [], newStatus: "salvaged",
-                        salvageBudget: SalvageBudgetInfo(cap: nil, booked: nil, remaining: nil))
+                        salvageBudget: SalvageBudget(cap: nil, booked: nil, remaining: nil))
     }
     func deleteSalvageItem(buybackId: String, assetId: String) async throws -> DeleteSalvageResult {
         DeleteSalvageResult(salvagedAssets: [], booked: 0, revertedTo: nil)

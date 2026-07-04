@@ -100,7 +100,7 @@ final class SalvageTests: XCTestCase {
                                      glassCracked: it.glassCracked, createdAt: nil, locationName: nil)
             }
             return SalvageResponse(assets: [], salvagedAssets: summaries, newStatus: "salvaged",
-                                   salvageBudget: SalvageBudgetInfo(cap: 100, booked: 0, remaining: 100))
+                                   salvageBudget: SalvageBudget(cap: 100, booked: 0, remaining: 100))
         }
         override func deleteSalvageItem(buybackId: String, assetId: String) async throws -> DeleteSalvageResult {
             deletedAssetId = assetId

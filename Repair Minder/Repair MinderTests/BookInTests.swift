@@ -350,6 +350,61 @@ final class BookInTests: XCTestCase {
         XCTAssertEqual(inputs.first?.serialNumbers, ["S0", "S1"])
     }
 
+    // MARK: - Receive per-line cost + OEM/refurb flags (parity with worker's item.unit_cost/is_oem/is_refurbished)
+
+    /// `prepareReceive()` seeds each draft's `unitCost` from the line's own cost so the
+    /// receive form starts pre-filled with a sensible value the user can override.
+    @MainActor
+    func testPrepareReceiveDefaultsUnitCostFromLine() async {
+        let spy = BookInSpy(); spy.lineCount = 1
+        let vm = BookInWizardViewModel(order: SupplierOrder(id: "o1", supplierName: "S", status: "pending"), service: spy)
+        await vm.reloadOrder()
+        vm.prepareReceive()
+        XCTAssertEqual(vm.drafts["l0"]?.unitCost, 5)   // BookInSpy line unitCost
+    }
+
+    /// The receive step must actually carry unit cost + OEM/refurb overrides through to the
+    /// built `ReceiveItemInput` — the worker's receive handler reads `item.unit_cost`,
+    /// `item.is_oem`, and `item.is_refurbished` per line (supplier_order_handlers.js).
+    @MainActor
+    func testReceiveInputCarriesCostAndFlags() async {
+        let spy = BookInSpy(); spy.lineCount = 1
+        let vm = BookInWizardViewModel(order: SupplierOrder(id: "o1", supplierName: "S", status: "pending"), service: spy)
+        await vm.reloadOrder()
+        vm.prepareReceive()
+        vm.drafts["l0"]?.unitCost = 12.5
+        vm.drafts["l0"]?.isOem = true
+        vm.drafts["l0"]?.isRefurbished = false
+
+        let inputs = vm.buildReceiveInputs()
+
+        XCTAssertEqual(inputs.first?.unitCost, 12.5)
+        XCTAssertEqual(inputs.first?.isOem, 1)
+        XCTAssertEqual(inputs.first?.isRefurbished, 0)
+    }
+
+    /// Keep the MF-3 clamp + positional-serial invariant intact alongside the new fields —
+    /// clamping quantity must not disturb the per-line cost/flag overrides.
+    @MainActor
+    func testReceiveInputCostFlagsSurviveQuantityClamp() async {
+        let spy = BookInSpy(); spy.lineCount = 1
+        let vm = BookInWizardViewModel(order: SupplierOrder(id: "o1", supplierName: "S", status: "pending"), service: spy)
+        await vm.reloadOrder()
+        vm.prepareReceive()
+        vm.lines[0].quantityReceived = 1   // remaining now 2 (ordered 3, received 1)
+        vm.drafts["l0"]?.quantity = 8       // force above remaining
+        vm.drafts["l0"]?.serials = ["S0", "S1", "S2", "S3", "S4", "S5", "S6", "S7"]
+        vm.drafts["l0"]?.unitCost = 7.25
+        vm.drafts["l0"]?.isRefurbished = true
+
+        let inputs = vm.buildReceiveInputs()
+
+        XCTAssertEqual(inputs.first?.quantity, 2)
+        XCTAssertEqual(inputs.first?.serialNumbers, ["S0", "S1"])
+        XCTAssertEqual(inputs.first?.unitCost, 7.25)
+        XCTAssertEqual(inputs.first?.isRefurbished, 1)
+    }
+
     @MainActor
     func testSupplierListStatusFilterAndCancel() async {
         let spy = BookInSpy()

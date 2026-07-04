@@ -103,7 +103,12 @@ struct AssetFilterSheet: View {
                             productTypeQuery = pt.name
                         } label: {
                             HStack {
-                                Text(pt.name)
+                                VStack(alignment: .leading) {
+                                    Text(pt.name)
+                                    if let sku = pt.sku, !sku.isEmpty {
+                                        Text(sku).font(.caption).foregroundStyle(.secondary)
+                                    }
+                                }
                                 Spacer()
                                 if viewModel.selectedProductTypeId == pt.id { Image(systemName: "checkmark") }
                             }

@@ -10,6 +10,12 @@ struct ReceiveDraft: Equatable {
     var serials: [String] = []
     var locationId: String?
     var subLocationId: String?
+    /// Per-line cost override for this receive (defaults from the line's own `unitCost` in
+    /// `prepareReceive()`). The worker's receive handler falls back to the line's cost when
+    /// omitted (`item.unit_cost ?? line.unit_cost`), so this is only a genuine override.
+    var unitCost: Double?
+    var isOem: Bool = false
+    var isRefurbished: Bool = false
 }
 
 @MainActor
@@ -170,7 +176,8 @@ final class BookInWizardViewModel: ObservableObject {
                 draft.quantity = min(draft.quantity, line.remaining)
                 drafts[line.id] = draft
             } else {
-                drafts[line.id] = ReceiveDraft(quantity: line.remaining, locationId: line.locationId, subLocationId: line.subLocationId)
+                drafts[line.id] = ReceiveDraft(quantity: line.remaining, locationId: line.locationId,
+                                                subLocationId: line.subLocationId, unitCost: line.unitCost)
             }
         }
         step = .receive
@@ -200,7 +207,8 @@ final class BookInWizardViewModel: ObservableObject {
             return ReceiveItemInput(
                 lineId: line.id, quantity: quantity,
                 serialNumbers: hasAnySerial ? positional : nil,
-                warrantyMonths: d.warrantyMonths, conditionGrade: d.conditionGrade,
+                unitCost: d.unitCost, warrantyMonths: d.warrantyMonths, conditionGrade: d.conditionGrade,
+                isOem: d.isOem ? 1 : 0, isRefurbished: d.isRefurbished ? 1 : 0,
                 locationId: d.locationId, subLocationId: d.subLocationId)
         }
     }

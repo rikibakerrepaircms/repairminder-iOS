@@ -127,5 +127,6 @@ struct AllocateDevice: Decodable, Equatable, Sendable {
 /// POST /api/assets/:id/deploy-external — this shape sits UNDER `data`.
 struct DeployExternalData: Decodable, Equatable, Sendable {
     let asset: Asset
+    // contract mirror; decoded for API fidelity, not yet rendered
     let deployment: ExternalDeploymentRecord   // reused from Phase 1 (Core/Models/Inventory.swift)
 }

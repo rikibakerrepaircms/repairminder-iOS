@@ -12,6 +12,7 @@ struct BulkReturnToSupplierRequest: Encodable {
 /// Result nested under `data`. Assets are grouped into per-supplier batches;
 /// `errors` collects assets the server skipped (not found / invalid status / no supplier).
 struct BulkReturnToSupplierResult: Decodable, Equatable, Sendable {
+    // contract mirror; decoded for API fidelity, not yet rendered
     var batches: [SupplierReturnBatch]
     var totalReturned: Int
     var errors: [BulkAssetError]

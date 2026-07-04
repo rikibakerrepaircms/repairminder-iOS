@@ -27,10 +27,12 @@ struct SalvageRequest: Encodable {
 /// drift on that heavier struct would throw a *false* failure client-side after the
 /// worker had already created the salvage assets.
 struct SalvageResponse: Decodable, Equatable, Sendable {
+    // contract mirror; decoded for API fidelity, not yet rendered
     var assets: [Asset]?
     var salvagedAssets: [SalvagedAssetSummary]
+    // contract mirror; decoded for API fidelity, not yet rendered
     var newStatus: String
-    var salvageBudget: SalvageBudgetInfo
+    var salvageBudget: SalvageBudget
 }
 
 /// Lighter salvage-asset projection (detail endpoint + salvage/delete responses).
@@ -47,15 +49,15 @@ struct SalvagedAssetSummary: Decodable, Equatable, Sendable, Identifiable {
     var locationName: String?
 }
 
-struct SalvageBudgetInfo: Decodable, Equatable, Sendable {
-    var cap: Double?
-    var booked: Double?
-    var remaining: Double?
-}
+// Note: salvage budget shape reuses `SalvageBudget` (Core/Models/BuybackInventory.swift) —
+// previously a near-identical duplicate (`SalvageBudgetInfo`) lived here; collapsed since
+// both had the exact same shape (cap/booked/remaining: Double?) and decoding semantics.
 
 /// 200 response for DELETE .../salvage/:assetId.
 struct DeleteSalvageResult: Decodable, Equatable, Sendable {
     var salvagedAssets: [SalvagedAssetSummary]
+    // contract mirror; decoded for API fidelity, not yet rendered
     var booked: Double?
+    // contract mirror; decoded for API fidelity, not yet rendered
     var revertedTo: String?
 }

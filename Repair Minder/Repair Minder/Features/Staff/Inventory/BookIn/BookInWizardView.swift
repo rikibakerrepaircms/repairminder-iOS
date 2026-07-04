@@ -202,7 +202,12 @@ private struct LineEditSheet: View {
                             productTypeOptions = []
                         } label: {
                             HStack {
-                                Text(pt.name)
+                                VStack(alignment: .leading) {
+                                    Text(pt.name)
+                                    if let sku = pt.sku, !sku.isEmpty {
+                                        Text(sku).font(.caption).foregroundStyle(.secondary)
+                                    }
+                                }
                                 Spacer()
                                 if productTypeId == pt.id { Image(systemName: "checkmark") }
                             }
@@ -282,6 +287,18 @@ private struct ReceiveLineEditor: View {
             ForEach(["A", "B", "C", "D", "F"], id: \.self) { Text($0).tag($0) }
         }
         Stepper("Warranty: \(draft.warrantyMonths) mo", value: $draft.warrantyMonths, in: 0...60, step: 3)
+        HStack {
+            Text("Unit cost")
+            Spacer()
+            TextField("Unit cost", text: unitCostBinding)
+                #if os(iOS)
+                .keyboardType(.decimalPad)
+                #endif
+                .multilineTextAlignment(.trailing)
+                .frame(maxWidth: 100)
+        }
+        Toggle("OEM", isOn: $draft.isOem)
+        Toggle("Refurbished", isOn: $draft.isRefurbished)
         // Defensive: even if `draft.quantity` is momentarily stale above `remaining` (e.g. a
         // draft carried over from before the order's receipts changed), never render more
         // serial fields than units left to receive.
@@ -323,6 +340,12 @@ private struct ReceiveLineEditor: View {
     }
 
     private var serialCount: Int { min(draft.quantity, line.remaining) }
+
+    private var unitCostBinding: Binding<String> {
+        Binding(
+            get: { draft.unitCost.map { String(format: "%.2f", $0) } ?? "" },
+            set: { draft.unitCost = Double($0) })
+    }
 
     private func serialBinding(_ i: Int) -> Binding<String> {
         Binding(
