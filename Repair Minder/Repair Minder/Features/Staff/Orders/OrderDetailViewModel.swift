@@ -383,6 +383,59 @@ final class OrderDetailViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Admin Extras (Package G)
+
+    /// Update the order's customer purchase order reference/value.
+    func updatePurchaseOrder(_ request: PurchaseOrderRequest) async -> Bool {
+        await perform {
+            try await self.apiClient.requestVoid(.updatePurchaseOrder(orderId: self.orderId), body: request)
+        }
+    }
+
+    /// Set (or clear, if `clientGroupId` is nil) the order's billing group.
+    func setBillingGroup(_ request: BillingGroupRequest) async -> Bool {
+        await perform {
+            try await self.apiClient.requestVoid(.setOrderBillingGroup(orderId: self.orderId), body: request)
+        }
+    }
+
+    /// Fetch the candidate client groups for the billing-group picker — scoped
+    /// to the order's client (the backend enforces membership on save).
+    func fetchClientGroups() async -> [ClientGroupMembership] {
+        guard let clientId = order?.client?.id else { return [] }
+        do {
+            return try await apiClient.request(.clientGroupsForClient(clientId: clientId))
+        } catch let e as APIError {
+            actionError = e.localizedDescription
+            return []
+        } catch {
+            actionError = error.localizedDescription
+            return []
+        }
+    }
+
+    /// Recreate the order (admin only): cancels the original order and creates
+    /// a new one, copying devices/items across. Returns the new order's id on
+    /// success, or nil on failure (with `actionError` set).
+    func recreateOrder(_ request: RecreateOrderRequest) async -> String? {
+        isPerformingAction = true
+        actionError = nil
+        defer { isPerformingAction = false }
+        do {
+            let response: RecreateOrderResponse = try await apiClient.requestFull(
+                .recreateOrder(orderId: orderId), body: request
+            )
+            await refresh()
+            return response.newOrder?.id
+        } catch let e as APIError {
+            actionError = e.localizedDescription
+            return nil
+        } catch {
+            actionError = error.localizedDescription
+            return nil
+        }
+    }
+
     /// Shared runner for close-out mutations: manages loading/error state and refreshes the order on success.
     private func perform(_ op: @escaping () async throws -> Void) async -> Bool {
         isPerformingAction = true

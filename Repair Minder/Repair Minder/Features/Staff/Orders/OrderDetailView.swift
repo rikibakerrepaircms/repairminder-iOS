@@ -36,6 +36,11 @@ struct OrderDetailView: View {
     @State private var refundTarget: OrderPayment?
     @State private var refundToDelete: OrderRefund?
     @State private var showDeleteRefundAlert = false
+    @State private var showPurchaseOrderSheet = false
+    @State private var showBillingGroupSheet = false
+    @State private var showRecreateConfirmation = false
+    @State private var showRecreateSheet = false
+    @State private var recreateSuccessMessage: String?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var isRegularWidth: Bool {
@@ -101,6 +106,9 @@ struct OrderDetailView: View {
 
                 // Close-out actions section
                 closeOutActionsSection(order)
+
+                // Admin section (purchase order, billing group, recreate)
+                adminSection(order)
 
                 // Payment actions section
                 if viewModel.isOrderEditable && viewModel.balanceDue > 0 {
@@ -309,6 +317,56 @@ struct OrderDetailView: View {
         }
         .sheet(item: $refundTarget) { payment in
             RefundPaymentSheet(payment: payment) { req in (await viewModel.createRefund(req)) ? nil : (viewModel.actionError ?? "Refund failed.") }
+        }
+        // MARK: - Admin Sheets (Package G)
+        .sheet(isPresented: $showPurchaseOrderSheet) {
+            if let order = viewModel.order {
+                PurchaseOrderSheet(order: order) { req in
+                    (await viewModel.updatePurchaseOrder(req)) ? nil : (viewModel.actionError ?? "Could not update purchase order.")
+                }
+            }
+        }
+        .sheet(isPresented: $showBillingGroupSheet) {
+            if let order = viewModel.order {
+                BillingGroupSheet(
+                    order: order,
+                    fetchGroups: { await viewModel.fetchClientGroups() }
+                ) { req in
+                    (await viewModel.setBillingGroup(req)) ? nil : (viewModel.actionError ?? "Could not update billing group.")
+                }
+            }
+        }
+        .confirmationDialog(
+            "Recreate Order",
+            isPresented: $showRecreateConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Recreate", role: .destructive) {
+                showRecreateSheet = true
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This cancels the original order and creates a new order with the same devices and items. This cannot be undone.")
+        }
+        .sheet(isPresented: $showRecreateSheet) {
+            RecreateOrderSheet(client: viewModel.order?.client) { req in
+                guard (await viewModel.recreateOrder(req)) != nil else {
+                    return viewModel.actionError ?? "Could not recreate order."
+                }
+                recreateSuccessMessage = "New order created. The original order has been cancelled."
+                return nil
+            }
+        }
+        .alert(
+            "Order Recreated",
+            isPresented: Binding(
+                get: { recreateSuccessMessage != nil },
+                set: { if !$0 { recreateSuccessMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) { recreateSuccessMessage = nil }
+        } message: {
+            Text(recreateSuccessMessage ?? "")
         }
         // MARK: - Device Action Sheets
         .sheet(item: $dueDateDevice) { device in
@@ -861,6 +919,85 @@ struct OrderDetailView: View {
             }
         }
         .accessibilityIdentifier("order-actions")
+    }
+
+    // MARK: - Admin Section (Package G)
+
+    private func adminSection(_ order: Order) -> some View {
+        SectionCard(title: "Admin", icon: "gearshape") {
+            VStack(alignment: .leading, spacing: 12) {
+                // Purchase order row
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Purchase Order")
+                            .font(.subheadline).fontWeight(.medium)
+                        if let reference = order.customerPoReference, !reference.isEmpty {
+                            Text(reference)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        if let value = order.customerPoValue {
+                            Text(CurrencyFormatter.format(value))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        if order.customerPoReference == nil && order.customerPoValue == nil {
+                            Text("No purchase order recorded")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    if viewModel.isOrderEditable {
+                        Button("Edit") {
+                            showPurchaseOrderSheet = true
+                        }
+                        .font(.caption)
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("po-edit")
+                    }
+                }
+
+                Divider()
+
+                // Billing group row
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Billing Group")
+                            .font(.subheadline).fontWeight(.medium)
+                        Text(order.billingGroup?.name ?? "None")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    if viewModel.isOrderEditable {
+                        Button(order.billingGroup != nil ? "Change" : "Set") {
+                            showBillingGroupSheet = true
+                        }
+                        .font(.caption)
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("billing-group-edit")
+                    }
+                }
+
+                Divider()
+
+                // Recreate order
+                Button(role: .destructive) {
+                    showRecreateConfirmation = true
+                } label: {
+                    Label("Recreate order", systemImage: "arrow.triangle.2.circlepath")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(.red)
+            }
+        }
+        .accessibilityIdentifier("order-admin")
     }
 
     // MARK: - Payment Actions Section

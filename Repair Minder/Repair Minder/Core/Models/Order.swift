@@ -91,6 +91,12 @@ struct Order: Decodable, Identifiable, Equatable, Hashable, Sendable {
     let globalDiscountAmount: Double?
     let globalDiscountReason: String?
 
+    // Admin extras (detail only) — Package G
+    let customerPoReference: String?
+    let customerPoValue: Double?
+    let customerPoReceivedAt: String?
+    let billingGroup: OrderBillingGroup?
+
     // MARK: - Computed Properties
 
     /// Display name for client
@@ -230,6 +236,14 @@ struct OrderLocation: Decodable, Equatable, Sendable {
 struct OrderAssignedUser: Decodable, Equatable, Sendable {
     let id: String
     let name: String
+}
+
+/// The client group an order's invoicing is attributed to (Package G).
+/// Set/cleared via `PATCH /api/orders/:id/billing-group`.
+struct OrderBillingGroup: Decodable, Equatable, Sendable {
+    let id: String
+    let name: String?
+    let postcode: String?
 }
 
 struct OrderItem: Decodable, Identifiable, Equatable, Sendable {
@@ -682,6 +696,65 @@ struct CreateRefundRequest: Encodable {
 struct CreateTicketNoteRequest: Encodable {
     var body: String
     var deviceId: String?
+}
+
+// MARK: - Purchase Order Request (Package G)
+
+/// Request body for `PUT /api/orders/:id/purchase-order`. Both fields use the
+/// synthesized omit-if-nil encoding (unlike `BillingGroupRequest` below) —
+/// the endpoint treats an omitted field as "leave unchanged", and this sheet
+/// always sends both current values together, so tri-state clearing isn't
+/// needed here the way it is for the discount/billing-group endpoints.
+struct PurchaseOrderRequest: Encodable {
+    var poReference: String?
+    var poValue: Double?
+}
+
+// MARK: - Billing Group Request (Package G)
+
+/// Request body for `PATCH /api/orders/:id/billing-group`. Uses a custom
+/// `encode(to:)` (rather than synthesized `encodeIfPresent`) so `nil` is sent
+/// as an explicit JSON `null` instead of being omitted — the backend clears
+/// the billing group only when the key is present with a `null` value.
+struct BillingGroupRequest: Encodable {
+    var clientGroupId: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case clientGroupId
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if let clientGroupId {
+            try container.encode(clientGroupId, forKey: .clientGroupId)
+        } else {
+            try container.encodeNil(forKey: .clientGroupId)
+        }
+    }
+}
+
+// MARK: - Recreate Order Request/Response (Package G)
+
+/// Request body for `POST /api/orders/:id/recreate` (admin only). Cancels the
+/// original order and creates a new one, copying devices/items across.
+struct RecreateOrderRequest: Encodable {
+    var clientEmail: String
+    var clientFirstName: String?
+    var clientLastName: String?
+    var clientPhone: String?
+    var locationId: String?
+    var assignedUserId: String?
+}
+
+/// The `/recreate` response is NOT `data`-wrapped, so this is decoded via
+/// `APIClient.requestFull` rather than the usual `request`.
+struct RecreateOrderResponse: Decodable {
+    let newOrder: NewOrderRef?
+
+    struct NewOrderRef: Decodable {
+        let id: String
+        let orderNumber: Int?
+    }
 }
 
 // MARK: - Created Signature Response

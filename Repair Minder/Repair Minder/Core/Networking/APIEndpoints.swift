@@ -123,6 +123,11 @@ enum APIEndpoint {
     case createTicketNote(ticketId: String)
     case orderDocument(orderId: String, type: DocumentType)
 
+    // Orders — admin extras (Package G)
+    case updatePurchaseOrder(orderId: String)
+    case setOrderBillingGroup(orderId: String)
+    case recreateOrder(orderId: String)
+
     // MARK: - Clients
 
     case clients(page: Int, limit: Int, search: String?)
@@ -133,6 +138,7 @@ enum APIEndpoint {
     case clientSearch(query: String)
     case clientsExport
     case clientsImport
+    case clientGroupsForClient(clientId: String)
 
     // MARK: - Tickets/Enquiries
 
@@ -508,6 +514,12 @@ enum APIEndpoint {
             return "/api/tickets/\(ticketId)/note"
         case .orderDocument(let orderId, let type):
             return "/api/orders/\(orderId)/documents/\(type.rawValue)"
+        case .updatePurchaseOrder(let orderId):
+            return "/api/orders/\(orderId)/purchase-order"
+        case .setOrderBillingGroup(let orderId):
+            return "/api/orders/\(orderId)/billing-group"
+        case .recreateOrder(let orderId):
+            return "/api/orders/\(orderId)/recreate"
 
         // Clients
         case .clients, .createClient:
@@ -520,6 +532,8 @@ enum APIEndpoint {
             return "/api/clients/export"
         case .clientsImport:
             return "/api/clients/import"
+        case .clientGroupsForClient(let clientId):
+            return "/api/clients/\(clientId)/groups"
 
         // Tickets
         case .tickets, .createTicket:
@@ -777,7 +791,7 @@ enum APIEndpoint {
              .deviceChecklistTemplates, .deviceQCRequirements,
              .deviceImages, .deviceImageFile(_, _, _, _, _),
              .orders, .order, .orderItems, .orderPayments, .orderSignatures, .orderRefunds, .orderDocument,
-             .clients, .client, .clientSearch, .clientsExport,
+             .clients, .client, .clientSearch, .clientsExport, .clientGroupsForClient,
              .tickets, .ticket, .ticketMacroExecutions,
              .ticketGenerateResponseStatus, .ticketRewriteResponseStatus,
              .macros, .macro, .macroExecutions, .macroExecution,
@@ -809,7 +823,7 @@ enum APIEndpoint {
              .createOrderDevice, .executeDeviceAction, .uploadDeviceImage,
              .createOrder, .createOrderItem, .createOrderPayment, .createOrderSignature,
              .sendQuote, .authorizeOrder, .despatchOrder, .collectOrder,
-             .createOrderRefund, .createTicketNote,
+             .createOrderRefund, .createTicketNote, .recreateOrder,
              .createClient, .clientsImport,
              .createTicket, .ticketReply, .ticketNote, .ticketGenerateResponse, .ticketRewriteResponse, .ticketExecuteMacro, .ticketPreviewMacro,
              .ticketResolve, .ticketReassign, .createEnquiry,
@@ -838,7 +852,7 @@ enum APIEndpoint {
         case .updateOrderDevice, .updateDeviceStatus, .updateDeviceBankDetails,
              .updateDeviceEngineer, .updateDeviceSubLocation, .updateBuyback, .updateBuybackStatus,
              .returnDeviceAccessory,
-             .updateOrder, .setOrderDiscount, .updateOrderItem,
+             .updateOrder, .setOrderDiscount, .updateOrderItem, .setOrderBillingGroup,
              .updateClient,
              .updateTicket,
              .pauseMacroExecution, .resumeMacroExecution,
@@ -850,7 +864,7 @@ enum APIEndpoint {
         // PUT endpoints
         case .togglePasscodeEnabled, .passcodeTimeout,
              .updatePushPreferences, .updateAsset, .updateProductType,
-             .updateSupplierOrderLine:
+             .updateSupplierOrderLine, .updatePurchaseOrder:
             return .put
 
         // DELETE endpoints
