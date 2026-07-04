@@ -43,7 +43,8 @@ final class InventoryEditActionUITest: XCTestCase {
         snap(app, "01-inventory-list")
 
         // Prime: a neutral tap dismisses the app-wide FAB overlay that can swallow the first tap.
-        app.staticTexts["Inventory"].firstMatch.tap()
+        let invTitle = app.staticTexts["Inventory"].firstMatch
+        if invTitle.exists { invTitle.tap() }
         Thread.sleep(forTimeInterval: 1)
 
         // Requires an asset in the demo company. When none exists (e.g. CI without a seed),
