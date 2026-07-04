@@ -23,11 +23,6 @@ struct ReturnToSupplierSheet: View {
             Form {
                 if let supplier = asset.supplierName {
                     Section("Supplier") { Text(supplier) }
-                } else {
-                    Section {
-                        Text("This asset has no supplier assigned. You won't be able to track this return.")
-                            .font(.caption).foregroundStyle(.orange)
-                    }
                 }
                 Section("Reason") {
                     Picker("Return reason", selection: $reason) {
@@ -50,7 +45,7 @@ struct ReturnToSupplierSheet: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { viewModel.actionError = nil; dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Return") { Task { await submit() } }
-                        .disabled(reason.isEmpty || asset.supplierName == nil || viewModel.isMutating)
+                        .disabled(reason.isEmpty || viewModel.isMutating)
                 }
             }
         }

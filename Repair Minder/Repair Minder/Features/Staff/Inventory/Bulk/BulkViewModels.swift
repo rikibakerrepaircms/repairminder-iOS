@@ -91,9 +91,6 @@ final class BulkMoveViewModel: ObservableObject {
         self.service = service ?? InventoryService()
     }
 
-    var successCount: Int { outcomes.filter(\.success).count }
-    var failureCount: Int { outcomes.filter { !$0.success }.count }
-
     func run(locationId: String, subLocationId: String?) async {
         guard !isRunning else { return }
         isRunning = true; outcomes = []
@@ -126,9 +123,6 @@ final class BulkDeployViewModel: ObservableObject {
         self.assets = BulkActions.deployableAssets(assets)
         self.service = service ?? InventoryService()
     }
-
-    var successCount: Int { outcomes.filter(\.success).count }
-    var failureCount: Int { outcomes.filter { !$0.success }.count }
 
     func runOrder(orderId: String, orderItemId: String?) async {
         await run { asset in

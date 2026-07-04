@@ -156,8 +156,8 @@ final class InventoryBulkTests: XCTestCase {
                                    service: spy)
         await vm.run(locationId: "L", subLocationId: nil)
         XCTAssertEqual(spy.moveCalls, ["1", "2", "3"])
-        XCTAssertEqual(vm.successCount, 2)
-        XCTAssertEqual(vm.failureCount, 1)
+        XCTAssertEqual(vm.outcomes.filter(\.success).count, 2)
+        XCTAssertEqual(vm.outcomes.filter { !$0.success }.count, 1)
         XCTAssertTrue(vm.finished)
     }
 
@@ -176,7 +176,7 @@ final class InventoryBulkTests: XCTestCase {
                                      service: spy)
         await vm.runOrder(orderId: "o1", orderItemId: nil)
         XCTAssertEqual(spy.allocateCalls, ["1"])
-        XCTAssertEqual(vm.successCount, 1)
+        XCTAssertEqual(vm.outcomes.filter(\.success).count, 1)
     }
 
     @MainActor
