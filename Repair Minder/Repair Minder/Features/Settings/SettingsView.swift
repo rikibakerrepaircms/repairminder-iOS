@@ -48,6 +48,7 @@ struct SettingsView: View {
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @ObservedObject private var tabConfig = TabBarConfig.shared
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.launchKiosk) private var launchKiosk
     @State private var selectedDestination: SettingsDestination?
 
     private var isRegularWidth: Bool {
@@ -146,6 +147,7 @@ struct SettingsView: View {
         List {
             profileSection
             featuresSection
+            kioskSection
             tabBarSection
             notificationsSection
             securitySection
@@ -258,6 +260,21 @@ struct SettingsView: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: - Kiosk Section
+
+    /// Launches the full-screen Kiosk takeover via the `launchKiosk`
+    /// environment closure injected by StaffMainView on the TabView.
+    private var kioskSection: some View {
+        Section {
+            Button {
+                launchKiosk()
+            } label: {
+                Label("Kiosk", systemImage: "cart.badge.plus")
+            }
+            .foregroundStyle(.primary)
         }
     }
 

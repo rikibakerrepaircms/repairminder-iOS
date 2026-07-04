@@ -323,6 +323,7 @@ private struct StaffMainView: View {
     @ObservedObject private var tabConfig = TabBarConfig.shared
     @State private var selectedTab: StaffTab = .feature(.dashboard)
     @State private var showBookingSheet = false
+    @State private var showKiosk = false
     @State private var fabDragOffset: CGFloat = 0
     private var fabState = FABState.shared
 
@@ -404,6 +405,21 @@ private struct StaffMainView: View {
                 .frame(minWidth: 600, minHeight: 700)
         }
         #endif
+        // Kiosk full-screen takeover (launched from the More menu via the
+        // `launchKiosk` environment closure injected below).
+        #if os(iOS)
+        .fullScreenCover(isPresented: $showKiosk) {
+            KioskView()
+        }
+        #elseif os(macOS)
+        .sheet(isPresented: $showKiosk) {
+            KioskView()
+                .frame(minWidth: 900, minHeight: 640)
+        }
+        #endif
+        // Inject the kiosk launcher so descendants inside the TabView
+        // (e.g. SettingsView / More tab) can trigger the takeover.
+        .environment(\.launchKiosk, { showKiosk = true })
         .onChange(of: deepLinkHandler.pendingDestination) { _, destination in
             handleDeepLink(destination)
         }

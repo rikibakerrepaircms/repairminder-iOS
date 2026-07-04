@@ -13,6 +13,7 @@ struct BookingView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var selectedServiceType: ServiceType?
     @State private var showAccessoriesBooking = false
+    @State private var showKioskFromBooking = false
     @State private var viewModel = BookingViewModel()
 
     /// Filtered service types: only those with backend support AND enabled by company settings.
@@ -102,6 +103,14 @@ struct BookingView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        // Kiosk covers the Booking cover directly — no dismiss needed.
+                        showKioskFromBooking = true
+                    } label: {
+                        Label("Kiosk Mode", systemImage: "cart.badge.plus")
+                    }
+                }
             }
             .navigationDestination(item: $selectedServiceType) { serviceType in
                 BookingWizardView(viewModel: viewModel, serviceType: serviceType, onComplete: {
@@ -114,6 +123,19 @@ struct BookingView: View {
                 })
             }
         }
+        // Self-contained kiosk takeover. BookingView is presented as its own
+        // full-screen cover, so custom environment values don't reliably cross
+        // that presentation boundary — own the presentation here instead.
+        #if os(iOS)
+        .fullScreenCover(isPresented: $showKioskFromBooking) {
+            KioskView()
+        }
+        #elseif os(macOS)
+        .sheet(isPresented: $showKioskFromBooking) {
+            KioskView()
+                .frame(minWidth: 900, minHeight: 640)
+        }
+        #endif
         .task {
             await viewModel.loadInitialData()
         }
