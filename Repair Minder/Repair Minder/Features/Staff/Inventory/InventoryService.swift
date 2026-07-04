@@ -63,6 +63,8 @@ protocol InventoryServing {
     func getSupplierOrder(id: String) async throws -> SupplierOrder
     func createSupplierOrder(_ body: CreateSupplierOrderRequest) async throws -> SupplierOrder
     func updateSupplierOrder(id: String, body: UpdateSupplierOrderRequest) async throws -> SupplierOrder
+    /// Hard-deletes an order with no received lines (worker refuses/cancels instead if it has received items).
+    func deleteSupplierOrder(id: String) async throws
     func addOrderLine(orderId: String, body: SupplierOrderLineRequest) async throws -> SupplierOrderLine
     func updateOrderLine(orderId: String, lineId: String, body: SupplierOrderLineRequest) async throws -> SupplierOrderLine
     func deleteOrderLine(orderId: String, lineId: String) async throws
@@ -271,6 +273,9 @@ final class InventoryService: InventoryServing {
     }
     func updateSupplierOrder(id: String, body: UpdateSupplierOrderRequest) async throws -> SupplierOrder {
         try await api.request(.updateSupplierOrder(id: id), body: body)
+    }
+    func deleteSupplierOrder(id: String) async throws {
+        try await api.requestVoid(.deleteSupplierOrder(id: id))
     }
     func addOrderLine(orderId: String, body: SupplierOrderLineRequest) async throws -> SupplierOrderLine {
         try await api.request(.addSupplierOrderLine(orderId: orderId), body: body)

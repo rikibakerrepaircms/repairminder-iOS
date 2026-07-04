@@ -80,6 +80,7 @@ class InventoryServingStub: InventoryServing {
     func updateSupplierOrder(id: String, body: UpdateSupplierOrderRequest) async throws -> SupplierOrder {
         SupplierOrder(id: id, supplierName: body.supplierName ?? "S", status: body.status ?? "pending")
     }
+    func deleteSupplierOrder(id: String) async throws {}
     func addOrderLine(orderId: String, body: SupplierOrderLineRequest) async throws -> SupplierOrderLine {
         SupplierOrderLine(id: "line1", name: body.name, quantityOrdered: body.quantityOrdered ?? 1, quantityReceived: 0, unitCost: body.unitCost ?? 0)
     }

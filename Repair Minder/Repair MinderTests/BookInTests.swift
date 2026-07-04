@@ -158,6 +158,7 @@ final class BookInTests: XCTestCase {
         var created: CreateSupplierOrderRequest?
         var receivedChunks: [[ReceiveItemInput]] = []
         var cancelledId: String?
+        var deletedId: String?
         var lineCount = 2
         override func createSupplierOrder(_ body: CreateSupplierOrderRequest) async throws -> SupplierOrder {
             created = body
@@ -176,6 +177,9 @@ final class BookInTests: XCTestCase {
         override func updateSupplierOrder(id: String, body: UpdateSupplierOrderRequest) async throws -> SupplierOrder {
             if body.status == "cancelled" { cancelledId = id }
             return SupplierOrder(id: id, supplierName: "S", status: body.status ?? "pending")
+        }
+        override func deleteSupplierOrder(id: String) async throws {
+            deletedId = id
         }
     }
 
@@ -350,7 +354,8 @@ final class BookInTests: XCTestCase {
     func testSupplierListStatusFilterAndCancel() async {
         let spy = BookInSpy()
         let vm = SupplierOrderListViewModel(service: spy)
-        vm.orders = [SupplierOrder(id: "1", supplierName: "A", status: "pending"),
+        // Order "1" has received items, so `cancel` must PATCH-cancel it (not hard-delete).
+        vm.orders = [SupplierOrder(id: "1", supplierName: "A", status: "pending", totalReceived: 1),
                      SupplierOrder(id: "2", supplierName: "B", status: "received"),
                      SupplierOrder(id: "3", supplierName: "C", status: "cancelled")]
         XCTAssertEqual(vm.filtered.map(\.id), ["1"])       // default hides received/cancelled
@@ -358,5 +363,45 @@ final class BookInTests: XCTestCase {
         XCTAssertEqual(Set(vm.filtered.map(\.id)), ["1", "2"])
         await vm.cancel(vm.orders[0])
         XCTAssertEqual(spy.cancelledId, "1")
+        XCTAssertNil(spy.deletedId)
+    }
+
+    // MARK: - Task 19: cancel deletes empty orders, matching web (worker's DELETE hard-deletes
+    // only when `total_received == 0`; otherwise it just PATCHes to cancelled).
+
+    @MainActor
+    func testCancelDeletesEmptyOrder() async {
+        let spy = BookInSpy()
+        let vm = SupplierOrderListViewModel(service: spy)
+        let order = SupplierOrder(id: "empty1", supplierName: "A", status: "pending", totalReceived: 0)
+        let result = await vm.cancel(order)
+        XCTAssertTrue(result)
+        XCTAssertEqual(spy.deletedId, "empty1")
+        XCTAssertNil(spy.cancelledId)
+    }
+
+    @MainActor
+    func testCancelCancelsNonEmptyOrder() async {
+        let spy = BookInSpy()
+        let vm = SupplierOrderListViewModel(service: spy)
+        let order = SupplierOrder(id: "partial1", supplierName: "A", status: "partial", totalReceived: 2)
+        let result = await vm.cancel(order)
+        XCTAssertTrue(result)
+        XCTAssertEqual(spy.cancelledId, "partial1")
+        XCTAssertNil(spy.deletedId)
+    }
+
+    /// A list row with no `total_received` in the payload (nil, not 0) must still be treated
+    /// as empty and hard-deleted — mirrors the worker's `order.total_received > 0` check where
+    /// SQLite's default is `0`, never NULL.
+    @MainActor
+    func testCancelTreatsNilTotalReceivedAsEmpty() async {
+        let spy = BookInSpy()
+        let vm = SupplierOrderListViewModel(service: spy)
+        let order = SupplierOrder(id: "nilreceived1", supplierName: "A", status: "pending")
+        let result = await vm.cancel(order)
+        XCTAssertTrue(result)
+        XCTAssertEqual(spy.deletedId, "nilreceived1")
+        XCTAssertNil(spy.cancelledId)
     }
 }

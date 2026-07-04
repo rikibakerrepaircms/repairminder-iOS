@@ -245,6 +245,7 @@ enum APIEndpoint {
     case supplierOrder(id: String)
     case createSupplierOrder
     case updateSupplierOrder(id: String)
+    case deleteSupplierOrder(id: String)
     case addSupplierOrderLine(orderId: String)
     case updateSupplierOrderLine(orderId: String, lineId: String)
     case deleteSupplierOrderLine(orderId: String, lineId: String)
@@ -585,6 +586,7 @@ enum APIEndpoint {
         case .supplierOrder(let id): return "/api/supplier-orders/\(id)"
         case .createSupplierOrder: return "/api/supplier-orders"
         case .updateSupplierOrder(let id): return "/api/supplier-orders/\(id)"
+        case .deleteSupplierOrder(let id): return "/api/supplier-orders/\(id)"
         case .addSupplierOrderLine(let orderId): return "/api/supplier-orders/\(orderId)/lines"
         case .updateSupplierOrderLine(let orderId, let lineId): return "/api/supplier-orders/\(orderId)/lines/\(lineId)"
         case .deleteSupplierOrderLine(let orderId, let lineId): return "/api/supplier-orders/\(orderId)/lines/\(lineId)"
@@ -729,7 +731,7 @@ enum APIEndpoint {
              .cancelMacroExecution,
              .boardDeleteColumn, .boardDeleteAction,
              .deleteDeviceImage, .deleteAsset, .removeMembership,
-             .deleteSupplierOrderLine, .deleteSalvageItem:
+             .deleteSupplierOrderLine, .deleteSalvageItem, .deleteSupplierOrder:
             return .delete
         }
     }
