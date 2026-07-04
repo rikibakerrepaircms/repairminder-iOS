@@ -13,6 +13,9 @@ struct BuybackDetailView: View {
     @State private var showPurchaseEdit = false
     @State private var showAddNote = false
     @State private var showSell = false
+    @State private var showRefurbSheet = false
+    @State private var editingRefurbItem: RefurbishmentItem?
+    @State private var pendingDeleteRefurbItem: RefurbishmentItem?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var isRegularWidth: Bool {
@@ -58,6 +61,34 @@ struct BuybackDetailView: View {
                 }
             }
         }
+        .sheet(isPresented: $showRefurbSheet) {
+            RefurbishmentEditSheet(existingItem: editingRefurbItem) { addRequest, updateRequest in
+                if let addRequest {
+                    return await viewModel.addRefurbishment(addRequest)
+                } else if let updateRequest, let itemId = editingRefurbItem?.id {
+                    return await viewModel.updateRefurbishment(itemId: itemId, updateRequest)
+                }
+                return "Nothing to save"
+            }
+        }
+        .confirmationDialog(
+            "Delete this refurbishment item?",
+            isPresented: Binding(
+                get: { pendingDeleteRefurbItem != nil },
+                set: { if !$0 { pendingDeleteRefurbItem = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                if let itemId = pendingDeleteRefurbItem?.id {
+                    Task { _ = await viewModel.deleteRefurbishment(itemId: itemId) }
+                }
+                pendingDeleteRefurbItem = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingDeleteRefurbItem = nil
+            }
+        }
     }
 
     // MARK: - Content
@@ -80,9 +111,7 @@ struct BuybackDetailView: View {
                     saleInfoSection(buyback)
                 }
 
-                if let items = buyback.refurbishmentItems, !items.isEmpty {
-                    refurbishmentSection(items, totals: buyback.totals)
-                }
+                refurbishmentSection(buyback.refurbishmentItems ?? [], totals: buyback.totals)
 
                 if buyback.locationName != nil || buyback.engineerName != nil {
                     locationSection(buyback)
@@ -398,6 +427,25 @@ struct BuybackDetailView: View {
     private func refurbishmentSection(_ items: [RefurbishmentItem], totals: BuybackTotals?) -> some View {
         SectionCard(title: "Refurbishment (\(items.count) items)", icon: "wrench.and.screwdriver") {
             VStack(spacing: 8) {
+                HStack {
+                    Spacer()
+                    Button("Add item") {
+                        editingRefurbItem = nil
+                        showRefurbSheet = true
+                    }
+                    .font(.caption)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityIdentifier("refurb-add")
+                    .disabled(viewModel.isMutating)
+                }
+
+                if items.isEmpty {
+                    Text("No refurbishment items yet.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
                 ForEach(items) { item in
                     HStack {
                         if let type = item.formattedItemType {
@@ -417,6 +465,21 @@ struct BuybackDetailView: View {
 
                         Text(item.formattedTotalCost ?? "-")
                             .font(.subheadline.monospacedDigit())
+
+                        Button {
+                            pendingDeleteRefurbItem = item
+                        } label: {
+                            Image(systemName: "trash")
+                                .foregroundStyle(.red)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(viewModel.isMutating)
+                        .accessibilityIdentifier("refurb-delete-\(item.id)")
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        editingRefurbItem = item
+                        showRefurbSheet = true
                     }
                 }
 

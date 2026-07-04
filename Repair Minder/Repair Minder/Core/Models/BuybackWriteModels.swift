@@ -57,3 +57,28 @@ struct AddToBuybackResponse: Decodable {
     let rmcheckRan: Bool?
     let redirectUrl: String?
 }
+
+// MARK: - Refurbishment Items
+
+struct AddRefurbishmentRequest: Encodable {
+    var itemType: String        // "part" | "labor" | "other"
+    var description: String
+    var unitCost: Double
+    var quantity: Int
+    var partNumber: String?
+    var supplier: String?
+}
+
+struct UpdateRefurbishmentRequest: Encodable {
+    var description: String?
+    var quantity: Int?
+    var unitCost: Double?
+    var partNumber: String?
+    var supplier: String?
+}
+
+struct RefurbishmentMutationResponse: Decodable {
+    let id: String?
+    let totalCost: Double?
+    let newTotalRefurbishmentCost: Double?
+}

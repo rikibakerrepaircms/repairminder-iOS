@@ -155,4 +155,56 @@ final class BuybackDetailViewModel: ObservableObject {
             return false
         }
     }
+
+    // MARK: - Refurbishment Items
+
+    /// POST /api/buyback/:id/refurbishment — returns nil on success, an error message otherwise.
+    func addRefurbishment(_ request: AddRefurbishmentRequest) async -> String? {
+        isMutating = true
+        actionError = nil
+        defer { isMutating = false }
+        do {
+            _ = try await service.addRefurbishment(id: buybackId, request: request)
+            await loadDetail()
+            return nil
+        } catch let e as APIError {
+            return e.localizedDescription
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
+    /// PATCH /api/buyback/:id/refurbishment/:itemId — returns nil on success, an error message otherwise.
+    func updateRefurbishment(itemId: String, _ request: UpdateRefurbishmentRequest) async -> String? {
+        isMutating = true
+        actionError = nil
+        defer { isMutating = false }
+        do {
+            try await service.updateRefurbishment(id: buybackId, itemId: itemId, request: request)
+            await loadDetail()
+            return nil
+        } catch let e as APIError {
+            return e.localizedDescription
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
+    /// DELETE /api/buyback/:id/refurbishment/:itemId — returns true on success.
+    func deleteRefurbishment(itemId: String) async -> Bool {
+        isMutating = true
+        actionError = nil
+        defer { isMutating = false }
+        do {
+            try await service.deleteRefurbishment(id: buybackId, itemId: itemId)
+            await loadDetail()
+            return true
+        } catch let e as APIError {
+            actionError = e.localizedDescription
+            return false
+        } catch {
+            actionError = error.localizedDescription
+            return false
+        }
+    }
 }
