@@ -144,7 +144,7 @@ final class BuybackDetailViewModel: ObservableObject {
         actionError = nil
         defer { isMutating = false }
         do {
-            try await service.updateFields(id: buybackId, fields: ["storefront_published": AnyEncodable(published)])
+            try await service.updateFields(id: buybackId, fields: ["storefront_published": AnyEncodable(published ? 1 : 0)])
             await loadDetail()
             return true
         } catch let e as APIError {

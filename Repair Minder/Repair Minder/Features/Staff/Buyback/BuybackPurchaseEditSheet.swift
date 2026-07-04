@@ -16,6 +16,19 @@ private let purchaseDateFormatter: DateFormatter = {
     return formatter
 }()
 
+/// Parses a user-entered decimal amount using the current locale (handles
+/// locales where `,` is the decimal separator), falling back to a plain
+/// `Double(_:)` parse for inputs like a bare ".".
+private func parseDecimal(_ s: String) -> Double? {
+    let t = s.trimmingCharacters(in: .whitespaces)
+    if t.isEmpty { return nil }
+    let f = NumberFormatter()
+    f.numberStyle = .decimal
+    f.locale = Locale.current
+    if let n = f.number(from: t) { return n.doubleValue }
+    return Double(t)
+}
+
 /// Edits `purchase_date`, `purchase_amount`, `purchase_payment_method`,
 /// `purchase_order_reference`, and `purchase_notes` via PATCH /api/buyback/:id.
 struct BuybackPurchaseEditSheet: View {
@@ -25,6 +38,10 @@ struct BuybackPurchaseEditSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var purchaseDate: Date
+    /// Whether `detail.purchaseDate` parsed successfully on init. When false,
+    /// `purchaseDate` is a placeholder (today) and must NOT be sent to the
+    /// server as a side effect of a failed prefill.
+    @State private var dateWasPrefilled: Bool
     @State private var amount: String
     @State private var paymentMethod: String
     @State private var reference: String
@@ -35,7 +52,20 @@ struct BuybackPurchaseEditSheet: View {
     init(detail: BuybackDetail, onSave: @escaping ([String: AnyEncodable]) async -> String?) {
         self.detail = detail
         self.onSave = onSave
-        _purchaseDate = State(initialValue: detail.purchaseDate.flatMap { purchaseDateFormatter.date(from: $0) } ?? Date())
+
+        var parsedDate: Date?
+        if let raw = detail.purchaseDate {
+            if let d = purchaseDateFormatter.date(from: raw) {
+                parsedDate = d
+            } else if let d = ISO8601DateFormatter().date(from: raw) {
+                parsedDate = d
+            } else if raw.count >= 10, let d = purchaseDateFormatter.date(from: String(raw.prefix(10))) {
+                parsedDate = d
+            }
+        }
+        _purchaseDate = State(initialValue: parsedDate ?? Date())
+        _dateWasPrefilled = State(initialValue: parsedDate != nil)
+
         _amount = State(initialValue: detail.purchaseAmount.map { String($0) } ?? "")
         _paymentMethod = State(initialValue: detail.purchasePaymentMethod ?? "")
         _reference = State(initialValue: detail.purchaseOrderReference ?? "")
@@ -47,6 +77,7 @@ struct BuybackPurchaseEditSheet: View {
             Form {
                 Section("Purchase") {
                     DatePicker("Date", selection: $purchaseDate, displayedComponents: .date)
+                        .onChange(of: purchaseDate) { _, _ in dateWasPrefilled = true }
                     TextField("Amount (£)", text: $amount)
                         #if os(iOS)
                         .keyboardType(.decimalPad)
@@ -90,19 +121,46 @@ struct BuybackPurchaseEditSheet: View {
         .disabled(isSaving)
     }
 
+    private func nonEmpty(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     private func save() async {
         isSaving = true
         errorMessage = nil
         defer { isSaving = false }
 
-        var fields: [String: AnyEncodable] = [
-            "purchase_date": AnyEncodable(purchaseDateFormatter.string(from: purchaseDate)),
-            "purchase_payment_method": AnyEncodable(paymentMethod),
-            "purchase_order_reference": AnyEncodable(reference),
-            "purchase_notes": AnyEncodable(notes),
-        ]
-        if let value = Double(amount) {
+        var fields: [String: AnyEncodable] = [:]
+
+        let trimmedAmount = amount.trimmingCharacters(in: .whitespaces)
+        if !trimmedAmount.isEmpty {
+            guard let value = parseDecimal(amount) else {
+                errorMessage = "Enter a valid amount"
+                return
+            }
             fields["purchase_amount"] = AnyEncodable(value)
+        }
+
+        if let method = nonEmpty(paymentMethod) {
+            fields["purchase_payment_method"] = AnyEncodable(method)
+        }
+        if let ref = nonEmpty(reference) {
+            fields["purchase_order_reference"] = AnyEncodable(ref)
+        }
+        if let noteText = nonEmpty(notes) {
+            fields["purchase_notes"] = AnyEncodable(noteText)
+        }
+        // Only send purchase_date when the prefill actually parsed (or the
+        // user has touched the picker since) — never invent "today" as a
+        // side effect of an unparseable server value.
+        if dateWasPrefilled {
+            fields["purchase_date"] = AnyEncodable(purchaseDateFormatter.string(from: purchaseDate))
+        }
+
+        guard !fields.isEmpty else {
+            errorMessage = "No changes to save"
+            return
         }
 
         if let error = await onSave(fields) {

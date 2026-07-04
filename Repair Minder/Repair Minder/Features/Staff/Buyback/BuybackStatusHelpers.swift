@@ -62,7 +62,7 @@ func nextBuybackStatuses(for status: BuybackStatus) -> [BuybackStatus] {
     case .refurbishing:
         return [.forSale, .awaitingParts, .readyToRepair]
     case .forSale:
-        return [.salvaged, .refurbishing, .readyToRepair]
+        return [.refurbishing, .readyToRepair]
     case .sold, .salvaged, .unknown:
         return []
     }

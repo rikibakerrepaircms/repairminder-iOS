@@ -8,6 +8,19 @@
 
 import SwiftUI
 
+/// Parses a user-entered decimal amount using the current locale (handles
+/// locales where `,` is the decimal separator), falling back to a plain
+/// `Double(_:)` parse for inputs like a bare ".".
+private func parseDecimal(_ s: String) -> Double? {
+    let t = s.trimmingCharacters(in: .whitespaces)
+    if t.isEmpty { return nil }
+    let f = NumberFormatter()
+    f.numberStyle = .decimal
+    f.locale = Locale.current
+    if let n = f.number(from: t) { return n.doubleValue }
+    return Double(t)
+}
+
 private enum SaleChannelOption: String, CaseIterable, Identifiable {
     case direct
     case ebay
@@ -120,8 +133,18 @@ struct SellBuybackSheet: View {
         errorMessage = nil
         defer { isSaving = false }
 
+        let trimmedPrice = salePrice.trimmingCharacters(in: .whitespaces)
+        var parsedPrice: Double?
+        if !trimmedPrice.isEmpty {
+            guard let value = parseDecimal(salePrice) else {
+                errorMessage = "Enter a valid amount"
+                return
+            }
+            parsedPrice = value
+        }
+
         let request = SellBuybackRequest(
-            salePrice: Double(salePrice),
+            salePrice: parsedPrice,
             locationId: nil,
             saleChannel: saleChannel.rawValue,
             clientId: nil,
