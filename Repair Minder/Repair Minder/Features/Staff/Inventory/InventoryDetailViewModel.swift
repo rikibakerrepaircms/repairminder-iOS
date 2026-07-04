@@ -46,18 +46,20 @@ final class InventoryDetailViewModel: ObservableObject {
 
     // MARK: - Mutations (Phase 2)
 
-    /// Applies a mutation's own response optimistically, then reconciles with the fully
-    /// joined GET /api/assets/:id row. The mutation handlers (move/edit/allocate/return*/
-    /// deploy-external) return a join-less `SELECT * FROM assets` row — no `location_name`,
-    /// `product_type_name`, `checked_out_order_number`, `checked_out_device_name`,
-    /// `enable_part_recovery` — so without this reconcile step those fields blank out on
-    /// screen after every mutation. If the re-fetch fails, degrade gracefully and keep the
-    /// optimistic result rather than blanking the screen. Posts `.inventoryAssetDidChange`
-    /// exactly once regardless of which branch runs.
+    /// Reconciles a mutation with the fully joined GET /api/assets/:id row. The mutation
+    /// handlers (move/edit/allocate/return*/deploy-external) return a join-less
+    /// `SELECT * FROM assets` row — no `location_name`, `product_type_name`,
+    /// `checked_out_order_number`, `checked_out_device_name`, `enable_part_recovery` — so
+    /// publishing that row would blank those fields on screen (the exact MF-7 symptom).
+    /// We publish the joined value once on success: during the await the UI keeps showing the
+    /// prior asset (no blank-joined-fields flicker), then updates to the joined row. Only if
+    /// the re-fetch fails do we fall back to the optimistic join-less `updated` row rather
+    /// than blanking the screen. Posts `.inventoryAssetDidChange` exactly once.
     private func applyUpdated(_ updated: Asset) async {
-        asset = updated
         if let joined = try? await service.fetchAsset(id: assetId) {
             asset = joined
+        } else {
+            asset = updated
         }
         NotificationCenter.default.post(name: .inventoryAssetDidChange, object: nil)
     }
