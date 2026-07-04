@@ -324,7 +324,7 @@ struct MessageAttachment: Codable, Identifiable, Equatable, Sendable {
 
 // MARK: - String Extension
 
-private extension String {
+extension String {
     /// Strip HTML tags from string
     func strippingHTML() -> String {
         guard let data = self.data(using: .utf8) else { return self }
@@ -361,6 +361,14 @@ struct TicketReplyRequest: Encodable {
 struct TicketNoteRequest: Encodable {
     let body: String
     let deviceId: String?
+}
+
+// MARK: - Status Request
+
+/// Request body for PATCH /api/tickets/:id (status-only update).
+/// Used to reopen a ticket — there's no dedicated reopen endpoint.
+struct TicketStatusRequest: Encodable {
+    var status: String
 }
 
 // MARK: - Reply Response

@@ -307,6 +307,11 @@ final class OrderDetailViewModel: ObservableObject {
         }
     }
 
+    /// Set (or clear, if all fields are nil) the whole-order discount
+    func setGlobalDiscount(_ request: OrderDiscountRequest) async -> Bool {
+        await perform { try await self.apiClient.requestVoid(.setOrderDiscount(orderId: self.orderId), body: request) }
+    }
+
     /// Add a note to the order's associated ticket
     func addNote(_ request: CreateTicketNoteRequest) async -> Bool {
         guard let ticketId = order?.ticketId else {
@@ -315,6 +320,66 @@ final class OrderDetailViewModel: ObservableObject {
         }
         return await perform {
             let _: EmptyResponse = try await self.apiClient.request(.createTicketNote(ticketId: ticketId), body: request)
+        }
+    }
+
+    /// Reply to the customer on the order's associated ticket.
+    /// `plainText` is the raw, un-escaped message text as typed by staff — this method
+    /// builds the HTML body itself (escaped) and sends the raw text as the plain-text body,
+    /// so neither the text/plain part nor SMS ever contain literal HTML markup.
+    func replyToCustomer(plainText: String, sendSms: Bool) async -> Bool {
+        guard let ticketId = order?.ticketId else {
+            actionError = "This order has no ticket to reply on."
+            return false
+        }
+        let request = TicketReplyRequest(
+            htmlBody: Self.htmlBodyFromPlainText(plainText),
+            textBody: plainText,
+            status: nil,
+            fromCustomEmailId: nil,
+            pendingAttachmentIds: nil,
+            sendSms: sendSms ? true : nil
+        )
+        return await perform {
+            let _: TicketReplyResponse = try await self.apiClient.request(.ticketReply(id: ticketId), body: request)
+        }
+    }
+
+    /// HTML-escapes `s`, replacing `&` first so subsequent `<`/`>` replacements aren't
+    /// double-escaped.
+    private static func htmlEscaped(_ s: String) -> String {
+        s.replacingOccurrences(of: "&", with: "&amp;")
+         .replacingOccurrences(of: "<", with: "&lt;")
+         .replacingOccurrences(of: ">", with: "&gt;")
+    }
+
+    /// Converts raw plain text into simple HTML for the reply body: HTML-escapes the
+    /// text, then converts newlines to `<br>` and wraps in a `<div>`.
+    private static func htmlBodyFromPlainText(_ text: String) -> String {
+        "<div>" + htmlEscaped(text).replacingOccurrences(of: "\n", with: "<br>") + "</div>"
+    }
+
+    /// Resolve the order's associated ticket. Idempotent — resolving an
+    /// already-resolved ticket still returns success.
+    func resolveTicket() async -> Bool {
+        guard let ticketId = order?.ticketId else {
+            actionError = "This order has no ticket to resolve."
+            return false
+        }
+        return await perform {
+            try await self.apiClient.requestVoid(.ticketResolve(id: ticketId))
+        }
+    }
+
+    /// Reopen (set back to open) the order's associated ticket. There's no
+    /// dedicated reopen endpoint — this uses the generic ticket update PATCH.
+    func reopenTicket() async -> Bool {
+        guard let ticketId = order?.ticketId else {
+            actionError = "This order has no ticket to reopen."
+            return false
+        }
+        return await perform {
+            try await self.apiClient.requestVoid(.updateTicket(id: ticketId), body: TicketStatusRequest(status: "open"))
         }
     }
 

@@ -103,6 +103,7 @@ enum APIEndpoint {
     case createOrder
     case order(id: String)
     case updateOrder(id: String)
+    case setOrderDiscount(orderId: String)
     case orderItems(orderId: String)
     case createOrderItem(orderId: String)
     case updateOrderItem(orderId: String, itemId: String)
@@ -479,6 +480,8 @@ enum APIEndpoint {
             return "/api/orders"
         case .order(let id), .updateOrder(let id):
             return "/api/orders/\(id)"
+        case .setOrderDiscount(let orderId):
+            return "/api/orders/\(orderId)/discount"
         case .orderItems(let orderId), .createOrderItem(let orderId):
             return "/api/orders/\(orderId)/items"
         case .updateOrderItem(let orderId, let itemId), .deleteOrderItem(let orderId, let itemId):
@@ -835,7 +838,7 @@ enum APIEndpoint {
         case .updateOrderDevice, .updateDeviceStatus, .updateDeviceBankDetails,
              .updateDeviceEngineer, .updateDeviceSubLocation, .updateBuyback, .updateBuybackStatus,
              .returnDeviceAccessory,
-             .updateOrder, .updateOrderItem,
+             .updateOrder, .setOrderDiscount, .updateOrderItem,
              .updateClient,
              .updateTicket,
              .pauseMacroExecution, .resumeMacroExecution,
