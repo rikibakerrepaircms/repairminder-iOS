@@ -15,6 +15,7 @@ final class SalvageViewModel: ObservableObject {
 
     // Reference data
     @Published var groups: [AssetGroupListItem] = []
+    @Published var groupQuery: String = ""
     @Published var locations: [Location] = []
     @Published var subLocations: [AssetSubLocationOption] = []
 
@@ -55,13 +56,18 @@ final class SalvageViewModel: ObservableObject {
 
     // MARK: Reference data
     func loadReferenceData() async {
-        async let g = try? service.fetchGroups(search: nil)
-        async let l = try? service.fetchLocations()
-        groups = (await g) ?? []
-        locations = (await l) ?? []
+        locations = (try? await service.fetchLocations()) ?? []
     }
     func loadSubLocations(_ id: String) async {
         subLocations = (try? await service.fetchSubLocations(locationId: id)) ?? []
+    }
+
+    /// Uncapped, searchable group/part lookup (NTH-3) — replaces the old one-shot
+    /// `limit:100`, no-search load so parts beyond the first page remain reachable.
+    /// Mirrors `AssetFilterOptions.searchGroups` in AssetFilterSheet.
+    func searchGroups(_ query: String) async {
+        guard !query.isEmpty else { groups = []; return }
+        groups = (try? await service.fetchGroups(search: query)) ?? []
     }
 
     // MARK: Staging
@@ -83,7 +89,7 @@ final class SalvageViewModel: ObservableObject {
     func removeStaged(_ id: String) { staged.removeAll { $0.id == id } }
 
     private func resetForm() {
-        selectedGroup = nil; grade = "A"; value = ""; lcdWorking = nil; glassCracked = nil
+        selectedGroup = nil; groupQuery = ""; grade = "A"; value = ""; lcdWorking = nil; glassCracked = nil
         subLocationId = nil; notes = ""
     }
 

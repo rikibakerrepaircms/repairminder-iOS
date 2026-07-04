@@ -139,6 +139,40 @@ final class SalvageTests: XCTestCase {
         XCTAssertFalse(ok)
     }
 
+    // MARK: - Searchable group/part picker (NTH-3)
+
+    @MainActor
+    final class GroupSearchSpy: InventoryServingStub {
+        var lastSearch: String?
+        var searchCallCount = 0
+        override func fetchGroups(search: String?) async throws -> [AssetGroupListItem] {
+            searchCallCount += 1
+            lastSearch = search
+            guard let search, !search.isEmpty else { return [] }
+            return [AssetGroupListItem(id: "g-\(search)", name: "Match for \(search)")]
+        }
+    }
+
+    @MainActor
+    func testSearchGroupsForwardsNonEmptyQueryToService() async {
+        let spy = GroupSearchSpy()
+        let vm = SalvageViewModel(buybackId: "b1", purchaseAmount: 100, salvaged: [], service: spy)
+        await vm.searchGroups("batt")
+        XCTAssertEqual(spy.lastSearch, "batt")
+        XCTAssertEqual(vm.groups.map(\.id), ["g-batt"])
+    }
+
+    @MainActor
+    func testSearchGroupsClearsResultsOnEmptyQueryWithoutCallingService() async {
+        let spy = GroupSearchSpy()
+        let vm = SalvageViewModel(buybackId: "b1", purchaseAmount: 100, salvaged: [], service: spy)
+        await vm.searchGroups("batt")
+        XCTAssertFalse(vm.groups.isEmpty)
+        await vm.searchGroups("")
+        XCTAssertTrue(vm.groups.isEmpty)
+        XCTAssertEqual(spy.searchCallCount, 1)   // empty query short-circuits before hitting the service
+    }
+
     @MainActor
     func testRemoveSalvagedCallsDelete() async {
         let spy = SalvageSpy()

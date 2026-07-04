@@ -17,10 +17,8 @@ final class AssetFilterOptions: ObservableObject {
     func loadTopLevel() async {
         async let cats = try? service.fetchCategories()
         async let locs = try? service.fetchLocations()
-        async let grps = try? service.fetchGroups(search: nil)
         categories = await cats ?? []
         locations = await locs ?? []
-        groups = await grps ?? []
     }
 
     func loadSubLocations(locationId: String) async {
@@ -31,6 +29,13 @@ final class AssetFilterOptions: ObservableObject {
         guard !query.isEmpty else { productTypes = []; return }
         productTypes = (try? await service.fetchProductTypes(search: query)) ?? []
     }
+
+    /// Uncapped, searchable group lookup (NTH-3) — the prior `limit:100`, no-search load
+    /// couldn't reach groups beyond the first page. Mirrors `searchProductTypes`.
+    func searchGroups(_ query: String) async {
+        guard !query.isEmpty else { groups = []; return }
+        groups = (try? await service.fetchGroups(search: query)) ?? []
+    }
 }
 
 struct AssetFilterSheet: View {
@@ -38,6 +43,7 @@ struct AssetFilterSheet: View {
     @StateObject private var options = AssetFilterOptions()
     @Environment(\.dismiss) private var dismiss
     @State private var productTypeQuery = ""
+    @State private var groupQuery = ""
 
     var body: some View {
         NavigationStack {
@@ -66,9 +72,24 @@ struct AssetFilterSheet: View {
                     }
                 }
                 Section("Group") {
-                    Picker("Group", selection: $viewModel.selectedGroupId) {
-                        Text("Any").tag(String?.none)
-                        ForEach(options.groups) { Text($0.name).tag(String?.some($0.id)) }
+                    TextField("Search groups…", text: $groupQuery)
+                        .onChange(of: groupQuery) { _, q in Task { await options.searchGroups(q) } }
+                    ForEach(options.groups) { g in
+                        Button {
+                            viewModel.selectedGroupId = g.id
+                            groupQuery = g.name
+                        } label: {
+                            HStack {
+                                Text(g.name)
+                                Spacer()
+                                if viewModel.selectedGroupId == g.id { Image(systemName: "checkmark") }
+                            }
+                        }
+                    }
+                    if viewModel.selectedGroupId != nil {
+                        Button("Clear group", role: .destructive) {
+                            viewModel.selectedGroupId = nil; groupQuery = ""
+                        }
                     }
                 }
                 Section("Product Type") {

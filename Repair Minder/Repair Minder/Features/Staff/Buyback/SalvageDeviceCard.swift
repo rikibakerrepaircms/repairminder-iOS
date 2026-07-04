@@ -48,9 +48,31 @@ struct SalvageDeviceCard: View {
 
     private var stagingForm: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Picker("Part", selection: $viewModel.selectedGroup) {
-                Text("Select inventory group…").tag(AssetGroupListItem?.none)
-                ForEach(viewModel.groups) { Text($0.name).tag(AssetGroupListItem?.some($0)) }
+            VStack(alignment: .leading, spacing: 4) {
+                TextField("Search inventory groups…", text: $viewModel.groupQuery)
+                    .onChange(of: viewModel.groupQuery) { _, q in Task { await viewModel.searchGroups(q) } }
+                if let selected = viewModel.selectedGroup {
+                    HStack {
+                        Text("Selected: \(selected.name)").font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Clear", role: .destructive) {
+                            viewModel.selectedGroup = nil
+                            viewModel.groupQuery = ""
+                        }.font(.caption)
+                    }
+                }
+                ForEach(viewModel.groups) { g in
+                    Button {
+                        viewModel.selectedGroup = g
+                        viewModel.groupQuery = g.name
+                    } label: {
+                        HStack {
+                            Text(g.name)
+                            Spacer()
+                            if viewModel.selectedGroup?.id == g.id { Image(systemName: "checkmark") }
+                        }
+                    }
+                }
             }
             Picker("Grade", selection: $viewModel.grade) {
                 ForEach(["A", "B", "C"], id: \.self) { Text($0).tag($0) }
