@@ -72,9 +72,13 @@ struct BulkDeploySheet: View {
             if let order = selectedOrder {
                 Section("Selected order") {
                     Text("Order \(order.orderNumber) · \(order.clientDisplayName)")
-                    Picker("Line item (optional)", selection: $selectedItemId) {
-                        Text("None").tag(String?.none)
-                        ForEach(lineItems) { Text($0.description).tag(String?.some($0.id)) }
+                    if lineItems.isEmpty {
+                        Text("This order has no line items. Add one first.").foregroundStyle(.secondary)
+                    } else {
+                        Picker("Line item", selection: $selectedItemId) {
+                            Text("Select…").tag(String?.none)
+                            ForEach(lineItems) { Text($0.description).tag(String?.some($0.id)) }
+                        }
                     }
                 }
                 Section {
@@ -82,6 +86,7 @@ struct BulkDeploySheet: View {
                         step = .progress
                         Task { await viewModel.runOrder(orderId: order.id, orderItemId: selectedItemId) }
                     }
+                    .disabled(!AssetActions.canConfirmDeployToOrder(hasLineItem: selectedItemId != nil))
                 }
             } else {
                 ForEach(orders) { order in

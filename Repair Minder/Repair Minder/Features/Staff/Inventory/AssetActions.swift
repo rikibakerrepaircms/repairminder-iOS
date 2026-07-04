@@ -31,4 +31,8 @@ enum AssetActions {
     static func canReturnToStock(_ a: Asset, hasActiveExternalDeployment: Bool) -> Bool {
         a.status == .deployed && hasActiveExternalDeployment
     }
+
+    /// Deploy-to-order (single or bulk) requires a line item to be selected, matching the web
+    /// `DeployToOrderModal`/`BulkDeployModal` — there is no "allocate without a line item" path in the UI.
+    static func canConfirmDeployToOrder(hasLineItem: Bool) -> Bool { hasLineItem }
 }
