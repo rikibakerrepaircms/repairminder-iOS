@@ -7,7 +7,10 @@ struct Asset: Decodable, Identifiable, Equatable, Sendable, Hashable {
     let id: String
     let assetTag: String
     let name: String
-    let status: AssetStatus
+    // Wrapped so a MISSING `status` key (not just an explicit `null`) also falls back to
+    // `.unknown` instead of throwing `keyNotFound` and blanking the whole list decode.
+    // See DefaultUnknown in UnknownDefaultable.swift.
+    @DefaultUnknown var status: AssetStatus = .unknown
 
     // Core columns
     var companyId: String?
