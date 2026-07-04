@@ -82,4 +82,28 @@ final class PaymentService: ObservableObject {
     func resendPaymentLinkEmail(linkId: String) async throws {
         try await apiClient.requestVoid(.resendPaymentLinkEmail(linkId: linkId))
     }
+
+    // MARK: - Refunds
+
+    /// Fetch refunds recorded against an order
+    func fetchRefunds(orderId: String) async throws -> [OrderRefund] {
+        try await apiClient.request(.orderRefunds(orderId: orderId))
+    }
+
+    /// Create a refund against an order
+    func createRefund(orderId: String, request: CreateRefundRequest) async throws -> OrderRefund {
+        try await apiClient.request(.createOrderRefund(orderId: orderId), body: request)
+    }
+
+    /// Delete a refund
+    func deleteRefund(orderId: String, refundId: String) async throws {
+        try await apiClient.requestVoid(.deleteOrderRefund(orderId: orderId, refundId: refundId))
+    }
+
+    /// Refund a terminal (card) payment
+    func refundTerminalPayment(transactionId: String, amount: Double?, reason: String?) async throws {
+        struct Body: Encodable { var amount: Double?; var reason: String? }
+        try await apiClient.requestVoid(.refundTerminalPayment(transactionId: transactionId),
+                                        body: Body(amount: amount, reason: reason))
+    }
 }
