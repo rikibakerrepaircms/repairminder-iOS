@@ -17,6 +17,7 @@ struct InventoryDetailView: View {
     @State private var showDeleteConfirm = false
     @State private var showManageGroups = false
     @State private var copiedTag = false
+    @State private var navigateOrderId: String?
     @Environment(\.dismiss) private var dismiss
 
     init(assetId: String) {
@@ -80,6 +81,7 @@ struct InventoryDetailView: View {
             }
         }
         .onChange(of: viewModel.didDelete) { _, deleted in if deleted { dismiss() } }
+        .navigationDestination(item: $navigateOrderId) { OrderDetailView(orderId: $0) }
     }
 
     @ToolbarContentBuilder private func toolbarMenu(_ a: Asset) -> some ToolbarContent {
@@ -171,11 +173,17 @@ struct InventoryDetailView: View {
             HStack { Text("Status").foregroundStyle(.secondary); Spacer(); AssetStatusBadge(status: a.status) }
             row("Location", a.locationName); row("Sub-location", a.subLocationCode)
             if a.status == .allocated || a.status == .deployed {
-                row("Order #", a.checkedOutOrderNumber.map(String.init)); row("Device", a.checkedOutDeviceName)
+                orderRow(a)
+                row("Device", a.checkedOutDeviceName)
             }
             if let ext = viewModel.externalDeployment?.active {
-                row("Deployed to", ext.customerName); row("Reference", ext.externalReference); row("Deployed", ext.deploymentDate)
-                row("Deployed by", ext.deployedBy)
+                if ext.status == "reserved" {
+                    row("Reserved for", ext.customerName); row("Claim reference", ext.externalReference)
+                    row("Reserved", ext.deploymentDate)
+                } else {
+                    row("Deployed to", ext.customerName); row("Reference", ext.externalReference); row("Deployed", ext.deploymentDate)
+                    row("Deployed by", ext.deployedBy)
+                }
                 if let history = viewModel.externalDeployment?.history, !history.isEmpty {
                     row("Previous deployments", String(history.count))
                 }
@@ -266,6 +274,28 @@ struct InventoryDetailView: View {
                 Spacer()
                 Text(value).multilineTextAlignment(.trailing)
             }.font(.subheadline)
+        }
+    }
+
+    /// The "Order #" row is tappable when the asset carries a real internal order id,
+    /// navigating to that order's detail (web parity: the ticket number links to the order).
+    @ViewBuilder private func orderRow(_ a: Asset) -> some View {
+        if let orderId = a.checkedOutToOrderId {
+            Button { navigateOrderId = orderId } label: {
+                HStack(alignment: .top) {
+                    Text("Order #").foregroundStyle(.secondary)
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Text(a.checkedOutOrderNumber.map { "#\($0)" } ?? orderId)
+                        Image(systemName: "chevron.right").font(.caption2)
+                    }
+                    .foregroundStyle(.blue)
+                }.font(.subheadline)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("asset-order-link")
+        } else {
+            row("Order #", a.checkedOutOrderNumber.map(String.init))
         }
     }
 
