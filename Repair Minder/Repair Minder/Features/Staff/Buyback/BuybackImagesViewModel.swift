@@ -23,11 +23,6 @@ final class BuybackImagesViewModel: ObservableObject {
     let buybackId: String
     private let service: BuybackService
 
-    /// Called after any successful mutation (upload/generate/set-final/delete)
-    /// so the caller can refresh anything else that embeds a smaller image
-    /// preview (e.g. `BuybackDetailViewModel.refresh()`).
-    var onChange: (() -> Void)?
-
     init(buybackId: String, service: BuybackService? = nil) {
         self.buybackId = buybackId
         self.service = service ?? BuybackService()
@@ -36,6 +31,7 @@ final class BuybackImagesViewModel: ObservableObject {
     /// GET /api/buyback/:id/images
     func loadImages() async {
         isLoading = true
+        imageError = nil
         defer { isLoading = false }
         do {
             images = try await service.fetchImages(id: buybackId)
@@ -49,40 +45,43 @@ final class BuybackImagesViewModel: ObservableObject {
     /// POST /api/buyback/:id/source-images — `field` is "source_front" or
     /// "source_back"; each is a separate request (single-file multipart helper).
     func uploadSource(_ image: PlatformImageData, field: String) async {
+        guard !isBusy else { return }
         isBusy = true
         imageError = nil
         defer { isBusy = false }
         do {
             _ = try await service.uploadSourceImage(id: buybackId, image: image, field: field)
             await loadImages()
-            onChange?()
         } catch let e as APIError {
-            imageError = e.localizedDescription
+            imageError = cleanMessage(e)
         } catch {
-            imageError = error.localizedDescription
+            imageError = cleanMessage(error)
         }
     }
 
     /// POST /api/buyback/:id/product-photos — front-only for v1. Tier-gated:
     /// the backend may reject this (403/error) if the company lacks
-    /// product-photo config; `APIError.localizedDescription` already carries
-    /// the server-provided message via `serverError`/`forbidden`.
+    /// product-photo config. That arrives as `APIError.httpError(statusCode:,
+    /// message:)` with the RAW JSON response body (this goes through
+    /// `uploadMultipartFull`, not `request`) — `cleanMessage` extracts the
+    /// `error` field so the UI doesn't show raw JSON.
     func generate(front: PlatformImageData, imageType: String? = nil) async {
+        guard !isBusy else { return }
         isBusy = true
         imageError = nil
         defer { isBusy = false }
         do {
             let response = try await service.generateProductPhotos(id: buybackId, front: front, imageType: imageType)
-            if (response.totalGenerated ?? response.generated?.count ?? 0) == 0,
-               let errors = response.errors, !errors.isEmpty {
-                imageError = errors.joined(separator: "\n")
+            let payload = response.data
+            if (payload?.totalGenerated ?? payload?.generated?.count ?? 0) == 0,
+               let errors = payload?.errors, !errors.isEmpty {
+                imageError = errors.compactMap { $0.error }.joined(separator: "\n")
             }
             await loadImages()
-            onChange?()
         } catch let e as APIError {
-            imageError = e.localizedDescription
+            imageError = cleanMessage(e)
         } catch {
-            imageError = error.localizedDescription
+            imageError = cleanMessage(error)
         }
     }
 
@@ -94,7 +93,6 @@ final class BuybackImagesViewModel: ObservableObject {
         do {
             _ = try await service.setImageFinal(imageId: imageId)
             await loadImages()
-            onChange?()
         } catch let e as APIError {
             imageError = e.localizedDescription
         } catch {
@@ -110,11 +108,26 @@ final class BuybackImagesViewModel: ObservableObject {
         do {
             try await service.deleteImage(imageId: imageId)
             images.removeAll { $0.id == imageId }
-            onChange?()
         } catch let e as APIError {
             imageError = e.localizedDescription
         } catch {
             imageError = error.localizedDescription
         }
+    }
+
+    /// `uploadMultipartFull` surfaces non-2xx responses as `APIError.httpError`
+    /// carrying the RAW response body (e.g. `{"success":false,"error":"…"}`),
+    /// unlike `.forbidden`/`.serverError` which already carry a parsed message.
+    /// Extract the `error` field so tier-gate failures don't dump raw JSON in
+    /// front of the user.
+    private func cleanMessage(_ error: Error) -> String {
+        let raw = error.localizedDescription
+        if let start = raw.firstIndex(of: "{"),
+           let data = String(raw[start...]).data(using: .utf8),
+           let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let msg = obj["error"] as? String {
+            return msg
+        }
+        return raw
     }
 }

@@ -102,7 +102,11 @@ final class BuybackService {
     /// POST /api/buyback/:id/product-photos — front-only for v1 (single-file
     /// multipart helper can't attach a second `source_back` in the same request).
     /// Tier-gated: a non-2xx here typically means the company lacks product-photo
-    /// config; callers should surface `APIError.localizedDescription` verbatim.
+    /// config. This goes through `uploadMultipartFull`, so a non-2xx arrives as
+    /// `APIError.httpError(statusCode:, message:)` with the RAW response body
+    /// string (not `.forbidden`/`.serverError`, which carry a pre-parsed message).
+    /// Callers must parse the JSON out of that raw body before showing it to the
+    /// user — see `BuybackImagesViewModel.cleanMessage(_:)`.
     func generateProductPhotos(id: String, front: PlatformImageData, imageType: String? = nil) async throws -> ProductPhotosResponse {
         try await api.uploadMultipartFull(
             .generateBuybackProductPhotos(id: id),
