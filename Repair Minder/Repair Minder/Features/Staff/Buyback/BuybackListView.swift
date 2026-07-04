@@ -185,10 +185,78 @@ struct BuybackListView: View {
                     }
                 }
             }
+
+            // Additional filters: storefront status menu + toggle pills
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    Menu {
+                        Button("All") {
+                            viewModel.selectStorefrontStatus(nil)
+                        }
+                        Divider()
+                        ForEach(BuybackListView.storefrontStatusOptions, id: \.self) { option in
+                            Button(BuybackListView.storefrontStatusDisplayName(option)) {
+                                viewModel.selectStorefrontStatus(option)
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(viewModel.storefrontStatus.map(BuybackListView.storefrontStatusDisplayName)
+                                ?? "Storefront: All")
+                            Image(systemName: "chevron.down")
+                                .font(.caption2)
+                        }
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(viewModel.storefrontStatus != nil ? Color.blue.opacity(0.15) : Color.platformGray6)
+                        .foregroundColor(viewModel.storefrontStatus != nil ? .blue : .secondary)
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(viewModel.storefrontStatus != nil ? Color.blue : Color.clear, lineWidth: 2)
+                        )
+                    }
+
+                    BuybackStatusPill(
+                        title: "Has Sell Price",
+                        count: nil,
+                        isSelected: viewModel.hasSellPriceOnly,
+                        color: .green
+                    ) {
+                        viewModel.toggleHasSellPriceOnly()
+                    }
+
+                    BuybackStatusPill(
+                        title: "Missing Images",
+                        count: nil,
+                        isSelected: viewModel.missingImagesOnly,
+                        color: .orange
+                    ) {
+                        viewModel.toggleMissingImagesOnly()
+                    }
+                }
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(Color.platformGroupedBackground)
+    }
+
+    // MARK: - Storefront Status Options
+
+    static let storefrontStatusOptions = ["not_started", "draft", "coming_soon", "ready", "live"]
+
+    static func storefrontStatusDisplayName(_ status: String) -> String {
+        switch status {
+        case "not_started": return "Not Started"
+        case "draft": return "Draft"
+        case "coming_soon": return "Coming Soon"
+        case "ready": return "Ready"
+        case "live": return "Live"
+        default: return status.replacingOccurrences(of: "_", with: " ").capitalized
+        }
     }
 
     // MARK: - iPhone Items List
