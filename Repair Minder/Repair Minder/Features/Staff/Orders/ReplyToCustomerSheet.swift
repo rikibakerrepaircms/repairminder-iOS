@@ -10,7 +10,7 @@ import SwiftUI
 struct ReplyToCustomerSheet: View {
     /// Whether SMS is available to offer as an additional send channel for this ticket's client.
     let smsAvailable: Bool
-    let onSend: (_ htmlBody: String, _ sendSms: Bool) async -> String?
+    let onSend: (_ plainText: String, _ sendSms: Bool) async -> String?
 
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
@@ -56,7 +56,7 @@ struct ReplyToCustomerSheet: View {
                     Button("Send") {
                         Task {
                             busy = true
-                            let err = await onSend(htmlBodyFromPlainText(trimmedText), sendSms)
+                            let err = await onSend(trimmedText, sendSms)
                             busy = false
                             if err == nil {
                                 dismiss()
@@ -70,10 +70,5 @@ struct ReplyToCustomerSheet: View {
                 }
             }
         }
-    }
-
-    /// Converts plain text into simple HTML for the reply body, preserving line breaks.
-    private func htmlBodyFromPlainText(_ text: String) -> String {
-        "<div>\(text.replacingOccurrences(of: "\n", with: "<br>"))</div>"
     }
 }

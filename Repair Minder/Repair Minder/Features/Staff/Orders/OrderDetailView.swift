@@ -291,8 +291,8 @@ struct OrderDetailView: View {
             }
         }
         .sheet(isPresented: $showReplySheet) {
-            ReplyToCustomerSheet(smsAvailable: viewModel.order?.client?.phone != nil) { htmlBody, sendSms in
-                (await viewModel.replyToCustomer(htmlBody: htmlBody, sendSms: sendSms)) ? nil : (viewModel.actionError ?? "Could not send reply.")
+            ReplyToCustomerSheet(smsAvailable: viewModel.order?.client?.phone != nil) { plainText, sendSms in
+                (await viewModel.replyToCustomer(plainText: plainText, sendSms: sendSms)) ? nil : (viewModel.actionError ?? "Could not send reply.")
             }
         }
         .confirmationDialog(
@@ -1362,7 +1362,7 @@ struct OrderDetailView: View {
                 }
             }
 
-            Text(message.bodyText ?? message.bodyHtml?.strippingOrderTicketHTML() ?? "")
+            Text(message.bodyText ?? message.bodyHtml?.strippingHTML() ?? "")
                 .font(.subheadline)
                 .foregroundStyle(.primary)
         }
@@ -1499,25 +1499,5 @@ struct DeviceNavTarget: Identifiable, Hashable {
 #Preview {
     NavigationStack {
         OrderDetailView(orderId: "test")
-    }
-}
-
-// MARK: - HTML Stripping
-
-private extension String {
-    /// Strip HTML tags for a plain-text preview of a ticket message body.
-    func strippingOrderTicketHTML() -> String {
-        guard let data = self.data(using: .utf8) else { return self }
-
-        let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
-            .documentType: NSAttributedString.DocumentType.html,
-            .characterEncoding: String.Encoding.utf8.rawValue
-        ]
-
-        if let attributedString = try? NSAttributedString(data: data, options: options, documentAttributes: nil) {
-            return attributedString.string
-        }
-
-        return self.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
     }
 }

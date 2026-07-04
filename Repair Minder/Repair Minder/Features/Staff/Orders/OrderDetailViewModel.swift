@@ -324,14 +324,17 @@ final class OrderDetailViewModel: ObservableObject {
     }
 
     /// Reply to the customer on the order's associated ticket.
-    func replyToCustomer(htmlBody: String, sendSms: Bool) async -> Bool {
+    /// `plainText` is the raw, un-escaped message text as typed by staff — this method
+    /// builds the HTML body itself (escaped) and sends the raw text as the plain-text body,
+    /// so neither the text/plain part nor SMS ever contain literal HTML markup.
+    func replyToCustomer(plainText: String, sendSms: Bool) async -> Bool {
         guard let ticketId = order?.ticketId else {
             actionError = "This order has no ticket to reply on."
             return false
         }
         let request = TicketReplyRequest(
-            htmlBody: htmlBody,
-            textBody: htmlBody,
+            htmlBody: Self.htmlBodyFromPlainText(plainText),
+            textBody: plainText,
             status: nil,
             fromCustomEmailId: nil,
             pendingAttachmentIds: nil,
@@ -340,6 +343,20 @@ final class OrderDetailViewModel: ObservableObject {
         return await perform {
             let _: TicketReplyResponse = try await self.apiClient.request(.ticketReply(id: ticketId), body: request)
         }
+    }
+
+    /// HTML-escapes `s`, replacing `&` first so subsequent `<`/`>` replacements aren't
+    /// double-escaped.
+    private static func htmlEscaped(_ s: String) -> String {
+        s.replacingOccurrences(of: "&", with: "&amp;")
+         .replacingOccurrences(of: "<", with: "&lt;")
+         .replacingOccurrences(of: ">", with: "&gt;")
+    }
+
+    /// Converts raw plain text into simple HTML for the reply body: HTML-escapes the
+    /// text, then converts newlines to `<br>` and wraps in a `<div>`.
+    private static func htmlBodyFromPlainText(_ text: String) -> String {
+        "<div>" + htmlEscaped(text).replacingOccurrences(of: "\n", with: "<br>") + "</div>"
     }
 
     /// Resolve the order's associated ticket. Idempotent — resolving an

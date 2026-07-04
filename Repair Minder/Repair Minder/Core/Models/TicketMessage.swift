@@ -324,7 +324,7 @@ struct MessageAttachment: Codable, Identifiable, Equatable, Sendable {
 
 // MARK: - String Extension
 
-private extension String {
+extension String {
     /// Strip HTML tags from string
     func strippingHTML() -> String {
         guard let data = self.data(using: .utf8) else { return self }
