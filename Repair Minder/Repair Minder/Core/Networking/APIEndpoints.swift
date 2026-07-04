@@ -86,6 +86,10 @@ enum APIEndpoint {
     case deviceQCRequirements(deviceId: String)
     case deviceQC(deviceId: String)
     case staffAuthorizeDevice(deviceId: String)
+    case collectDevice(deviceId: String)
+    case despatchDevice(deviceId: String)
+    case deviceReadyForCollection(deviceId: String)
+    case addDeviceAccessory(orderId: String, deviceId: String)
 
     // Device Images
     case deviceImages(orderId: String, deviceId: String)
@@ -99,6 +103,7 @@ enum APIEndpoint {
     case createOrder
     case order(id: String)
     case updateOrder(id: String)
+    case setOrderDiscount(orderId: String)
     case orderItems(orderId: String)
     case createOrderItem(orderId: String)
     case updateOrderItem(orderId: String, itemId: String)
@@ -118,6 +123,11 @@ enum APIEndpoint {
     case createTicketNote(ticketId: String)
     case orderDocument(orderId: String, type: DocumentType)
 
+    // Orders — admin extras (Package G)
+    case updatePurchaseOrder(orderId: String)
+    case setOrderBillingGroup(orderId: String)
+    case recreateOrder(orderId: String)
+
     // MARK: - Clients
 
     case clients(page: Int, limit: Int, search: String?)
@@ -128,6 +138,7 @@ enum APIEndpoint {
     case clientSearch(query: String)
     case clientsExport
     case clientsImport
+    case clientGroupsForClient(clientId: String)
 
     // MARK: - Tickets/Enquiries
 
@@ -238,6 +249,12 @@ enum APIEndpoint {
     // AI listing generation (job-poll)
     case generateBuybackListing(id: String)
     case buybackListingStatus(id: String)
+    // Image management (Package D)
+    case buybackImages(id: String, imageType: String?)
+    case uploadBuybackSourceImage(id: String)
+    case generateBuybackProductPhotos(id: String)
+    case setBuybackImageFinal(imageId: String)
+    case deleteBuybackImage(imageId: String)
 
     // MARK: - Inventory / Assets
 
@@ -448,6 +465,14 @@ enum APIEndpoint {
             return "/api/devices/\(deviceId)/qc"
         case .staffAuthorizeDevice(let deviceId):
             return "/api/devices/\(deviceId)/staff-authorize"
+        case .collectDevice(let deviceId):
+            return "/api/devices/\(deviceId)/collect"
+        case .despatchDevice(let deviceId):
+            return "/api/devices/\(deviceId)/despatch"
+        case .deviceReadyForCollection(let deviceId):
+            return "/api/devices/\(deviceId)/ready-for-collection"
+        case .addDeviceAccessory(let orderId, let deviceId):
+            return "/api/orders/\(orderId)/devices/\(deviceId)/accessories"
         case .deviceImages(let orderId, let deviceId),
              .uploadDeviceImage(let orderId, let deviceId):
             return "/api/orders/\(orderId)/devices/\(deviceId)/images"
@@ -461,6 +486,8 @@ enum APIEndpoint {
             return "/api/orders"
         case .order(let id), .updateOrder(let id):
             return "/api/orders/\(id)"
+        case .setOrderDiscount(let orderId):
+            return "/api/orders/\(orderId)/discount"
         case .orderItems(let orderId), .createOrderItem(let orderId):
             return "/api/orders/\(orderId)/items"
         case .updateOrderItem(let orderId, let itemId), .deleteOrderItem(let orderId, let itemId):
@@ -487,6 +514,12 @@ enum APIEndpoint {
             return "/api/tickets/\(ticketId)/note"
         case .orderDocument(let orderId, let type):
             return "/api/orders/\(orderId)/documents/\(type.rawValue)"
+        case .updatePurchaseOrder(let orderId):
+            return "/api/orders/\(orderId)/purchase-order"
+        case .setOrderBillingGroup(let orderId):
+            return "/api/orders/\(orderId)/billing-group"
+        case .recreateOrder(let orderId):
+            return "/api/orders/\(orderId)/recreate"
 
         // Clients
         case .clients, .createClient:
@@ -499,6 +532,8 @@ enum APIEndpoint {
             return "/api/clients/export"
         case .clientsImport:
             return "/api/clients/import"
+        case .clientGroupsForClient(let clientId):
+            return "/api/clients/\(clientId)/groups"
 
         // Tickets
         case .tickets, .createTicket:
@@ -637,6 +672,16 @@ enum APIEndpoint {
             return "/api/buyback/\(id)/refurbishment/\(itemId)"
         case .generateBuybackListing(let id), .buybackListingStatus(let id):
             return "/api/buyback/\(id)/generate-listing"
+        case .buybackImages(let id, _):
+            return "/api/buyback/\(id)/images"
+        case .uploadBuybackSourceImage(let id):
+            return "/api/buyback/\(id)/source-images"
+        case .generateBuybackProductPhotos(let id):
+            return "/api/buyback/\(id)/product-photos"
+        case .setBuybackImageFinal(let imageId):
+            return "/api/buyback/images/\(imageId)/final"
+        case .deleteBuybackImage(let imageId):
+            return "/api/buyback/images/\(imageId)"
 
         // Inventory / Assets
         case .inventoryList: return "/api/assets"
@@ -746,7 +791,7 @@ enum APIEndpoint {
              .deviceChecklistTemplates, .deviceQCRequirements,
              .deviceImages, .deviceImageFile(_, _, _, _, _),
              .orders, .order, .orderItems, .orderPayments, .orderSignatures, .orderRefunds, .orderDocument,
-             .clients, .client, .clientSearch, .clientsExport,
+             .clients, .client, .clientSearch, .clientsExport, .clientGroupsForClient,
              .tickets, .ticket, .ticketMacroExecutions,
              .ticketGenerateResponseStatus, .ticketRewriteResponseStatus,
              .macros, .macro, .macroExecutions, .macroExecution,
@@ -759,6 +804,7 @@ enum APIEndpoint {
              .boardColumns, .boardCardPositions,
              .schedule, .teamSchedule, .boardPinnedPreferences,
              .buybackList, .buybackDetail, .buybackImageFile, .buybackNotes, .buybackListingStatus,
+             .buybackImages,
              .inventoryList, .inventoryDetail, .inventoryByTag, .inventoryActivity,
              .inventoryAssetGroups, .inventoryExternalDeployment, .productTypeCategories, .assetGroupsList,
              .assetGroup, .assetGroupAssets, .assetGroupProducts,
@@ -777,7 +823,7 @@ enum APIEndpoint {
              .createOrderDevice, .executeDeviceAction, .uploadDeviceImage,
              .createOrder, .createOrderItem, .createOrderPayment, .createOrderSignature,
              .sendQuote, .authorizeOrder, .despatchOrder, .collectOrder,
-             .createOrderRefund, .createTicketNote,
+             .createOrderRefund, .createTicketNote, .recreateOrder,
              .createClient, .clientsImport,
              .createTicket, .ticketReply, .ticketNote, .ticketGenerateResponse, .ticketRewriteResponse, .ticketExecuteMacro, .ticketPreviewMacro,
              .ticketResolve, .ticketReassign, .createEnquiry,
@@ -797,14 +843,16 @@ enum APIEndpoint {
              .salvageBuyback, .cancelDeviceWork, .completeDeviceChecklist, .deviceQC,
              .addBuybackNote, .sellBuyback, .sellBuybackBulk, .addDeviceToBuyback,
              .createKioskOrder, .staffAuthorizeDevice,
-             .addRefurbishmentItem, .generateBuybackListing:
+             .addRefurbishmentItem, .generateBuybackListing,
+             .uploadBuybackSourceImage, .generateBuybackProductPhotos, .setBuybackImageFinal,
+             .collectDevice, .despatchDevice, .deviceReadyForCollection, .addDeviceAccessory:
             return .post
 
         // PATCH endpoints
         case .updateOrderDevice, .updateDeviceStatus, .updateDeviceBankDetails,
              .updateDeviceEngineer, .updateDeviceSubLocation, .updateBuyback, .updateBuybackStatus,
              .returnDeviceAccessory,
-             .updateOrder, .updateOrderItem,
+             .updateOrder, .setOrderDiscount, .updateOrderItem, .setOrderBillingGroup,
              .updateClient,
              .updateTicket,
              .pauseMacroExecution, .resumeMacroExecution,
@@ -816,7 +864,7 @@ enum APIEndpoint {
         // PUT endpoints
         case .togglePasscodeEnabled, .passcodeTimeout,
              .updatePushPreferences, .updateAsset, .updateProductType,
-             .updateSupplierOrderLine:
+             .updateSupplierOrderLine, .updatePurchaseOrder:
             return .put
 
         // DELETE endpoints
@@ -828,7 +876,7 @@ enum APIEndpoint {
              .deleteDeviceImage, .deleteAsset, .removeMembership,
              .deleteSupplierOrderLine, .deleteSalvageItem, .deleteSupplierOrder,
              .deleteOrderRefund, .cancelKioskOrder,
-             .deleteRefurbishmentItem:
+             .deleteRefurbishmentItem, .deleteBuybackImage:
             return .delete
         }
     }
@@ -1126,6 +1174,10 @@ enum APIEndpoint {
 
         case .kioskProductCategories:
             return [URLQueryItem(name: "product_kind", value: "product")]
+
+        case .buybackImages(_, let imageType):
+            guard let imageType = imageType, !imageType.isEmpty else { return nil }
+            return [URLQueryItem(name: "image_type", value: imageType)]
 
         case .kioskAvailableAssets(let productTypeId, let groupId, let search):
             var items: [URLQueryItem] = []

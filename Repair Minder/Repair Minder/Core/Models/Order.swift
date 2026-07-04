@@ -91,6 +91,12 @@ struct Order: Decodable, Identifiable, Equatable, Hashable, Sendable {
     let globalDiscountAmount: Double?
     let globalDiscountReason: String?
 
+    // Admin extras (detail only) — Package G
+    let customerPoReference: String?
+    let customerPoValue: Double?
+    let customerPoReceivedAt: String?
+    let billingGroup: OrderBillingGroup?
+
     // MARK: - Computed Properties
 
     /// Display name for client
@@ -230,6 +236,14 @@ struct OrderLocation: Decodable, Equatable, Sendable {
 struct OrderAssignedUser: Decodable, Equatable, Sendable {
     let id: String
     let name: String
+}
+
+/// The client group an order's invoicing is attributed to (Package G).
+/// Set/cleared via `PATCH /api/orders/:id/billing-group`.
+struct OrderBillingGroup: Decodable, Equatable, Sendable {
+    let id: String
+    let name: String?
+    let postcode: String?
 }
 
 struct OrderItem: Decodable, Identifiable, Equatable, Sendable {
@@ -511,7 +525,17 @@ struct OrderNote: Decodable, Equatable, Sendable {
 // MARK: - Order Item Request
 
 /// Encodable request body for creating or updating an order line item.
-/// Property names are camelCase; APIClient's encoder converts to snake_case.
+///
+/// Uses a custom `encode(to:)` (rather than synthesized `encodeIfPresent`) so the three
+/// discount fields are always sent — as explicit JSON `null` when nil, never omitted.
+/// The backend update endpoint is tri-state: an OMITTED discount key means "leave
+/// unchanged", while an explicit `null` means "clear". With synthesized encoding, a nil
+/// `discountPercent`/`discountAmount`/`discountReason` would simply be omitted, so
+/// clearing an item's discount would silently fail to persist. All other fields keep
+/// their normal omit-if-nil behavior so updates don't wipe unrelated fields.
+///
+/// Because a manual `encode(to:)` bypasses the encoder's `.convertToSnakeCase` key
+/// strategy, every key below is mapped to its snake_case wire name explicitly.
 struct OrderItemRequest: Encodable {
     var itemType: String        // "repair", "device_sale", "accessory", "device_purchase"
     var description: String
@@ -527,6 +551,96 @@ struct OrderItemRequest: Encodable {
     var discountPercent: Double?
     var discountAmount: Double?
     var discountReason: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case itemType = "item_type"
+        case description = "description"
+        case quantity = "quantity"
+        case unitPrice = "unit_price"
+        case priceIncVat = "price_inc_vat"
+        case vatRate = "vat_rate"
+        case deviceId = "device_id"
+        case isWarrantyItem = "is_warranty_item"
+        case warrantyNotes = "warranty_notes"
+        case productTypeId = "product_type_id"
+        case qualityTier = "quality_tier"
+        case discountPercent = "discount_percent"
+        case discountAmount = "discount_amount"
+        case discountReason = "discount_reason"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        // Non-optional fields — always encoded.
+        try container.encode(itemType, forKey: .itemType)
+        try container.encode(description, forKey: .description)
+        try container.encode(quantity, forKey: .quantity)
+        try container.encode(unitPrice, forKey: .unitPrice)
+
+        // Optional fields (non-discount) — omitted when nil, unchanged behavior.
+        try container.encodeIfPresent(priceIncVat, forKey: .priceIncVat)
+        try container.encodeIfPresent(vatRate, forKey: .vatRate)
+        try container.encodeIfPresent(deviceId, forKey: .deviceId)
+        try container.encodeIfPresent(isWarrantyItem, forKey: .isWarrantyItem)
+        try container.encodeIfPresent(warrantyNotes, forKey: .warrantyNotes)
+        try container.encodeIfPresent(productTypeId, forKey: .productTypeId)
+        try container.encodeIfPresent(qualityTier, forKey: .qualityTier)
+
+        // Discount fields — always present; explicit `null` when nil so the backend
+        // clears the discount instead of leaving it unchanged.
+        if let discountPercent {
+            try container.encode(discountPercent, forKey: .discountPercent)
+        } else {
+            try container.encodeNil(forKey: .discountPercent)
+        }
+        if let discountAmount {
+            try container.encode(discountAmount, forKey: .discountAmount)
+        } else {
+            try container.encodeNil(forKey: .discountAmount)
+        }
+        if let discountReason {
+            try container.encode(discountReason, forKey: .discountReason)
+        } else {
+            try container.encodeNil(forKey: .discountReason)
+        }
+    }
+}
+
+// MARK: - Order Discount Request
+
+/// Encodable request body for `PATCH /api/orders/:id/discount` (whole-order discount).
+/// Sending all three fields as `nil` clears any existing discount. Uses a custom
+/// `encode(to:)` (rather than synthesized `encodeIfPresent`) so `nil` fields are sent
+/// as explicit JSON `null` instead of being omitted — the backend's clear-discount
+/// check requires all three keys present with `null` values, not absent keys.
+struct OrderDiscountRequest: Encodable {
+    var discountPercent: Double?
+    var discountAmount: Double?
+    var discountReason: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case discountPercent, discountAmount, discountReason
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if let discountPercent {
+            try container.encode(discountPercent, forKey: .discountPercent)
+        } else {
+            try container.encodeNil(forKey: .discountPercent)
+        }
+        if let discountAmount {
+            try container.encode(discountAmount, forKey: .discountAmount)
+        } else {
+            try container.encodeNil(forKey: .discountAmount)
+        }
+        if let discountReason {
+            try container.encode(discountReason, forKey: .discountReason)
+        } else {
+            try container.encodeNil(forKey: .discountReason)
+        }
+    }
 }
 
 // MARK: - Manual Payment Request
@@ -582,6 +696,89 @@ struct CreateRefundRequest: Encodable {
 struct CreateTicketNoteRequest: Encodable {
     var body: String
     var deviceId: String?
+}
+
+// MARK: - Purchase Order Request (Package G)
+
+/// Request body for `PUT /api/orders/:id/purchase-order`. Uses a custom
+/// `encode(to:)` (rather than synthesized `encodeIfPresent`) so both fields
+/// are ALWAYS sent — as explicit JSON `null` when nil, never omitted. With
+/// synthesized encoding, blanking a PO reference/value would send nothing for
+/// that key, and the backend treats an omitted key as "leave unchanged" —
+/// so clearing would silently no-op. The backend clears the field only when
+/// the key is present with an explicit `null`.
+///
+/// Because a manual `encode(to:)` bypasses the encoder's `.convertToSnakeCase`
+/// key strategy, both keys are mapped to their snake_case wire names explicitly.
+struct PurchaseOrderRequest: Encodable {
+    var poReference: String?
+    var poValue: Double?
+
+    private enum CodingKeys: String, CodingKey {
+        case poReference = "po_reference"
+        case poValue = "po_value"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if let poReference {
+            try container.encode(poReference, forKey: .poReference)
+        } else {
+            try container.encodeNil(forKey: .poReference)
+        }
+        if let poValue {
+            try container.encode(poValue, forKey: .poValue)
+        } else {
+            try container.encodeNil(forKey: .poValue)
+        }
+    }
+}
+
+// MARK: - Billing Group Request (Package G)
+
+/// Request body for `PATCH /api/orders/:id/billing-group`. Uses a custom
+/// `encode(to:)` (rather than synthesized `encodeIfPresent`) so `nil` is sent
+/// as an explicit JSON `null` instead of being omitted — the backend clears
+/// the billing group only when the key is present with a `null` value.
+struct BillingGroupRequest: Encodable {
+    var clientGroupId: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case clientGroupId
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if let clientGroupId {
+            try container.encode(clientGroupId, forKey: .clientGroupId)
+        } else {
+            try container.encodeNil(forKey: .clientGroupId)
+        }
+    }
+}
+
+// MARK: - Recreate Order Request/Response (Package G)
+
+/// Request body for `POST /api/orders/:id/recreate` (admin only). Cancels the
+/// original order and creates a new one, copying devices/items across.
+struct RecreateOrderRequest: Encodable {
+    var clientEmail: String
+    var clientFirstName: String?
+    var clientLastName: String?
+    var clientPhone: String?
+    var locationId: String?
+    var assignedUserId: String?
+}
+
+/// The `/recreate` response is NOT `data`-wrapped, so this is decoded via
+/// `APIClient.requestFull` rather than the usual `request`.
+struct RecreateOrderResponse: Decodable {
+    let newOrder: NewOrderRef?
+
+    struct NewOrderRef: Decodable {
+        let id: String
+        let orderNumber: Int?
+    }
 }
 
 // MARK: - Created Signature Response

@@ -18,6 +18,9 @@ struct OrderDetailView: View {
     @State private var showCardPaymentSheet = false
     @State private var showPayoutSheet = false
     @State private var payoutDevice: OrderDeviceSummary?
+    @State private var dueDateDevice: OrderDeviceSummary?
+    @State private var deviceToDelete: OrderDeviceSummary?
+    @State private var showDeleteDeviceConfirmation = false
     @State private var deletingPaymentId: String?
     @State private var showDeletePaymentAlert = false
     @State private var selectedDeviceNav: DeviceNavTarget?
@@ -27,9 +30,17 @@ struct OrderDetailView: View {
     @State private var showDespatchSheet = false
     @State private var showCollectSheet = false
     @State private var showAddNoteSheet = false
+    @State private var showDiscountSheet = false
+    @State private var showReplySheet = false
+    @State private var showResolveConfirmation = false
     @State private var refundTarget: OrderPayment?
     @State private var refundToDelete: OrderRefund?
     @State private var showDeleteRefundAlert = false
+    @State private var showPurchaseOrderSheet = false
+    @State private var showBillingGroupSheet = false
+    @State private var showRecreateConfirmation = false
+    @State private var showRecreateSheet = false
+    @State private var recreateSuccessMessage: String?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var isRegularWidth: Bool {
@@ -90,11 +101,14 @@ struct OrderDetailView: View {
 
                 // Totals section
                 if let totals = order.totals {
-                    totalsSection(totals, paymentStatus: order.effectivePaymentStatus)
+                    totalsSection(totals, order: order)
                 }
 
                 // Close-out actions section
                 closeOutActionsSection(order)
+
+                // Admin section (purchase order, billing group, recreate)
+                adminSection(order)
 
                 // Payment actions section
                 if viewModel.isOrderEditable && viewModel.balanceDue > 0 {
@@ -124,6 +138,11 @@ struct OrderDetailView: View {
                 // Dates section
                 if let dates = order.dates {
                     datesSection(dates)
+                }
+
+                // Customer / ticket conversation section
+                if order.ticketId != nil {
+                    customerSection(order)
                 }
 
                 // Notes section
@@ -272,8 +291,108 @@ struct OrderDetailView: View {
         .sheet(isPresented: $showAddNoteSheet) {
             AddOrderNoteSheet { req in (await viewModel.addNote(req)) ? nil : (viewModel.actionError ?? "Could not add note.") }
         }
+        .sheet(isPresented: $showDiscountSheet) {
+            if let order = viewModel.order {
+                OrderDiscountSheet(order: order) { req in
+                    (await viewModel.setGlobalDiscount(req)) ? nil : (viewModel.actionError ?? "Could not update discount.")
+                }
+            }
+        }
+        .sheet(isPresented: $showReplySheet) {
+            ReplyToCustomerSheet(smsAvailable: viewModel.order?.client?.phone != nil) { plainText, sendSms in
+                (await viewModel.replyToCustomer(plainText: plainText, sendSms: sendSms)) ? nil : (viewModel.actionError ?? "Could not send reply.")
+            }
+        }
+        .confirmationDialog(
+            "Resolve Ticket",
+            isPresented: $showResolveConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Resolve") {
+                Task { _ = await viewModel.resolveTicket() }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Mark this customer's ticket as resolved?")
+        }
         .sheet(item: $refundTarget) { payment in
             RefundPaymentSheet(payment: payment) { req in (await viewModel.createRefund(req)) ? nil : (viewModel.actionError ?? "Refund failed.") }
+        }
+        // MARK: - Admin Sheets (Package G)
+        .sheet(isPresented: $showPurchaseOrderSheet) {
+            if let order = viewModel.order {
+                PurchaseOrderSheet(order: order) { req in
+                    (await viewModel.updatePurchaseOrder(req)) ? nil : (viewModel.actionError ?? "Could not update purchase order.")
+                }
+            }
+        }
+        .sheet(isPresented: $showBillingGroupSheet) {
+            if let order = viewModel.order {
+                BillingGroupSheet(
+                    order: order,
+                    fetchGroups: { await viewModel.fetchClientGroups() }
+                ) { req in
+                    (await viewModel.setBillingGroup(req)) ? nil : (viewModel.actionError ?? "Could not update billing group.")
+                }
+            }
+        }
+        .confirmationDialog(
+            "Recreate Order",
+            isPresented: $showRecreateConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Recreate", role: .destructive) {
+                showRecreateSheet = true
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This cancels the original order and creates a new order with the same devices and items. This cannot be undone.")
+        }
+        .sheet(isPresented: $showRecreateSheet) {
+            RecreateOrderSheet(client: viewModel.order?.client) { req in
+                guard await viewModel.recreateOrder(req) else {
+                    return viewModel.actionError ?? "Could not recreate order."
+                }
+                if let newOrderNumber = viewModel.recreatedOrderNumber {
+                    recreateSuccessMessage = "New order #\(newOrderNumber) created. The original order has been cancelled."
+                } else {
+                    recreateSuccessMessage = "New order created. The original order has been cancelled."
+                }
+                return nil
+            }
+        }
+        .alert(
+            "Order Recreated",
+            isPresented: Binding(
+                get: { recreateSuccessMessage != nil },
+                set: { if !$0 { recreateSuccessMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) { recreateSuccessMessage = nil }
+        } message: {
+            Text(recreateSuccessMessage ?? "")
+        }
+        // MARK: - Device Action Sheets
+        .sheet(item: $dueDateDevice) { device in
+            OrderDeviceDueDateSheet(deviceName: device.displayName ?? "Device") { dateString in
+                (await viewModel.updateDeviceDueDate(deviceId: device.id, dueDate: dateString)) ? nil : (viewModel.actionError ?? "Could not update due date.")
+            }
+        }
+        .confirmationDialog(
+            "Delete Device",
+            isPresented: $showDeleteDeviceConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                if let device = deviceToDelete {
+                    Task { _ = await viewModel.deleteDevice(deviceId: device.id) }
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            if let device = deviceToDelete {
+                Text("Are you sure you want to delete \"\(device.displayName ?? "this device")\"? This cannot be undone.")
+            }
         }
     }
 
@@ -415,12 +534,38 @@ struct OrderDetailView: View {
         SectionCard(title: "Devices", icon: "iphone") {
             VStack(spacing: 0) {
                 ForEach(devices) { device in
-                    Button {
-                        selectedDeviceNav = DeviceNavTarget(id: device.id, orderId: orderId)
-                    } label: {
-                        deviceRow(device)
+                    HStack(spacing: 4) {
+                        // Navigation button — tapping the row navigates to device detail.
+                        Button {
+                            selectedDeviceNav = DeviceNavTarget(id: device.id, orderId: orderId)
+                        } label: {
+                            deviceRow(device)
+                        }
+                        .buttonStyle(.plain)
+
+                        // Per-device action menu — a sibling control (NOT nested inside
+                        // the navigation Button) so tapping it doesn't trigger navigation.
+                        if viewModel.isOrderEditable {
+                            Menu {
+                                Button {
+                                    dueDateDevice = device
+                                } label: {
+                                    Label("Edit due date", systemImage: "calendar")
+                                }
+                                Button(role: .destructive) {
+                                    deviceToDelete = device
+                                    showDeleteDeviceConfirmation = true
+                                } label: {
+                                    Label("Delete device", systemImage: "trash")
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis.circle")
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 32, height: 32)
+                            }
+                            .accessibilityIdentifier("device-menu-\(device.id)")
+                        }
                     }
-                    .buttonStyle(.plain)
 
                     if device.id != devices.last?.id {
                         Divider().padding(.vertical, 4)
@@ -611,7 +756,7 @@ struct OrderDetailView: View {
 
     // MARK: - Totals Section
 
-    private func totalsSection(_ totals: OrderTotals, paymentStatus: PaymentStatus) -> some View {
+    private func totalsSection(_ totals: OrderTotals, order: Order) -> some View {
         SectionCard(title: "Totals", icon: "sum") {
             VStack(spacing: 8) {
                 if isRegularWidth {
@@ -622,6 +767,10 @@ struct OrderDetailView: View {
                 } else {
                     totalRow("Subtotal", value: totals.formattedSubtotal)
                     totalRow("VAT", value: totals.formattedVatTotal)
+                }
+
+                if let discountTotal = totals.discountTotal, discountTotal > 0 {
+                    totalRow("Discount", value: "-\(CurrencyFormatter.format(discountTotal))", color: .orange)
                 }
 
                 Divider()
@@ -641,14 +790,65 @@ struct OrderDetailView: View {
 
                     Spacer()
 
-                    PaymentStatusBadge(status: paymentStatus)
+                    PaymentStatusBadge(status: order.effectivePaymentStatus)
 
                     Text(totals.formattedBalanceDue)
                         .fontWeight(.bold)
                         .foregroundStyle(totals.balanceDue > 0 ? .red : .green)
                 }
+
+                Divider()
+
+                globalDiscountRow(order)
             }
         }
+    }
+
+    // MARK: - Global Discount Row
+
+    @ViewBuilder
+    private func globalDiscountRow(_ order: Order) -> some View {
+        let hasDiscount = (order.globalDiscountPercent ?? 0) > 0 || (order.globalDiscountAmount ?? 0) > 0
+
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Order Discount")
+                    .font(.subheadline).fontWeight(.medium)
+                if hasDiscount {
+                    Text(discountDescription(order))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("No discount applied")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+
+            if viewModel.isOrderEditable {
+                Button(hasDiscount ? "Edit discount" : "Add discount") {
+                    showDiscountSheet = true
+                }
+                .font(.caption)
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("order-discount-edit")
+            }
+        }
+    }
+
+    private func discountDescription(_ order: Order) -> String {
+        var parts: [String] = []
+        if let percent = order.globalDiscountPercent, percent > 0 {
+            parts.append(String(format: "%.0f%% off", percent))
+        } else if let amount = order.globalDiscountAmount, amount > 0 {
+            parts.append("\(CurrencyFormatter.format(amount)) off")
+        }
+        if let reason = order.globalDiscountReason, !reason.isEmpty {
+            parts.append(reason)
+        }
+        return parts.joined(separator: " — ")
     }
 
     private func totalRow(_ label: String, value: String, bold: Bool = false, color: Color = .primary) -> some View {
@@ -723,6 +923,88 @@ struct OrderDetailView: View {
             }
         }
         .accessibilityIdentifier("order-actions")
+    }
+
+    // MARK: - Admin Section (Package G)
+
+    private func adminSection(_ order: Order) -> some View {
+        SectionCard(title: "Admin", icon: "gearshape") {
+            VStack(alignment: .leading, spacing: 12) {
+                // Purchase order row
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Purchase Order")
+                            .font(.subheadline).fontWeight(.medium)
+                        if let reference = order.customerPoReference, !reference.isEmpty {
+                            Text(reference)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        if let value = order.customerPoValue {
+                            Text(CurrencyFormatter.format(value))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        if order.customerPoReference == nil && order.customerPoValue == nil {
+                            Text("No purchase order recorded")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    if viewModel.isOrderEditable {
+                        Button("Edit") {
+                            showPurchaseOrderSheet = true
+                        }
+                        .font(.caption)
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("po-edit")
+                    }
+                }
+
+                Divider()
+
+                // Billing group row
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Billing Group")
+                            .font(.subheadline).fontWeight(.medium)
+                        Text(order.billingGroup?.name ?? "None")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    if viewModel.isOrderEditable {
+                        Button(order.billingGroup != nil ? "Change" : "Set") {
+                            showBillingGroupSheet = true
+                        }
+                        .font(.caption)
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("billing-group-edit")
+                    }
+                }
+
+                // Recreate order — admin only (backend returns 403 for non-admins),
+                // and only meaningful while the order hasn't already been cancelled.
+                if AuthManager.shared.currentUser?.role.isAdmin == true && order.status != .cancelled {
+                    Divider()
+
+                    Button(role: .destructive) {
+                        showRecreateConfirmation = true
+                    } label: {
+                        Label("Recreate order", systemImage: "arrow.triangle.2.circlepath")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                }
+            }
+        }
+        .accessibilityIdentifier("order-admin")
     }
 
     // MARK: - Payment Actions Section
@@ -1116,6 +1398,117 @@ struct OrderDetailView: View {
             Text(DateFormatters.formatRelativeDate(date) ?? date)
                 .font(.subheadline)
                 .foregroundStyle(color)
+        }
+    }
+
+    // MARK: - Customer Section
+
+    /// Shows a read-only view of the order's ticket conversation plus
+    /// reply / resolve / reopen actions. Gated on `order.ticketId != nil`.
+    private func customerSection(_ order: Order) -> some View {
+        let ticket = order.ticket
+        let isClosedOrResolved = ["resolved", "closed"].contains(ticket?.status?.lowercased() ?? "")
+
+        return SectionCard(title: "Customer", icon: "bubble.left.and.bubble.right") {
+            VStack(alignment: .leading, spacing: 12) {
+                if let status = ticket?.status {
+                    HStack {
+                        Text("Ticket status")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(status.capitalized)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background((isClosedOrResolved ? Color.gray : Color.green).opacity(0.15))
+                            .foregroundStyle(isClosedOrResolved ? .gray : .green)
+                            .clipShape(Capsule())
+                    }
+                }
+
+                if let messages = ticket?.messages, !messages.isEmpty {
+                    Divider()
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(messages) { message in
+                            ticketMessageRow(message)
+                            if message.id != messages.last?.id {
+                                Divider()
+                            }
+                        }
+                    }
+                }
+
+                Divider()
+
+                HStack(spacing: 10) {
+                    Button {
+                        showReplySheet = true
+                    } label: {
+                        Label("Reply to customer", systemImage: "paperplane")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isClosedOrResolved || viewModel.isPerformingAction)
+                    .accessibilityIdentifier("order-reply-to-customer")
+
+                    if isClosedOrResolved {
+                        Button {
+                            Task { _ = await viewModel.reopenTicket() }
+                        } label: {
+                            Label("Reopen", systemImage: "arrow.uturn.backward")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(viewModel.isPerformingAction)
+                        .accessibilityIdentifier("order-reopen-ticket")
+                    } else {
+                        Button {
+                            showResolveConfirmation = true
+                        } label: {
+                            Label("Resolve", systemImage: "checkmark.circle")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.green)
+                        .disabled(viewModel.isPerformingAction)
+                        .accessibilityIdentifier("order-resolve-ticket")
+                    }
+                }
+
+                if let actionError = viewModel.actionError {
+                    Text(actionError)
+                        .foregroundStyle(.red)
+                        .font(.footnote)
+                }
+            }
+        }
+    }
+
+    private func ticketMessageRow(_ message: OrderTicketMessage) -> some View {
+        let isInbound = message.type == "email_inbound" || message.type == "sms_inbound"
+        let isNote = message.type == "note"
+
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(isNote ? "Note" : (message.fromName ?? (isInbound ? "Customer" : "Staff")))
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(isNote ? .orange : (isInbound ? .blue : .primary))
+
+                Spacer()
+
+                if let createdAt = message.createdAt {
+                    Text(DateFormatters.formatRelativeDate(createdAt) ?? createdAt)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            Text(message.bodyText ?? message.bodyHtml?.strippingHTML() ?? "")
+                .font(.subheadline)
+                .foregroundStyle(.primary)
         }
     }
 

@@ -33,6 +33,12 @@ final class OrderDetailViewModel: ObservableObject {
     @Published private(set) var isPerformingAction = false
     @Published var actionError: String?
 
+    /// Order number of the newly-created order after a successful `recreateOrder`
+    /// call, when the backend includes it in the response. May be nil even on
+    /// success — the recreate succeeded (original cancelled + refreshed) whether
+    /// or not the new order's id/number came back in the response body.
+    @Published private(set) var recreatedOrderNumber: Int?
+
     // MARK: - Private
 
     private let orderId: String
@@ -288,6 +294,30 @@ final class OrderDetailViewModel: ObservableObject {
         await perform { try await self.paymentService.deleteRefund(orderId: self.orderId, refundId: refundId) }
     }
 
+    /// Update a device's due date
+    func updateDeviceDueDate(deviceId: String, dueDate: String) async -> Bool {
+        await perform {
+            try await self.apiClient.requestVoid(
+                .updateOrderDevice(orderId: self.orderId, deviceId: deviceId),
+                body: DeviceUpdateRequest.dueDate(dueDate)
+            )
+        }
+    }
+
+    /// Delete a device from the order
+    func deleteDevice(deviceId: String) async -> Bool {
+        await perform {
+            try await self.apiClient.requestVoid(
+                .deleteOrderDevice(orderId: self.orderId, deviceId: deviceId)
+            )
+        }
+    }
+
+    /// Set (or clear, if all fields are nil) the whole-order discount
+    func setGlobalDiscount(_ request: OrderDiscountRequest) async -> Bool {
+        await perform { try await self.apiClient.requestVoid(.setOrderDiscount(orderId: self.orderId), body: request) }
+    }
+
     /// Add a note to the order's associated ticket
     func addNote(_ request: CreateTicketNoteRequest) async -> Bool {
         guard let ticketId = order?.ticketId else {
@@ -296,6 +326,127 @@ final class OrderDetailViewModel: ObservableObject {
         }
         return await perform {
             let _: EmptyResponse = try await self.apiClient.request(.createTicketNote(ticketId: ticketId), body: request)
+        }
+    }
+
+    /// Reply to the customer on the order's associated ticket.
+    /// `plainText` is the raw, un-escaped message text as typed by staff — this method
+    /// builds the HTML body itself (escaped) and sends the raw text as the plain-text body,
+    /// so neither the text/plain part nor SMS ever contain literal HTML markup.
+    func replyToCustomer(plainText: String, sendSms: Bool) async -> Bool {
+        guard let ticketId = order?.ticketId else {
+            actionError = "This order has no ticket to reply on."
+            return false
+        }
+        let request = TicketReplyRequest(
+            htmlBody: Self.htmlBodyFromPlainText(plainText),
+            textBody: plainText,
+            status: nil,
+            fromCustomEmailId: nil,
+            pendingAttachmentIds: nil,
+            sendSms: sendSms ? true : nil
+        )
+        return await perform {
+            let _: TicketReplyResponse = try await self.apiClient.request(.ticketReply(id: ticketId), body: request)
+        }
+    }
+
+    /// HTML-escapes `s`, replacing `&` first so subsequent `<`/`>` replacements aren't
+    /// double-escaped.
+    private static func htmlEscaped(_ s: String) -> String {
+        s.replacingOccurrences(of: "&", with: "&amp;")
+         .replacingOccurrences(of: "<", with: "&lt;")
+         .replacingOccurrences(of: ">", with: "&gt;")
+    }
+
+    /// Converts raw plain text into simple HTML for the reply body: HTML-escapes the
+    /// text, then converts newlines to `<br>` and wraps in a `<div>`.
+    private static func htmlBodyFromPlainText(_ text: String) -> String {
+        "<div>" + htmlEscaped(text).replacingOccurrences(of: "\n", with: "<br>") + "</div>"
+    }
+
+    /// Resolve the order's associated ticket. Idempotent — resolving an
+    /// already-resolved ticket still returns success.
+    func resolveTicket() async -> Bool {
+        guard let ticketId = order?.ticketId else {
+            actionError = "This order has no ticket to resolve."
+            return false
+        }
+        return await perform {
+            try await self.apiClient.requestVoid(.ticketResolve(id: ticketId))
+        }
+    }
+
+    /// Reopen (set back to open) the order's associated ticket. There's no
+    /// dedicated reopen endpoint — this uses the generic ticket update PATCH.
+    func reopenTicket() async -> Bool {
+        guard let ticketId = order?.ticketId else {
+            actionError = "This order has no ticket to reopen."
+            return false
+        }
+        return await perform {
+            try await self.apiClient.requestVoid(.updateTicket(id: ticketId), body: TicketStatusRequest(status: "open"))
+        }
+    }
+
+    // MARK: - Admin Extras (Package G)
+
+    /// Update the order's customer purchase order reference/value.
+    func updatePurchaseOrder(_ request: PurchaseOrderRequest) async -> Bool {
+        await perform {
+            try await self.apiClient.requestVoid(.updatePurchaseOrder(orderId: self.orderId), body: request)
+        }
+    }
+
+    /// Set (or clear, if `clientGroupId` is nil) the order's billing group.
+    func setBillingGroup(_ request: BillingGroupRequest) async -> Bool {
+        await perform {
+            try await self.apiClient.requestVoid(.setOrderBillingGroup(orderId: self.orderId), body: request)
+        }
+    }
+
+    /// Fetch the candidate client groups for the billing-group picker — scoped
+    /// to the order's client (the backend enforces membership on save).
+    func fetchClientGroups() async -> [ClientGroupMembership] {
+        guard let clientId = order?.client?.id else { return [] }
+        do {
+            return try await apiClient.request(.clientGroupsForClient(clientId: clientId))
+        } catch let e as APIError {
+            actionError = e.localizedDescription
+            return []
+        } catch {
+            actionError = error.localizedDescription
+            return []
+        }
+    }
+
+    /// Recreate the order (admin only): cancels the original order and creates
+    /// a new one, copying devices/items across. Returns the new order's id on
+    /// success, or nil on failure (with `actionError` set).
+    /// Recreates the order (admin only). Returns `true` on any successful (2xx)
+    /// response, regardless of whether the response body includes the new
+    /// order's id/number — the recreate has already happened server-side
+    /// (original cancelled, new order created) by the time we get a response,
+    /// so a missing id must not be reported as a failure.
+    @discardableResult
+    func recreateOrder(_ request: RecreateOrderRequest) async -> Bool {
+        isPerformingAction = true
+        actionError = nil
+        recreatedOrderNumber = nil
+        defer { isPerformingAction = false }
+        do {
+            let response: RecreateOrderResponse = try await apiClient.requestFull(
+                .recreateOrder(orderId: orderId), body: request
+            )
+            recreatedOrderNumber = response.newOrder?.orderNumber
+            await refresh()
+            return true
+        } catch let e as APIError {
+            actionError = e.localizedDescription
+            return false
+        } catch {
+            actionError = error.localizedDescription
+            return false
         }
     }
 
