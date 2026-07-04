@@ -1,4 +1,5 @@
 import Foundation
+#if os(iOS)
 import CoreMotion
 
 /// Peak-to-peak spread of a sample series — captures rapid oscillation (a vibrating motor) even when
@@ -108,3 +109,4 @@ final class MotionAliveProbeCM: MotionAliveProbe {
         #endif
     }
 }
+#endif
