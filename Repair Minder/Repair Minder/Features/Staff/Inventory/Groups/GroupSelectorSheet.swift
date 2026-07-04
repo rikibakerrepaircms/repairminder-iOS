@@ -55,7 +55,6 @@ struct GroupSelectorSheet: View {
                         .accessibilityIdentifier("group-selector-save")
                 }
             }
-            .onAppear { selected = Set(initialSelection) }
         }
     }
 

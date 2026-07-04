@@ -29,4 +29,34 @@ final class GroupEditSheetTests: XCTestCase {
         let ok = await m.submit()
         XCTAssertFalse(ok); XCTAssertNotNil(m.errorMessage)
     }
+    func testGroupEditEmitsEmptyStringForClearedFields() throws {
+        var g = InventoryGroup(id: "g1", name: "Screens")
+        g.sku = "SCR"; g.subcategory = "Glass"; g.manufacturer = "Apple"
+        g.modelNumber = "A1"; g.preferredSupplierName = "ACME"
+        let m = GroupEditModel(group: g, service: Mock())
+        // User clears every previously-set optional string field.
+        m.sku = ""; m.subcategory = ""; m.manufacturer = ""; m.modelNumber = ""; m.preferredSupplierName = ""
+        let body = m.buildRequest()
+        let encoder = JSONEncoder(); encoder.keyEncodingStrategy = .convertToSnakeCase
+        let data = try encoder.encode(body)
+        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(json["sku"] as? String, "")
+        XCTAssertEqual(json["subcategory"] as? String, "")
+        XCTAssertEqual(json["manufacturer"] as? String, "")
+        XCTAssertEqual(json["model_number"] as? String, "")
+        XCTAssertEqual(json["preferred_supplier_name"] as? String, "")
+    }
+    func testGroupEditOmitsNeverSetFields() throws {
+        // Fields that were never populated should stay omitted (nil), not blasted to "".
+        let m = GroupEditModel(group: InventoryGroup(id: "g1", name: "Screens"), service: Mock())
+        let body = m.buildRequest()
+        let encoder = JSONEncoder(); encoder.keyEncodingStrategy = .convertToSnakeCase
+        let data = try encoder.encode(body)
+        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertNil(json["sku"])
+        XCTAssertNil(json["subcategory"])
+        XCTAssertNil(json["manufacturer"])
+        XCTAssertNil(json["model_number"])
+        XCTAssertNil(json["preferred_supplier_name"])
+    }
 }
