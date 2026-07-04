@@ -83,6 +83,7 @@ final class KioskViewModel: ObservableObject {
     }
     var isGuestCheckout: Bool { selectedClient == nil }
     var isEmpty: Bool { items.isEmpty }
+    var itemCount: Int { items.reduce(0) { $0 + $1.quantity } }
 
     // MARK: - Catalog passthroughs
 

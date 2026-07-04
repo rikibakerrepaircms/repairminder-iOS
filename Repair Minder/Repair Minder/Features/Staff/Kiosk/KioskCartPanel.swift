@@ -37,7 +37,7 @@ struct KioskCartPanel: View {
         HStack {
             VStack(alignment: .leading, spacing: 1) {
                 Text("Cart").font(.headline)
-                Text("\(viewModel.items.count) item\(viewModel.items.count == 1 ? "" : "s")")
+                Text("\(viewModel.itemCount) item\(viewModel.itemCount == 1 ? "" : "s")")
                     .font(.caption2).foregroundStyle(.secondary)
             }
             Spacer()
@@ -130,7 +130,7 @@ struct KioskCartPanel: View {
     private var globalDiscountButton: some View {
         Button { onEditGlobalDiscount() } label: {
             if viewModel.totals.globalDiscount > 0 {
-                Label("Discount: \(money(viewModel.totals.globalDiscount)) applied", systemImage: "tag.fill")
+                Label(globalDiscountLabel, systemImage: "tag.fill")
                     .font(.subheadline).frame(maxWidth: .infinity).padding(.vertical, 8)
                     .background(Color.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
                     .foregroundStyle(.green)
@@ -141,6 +141,17 @@ struct KioskCartPanel: View {
                     .foregroundStyle(.white)
             }
         }.buttonStyle(.plain)
+    }
+
+    private var globalDiscountLabel: String {
+        var base: String
+        if let pct = viewModel.globalDiscountPercent, pct != 0 {
+            base = "\(pct == pct.rounded() ? String(Int(pct)) : String(pct))% off"
+        } else {
+            base = "\(money(viewModel.totals.globalDiscount)) off"
+        }
+        if let r = viewModel.globalDiscountReason, !r.isEmpty { base += " — \(r)" }
+        return base
     }
 
     private func row(_ label: String, _ value: Double, tint: Color? = nil) -> some View {

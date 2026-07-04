@@ -49,6 +49,7 @@ struct KioskCatalogPanel: View {
                 TextField("Search or scan barcode…", text: $searchText)
                     .textFieldStyle(.plain)
                     .onChange(of: searchText) { _, v in scheduleSearch(v) }
+                    .onSubmit { Task { await submitScan() } }
                 if !searchText.isEmpty {
                     Button { searchText = "" ; scheduleSearch("") } label: { Image(systemName: "xmark.circle.fill") }
                         .buttonStyle(.plain).foregroundStyle(.secondary)
@@ -194,6 +195,15 @@ struct KioskCatalogPanel: View {
             let product: KioskProduct = try await APIClient.shared.request(.productTypeBySku(sku: sku))
             onSelectProduct(product)
         } catch { scanError = "No product matches \(sku)." }
+    }
+    private func submitScan() async {
+        let code = searchText.trimmingCharacters(in: .whitespaces)
+        guard code.count >= 3 else { return }
+        if let product: KioskProduct = try? await APIClient.shared.request(.productTypeBySku(sku: code)) {
+            onSelectProduct(product)
+            searchText = ""            // clear → back to browse
+        }
+        // miss: leave the text as a search filter (silent), matching web
     }
 }
 

@@ -69,7 +69,7 @@ private struct KioskClientPickerSheet: View {
                     TextField("Phone (optional)", text: $newPhone)
                     Button("Use this client") {
                         onSelect(KioskClientRef(id: "",
-                            email: newEmail.isEmpty ? nil : newEmail,
+                            email: newEmail.isEmpty ? nil : newEmail.trimmingCharacters(in: .whitespaces).lowercased(),
                             firstName: newFirst.isEmpty ? nil : newFirst,
                             lastName: newLast.isEmpty ? nil : newLast,
                             phone: newPhone.isEmpty ? nil : newPhone))

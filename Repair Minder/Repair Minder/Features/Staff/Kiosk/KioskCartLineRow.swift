@@ -31,7 +31,13 @@ struct KioskCartLineRow: View {
                         if item.quantity > 1 { onQuantityChange(item.quantity - 1) } else { onRemove() }
                     } label: { Image(systemName: "minus").frame(width: 34, height: 34) }
                     Text("\(item.quantity)").font(.body.weight(.medium)).frame(minWidth: 32)
-                    Button { onQuantityChange(item.quantity + 1) } label: { Image(systemName: "plus").frame(width: 34, height: 34) }
+                    Button {
+                        if item.selectedAssets.isEmpty {
+                            onQuantityChange(item.quantity + 1)
+                        } else {
+                            onManageAssets()   // serialized: reopen allocation to add the extra unit
+                        }
+                    } label: { Image(systemName: "plus").frame(width: 34, height: 34) }
                 }
                 .buttonStyle(.bordered)
 

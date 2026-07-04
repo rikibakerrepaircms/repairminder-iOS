@@ -32,7 +32,8 @@ enum KioskCartMath {
         let grossTotal = jsRound2(quantity * unitPrice)
         let effectiveDiscount: Double
         if let pct = item.discountPercent, pct != 0 {
-            effectiveDiscount = jsRound2(grossTotal * (pct / 100))
+            let clampedPct = min(max(pct, 0), 100)
+            effectiveDiscount = jsRound2(grossTotal * (clampedPct / 100))
         } else {
             effectiveDiscount = min(item.discountAmount ?? 0, grossTotal)
         }
@@ -61,7 +62,8 @@ enum KioskCartMath {
 
         var globalDiscountValue = 0.0
         if let pct = globalDiscountPercent, pct != 0 {
-            globalDiscountValue = jsRound2(itemsSubtotal * (pct / 100))
+            let clampedPct = min(max(pct, 0), 100)
+            globalDiscountValue = jsRound2(itemsSubtotal * (clampedPct / 100))
         } else if let amt = globalDiscountAmount, amt != 0 {
             globalDiscountValue = jsRound2(min(amt, itemsSubtotal))
         }

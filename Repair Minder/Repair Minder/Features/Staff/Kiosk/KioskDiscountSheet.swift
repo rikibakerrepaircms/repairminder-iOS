@@ -14,13 +14,16 @@ struct KioskDiscountSheet: View {
     @State private var reason: String
     let onSave: (KioskDiscountValue) -> Void
     private let hasExisting: Bool
+    let maxAmount: Double?
     @Environment(\.dismiss) private var dismiss
 
     enum Mode: String, CaseIterable { case percent = "Percent", amount = "Amount" }
 
-    init(title: String, initial: KioskDiscountValue, onSave: @escaping (KioskDiscountValue) -> Void) {
+    init(title: String, initial: KioskDiscountValue, maxAmount: Double? = nil,
+         onSave: @escaping (KioskDiscountValue) -> Void) {
         self.title = title
         self.onSave = onSave
+        self.maxAmount = maxAmount
         self.hasExisting = initial.percent != nil || initial.amount != nil
         _mode = State(initialValue: initial.percent != nil ? .percent : .amount)
         _percentText = State(initialValue: initial.percent.map { String($0) } ?? "")
@@ -59,8 +62,12 @@ struct KioskDiscountSheet: View {
 
     private var canApply: Bool {
         guard !reason.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
-        let value = mode == .percent ? Double(percentText) : Double(amountText)
-        return (value ?? 0) > 0
+        guard let value = mode == .percent ? Double(percentText) : Double(amountText) else { return false }
+        if mode == .percent {
+            return value > 0 && value <= 100
+        } else {
+            return value > 0 && (maxAmount == nil || value <= maxAmount! + 0.001)
+        }
     }
 
     private func apply() {

@@ -118,7 +118,7 @@ struct KioskView: View {
             VStack(spacing: 0) {
                 Picker("", selection: $iphoneTab) {
                     Text("Catalog").tag(0)
-                    Text("Cart (\(viewModel.items.count))").tag(1)
+                    Text("Cart (\(viewModel.itemCount))").tag(1)
                 }
                 .pickerStyle(.segmented)
                 .padding(8)
@@ -165,6 +165,20 @@ struct KioskView: View {
     // MARK: - Product selection
 
     private func handleSelectProduct(_ product: KioskProduct) {
+        // Re-tapping a product already in the cart manages that line rather than duplicating it.
+        if !product.id.isEmpty,
+           let existing = viewModel.items.first(where: { $0.productTypeId == product.id }) {
+            if !existing.selectedAssets.isEmpty {
+                // serialized + already allocated → reopen allocation to add/adjust
+                allocationContext = AllocationContext(
+                    productTypeId: product.id, name: existing.description,
+                    unitPrice: existing.unitPrice, vatRate: existing.vatRate,
+                    sku: existing.productSku, existingItemId: existing.id)
+            } else {
+                viewModel.setQuantity(existing.id, existing.quantity + 1)
+            }
+            return
+        }
         if !product.id.isEmpty {
             Task {
                 let assets = (try? await KioskService()
@@ -173,12 +187,9 @@ struct KioskView: View {
                     addDirect(product)
                 } else {
                     allocationContext = AllocationContext(
-                        productTypeId: product.id,
-                        name: product.name,
-                        unitPrice: product.defaultSellPrice ?? 0,
-                        vatRate: product.vatRate ?? 20,
-                        sku: product.sku,
-                        existingItemId: nil)
+                        productTypeId: product.id, name: product.name,
+                        unitPrice: product.defaultSellPrice ?? 0, vatRate: product.vatRate ?? 20,
+                        sku: product.sku, existingItemId: nil)
                 }
             }
         } else {
@@ -228,12 +239,14 @@ struct KioskView: View {
 
     private func itemDiscountSheet(_ itemId: String) -> some View {
         let item = viewModel.items.first { $0.id == itemId }
+        let maxAmount = (item.map { Double($0.quantity) * $0.unitPrice })
         return KioskDiscountSheet(
             title: "Item Discount",
             initial: KioskDiscountValue(
                 percent: item?.discountPercent,
                 amount: item?.discountAmount,
                 reason: item?.discountReason),
+            maxAmount: maxAmount,
             onSave: { value in
                 viewModel.updateItem(itemId) {
                     $0.discountPercent = value.percent
@@ -250,6 +263,7 @@ struct KioskView: View {
                 percent: viewModel.globalDiscountPercent,
                 amount: viewModel.globalDiscountAmount,
                 reason: viewModel.globalDiscountReason),
+            maxAmount: viewModel.totals.subtotal,
             onSave: { value in
                 viewModel.globalDiscountPercent = value.percent
                 viewModel.globalDiscountAmount = value.amount
