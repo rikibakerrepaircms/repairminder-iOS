@@ -21,8 +21,13 @@ struct SalvageRequest: Encodable {
 
 /// 201 response. `assets` = the newly created salvaged asset rows (full `Asset`);
 /// `salvaged_assets` = the lighter projection of ALL non-deleted salvage rows.
+///
+/// `assets` is optional (NTH-12): `SalvageViewModel.book()` only reads `salvagedAssets`,
+/// so a full `Asset` decode isn't load-bearing here. Keeping it required meant a field
+/// drift on that heavier struct would throw a *false* failure client-side after the
+/// worker had already created the salvage assets.
 struct SalvageResponse: Decodable, Equatable, Sendable {
-    var assets: [Asset]
+    var assets: [Asset]?
     var salvagedAssets: [SalvagedAssetSummary]
     var newStatus: String
     var salvageBudget: SalvageBudgetInfo

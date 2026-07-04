@@ -41,11 +41,22 @@ final class SalvageTests: XCTestCase {
          "salvage_budget":{"cap":100.0,"booked":5.0,"remaining":95.0}}
         """#
         let resp = try decode(SalvageResponse.self, json)
-        XCTAssertEqual(resp.assets.first?.sourceType, "salvaged")
-        XCTAssertEqual(resp.assets.first?.lcdWorking, 1)
+        XCTAssertEqual(resp.assets?.first?.sourceType, "salvaged")
+        XCTAssertEqual(resp.assets?.first?.lcdWorking, 1)
         XCTAssertEqual(resp.salvagedAssets.first?.cost, 5.0)
         XCTAssertEqual(resp.newStatus, "salvaged")
         XCTAssertEqual(resp.salvageBudget.remaining, 95.0)
+    }
+
+    /// NTH-12: `assets` (the full re-decoded Asset rows) is a nice-to-have, not something
+    /// the VM actually reads (`book()` only uses `salvagedAssets`). If the field drifts or
+    /// is omitted, decoding must still succeed rather than throwing a false failure after
+    /// the worker has already created the salvage assets.
+    func testSalvageResponseDecodesWithoutAssets() throws {
+        let json = #"""
+        {"salvaged_assets":[],"new_status":"salvaged","salvage_budget":{"cap":100,"booked":0,"remaining":100}}
+        """#
+        XCTAssertNoThrow(try decode(SalvageResponse.self, json))
     }
 
     func testDeleteSalvageResultDecodes() throws {
