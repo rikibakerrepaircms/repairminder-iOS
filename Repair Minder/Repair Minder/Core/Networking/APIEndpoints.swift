@@ -235,6 +235,12 @@ enum APIEndpoint {
     // AI listing generation (job-poll)
     case generateBuybackListing(id: String)
     case buybackListingStatus(id: String)
+    // Image management (Package D)
+    case buybackImages(id: String, imageType: String?)
+    case uploadBuybackSourceImage(id: String)
+    case generateBuybackProductPhotos(id: String)
+    case setBuybackImageFinal(imageId: String)
+    case deleteBuybackImage(imageId: String)
 
     // MARK: - Inventory / Assets
 
@@ -628,6 +634,16 @@ enum APIEndpoint {
             return "/api/buyback/\(id)/refurbishment/\(itemId)"
         case .generateBuybackListing(let id), .buybackListingStatus(let id):
             return "/api/buyback/\(id)/generate-listing"
+        case .buybackImages(let id, _):
+            return "/api/buyback/\(id)/images"
+        case .uploadBuybackSourceImage(let id):
+            return "/api/buyback/\(id)/source-images"
+        case .generateBuybackProductPhotos(let id):
+            return "/api/buyback/\(id)/product-photos"
+        case .setBuybackImageFinal(let imageId):
+            return "/api/buyback/images/\(imageId)/final"
+        case .deleteBuybackImage(let imageId):
+            return "/api/buyback/images/\(imageId)"
 
         // Inventory / Assets
         case .inventoryList: return "/api/assets"
@@ -749,6 +765,7 @@ enum APIEndpoint {
              .boardColumns, .boardCardPositions,
              .schedule, .teamSchedule, .boardPinnedPreferences,
              .buybackList, .buybackDetail, .buybackImageFile, .buybackNotes, .buybackListingStatus,
+             .buybackImages,
              .inventoryList, .inventoryDetail, .inventoryByTag, .inventoryActivity,
              .inventoryAssetGroups, .inventoryExternalDeployment, .productTypeCategories, .assetGroupsList,
              .assetGroup, .assetGroupAssets, .assetGroupProducts,
@@ -787,7 +804,8 @@ enum APIEndpoint {
              .salvageBuyback, .cancelDeviceWork, .completeDeviceChecklist, .deviceQC,
              .addBuybackNote, .sellBuyback, .sellBuybackBulk, .addDeviceToBuyback,
              .createKioskOrder, .staffAuthorizeDevice,
-             .addRefurbishmentItem, .generateBuybackListing:
+             .addRefurbishmentItem, .generateBuybackListing,
+             .uploadBuybackSourceImage, .generateBuybackProductPhotos, .setBuybackImageFinal:
             return .post
 
         // PATCH endpoints
@@ -818,7 +836,7 @@ enum APIEndpoint {
              .deleteDeviceImage, .deleteAsset, .removeMembership,
              .deleteSupplierOrderLine, .deleteSalvageItem, .deleteSupplierOrder,
              .deleteOrderRefund, .cancelKioskOrder,
-             .deleteRefurbishmentItem:
+             .deleteRefurbishmentItem, .deleteBuybackImage:
             return .delete
         }
     }
@@ -1100,6 +1118,10 @@ enum APIEndpoint {
             guard !items.isEmpty else { return nil }
             items.append(URLQueryItem(name: "format", value: "auto"))
             return items
+
+        case .buybackImages(_, let imageType):
+            guard let imageType = imageType, !imageType.isEmpty else { return nil }
+            return [URLQueryItem(name: "image_type", value: imageType)]
 
         case .kioskAvailableAssets(let productTypeId, let groupId, let search):
             var items: [URLQueryItem] = []

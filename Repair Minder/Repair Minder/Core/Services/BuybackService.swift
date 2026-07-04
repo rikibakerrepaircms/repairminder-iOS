@@ -76,4 +76,56 @@ final class BuybackService {
     func listingStatus(id: String) async throws -> ListingJobState {
         try await api.request(.buybackListingStatus(id: id))
     }
+
+    // MARK: - Image Management (Package D)
+
+    /// GET /api/buyback/:id/images — optionally filtered by `image_type`.
+    func fetchImages(id: String, imageType: String? = nil) async throws -> [BuybackImageItem] {
+        try await api.request(.buybackImages(id: id, imageType: imageType))
+    }
+
+    /// POST /api/buyback/:id/source-images — one multipart request per photo.
+    /// The backend accepts `source_front` / `source_back` fields (each needs
+    /// >=1); `uploadMultipartFull` is single-file only, so front and back are
+    /// sent as two separate requests using `field` to pick which name to use.
+    func uploadSourceImage(id: String, image: PlatformImageData, field: String) async throws -> SourceImagesResponse {
+        try await api.uploadMultipartFull(
+            .uploadBuybackSourceImage(id: id),
+            fileData: image.jpegData,
+            fileName: image.fileName,
+            mimeType: "image/jpeg",
+            fileFieldName: field,
+            fields: [:]
+        )
+    }
+
+    /// POST /api/buyback/:id/product-photos — front-only for v1 (single-file
+    /// multipart helper can't attach a second `source_back` in the same request).
+    /// Tier-gated: a non-2xx here typically means the company lacks product-photo
+    /// config; callers should surface `APIError.localizedDescription` verbatim.
+    func generateProductPhotos(id: String, front: PlatformImageData, imageType: String? = nil) async throws -> ProductPhotosResponse {
+        try await api.uploadMultipartFull(
+            .generateBuybackProductPhotos(id: id),
+            fileData: front.jpegData,
+            fileName: front.fileName,
+            mimeType: "image/jpeg",
+            fileFieldName: "source_front",
+            fields: imageType.map { ["image_type": $0] } ?? [:]
+        )
+    }
+
+    /// POST /api/buyback/images/:imageId/final — bodyless.
+    func setImageFinal(imageId: String) async throws -> SetFinalResponse {
+        try await api.request(.setBuybackImageFinal(imageId: imageId))
+    }
+
+    /// DELETE /api/buyback/images/:imageId → { success, message } with NO `data`
+    /// key. `requestVoid` decodes `APIResponse<EmptyResponse>`, whose `data` field
+    /// is Optional — Swift's synthesized decoding maps a missing key to `nil` for
+    /// Optional properties, and the check inside `requestVoid` only inspects
+    /// `response.success` (never unwraps `data`), so this decodes cleanly without
+    /// any custom handling. Verified by reading `APIResponse<T>` / `requestVoid`.
+    func deleteImage(imageId: String) async throws {
+        try await api.requestVoid(.deleteBuybackImage(imageId: imageId))
+    }
 }
