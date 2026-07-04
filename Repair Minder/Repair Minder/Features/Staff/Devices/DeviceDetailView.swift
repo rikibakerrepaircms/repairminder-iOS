@@ -44,6 +44,9 @@ struct DeviceDetailView: View {
     // Add part state
     @State private var showAddPartSheet = false
 
+    // Staff authorize state
+    @State private var showingStaffAuthorizeSheet = false
+
     private var isRegularWidth: Bool {
         horizontalSizeClass == .regular
     }
@@ -187,6 +190,11 @@ struct DeviceDetailView: View {
         .sheet(isPresented: $showAddPartSheet) {
             AddPartSheet { assetId in
                 await viewModel.allocatePart(assetId: assetId)
+            }
+        }
+        .sheet(isPresented: $showingStaffAuthorizeSheet) {
+            StaffAuthorizeSheet { request in
+                await viewModel.staffAuthorize(request)
             }
         }
     }
@@ -550,6 +558,21 @@ struct DeviceDetailView: View {
                         }
                     }
                 }
+            }
+
+            // Staff authorize — only while awaiting customer/staff authorization
+            if device.deviceStatus == .awaitingAuthorisation {
+                Button {
+                    showingStaffAuthorizeSheet = true
+                } label: {
+                    HStack {
+                        Text("Staff authorize")
+                        Spacer()
+                        Image(systemName: "checkmark.shield")
+                    }
+                }
+                .disabled(viewModel.isUpdating)
+                .accessibilityIdentifier("staff-authorize-button")
             }
 
             // Quality check — only while awaiting QC
