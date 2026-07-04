@@ -217,6 +217,149 @@ final class DeviceDetailViewModel {
         await updateDevice(.repairNotes(notes))
     }
 
+    // MARK: - Accessories
+
+    /// Mark an accessory as returned
+    func markAccessoryReturned(accessoryId: String) async {
+        isUpdating = true
+        error = nil
+        do {
+            try await APIClient.shared.requestVoid(
+                .returnDeviceAccessory(orderId: orderId, deviceId: deviceId, accessoryId: accessoryId)
+            )
+            await loadDevice()
+        } catch {
+            self.error = error.localizedDescription
+            #if DEBUG
+            print("Failed to mark accessory returned: \(error)")
+            #endif
+        }
+        isUpdating = false
+    }
+
+    // MARK: - Parts
+
+    /// Allocates an in-stock inventory asset onto this device as a used part.
+    /// Reuses the Inventory feature's allocate endpoint (`POST /api/assets/:id/allocate`)
+    /// with `device_id` set to this device — the same contract `DeployToOrderWizard`
+    /// uses with `order_id` for orders.
+    /// Returns nil on success (device is refreshed), or a human-readable error message.
+    func allocatePart(assetId: String) async -> String? {
+        isUpdating = true
+        defer { isUpdating = false }
+        do {
+            _ = try await InventoryService().allocateAsset(
+                id: assetId,
+                body: AllocateRequest(deviceId: deviceId, deploy: false)
+            )
+            await loadDevice()
+            return nil
+        } catch {
+            #if DEBUG
+            print("Failed to allocate part: \(error)")
+            #endif
+            return error.localizedDescription
+        }
+    }
+
+    // MARK: - Cancel Work
+
+    /// Cancel in-progress work on this device
+    func cancelWork(reason: String?) async {
+        isUpdating = true
+        error = nil
+        do {
+            try await APIClient.shared.requestVoid(
+                .cancelDeviceWork(deviceId: deviceId),
+                body: CancelWorkRequest(reassignTo: nil, cancelReason: reason)
+            )
+            await loadDevice()
+            await loadActions()
+        } catch {
+            self.error = error.localizedDescription
+            #if DEBUG
+            print("Failed to cancel work: \(error)")
+            #endif
+        }
+        isUpdating = false
+    }
+
+    // MARK: - Checklists
+
+    /// Fetch checklist templates of a given type (intake|pre_repair|post_repair|outgoing).
+    func fetchChecklistTemplates(type: String) async -> [ChecklistTemplate] {
+        do {
+            return try await APIClient.shared.request(
+                .deviceChecklistTemplates(orderId: orderId, deviceId: deviceId, checklistType: type)
+            )
+        } catch {
+            self.error = error.localizedDescription
+            #if DEBUG
+            print("Failed to fetch checklist templates: \(error)")
+            #endif
+            return []
+        }
+    }
+
+    /// Submit a completed checklist result set. Returns nil on success,
+    /// or a human-readable error message on failure.
+    func completeChecklist(_ request: CompleteChecklistRequest) async -> String? {
+        isUpdating = true
+        defer { isUpdating = false }
+
+        do {
+            let _: CreatedChecklistResponse = try await APIClient.shared.request(
+                .completeDeviceChecklist(orderId: orderId, deviceId: deviceId),
+                body: request
+            )
+            await loadDevice()
+            await loadActions()
+            return nil
+        } catch {
+            #if DEBUG
+            print("Failed to complete checklist: \(error)")
+            #endif
+            return error.localizedDescription
+        }
+    }
+
+    // MARK: - Quality Check
+
+    /// Fetch QC readiness requirements for this device.
+    func fetchQCRequirements() async -> QCRequirements? {
+        do {
+            return try await APIClient.shared.request(.deviceQCRequirements(deviceId: deviceId))
+        } catch {
+            self.error = error.localizedDescription
+            #if DEBUG
+            print("Failed to fetch QC requirements: \(error)")
+            #endif
+            return nil
+        }
+    }
+
+    /// Submit a QC pass/fail decision. Returns nil on success,
+    /// or a human-readable error message on failure.
+    func submitQC(_ request: QCActionRequest) async -> String? {
+        isUpdating = true
+        defer { isUpdating = false }
+
+        do {
+            let _: QCActionResponse = try await APIClient.shared.request(
+                .deviceQC(deviceId: deviceId),
+                body: request
+            )
+            await loadDevice()
+            await loadActions()
+            return nil
+        } catch {
+            #if DEBUG
+            print("Failed to submit QC: \(error)")
+            #endif
+            return error.localizedDescription
+        }
+    }
+
     // MARK: - Message Handling
 
     /// Clear success message

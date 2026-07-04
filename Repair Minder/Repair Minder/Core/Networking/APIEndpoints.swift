@@ -79,6 +79,12 @@ enum APIEndpoint {
     case updateDeviceBankDetails(deviceId: String)
     case updateDeviceEngineer(deviceId: String)
     case updateDeviceSubLocation(deviceId: String)
+    case returnDeviceAccessory(orderId: String, deviceId: String, accessoryId: String)
+    case cancelDeviceWork(deviceId: String)
+    case deviceChecklistTemplates(orderId: String, deviceId: String, checklistType: String)
+    case completeDeviceChecklist(orderId: String, deviceId: String)
+    case deviceQCRequirements(deviceId: String)
+    case deviceQC(deviceId: String)
 
     // Device Images
     case deviceImages(orderId: String, deviceId: String)
@@ -403,6 +409,18 @@ enum APIEndpoint {
             return "/api/devices/\(deviceId)/engineer"
         case .updateDeviceSubLocation(let deviceId):
             return "/api/devices/\(deviceId)/sub-location"
+        case .returnDeviceAccessory(let orderId, let deviceId, let accessoryId):
+            return "/api/orders/\(orderId)/devices/\(deviceId)/accessories/\(accessoryId)/return"
+        case .cancelDeviceWork(let deviceId):
+            return "/api/devices/\(deviceId)/cancel-work"
+        case .deviceChecklistTemplates(let orderId, let deviceId, _):
+            return "/api/orders/\(orderId)/devices/\(deviceId)/checklists/templates"
+        case .completeDeviceChecklist(let orderId, let deviceId):
+            return "/api/orders/\(orderId)/devices/\(deviceId)/checklists"
+        case .deviceQCRequirements(let deviceId):
+            return "/api/devices/\(deviceId)/qc-requirements"
+        case .deviceQC(let deviceId):
+            return "/api/devices/\(deviceId)/qc"
         case .deviceImages(let orderId, let deviceId),
              .uploadDeviceImage(let orderId, let deviceId):
             return "/api/orders/\(orderId)/devices/\(deviceId)/images"
@@ -666,6 +684,7 @@ enum APIEndpoint {
              .dashboardStats, .commissionEstimate, .enquiryStats, .lifecycle, .categoryBreakdown, .activityLog,
              .bookingHeatmap, .buybackStats, .bookingsByTime,
              .devices, .myQueue, .myActiveWork, .orderDevices, .orderDevice, .deviceActions,
+             .deviceChecklistTemplates, .deviceQCRequirements,
              .deviceImages, .deviceImageFile(_, _, _, _, _),
              .orders, .order, .orderItems, .orderPayments, .orderSignatures, .orderRefunds, .orderDocument,
              .clients, .client, .clientSearch, .clientsExport,
@@ -714,12 +733,13 @@ enum APIEndpoint {
              .addMembership, .bulkAssignGroups, .promoteGroup, .createProductType,
              .bulkReturnToSupplier, .importAssets, .createSupplierOrder,
              .addSupplierOrderLine, .receiveSupplierOrder, .extractInvoice,
-             .salvageBuyback:
+             .salvageBuyback, .cancelDeviceWork, .completeDeviceChecklist, .deviceQC:
             return .post
 
         // PATCH endpoints
         case .updateOrderDevice, .updateDeviceStatus, .updateDeviceBankDetails,
              .updateDeviceEngineer, .updateDeviceSubLocation, .updateBuyback,
+             .returnDeviceAccessory,
              .updateOrder, .updateOrderItem,
              .updateClient,
              .updateTicket,
@@ -798,6 +818,9 @@ enum APIEndpoint {
 
         case .devices(let filter):
             return filter.queryItems
+
+        case .deviceChecklistTemplates(_, _, let checklistType):
+            return [URLQueryItem(name: "checklist_type", value: checklistType)]
 
         case .orders(let page, let limit, let status, let paymentStatus, let locationId, let assignedUserId, let search):
             var items = [

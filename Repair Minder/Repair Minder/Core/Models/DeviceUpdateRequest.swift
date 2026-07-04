@@ -92,6 +92,13 @@ struct DeviceUpdateRequest: Encodable, Sendable {
         return request
     }
 
+    /// Create a request to update the due date (formatted `yyyy-MM-dd`, local time)
+    static func dueDate(_ dueDate: String?) -> DeviceUpdateRequest {
+        var request = DeviceUpdateRequest()
+        request.dueDate = dueDate
+        return request
+    }
+
     /// Create a request to update diagnosis notes
     static func diagnosisNotes(_ notes: String) -> DeviceUpdateRequest {
         var request = DeviceUpdateRequest()
@@ -112,6 +119,14 @@ struct DeviceUpdateRequest: Encodable, Sendable {
         request.repairNotes = notes
         return request
     }
+}
+
+// MARK: - Cancel Work Request
+
+/// Request body for `POST /api/devices/:deviceId/cancel-work`
+struct CancelWorkRequest: Encodable, Sendable {
+    var reassignTo: String?
+    var cancelReason: String?
 }
 
 // MARK: - Device Status Update Request

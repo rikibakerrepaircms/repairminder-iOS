@@ -25,9 +25,37 @@ struct DeviceDetailView: View {
     @State private var editingRepairNotes = false
     @State private var repairNotesText = ""
 
+    // Due date editor state
+    @State private var showingDueDatePicker = false
+    @State private var dueDatePickerValue = Date()
+
+    // Cancel work state
+    @State private var showingCancelWorkSheet = false
+    @State private var cancelWorkReason = ""
+
+    // Checklist completion state
+    @State private var checklistTemplate: ChecklistTemplate?
+    @State private var isFetchingChecklistTemplate = false
+
+    // QC (quality check) state
+    @State private var qcSheetItem: QCSheetItem?
+    @State private var isFetchingQCRequirements = false
+
+    // Add part state
+    @State private var showAddPartSheet = false
+
     private var isRegularWidth: Bool {
         horizontalSizeClass == .regular
     }
+
+    /// Formats a `Date` as `yyyy-MM-dd` using the device's LOCAL time zone
+    /// (no explicit `timeZone` set → defaults to the system's current time zone).
+    private static let localDateFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        df.locale = Locale(identifier: "en_US_POSIX")
+        return df
+    }()
 
     init(orderId: String, deviceId: String) {
         _viewModel = State(initialValue: DeviceDetailViewModel(orderId: orderId, deviceId: deviceId))
@@ -97,6 +125,70 @@ struct DeviceDetailView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingDueDatePicker) {
+            NavigationStack {
+                Form {
+                    DatePicker("Due date", selection: $dueDatePickerValue, displayedComponents: .date)
+                        .datePickerStyle(.graphical)
+                }
+                .navigationTitle("Due Date")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { showingDueDatePicker = false }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") {
+                            let dateString = Self.localDateFormatter.string(from: dueDatePickerValue)
+                            showingDueDatePicker = false
+                            Task { await viewModel.updateDevice(.dueDate(dateString)) }
+                        }
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showingCancelWorkSheet) {
+            NavigationStack {
+                Form {
+                    Section("Reason (optional)") {
+                        TextEditor(text: $cancelWorkReason)
+                            .frame(minHeight: 80)
+                    }
+                }
+                .navigationTitle("Cancel Work")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") { showingCancelWorkSheet = false }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Cancel Work", role: .destructive) {
+                            let reason = cancelWorkReason.trimmingCharacters(in: .whitespacesAndNewlines)
+                            showingCancelWorkSheet = false
+                            cancelWorkReason = ""
+                            Task { await viewModel.cancelWork(reason: reason.isEmpty ? nil : reason) }
+                        }
+                    }
+                }
+            }
+            .presentationDetents([.medium])
+        }
+        .sheet(item: $checklistTemplate) { template in
+            ChecklistFormSheet(template: template) { request in
+                await viewModel.completeChecklist(request)
+            }
+        }
+        .sheet(item: $qcSheetItem) { item in
+            QCSheet(requirements: item.requirements) { request in
+                await viewModel.submitQC(request)
+            }
+        }
+        .sheet(isPresented: $showAddPartSheet) {
+            AddPartSheet { assetId in
+                await viewModel.allocatePart(assetId: assetId)
+            }
+        }
     }
 
     // MARK: - Loading View
@@ -152,9 +244,7 @@ struct DeviceDetailView: View {
             }
 
             // Parts used
-            if !device.partsUsed.isEmpty {
-                partsSection(device)
-            }
+            partsSection(device)
 
             // Accessories
             if !device.accessories.isEmpty {
@@ -224,7 +314,22 @@ struct DeviceDetailView: View {
                     }
                     GridRow {
                         gridField("Workflow") {
-                            WorkflowTypeBadge(workflowType: device.workflow)
+                            Menu {
+                                Button(DeviceWorkflowType.repair.displayName) {
+                                    Task { await viewModel.updateDevice(.workflowType(.repair)) }
+                                }
+                                Button(DeviceWorkflowType.buyback.displayName) {
+                                    Task { await viewModel.updateDevice(.workflowType(.buyback)) }
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    WorkflowTypeBadge(workflowType: device.workflow)
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .disabled(viewModel.isUpdating)
                         }
                         if let engineer = device.assignedEngineer {
                             gridField("Assigned To") {
@@ -232,26 +337,39 @@ struct DeviceDetailView: View {
                             }
                         }
                     }
-                    if device.subLocation != nil || device.formattedDueDate != nil {
-                        GridRow {
-                            if let subLocation = device.subLocation {
-                                gridField("Location") {
-                                    VStack(alignment: .leading) {
-                                        Text(subLocation.code)
-                                        if let description = subLocation.description {
-                                            Text(description)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
+                    GridRow {
+                        if let subLocation = device.subLocation {
+                            gridField("Location") {
+                                VStack(alignment: .leading) {
+                                    Text(subLocation.code)
+                                    if let description = subLocation.description {
+                                        Text(description)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
                                     }
                                 }
                             }
-                            if let dueDate = device.formattedDueDate {
-                                gridField("Due") {
-                                    Text(dueDate)
-                                        .foregroundStyle(device.isOverdue ? .red : .primary)
+                        }
+                        gridField("Due") {
+                            Button {
+                                dueDatePickerValue = device.dueDate.flatMap { DateFormatters.parseISO8601($0) } ?? Date()
+                                showingDueDatePicker = true
+                            } label: {
+                                HStack(spacing: 4) {
+                                    if let dueDate = device.formattedDueDate {
+                                        Text(dueDate)
+                                            .foregroundStyle(device.isOverdue ? .red : .primary)
+                                    } else {
+                                        Text("Set due date")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
                                 }
                             }
+                            .buttonStyle(.plain)
+                            .disabled(viewModel.isUpdating)
                         }
                     }
                 }
@@ -296,11 +414,24 @@ struct DeviceDetailView: View {
                 }
                 .disabled(viewModel.isUpdating)
 
-                HStack {
-                    Text("Workflow")
-                    Spacer()
-                    WorkflowTypeBadge(workflowType: device.workflow)
+                Menu {
+                    Button(DeviceWorkflowType.repair.displayName) {
+                        Task { await viewModel.updateDevice(.workflowType(.repair)) }
+                    }
+                    Button(DeviceWorkflowType.buyback.displayName) {
+                        Task { await viewModel.updateDevice(.workflowType(.buyback)) }
+                    }
+                } label: {
+                    HStack {
+                        Text("Workflow")
+                        Spacer()
+                        WorkflowTypeBadge(workflowType: device.workflow)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                .disabled(viewModel.isUpdating)
                 if let engineers = device.availableEngineers, !engineers.isEmpty {
                     Menu {
                         Button("Unassigned") {
@@ -372,14 +503,27 @@ struct DeviceDetailView: View {
                         }
                     }
                 }
-                if let dueDate = device.formattedDueDate {
+                Button {
+                    dueDatePickerValue = device.dueDate.flatMap { DateFormatters.parseISO8601($0) } ?? Date()
+                    showingDueDatePicker = true
+                } label: {
                     HStack {
                         Text("Due")
                         Spacer()
-                        Text(dueDate)
-                            .foregroundStyle(device.isOverdue ? .red : .secondary)
+                        if let dueDate = device.formattedDueDate {
+                            Text(dueDate)
+                                .foregroundStyle(device.isOverdue ? .red : .secondary)
+                        } else {
+                            Text("Set due date")
+                                .foregroundStyle(.secondary)
+                        }
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
                 }
+                .buttonStyle(.plain)
+                .disabled(viewModel.isUpdating)
             }
 
             // Available actions always full width
@@ -406,6 +550,42 @@ struct DeviceDetailView: View {
                         }
                     }
                 }
+            }
+
+            // Quality check — only while awaiting QC
+            if device.deviceStatus == .repairedQc {
+                Button {
+                    Task { await startQC() }
+                } label: {
+                    HStack {
+                        if isFetchingQCRequirements {
+                            ProgressView()
+                        } else {
+                            Text("Quality check")
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .disabled(isFetchingQCRequirements || viewModel.isUpdating)
+                .accessibilityIdentifier("qc-start-button")
+            }
+
+            // Cancel work — only while diagnosis/repair is actively in progress
+            if device.deviceStatus == .diagnosing || device.deviceStatus == .repairing {
+                Button(role: .destructive) {
+                    cancelWorkReason = ""
+                    showingCancelWorkSheet = true
+                } label: {
+                    HStack {
+                        Text("Cancel Work")
+                        Spacer()
+                        Image(systemName: "xmark.circle")
+                    }
+                }
+                .disabled(viewModel.isUpdating)
             }
         } header: {
             Text("Status")
@@ -768,7 +948,7 @@ struct DeviceDetailView: View {
     // MARK: - Parts Section
 
     private func partsSection(_ device: DeviceDetail) -> some View {
-        Section("Parts Used") {
+        Section {
             ForEach(device.partsUsed) { part in
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
@@ -801,6 +981,24 @@ struct DeviceDetailView: View {
                     .foregroundStyle(.secondary)
                 }
             }
+            if device.partsUsed.isEmpty {
+                Text("No parts added yet.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            HStack {
+                Text("Parts Used")
+                Spacer()
+                Button {
+                    showAddPartSheet = true
+                } label: {
+                    Label("Add Part", systemImage: "plus.circle")
+                }
+                .font(.caption)
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("add-part-button")
+            }
         }
     }
 
@@ -823,6 +1021,14 @@ struct DeviceDetailView: View {
                     if accessory.isReturned {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(.green)
+                    } else {
+                        Button("Mark returned") {
+                            Task { await viewModel.markAccessoryReturned(accessoryId: accessory.id) }
+                        }
+                        .font(.caption)
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(viewModel.isUpdating)
                     }
                 }
             }
@@ -868,6 +1074,18 @@ struct DeviceDetailView: View {
                     }
                 }
             }
+
+            Button {
+                Task { await startChecklist(for: device) }
+            } label: {
+                if isFetchingChecklistTemplate {
+                    ProgressView()
+                } else {
+                    Text("Complete checklist")
+                }
+            }
+            .disabled(isFetchingChecklistTemplate)
+            .accessibilityIdentifier("checklist-complete-button")
         } header: {
             HStack {
                 Text("Checklist")
@@ -876,6 +1094,48 @@ struct DeviceDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    /// Maps device state to a checklist type, fetches its default template, and
+    /// presents `ChecklistFormSheet` via `checklistTemplate`.
+    ///
+    /// Mapping: repair-in-progress/QC states use `post_repair`; everything earlier
+    /// (received, diagnosing, awaiting authorisation, etc.) uses `pre_repair`.
+    private func startChecklist(for device: DeviceDetail) async {
+        let checklistType: String
+        switch device.deviceStatus {
+        case .repairing, .repairedQc:
+            checklistType = "post_repair"
+        default:
+            checklistType = "pre_repair"
+        }
+
+        isFetchingChecklistTemplate = true
+        viewModel.error = nil
+        let templates = await viewModel.fetchChecklistTemplates(type: checklistType)
+        isFetchingChecklistTemplate = false
+
+        if let defaultTemplate = templates.first(where: { $0.isDefault }) ?? templates.first {
+            checklistTemplate = defaultTemplate
+        } else if viewModel.error == nil {
+            // `fetchChecklistTemplates` already surfaces network/decoding failures via
+            // `viewModel.error` (set inside its catch block before returning `[]`).
+            // Clearing `error` above lets us tell that apart from the silent
+            // success-but-empty case (no error thrown, just no template configured)
+            // so the user gets feedback instead of nothing happening on tap.
+            viewModel.error = "No checklist template available for this stage."
+        }
+    }
+
+    /// Fetches QC readiness requirements and presents `QCSheet` via `qcSheetItem`.
+    private func startQC() async {
+        isFetchingQCRequirements = true
+        let requirements = await viewModel.fetchQCRequirements()
+        isFetchingQCRequirements = false
+
+        if let requirements {
+            qcSheetItem = QCSheetItem(requirements: requirements)
         }
     }
 
@@ -936,6 +1196,15 @@ struct DeviceDetailView: View {
         formatter.currencyCode = "GBP"
         return formatter.string(from: amount as NSDecimalNumber) ?? "£0.00"
     }
+}
+
+// MARK: - QC Sheet Item
+
+/// `QCRequirements` has no natural identity of its own (it's a plain readiness
+/// snapshot), so this wrapper gives `.sheet(item:)` an `Identifiable` to key off.
+private struct QCSheetItem: Identifiable {
+    let id = UUID()
+    let requirements: QCRequirements
 }
 
 // MARK: - Device Action Sheet
