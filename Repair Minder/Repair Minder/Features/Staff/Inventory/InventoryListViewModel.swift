@@ -9,6 +9,9 @@ final class InventoryListViewModel: ObservableObject {
     @Published private(set) var isLoadingMore = false
     @Published private(set) var hasMore = false
     @Published private(set) var error: String?
+    /// Total matching-result count from the last first-page load's `meta.total`
+    /// (nil until a load completes; not updated by `loadMore()` — see NTH-10b).
+    @Published private(set) var total: Int?
 
     // Filter state (bound to UI)
     @Published var searchText = ""
@@ -61,9 +64,10 @@ final class InventoryListViewModel: ObservableObject {
             pendingReload = false
             isLoading = true; error = nil; currentPage = 1
             do {
-                let page = try await service.fetchAssets(page: 1, pageSize: pageSize, filters: query)
-                assets = page
-                hasMore = page.count == pageSize
+                let result = try await service.fetchAssetsWithTotal(page: 1, pageSize: pageSize, filters: query)
+                assets = result.items
+                total = result.total
+                hasMore = result.items.count == pageSize
             } catch {
                 self.error = error.localizedDescription
             }
@@ -106,9 +110,10 @@ final class InventoryListViewModel: ObservableObject {
     func refresh() async {
         currentPage = 1
         do {
-            let page = try await service.fetchAssets(page: 1, pageSize: pageSize, filters: query)
-            assets = page
-            hasMore = page.count == pageSize
+            let result = try await service.fetchAssetsWithTotal(page: 1, pageSize: pageSize, filters: query)
+            assets = result.items
+            total = result.total
+            hasMore = result.items.count == pageSize
             error = nil
         } catch {
             self.error = error.localizedDescription

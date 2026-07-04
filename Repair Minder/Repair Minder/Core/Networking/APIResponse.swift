@@ -37,6 +37,17 @@ struct APIResponseWithFilters<T: Decodable, F: Decodable>: Decodable {
     let code: String?
 }
 
+/// API response envelope for list endpoints that return pagination under a `meta` key
+/// instead of `pagination` — e.g. `GET /api/assets` and `GET /api/asset-groups`
+/// (`{success, data: [...], meta: {page, limit, total, total_pages}}`).
+/// `APIResponse<T>` only unwraps `pagination`, so these are decoded whole-body via
+/// `APIClient.requestFull`. Reuses `Pagination` since the `meta` shape is identical.
+struct APIResponseWithMeta<T: Decodable>: Decodable {
+    let success: Bool
+    let data: T
+    let meta: Pagination?
+}
+
 /// Empty response for endpoints that return no data in the response body
 struct EmptyResponse: Decodable {}
 

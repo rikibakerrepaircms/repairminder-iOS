@@ -6,9 +6,14 @@ final class InventoryGroupsListViewModelTests: XCTestCase {
     final class Mock: InventoryServingStub {
         var lastParams: (search: String?, category: String?, hasProducts: Bool?, unlinkedOnly: Bool?, sortBy: String?, sortOrder: String?)?
         var groups: [InventoryGroup] = []
+        var total: Int?
         override func listGroups(page: Int, limit: Int, search: String?, category: String?, hasProducts: Bool?, unlinkedOnly: Bool?, sortBy: String?, sortOrder: String?) async throws -> [InventoryGroup] {
             lastParams = (search, category, hasProducts, unlinkedOnly, sortBy, sortOrder)
             return groups
+        }
+        override func listGroupsWithTotal(page: Int, limit: Int, search: String?, category: String?, hasProducts: Bool?, unlinkedOnly: Bool?, sortBy: String?, sortOrder: String?) async throws -> (items: [InventoryGroup], total: Int?) {
+            let items = try await listGroups(page: page, limit: limit, search: search, category: category, hasProducts: hasProducts, unlinkedOnly: unlinkedOnly, sortBy: sortBy, sortOrder: sortOrder)
+            return (items, total)
         }
     }
     func testLoadPassesFiltersAndSetsHasMore() async {
@@ -24,6 +29,15 @@ final class InventoryGroupsListViewModelTests: XCTestCase {
         XCTAssertEqual(mock.lastParams?.sortBy, "in_stock_count")
         XCTAssertEqual(mock.lastParams?.sortOrder, "desc")
     }
+    func testCapturesTotalFromMeta() async {
+        let mock = Mock()
+        mock.groups = [InventoryGroup(id: "g1", name: "n")]
+        mock.total = 42
+        let vm = InventoryGroupsListViewModel(service: mock, pageSize: 25)
+        await vm.load()
+        XCTAssertEqual(vm.total, 42)
+    }
+
     func testUnlinkedOnlyMapsToEmptyGroups() async {
         let mock = Mock()
         let vm = InventoryGroupsListViewModel(service: mock, pageSize: 25)

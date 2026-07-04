@@ -4,6 +4,9 @@ import Foundation
 @MainActor
 protocol InventoryServing {
     func fetchAssets(page: Int, pageSize: Int, filters: AssetQuery) async throws -> [Asset]
+    /// Like `fetchAssets` but also surfaces the `meta.total` result count (page 1 only
+    /// needs this — used by `InventoryListViewModel` to show "N assets found").
+    func fetchAssetsWithTotal(page: Int, pageSize: Int, filters: AssetQuery) async throws -> (items: [Asset], total: Int?)
     func fetchAsset(id: String) async throws -> Asset
     func fetchAssetByTag(_ tag: String) async throws -> Asset
     func fetchActivity(id: String) async throws -> [AssetActivity]
@@ -30,6 +33,9 @@ protocol InventoryServing {
 
     // Phase 3 — Groups
     func listGroups(page: Int, limit: Int, search: String?, category: String?, hasProducts: Bool?, unlinkedOnly: Bool?, sortBy: String?, sortOrder: String?) async throws -> [InventoryGroup]
+    /// Like `listGroups` but also surfaces the `meta.total` result count (page 1 only
+    /// needs this — used by `InventoryGroupsListViewModel` to show "N groups found").
+    func listGroupsWithTotal(page: Int, limit: Int, search: String?, category: String?, hasProducts: Bool?, unlinkedOnly: Bool?, sortBy: String?, sortOrder: String?) async throws -> (items: [InventoryGroup], total: Int?)
     func fetchGroup(id: String) async throws -> InventoryGroup
     func fetchGroupAssets(id: String, page: Int, limit: Int) async throws -> [Asset]
     func fetchGroupProducts(id: String) async throws -> [LinkedProduct]
@@ -111,6 +117,15 @@ final class InventoryService: InventoryServing {
             hasGroups: q.hasGroups, hasProducts: q.hasProducts, search: q.search))
     }
 
+    func fetchAssetsWithTotal(page: Int, pageSize: Int, filters q: AssetQuery) async throws -> (items: [Asset], total: Int?) {
+        let envelope: APIResponseWithMeta<[Asset]> = try await api.requestFull(.inventoryList(
+            page: page, limit: pageSize,
+            status: q.status, category: q.category,
+            locationId: q.locationId, subLocationId: q.subLocationId,
+            productTypeId: q.productTypeId, groupId: q.groupId,
+            hasGroups: q.hasGroups, hasProducts: q.hasProducts, search: q.search))
+        return (envelope.data, envelope.meta?.total)
+    }
     func fetchAsset(id: String) async throws -> Asset {
         try await api.request(.inventoryDetail(id: id))
     }
@@ -186,6 +201,10 @@ final class InventoryService: InventoryServing {
     // MARK: - Phase 3 group actions
     func listGroups(page: Int, limit: Int, search: String?, category: String?, hasProducts: Bool?, unlinkedOnly: Bool?, sortBy: String?, sortOrder: String?) async throws -> [InventoryGroup] {
         try await api.request(.assetGroupsList(page: page, limit: limit, search: search, category: category, hasProducts: hasProducts, unlinkedOnly: unlinkedOnly, sortBy: sortBy, sortOrder: sortOrder))
+    }
+    func listGroupsWithTotal(page: Int, limit: Int, search: String?, category: String?, hasProducts: Bool?, unlinkedOnly: Bool?, sortBy: String?, sortOrder: String?) async throws -> (items: [InventoryGroup], total: Int?) {
+        let envelope: APIResponseWithMeta<[InventoryGroup]> = try await api.requestFull(.assetGroupsList(page: page, limit: limit, search: search, category: category, hasProducts: hasProducts, unlinkedOnly: unlinkedOnly, sortBy: sortBy, sortOrder: sortOrder))
+        return (envelope.data, envelope.meta?.total)
     }
     func fetchGroup(id: String) async throws -> InventoryGroup {
         try await api.request(.assetGroup(id: id))

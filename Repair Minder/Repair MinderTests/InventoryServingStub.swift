@@ -6,6 +6,12 @@ import Foundation
 @MainActor
 class InventoryServingStub: InventoryServing {
     func fetchAssets(page: Int, pageSize: Int, filters: AssetQuery) async throws -> [Asset] { [] }
+    /// Default: delegate to `fetchAssets` with a nil total. Declared directly on this class
+    /// (not via a protocol-extension default) so subclasses can `override` it normally —
+    /// subclasses that only override `fetchAssets` still get its result via this delegation.
+    func fetchAssetsWithTotal(page: Int, pageSize: Int, filters: AssetQuery) async throws -> (items: [Asset], total: Int?) {
+        (try await fetchAssets(page: page, pageSize: pageSize, filters: filters), nil)
+    }
     func fetchAsset(id: String) async throws -> Asset { Asset(id: id, assetTag: "T", name: "n", status: .inStock) }
     func fetchAssetByTag(_ tag: String) async throws -> Asset { Asset(id: "a", assetTag: tag, name: "n", status: .inStock) }
     func fetchActivity(id: String) async throws -> [AssetActivity] { [] }
@@ -35,6 +41,10 @@ class InventoryServingStub: InventoryServing {
     func searchOrders(search: String) async throws -> [Order] { [] }
     func fetchOrderItems(orderId: String) async throws -> [OrderItem] { [] }
     func listGroups(page: Int, limit: Int, search: String?, category: String?, hasProducts: Bool?, unlinkedOnly: Bool?, sortBy: String?, sortOrder: String?) async throws -> [InventoryGroup] { [] }
+    /// Default: delegate to `listGroups` with a nil total (see `fetchAssetsWithTotal` note).
+    func listGroupsWithTotal(page: Int, limit: Int, search: String?, category: String?, hasProducts: Bool?, unlinkedOnly: Bool?, sortBy: String?, sortOrder: String?) async throws -> (items: [InventoryGroup], total: Int?) {
+        (try await listGroups(page: page, limit: limit, search: search, category: category, hasProducts: hasProducts, unlinkedOnly: unlinkedOnly, sortBy: sortBy, sortOrder: sortOrder), nil)
+    }
     func fetchGroup(id: String) async throws -> InventoryGroup { InventoryGroup(id: id, name: "n") }
     func fetchGroupAssets(id: String, page: Int, limit: Int) async throws -> [Asset] { [] }
     func fetchGroupProducts(id: String) async throws -> [LinkedProduct] { [] }

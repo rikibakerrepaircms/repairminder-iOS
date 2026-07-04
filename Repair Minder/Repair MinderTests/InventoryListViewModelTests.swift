@@ -6,10 +6,14 @@ final class InventoryListViewModelTests: XCTestCase {
 
     final class MockService: InventoryServingStub {
         var pages: [[Asset]] = []
+        var total: Int?
         var lastQuery: AssetQuery?
         override func fetchAssets(page: Int, pageSize: Int, filters: AssetQuery) async throws -> [Asset] {
             lastQuery = filters
             return page <= pages.count ? pages[page - 1] : []
+        }
+        override func fetchAssetsWithTotal(page: Int, pageSize: Int, filters: AssetQuery) async throws -> (items: [Asset], total: Int?) {
+            (try await fetchAssets(page: page, pageSize: pageSize, filters: filters), total)
         }
     }
 
@@ -35,6 +39,15 @@ final class InventoryListViewModelTests: XCTestCase {
         await vm.loadMore()
         XCTAssertEqual(vm.assets.count, 3)
         XCTAssertFalse(vm.hasMore) // last page returned < pageSize
+    }
+
+    func testCapturesTotalFromMeta() async {
+        let mock = MockService()
+        mock.pages = [[asset("1"), asset("2")]]
+        mock.total = 42
+        let vm = InventoryListViewModel(service: mock, pageSize: 24)
+        await vm.loadAssets()
+        XCTAssertEqual(vm.total, 42)
     }
 
     func testStatusPillBuildsQuery() async {

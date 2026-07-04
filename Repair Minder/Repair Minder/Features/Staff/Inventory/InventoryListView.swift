@@ -208,6 +208,11 @@ struct InventoryListView: View {
             emptyView
         } else {
             List {
+                if let total = viewModel.total {
+                    Text("\(total) asset\(total == 1 ? "" : "s") found")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .listRowSeparator(.hidden)
+                }
                 ForEach(viewModel.assets) { asset in
                     assetRow(asset)
                         .task { await viewModel.loadMoreIfNeeded(currentItem: asset) }

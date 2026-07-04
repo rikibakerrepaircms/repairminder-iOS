@@ -30,6 +30,11 @@ struct InventoryGroupsListView: View {
                 Toggle("Ascending", isOn: $vm.sortAscending)
             }
             if let e = vm.errorMessage { Text(e).foregroundStyle(.red) }
+            if let total = vm.total {
+                Text("\(total) group\(total == 1 ? "" : "s") found")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .listRowSeparator(.hidden)
+            }
             if vm.groups.isEmpty && !vm.isLoading {
                 ContentUnavailableView("No inventory groups", systemImage: "shippingbox")
             }

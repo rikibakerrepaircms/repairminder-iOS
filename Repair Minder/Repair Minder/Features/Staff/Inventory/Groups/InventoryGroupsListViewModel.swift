@@ -20,6 +20,8 @@ final class InventoryGroupsListViewModel: ObservableObject {
     @Published private(set) var hasMore = false
     @Published var errorMessage: String?
     @Published private(set) var knownCategories: [String] = []
+    /// Total matching-result count from the last first-page load's `meta.total` (NTH-10b).
+    @Published private(set) var total: Int?
 
     @Published var search = ""
     @Published var category: String?
@@ -43,11 +45,12 @@ final class InventoryGroupsListViewModel: ObservableObject {
         isLoading = true; errorMessage = nil; page = 1
         defer { isLoading = false }
         do {
-            let result = try await fetch(page: 1)
-            groups = result
-            let cats = result.compactMap { $0.category }.filter { !$0.isEmpty }
+            let result = try await fetchWithTotal(page: 1)
+            groups = result.items
+            total = result.total
+            let cats = result.items.compactMap { $0.category }.filter { !$0.isEmpty }
             knownCategories = Array(Set(knownCategories + cats)).sorted()
-            hasMore = result.count == pageSize
+            hasMore = result.items.count == pageSize
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -68,6 +71,17 @@ final class InventoryGroupsListViewModel: ObservableObject {
 
     private func fetch(page: Int) async throws -> [InventoryGroup] {
         try await service.listGroups(
+            page: page, limit: pageSize,
+            search: search.isEmpty ? nil : search,
+            category: category,
+            hasProducts: hasProducts ? true : nil,
+            unlinkedOnly: emptyGroups ? true : nil,
+            sortBy: sortField.rawValue,
+            sortOrder: sortAscending ? "asc" : "desc")
+    }
+
+    private func fetchWithTotal(page: Int) async throws -> (items: [InventoryGroup], total: Int?) {
+        try await service.listGroupsWithTotal(
             page: page, limit: pageSize,
             search: search.isEmpty ? nil : search,
             category: category,
