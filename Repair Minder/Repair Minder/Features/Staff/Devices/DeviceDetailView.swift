@@ -33,6 +33,10 @@ struct DeviceDetailView: View {
     @State private var showingCancelWorkSheet = false
     @State private var cancelWorkReason = ""
 
+    // Checklist completion state
+    @State private var checklistTemplate: ChecklistTemplate?
+    @State private var isFetchingChecklistTemplate = false
+
     private var isRegularWidth: Bool {
         horizontalSizeClass == .regular
     }
@@ -162,6 +166,11 @@ struct DeviceDetailView: View {
                 }
             }
             .presentationDetents([.medium])
+        }
+        .sheet(item: $checklistTemplate) { template in
+            ChecklistFormSheet(template: template) { request in
+                await viewModel.completeChecklist(request)
+            }
         }
     }
 
@@ -1011,6 +1020,18 @@ struct DeviceDetailView: View {
                     }
                 }
             }
+
+            Button {
+                Task { await startChecklist(for: device) }
+            } label: {
+                if isFetchingChecklistTemplate {
+                    ProgressView()
+                } else {
+                    Text("Complete checklist")
+                }
+            }
+            .disabled(isFetchingChecklistTemplate)
+            .accessibilityIdentifier("checklist-complete-button")
         } header: {
             HStack {
                 Text("Checklist")
@@ -1019,6 +1040,29 @@ struct DeviceDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    /// Maps device state to a checklist type, fetches its default template, and
+    /// presents `ChecklistFormSheet` via `checklistTemplate`.
+    ///
+    /// Mapping: repair-in-progress/QC states use `post_repair`; everything earlier
+    /// (received, diagnosing, awaiting authorisation, etc.) uses `pre_repair`.
+    private func startChecklist(for device: DeviceDetail) async {
+        let checklistType: String
+        switch device.deviceStatus {
+        case .repairing, .repairedQc:
+            checklistType = "post_repair"
+        default:
+            checklistType = "pre_repair"
+        }
+
+        isFetchingChecklistTemplate = true
+        let templates = await viewModel.fetchChecklistTemplates(type: checklistType)
+        isFetchingChecklistTemplate = false
+
+        if let defaultTemplate = templates.first(where: { $0.isDefault }) ?? templates.first {
+            checklistTemplate = defaultTemplate
         }
     }
 

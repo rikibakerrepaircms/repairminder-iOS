@@ -259,6 +259,45 @@ final class DeviceDetailViewModel {
         isUpdating = false
     }
 
+    // MARK: - Checklists
+
+    /// Fetch checklist templates of a given type (intake|pre_repair|post_repair|outgoing).
+    func fetchChecklistTemplates(type: String) async -> [ChecklistTemplate] {
+        do {
+            return try await APIClient.shared.request(
+                .deviceChecklistTemplates(orderId: orderId, deviceId: deviceId, checklistType: type)
+            )
+        } catch {
+            self.error = error.localizedDescription
+            #if DEBUG
+            print("Failed to fetch checklist templates: \(error)")
+            #endif
+            return []
+        }
+    }
+
+    /// Submit a completed checklist result set. Returns nil on success,
+    /// or a human-readable error message on failure.
+    func completeChecklist(_ request: CompleteChecklistRequest) async -> String? {
+        isUpdating = true
+        defer { isUpdating = false }
+
+        do {
+            let _: CreatedChecklistResponse = try await APIClient.shared.request(
+                .completeDeviceChecklist(orderId: orderId, deviceId: deviceId),
+                body: request
+            )
+            await loadDevice()
+            await loadActions()
+            return nil
+        } catch {
+            #if DEBUG
+            print("Failed to complete checklist: \(error)")
+            #endif
+            return error.localizedDescription
+        }
+    }
+
     // MARK: - Message Handling
 
     /// Clear success message
