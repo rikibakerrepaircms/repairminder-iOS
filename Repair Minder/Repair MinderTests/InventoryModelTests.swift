@@ -94,4 +94,17 @@ extension InventoryModelTests {
         XCTAssertEqual(a.status, .allocated)
         XCTAssertEqual(a.checkedOutOrderNumber, 100000021)
     }
+
+    // MF-5 regression: a single row with `status: null` must not throw and
+    // must not blank the entire [Asset] list decode.
+    func testAssetStatusNullDecodesToUnknownAndListSurvives() throws {
+        let json = #"""
+        [{"id":"a1","asset_tag":"AST-1","name":"Part","status":null},
+         {"id":"a2","asset_tag":"AST-2","name":"Part2","status":"in_stock"}]
+        """#
+        let assets = try decode([Asset].self, json)
+        XCTAssertEqual(assets.count, 2)
+        XCTAssertEqual(assets[0].status, .unknown)
+        XCTAssertEqual(assets[1].status, .inStock)
+    }
 }
