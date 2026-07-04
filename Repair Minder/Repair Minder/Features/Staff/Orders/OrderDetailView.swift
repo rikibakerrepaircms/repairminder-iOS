@@ -18,6 +18,9 @@ struct OrderDetailView: View {
     @State private var showCardPaymentSheet = false
     @State private var showPayoutSheet = false
     @State private var payoutDevice: OrderDeviceSummary?
+    @State private var dueDateDevice: OrderDeviceSummary?
+    @State private var deviceToDelete: OrderDeviceSummary?
+    @State private var showDeleteDeviceConfirmation = false
     @State private var deletingPaymentId: String?
     @State private var showDeletePaymentAlert = false
     @State private var selectedDeviceNav: DeviceNavTarget?
@@ -275,6 +278,28 @@ struct OrderDetailView: View {
         .sheet(item: $refundTarget) { payment in
             RefundPaymentSheet(payment: payment) { req in (await viewModel.createRefund(req)) ? nil : (viewModel.actionError ?? "Refund failed.") }
         }
+        // MARK: - Device Action Sheets
+        .sheet(item: $dueDateDevice) { device in
+            OrderDeviceDueDateSheet(deviceName: device.displayName ?? "Device") { dateString in
+                (await viewModel.updateDeviceDueDate(deviceId: device.id, dueDate: dateString)) ? nil : (viewModel.actionError ?? "Could not update due date.")
+            }
+        }
+        .confirmationDialog(
+            "Delete Device",
+            isPresented: $showDeleteDeviceConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                if let device = deviceToDelete {
+                    Task { _ = await viewModel.deleteDevice(deviceId: device.id) }
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            if let device = deviceToDelete {
+                Text("Are you sure you want to delete \"\(device.displayName ?? "this device")\"? This cannot be undone.")
+            }
+        }
     }
 
     // MARK: - Header Card
@@ -415,12 +440,38 @@ struct OrderDetailView: View {
         SectionCard(title: "Devices", icon: "iphone") {
             VStack(spacing: 0) {
                 ForEach(devices) { device in
-                    Button {
-                        selectedDeviceNav = DeviceNavTarget(id: device.id, orderId: orderId)
-                    } label: {
-                        deviceRow(device)
+                    HStack(spacing: 4) {
+                        // Navigation button — tapping the row navigates to device detail.
+                        Button {
+                            selectedDeviceNav = DeviceNavTarget(id: device.id, orderId: orderId)
+                        } label: {
+                            deviceRow(device)
+                        }
+                        .buttonStyle(.plain)
+
+                        // Per-device action menu — a sibling control (NOT nested inside
+                        // the navigation Button) so tapping it doesn't trigger navigation.
+                        if viewModel.isOrderEditable {
+                            Menu {
+                                Button {
+                                    dueDateDevice = device
+                                } label: {
+                                    Label("Edit due date", systemImage: "calendar")
+                                }
+                                Button(role: .destructive) {
+                                    deviceToDelete = device
+                                    showDeleteDeviceConfirmation = true
+                                } label: {
+                                    Label("Delete device", systemImage: "trash")
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis.circle")
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 32, height: 32)
+                            }
+                            .accessibilityIdentifier("device-menu-\(device.id)")
+                        }
                     }
-                    .buttonStyle(.plain)
 
                     if device.id != devices.last?.id {
                         Divider().padding(.vertical, 4)
