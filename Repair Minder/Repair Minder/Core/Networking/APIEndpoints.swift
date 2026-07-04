@@ -85,6 +85,7 @@ enum APIEndpoint {
     case completeDeviceChecklist(orderId: String, deviceId: String)
     case deviceQCRequirements(deviceId: String)
     case deviceQC(deviceId: String)
+    case staffAuthorizeDevice(deviceId: String)
 
     // Device Images
     case deviceImages(orderId: String, deviceId: String)
@@ -228,7 +229,12 @@ enum APIEndpoint {
     case buybackNotes(id: String)
     case addBuybackNote(id: String)
     case sellBuyback(id: String)
+    case sellBuybackBulk
     case addDeviceToBuyback(deviceId: String)
+    // Refurbishment items
+    case addRefurbishmentItem(id: String)
+    case updateRefurbishmentItem(id: String, itemId: String)
+    case deleteRefurbishmentItem(id: String, itemId: String)
 
     // MARK: - Inventory / Assets
 
@@ -437,6 +443,8 @@ enum APIEndpoint {
             return "/api/devices/\(deviceId)/qc-requirements"
         case .deviceQC(let deviceId):
             return "/api/devices/\(deviceId)/qc"
+        case .staffAuthorizeDevice(let deviceId):
+            return "/api/devices/\(deviceId)/staff-authorize"
         case .deviceImages(let orderId, let deviceId),
              .uploadDeviceImage(let orderId, let deviceId):
             return "/api/orders/\(orderId)/devices/\(deviceId)/images"
@@ -616,8 +624,14 @@ enum APIEndpoint {
             return "/api/buyback/\(id)/notes"
         case .sellBuyback(let id):
             return "/api/buyback/\(id)/sell"
+        case .sellBuybackBulk:
+            return "/api/buyback/sell-bulk"
         case .addDeviceToBuyback(let deviceId):
             return "/api/devices/\(deviceId)/add-to-buyback"
+        case .addRefurbishmentItem(let id):
+            return "/api/buyback/\(id)/refurbishment"
+        case .updateRefurbishmentItem(let id, let itemId), .deleteRefurbishmentItem(let id, let itemId):
+            return "/api/buyback/\(id)/refurbishment/\(itemId)"
 
         // Inventory / Assets
         case .inventoryList: return "/api/assets"
@@ -776,8 +790,9 @@ enum APIEndpoint {
              .bulkReturnToSupplier, .importAssets, .createSupplierOrder,
              .addSupplierOrderLine, .receiveSupplierOrder, .extractInvoice,
              .salvageBuyback, .cancelDeviceWork, .completeDeviceChecklist, .deviceQC,
-             .addBuybackNote, .sellBuyback, .addDeviceToBuyback,
-             .createKioskOrder:
+             .addBuybackNote, .sellBuyback, .sellBuybackBulk, .addDeviceToBuyback,
+             .createKioskOrder, .staffAuthorizeDevice,
+             .addRefurbishmentItem:
             return .post
 
         // PATCH endpoints
@@ -790,7 +805,7 @@ enum APIEndpoint {
              .pauseMacroExecution, .resumeMacroExecution,
              .boardUpdateColumn, .boardReorderColumns,
              .boardUpdatePinnedPreference, .updateScheduleItem,
-             .updateSupplierOrder:
+             .updateSupplierOrder, .updateRefurbishmentItem:
             return .patch
 
         // PUT endpoints
@@ -807,7 +822,8 @@ enum APIEndpoint {
              .boardDeleteColumn, .boardDeleteAction,
              .deleteDeviceImage, .deleteAsset, .removeMembership,
              .deleteSupplierOrderLine, .deleteSalvageItem, .deleteSupplierOrder,
-             .deleteOrderRefund, .cancelKioskOrder:
+             .deleteOrderRefund, .cancelKioskOrder,
+             .deleteRefurbishmentItem:
             return .delete
         }
     }

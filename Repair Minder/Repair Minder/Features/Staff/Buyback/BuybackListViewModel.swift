@@ -24,24 +24,34 @@ final class BuybackListViewModel: ObservableObject {
     @Published var selectedStatus: String?
     @Published var selectedLocationId: String?
     @Published var selectedEngineerId: String?
+    @Published var storefrontStatus: String?     // not_started|draft|coming_soon|ready|live
+    @Published var hasSellPriceOnly = false
+    @Published var missingImagesOnly = false
+
+    // Bulk-sell multi-select
+    @Published var isSelecting = false
+    @Published var selectedIds: Set<String> = []
 
     // MARK: - Private
 
     private let apiClient: APIClient
+    private let buybackService: BuybackService
     private var currentPage = 1
     private let pageSize = 20
     private var searchTask: Task<Void, Never>?
 
     // MARK: - Initialization
 
-    init(apiClient: APIClient? = nil) {
+    init(apiClient: APIClient? = nil, buybackService: BuybackService? = nil) {
         self.apiClient = apiClient ?? APIClient.shared
+        self.buybackService = buybackService ?? BuybackService()
     }
 
     // MARK: - Computed Properties
 
     var hasActiveFilters: Bool {
         selectedStatus != nil || selectedLocationId != nil || selectedEngineerId != nil || !searchText.isEmpty
+            || storefrontStatus != nil || hasSellPriceOnly || missingImagesOnly
     }
 
     var statusCounts: [BuybackStatusCount] {
@@ -50,6 +60,22 @@ final class BuybackListViewModel: ObservableObject {
 
     var totalCount: Int {
         pagination?.total ?? 0
+    }
+
+    /// The currently-selected items, in list order. Only `for_sale` items are
+    /// selectable, so this is effectively the eligible set for bulk-sell.
+    var selectedItems: [BuybackItem] {
+        items.filter { selectedIds.contains($0.id) }
+    }
+
+    /// Whether an item may be selected for bulk-sell — only `for_sale` items
+    /// can be sold, so other statuses are excluded from selection.
+    func isSelectable(_ item: BuybackItem) -> Bool {
+        item.buybackStatus == .forSale
+    }
+
+    func isSelected(_ item: BuybackItem) -> Bool {
+        selectedIds.contains(item.id)
     }
 
     // MARK: - Data Loading
@@ -125,6 +151,21 @@ final class BuybackListViewModel: ObservableObject {
         Task { await loadItems() }
     }
 
+    func selectStorefrontStatus(_ status: String?) {
+        storefrontStatus = (storefrontStatus == status) ? nil : status
+        Task { await loadItems() }
+    }
+
+    func toggleHasSellPriceOnly() {
+        hasSellPriceOnly.toggle()
+        Task { await loadItems() }
+    }
+
+    func toggleMissingImagesOnly() {
+        missingImagesOnly.toggle()
+        Task { await loadItems() }
+    }
+
     func applyFilter() async {
         await loadItems()
     }
@@ -134,6 +175,9 @@ final class BuybackListViewModel: ObservableObject {
         selectedLocationId = nil
         selectedEngineerId = nil
         searchText = ""
+        storefrontStatus = nil
+        hasSellPriceOnly = false
+        missingImagesOnly = false
         await loadItems()
     }
 
@@ -145,6 +189,41 @@ final class BuybackListViewModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 300_000_000) // 300ms debounce
             guard !Task.isCancelled else { return }
             await loadItems()
+        }
+    }
+
+    // MARK: - Bulk Selection
+
+    func toggleSelectionMode() {
+        isSelecting.toggle()
+        if !isSelecting {
+            selectedIds.removeAll()
+        }
+    }
+
+    func toggleSelection(_ item: BuybackItem) {
+        guard isSelectable(item) else { return }
+        if selectedIds.contains(item.id) {
+            selectedIds.remove(item.id)
+        } else {
+            selectedIds.insert(item.id)
+        }
+    }
+
+    /// POST /api/buyback/sell-bulk — sells all currently-selected items in one
+    /// order, then reloads the list and exits selection mode. Returns an error
+    /// message on failure (per-item validation errors are joined by the API).
+    func sellBulk(_ request: BulkSellRequest) async -> String? {
+        do {
+            _ = try await buybackService.sellBulk(request)
+            selectedIds.removeAll()
+            isSelecting = false
+            await loadItems()
+            return nil
+        } catch let e as APIError {
+            return e.localizedDescription
+        } catch {
+            return error.localizedDescription
         }
     }
 
@@ -198,6 +277,15 @@ final class BuybackListViewModel: ObservableObject {
         }
         if let engineerId = selectedEngineerId {
             queryItems.append(URLQueryItem(name: "engineer_id", value: engineerId))
+        }
+        if let storefrontStatus, !storefrontStatus.isEmpty {
+            queryItems.append(URLQueryItem(name: "storefront_status", value: storefrontStatus))
+        }
+        if hasSellPriceOnly {
+            queryItems.append(URLQueryItem(name: "has_sell_price", value: "true"))
+        }
+        if missingImagesOnly {
+            queryItems.append(URLQueryItem(name: "missing_images", value: "true"))
         }
 
         components.queryItems = queryItems

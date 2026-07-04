@@ -14,6 +14,7 @@ struct BuybackListView: View {
     @StateObject private var viewModel = BuybackListViewModel()
     @State private var selectedItemId: String?
     @State private var showPurchasePrice = false
+    @State private var showBulkSell = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var isRegularWidth: Bool {
@@ -33,6 +34,56 @@ struct BuybackListView: View {
         .task {
             await viewModel.loadItems()
         }
+        .safeAreaInset(edge: .bottom) {
+            if viewModel.isSelecting && !viewModel.selectedIds.isEmpty {
+                bulkSellBar
+            }
+        }
+        .sheet(isPresented: $showBulkSell) {
+            BulkSellSheet(items: viewModel.selectedItems) { request in
+                await viewModel.sellBulk(request)
+            }
+        }
+    }
+
+    // MARK: - Bulk Sell
+
+    /// Only `for_sale` items can be sold; selecting flips the row into a
+    /// checkable state and disables ineligible items. Shown when at least
+    /// one item is selected.
+    private var bulkSellBar: some View {
+        HStack {
+            Text("\(viewModel.selectedIds.count) selected")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button {
+                showBulkSell = true
+            } label: {
+                Text("Sell (\(viewModel.selectedIds.count))")
+                    .fontWeight(.semibold)
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("bulk-sell-open")
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.bar)
+    }
+
+    @ToolbarContentBuilder
+    private var selectionToolbar: some ToolbarContent {
+        if viewModel.isSelecting {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") { viewModel.toggleSelectionMode() }
+                    .accessibilityIdentifier("bulk-sell-done")
+            }
+        } else {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Select") { viewModel.toggleSelectionMode() }
+                    .accessibilityIdentifier("bulk-sell-select")
+            }
+        }
     }
 
     // MARK: - Embedded Layout (inside another NavigationStack)
@@ -49,6 +100,7 @@ struct BuybackListView: View {
         .navigationDestination(for: String.self) { itemId in
             BuybackDetailView(buybackId: itemId)
         }
+        .toolbar { selectionToolbar }
     }
 
     // MARK: - iPhone Layout
@@ -66,6 +118,7 @@ struct BuybackListView: View {
             .navigationDestination(for: String.self) { itemId in
                 BuybackDetailView(buybackId: itemId)
             }
+            .toolbar { selectionToolbar }
         }
     }
 
@@ -95,6 +148,7 @@ struct BuybackListView: View {
                             }
                         }
                     }
+                    selectionToolbar
                 }
             }
         } detail: {
@@ -185,10 +239,78 @@ struct BuybackListView: View {
                     }
                 }
             }
+
+            // Additional filters: storefront status menu + toggle pills
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    Menu {
+                        Button("All") {
+                            viewModel.selectStorefrontStatus(nil)
+                        }
+                        Divider()
+                        ForEach(BuybackListView.storefrontStatusOptions, id: \.self) { option in
+                            Button(BuybackListView.storefrontStatusDisplayName(option)) {
+                                viewModel.selectStorefrontStatus(option)
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(viewModel.storefrontStatus.map(BuybackListView.storefrontStatusDisplayName)
+                                ?? "Storefront: All")
+                            Image(systemName: "chevron.down")
+                                .font(.caption2)
+                        }
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(viewModel.storefrontStatus != nil ? Color.blue.opacity(0.15) : Color.platformGray6)
+                        .foregroundColor(viewModel.storefrontStatus != nil ? .blue : .secondary)
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(viewModel.storefrontStatus != nil ? Color.blue : Color.clear, lineWidth: 2)
+                        )
+                    }
+
+                    BuybackStatusPill(
+                        title: "Has Sell Price",
+                        count: nil,
+                        isSelected: viewModel.hasSellPriceOnly,
+                        color: .green
+                    ) {
+                        viewModel.toggleHasSellPriceOnly()
+                    }
+
+                    BuybackStatusPill(
+                        title: "Missing Images",
+                        count: nil,
+                        isSelected: viewModel.missingImagesOnly,
+                        color: .orange
+                    ) {
+                        viewModel.toggleMissingImagesOnly()
+                    }
+                }
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(Color.platformGroupedBackground)
+    }
+
+    // MARK: - Storefront Status Options
+
+    static let storefrontStatusOptions = ["not_started", "draft", "coming_soon", "ready", "live"]
+
+    static func storefrontStatusDisplayName(_ status: String) -> String {
+        switch status {
+        case "not_started": return "Not Started"
+        case "draft": return "Draft"
+        case "coming_soon": return "Coming Soon"
+        case "ready": return "Ready"
+        case "live": return "Live"
+        default: return status.replacingOccurrences(of: "_", with: " ").capitalized
+        }
     }
 
     // MARK: - iPhone Items List
@@ -196,12 +318,10 @@ struct BuybackListView: View {
     private var iPhoneItemsList: some View {
         List {
             ForEach(viewModel.items) { item in
-                NavigationLink(value: item.id) {
-                    buybackRow(item)
-                }
-                .task {
-                    await viewModel.loadMoreIfNeeded(currentItem: item)
-                }
+                itemRow(item)
+                    .task {
+                        await viewModel.loadMoreIfNeeded(currentItem: item)
+                    }
             }
 
             if viewModel.isLoadingMore {
@@ -219,24 +339,64 @@ struct BuybackListView: View {
         }
     }
 
+    /// Row wrapper for the iPhone list — navigates to detail normally, or
+    /// toggles bulk-sell selection while `isSelecting` is active.
+    @ViewBuilder
+    private func itemRow(_ item: BuybackItem) -> some View {
+        if viewModel.isSelecting {
+            Button {
+                viewModel.toggleSelection(item)
+            } label: {
+                selectableRow(item)
+            }
+            .buttonStyle(.plain)
+            .disabled(!viewModel.isSelectable(item))
+        } else {
+            NavigationLink(value: item.id) {
+                buybackRow(item)
+            }
+        }
+    }
+
+    /// A row with a leading checkmark indicator, dimmed when the item isn't
+    /// eligible for bulk-sell (only `for_sale` items can be sold).
+    private func selectableRow(_ item: BuybackItem) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: viewModel.isSelected(item) ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(viewModel.isSelected(item) ? Color.accentColor : .secondary)
+            buybackRow(item)
+        }
+        .opacity(viewModel.isSelectable(item) ? 1 : 0.4)
+    }
+
     // MARK: - iPad Items List
 
     private var iPadItemsList: some View {
         List {
             ForEach(viewModel.items) { item in
-                buybackRow(item)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        selectedItemId = item.id
+                Group {
+                    if viewModel.isSelecting {
+                        selectableRow(item)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                viewModel.toggleSelection(item)
+                            }
+                    } else {
+                        buybackRow(item)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                selectedItemId = item.id
+                            }
+                            .listRowBackground(
+                                selectedItemId == item.id
+                                    ? Color.accentColor.opacity(0.1)
+                                    : nil
+                            )
                     }
-                    .listRowBackground(
-                        selectedItemId == item.id
-                            ? Color.accentColor.opacity(0.1)
-                            : nil
-                    )
-                    .task {
-                        await viewModel.loadMoreIfNeeded(currentItem: item)
-                    }
+                }
+                .task {
+                    await viewModel.loadMoreIfNeeded(currentItem: item)
+                }
             }
 
             if viewModel.isLoadingMore {
