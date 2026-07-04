@@ -83,6 +83,8 @@ enum APIEndpoint {
     case cancelDeviceWork(deviceId: String)
     case deviceChecklistTemplates(orderId: String, deviceId: String, checklistType: String)
     case completeDeviceChecklist(orderId: String, deviceId: String)
+    case deviceQCRequirements(deviceId: String)
+    case deviceQC(deviceId: String)
 
     // Device Images
     case deviceImages(orderId: String, deviceId: String)
@@ -415,6 +417,10 @@ enum APIEndpoint {
             return "/api/orders/\(orderId)/devices/\(deviceId)/checklists/templates"
         case .completeDeviceChecklist(let orderId, let deviceId):
             return "/api/orders/\(orderId)/devices/\(deviceId)/checklists"
+        case .deviceQCRequirements(let deviceId):
+            return "/api/devices/\(deviceId)/qc-requirements"
+        case .deviceQC(let deviceId):
+            return "/api/devices/\(deviceId)/qc"
         case .deviceImages(let orderId, let deviceId),
              .uploadDeviceImage(let orderId, let deviceId):
             return "/api/orders/\(orderId)/devices/\(deviceId)/images"
@@ -678,7 +684,7 @@ enum APIEndpoint {
              .dashboardStats, .commissionEstimate, .enquiryStats, .lifecycle, .categoryBreakdown, .activityLog,
              .bookingHeatmap, .buybackStats, .bookingsByTime,
              .devices, .myQueue, .myActiveWork, .orderDevices, .orderDevice, .deviceActions,
-             .deviceChecklistTemplates,
+             .deviceChecklistTemplates, .deviceQCRequirements,
              .deviceImages, .deviceImageFile(_, _, _, _, _),
              .orders, .order, .orderItems, .orderPayments, .orderSignatures, .orderRefunds, .orderDocument,
              .clients, .client, .clientSearch, .clientsExport,
@@ -727,7 +733,7 @@ enum APIEndpoint {
              .addMembership, .bulkAssignGroups, .promoteGroup, .createProductType,
              .bulkReturnToSupplier, .importAssets, .createSupplierOrder,
              .addSupplierOrderLine, .receiveSupplierOrder, .extractInvoice,
-             .salvageBuyback, .cancelDeviceWork, .completeDeviceChecklist:
+             .salvageBuyback, .cancelDeviceWork, .completeDeviceChecklist, .deviceQC:
             return .post
 
         // PATCH endpoints

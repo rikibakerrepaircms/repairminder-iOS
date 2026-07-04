@@ -298,6 +298,43 @@ final class DeviceDetailViewModel {
         }
     }
 
+    // MARK: - Quality Check
+
+    /// Fetch QC readiness requirements for this device.
+    func fetchQCRequirements() async -> QCRequirements? {
+        do {
+            return try await APIClient.shared.request(.deviceQCRequirements(deviceId: deviceId))
+        } catch {
+            self.error = error.localizedDescription
+            #if DEBUG
+            print("Failed to fetch QC requirements: \(error)")
+            #endif
+            return nil
+        }
+    }
+
+    /// Submit a QC pass/fail decision. Returns nil on success,
+    /// or a human-readable error message on failure.
+    func submitQC(_ request: QCActionRequest) async -> String? {
+        isUpdating = true
+        defer { isUpdating = false }
+
+        do {
+            let _: QCActionResponse = try await APIClient.shared.request(
+                .deviceQC(deviceId: deviceId),
+                body: request
+            )
+            await loadDevice()
+            await loadActions()
+            return nil
+        } catch {
+            #if DEBUG
+            print("Failed to submit QC: \(error)")
+            #endif
+            return error.localizedDescription
+        }
+    }
+
     // MARK: - Message Handling
 
     /// Clear success message

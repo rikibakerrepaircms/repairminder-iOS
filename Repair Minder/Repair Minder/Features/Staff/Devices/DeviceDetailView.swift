@@ -37,6 +37,10 @@ struct DeviceDetailView: View {
     @State private var checklistTemplate: ChecklistTemplate?
     @State private var isFetchingChecklistTemplate = false
 
+    // QC (quality check) state
+    @State private var qcSheetItem: QCSheetItem?
+    @State private var isFetchingQCRequirements = false
+
     private var isRegularWidth: Bool {
         horizontalSizeClass == .regular
     }
@@ -170,6 +174,11 @@ struct DeviceDetailView: View {
         .sheet(item: $checklistTemplate) { template in
             ChecklistFormSheet(template: template) { request in
                 await viewModel.completeChecklist(request)
+            }
+        }
+        .sheet(item: $qcSheetItem) { item in
+            QCSheet(requirements: item.requirements) { request in
+                await viewModel.submitQC(request)
             }
         }
     }
@@ -535,6 +544,27 @@ struct DeviceDetailView: View {
                         }
                     }
                 }
+            }
+
+            // Quality check — only while awaiting QC
+            if device.deviceStatus == .repairedQc {
+                Button {
+                    Task { await startQC() }
+                } label: {
+                    HStack {
+                        if isFetchingQCRequirements {
+                            ProgressView()
+                        } else {
+                            Text("Quality check")
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .disabled(isFetchingQCRequirements || viewModel.isUpdating)
+                .accessibilityIdentifier("qc-start-button")
             }
 
             // Cancel work — only while diagnosis/repair is actively in progress
@@ -1066,6 +1096,17 @@ struct DeviceDetailView: View {
         }
     }
 
+    /// Fetches QC readiness requirements and presents `QCSheet` via `qcSheetItem`.
+    private func startQC() async {
+        isFetchingQCRequirements = true
+        let requirements = await viewModel.fetchQCRequirements()
+        isFetchingQCRequirements = false
+
+        if let requirements {
+            qcSheetItem = QCSheetItem(requirements: requirements)
+        }
+    }
+
     // MARK: - Timestamps Section
 
     private func timestampsSection(_ device: DeviceDetail) -> some View {
@@ -1123,6 +1164,15 @@ struct DeviceDetailView: View {
         formatter.currencyCode = "GBP"
         return formatter.string(from: amount as NSDecimalNumber) ?? "£0.00"
     }
+}
+
+// MARK: - QC Sheet Item
+
+/// `QCRequirements` has no natural identity of its own (it's a plain readiness
+/// snapshot), so this wrapper gives `.sheet(item:)` an `Identifiable` to key off.
+private struct QCSheetItem: Identifiable {
+    let id = UUID()
+    let requirements: QCRequirements
 }
 
 // MARK: - Device Action Sheet
