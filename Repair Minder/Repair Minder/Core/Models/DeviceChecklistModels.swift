@@ -25,13 +25,20 @@ struct ChecklistTemplate: Decodable, Identifiable, Sendable {
 /// this decoder is tolerant of both.
 struct ChecklistTemplateItem: Decodable, Identifiable, Hashable, Sendable {
     /// Stable id for `ForEach`; falls back to `name` when no explicit id is present.
+    /// NOTE: not guaranteed unique across items with duplicate names — callers that
+    /// need per-row uniqueness (e.g. `ChecklistFormSheet`) should key state by
+    /// array index instead of `id`.
     let id: String
     let name: String
+    /// Whether this item must be resolved (any status other than `.notTested`)
+    /// before a checklist submission is allowed. Defaults to `false` when absent.
+    let required: Bool
 
     init(from decoder: Decoder) throws {
         if let s = try? decoder.singleValueContainer().decode(String.self) {
             self.name = s
             self.id = s
+            self.required = false
             return
         }
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -41,10 +48,11 @@ struct ChecklistTemplateItem: Decodable, Identifiable, Hashable, Sendable {
             ?? ""
         self.name = n
         self.id = (try? c.decode(String.self, forKey: .id)) ?? n
+        self.required = (try? c.decode(Bool.self, forKey: .required)) ?? false
     }
 
     private enum CodingKeys: String, CodingKey {
-        case name, label, text, id
+        case name, label, text, id, required
     }
 }
 

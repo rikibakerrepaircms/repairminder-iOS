@@ -15,8 +15,10 @@ struct ChecklistFormSheet: View {
     let onSubmit: (CompleteChecklistRequest) async -> String?
 
     @Environment(\.dismiss) private var dismiss
-    @State private var statuses: [String: ChecklistResultStatus] = [:]
-    @State private var notes: [String: String] = [:]
+    /// Keyed by array index (not `item.id`) so duplicate-named items each get
+    /// their own independent status/note — `id` can collide across rows.
+    @State private var statuses: [Int: ChecklistResultStatus] = [:]
+    @State private var notes: [Int: String] = [:]
     @State private var busy = false
     @State private var errorText: String?
 
@@ -24,12 +26,19 @@ struct ChecklistFormSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    ForEach(template.items) { item in
+                    ForEach(Array(template.items.enumerated()), id: \.offset) { index, item in
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(item.name)
-                                .font(.subheadline)
+                            HStack {
+                                Text(item.name)
+                                    .font(.subheadline)
+                                if item.required {
+                                    Text("Required")
+                                        .font(.caption2)
+                                        .foregroundStyle(.orange)
+                                }
+                            }
 
-                            Picker("Status", selection: statusBinding(for: item)) {
+                            Picker("Status", selection: statusBinding(for: index)) {
                                 ForEach(ChecklistResultStatus.allCases) { status in
                                     Text(status.label).tag(status)
                                 }
@@ -39,7 +48,7 @@ struct ChecklistFormSheet: View {
 
                             TextField(
                                 "Note (optional)",
-                                text: noteBinding(for: item)
+                                text: noteBinding(for: index)
                             )
                             .font(.footnote)
                         }
@@ -52,6 +61,10 @@ struct ChecklistFormSheet: View {
                 if let errorText {
                     Text(errorText)
                         .foregroundStyle(.red)
+                        .font(.footnote)
+                } else if hasOutstandingRequiredItems {
+                    Text("Complete all required items (\(outstandingRequiredCount) remaining).")
+                        .foregroundStyle(.orange)
                         .font(.footnote)
                 }
             }
@@ -68,7 +81,7 @@ struct ChecklistFormSheet: View {
                     Button("Submit") {
                         submit()
                     }
-                    .disabled(busy)
+                    .disabled(busy || hasOutstandingRequiredItems)
                     .accessibilityIdentifier("checklist-submit")
                 }
             }
@@ -78,28 +91,49 @@ struct ChecklistFormSheet: View {
 
     // MARK: - Bindings
 
-    private func statusBinding(for item: ChecklistTemplateItem) -> Binding<ChecklistResultStatus> {
+    private func statusBinding(for index: Int) -> Binding<ChecklistResultStatus> {
         Binding(
-            get: { statuses[item.id] ?? .notTested },
-            set: { statuses[item.id] = $0 }
+            get: { statuses[index] ?? .notTested },
+            set: { statuses[index] = $0 }
         )
     }
 
-    private func noteBinding(for item: ChecklistTemplateItem) -> Binding<String> {
+    private func noteBinding(for index: Int) -> Binding<String> {
         Binding(
-            get: { notes[item.id] ?? "" },
-            set: { notes[item.id] = $0 }
+            get: { notes[index] ?? "" },
+            set: { notes[index] = $0 }
         )
+    }
+
+    // MARK: - Required-item validation
+
+    /// Count of required items still sitting at `.notTested`.
+    private var outstandingRequiredCount: Int {
+        template.items.enumerated().reduce(into: 0) { count, pair in
+            let (index, item) = pair
+            if item.required && (statuses[index] ?? .notTested) == .notTested {
+                count += 1
+            }
+        }
+    }
+
+    private var hasOutstandingRequiredItems: Bool {
+        outstandingRequiredCount > 0
     }
 
     // MARK: - Submit
 
     private func submit() {
-        let results = template.items.map { item in
+        guard !hasOutstandingRequiredItems else {
+            errorText = "Complete all required items (\(outstandingRequiredCount) remaining)."
+            return
+        }
+
+        let results = template.items.enumerated().map { index, item in
             ChecklistResultItem(
                 name: item.name,
-                status: (statuses[item.id] ?? .notTested).rawValue,
-                notes: notes[item.id]?.isEmpty == false ? notes[item.id] : nil
+                status: (statuses[index] ?? .notTested).rawValue,
+                notes: notes[index]?.isEmpty == false ? notes[index] : nil
             )
         }
         let request = CompleteChecklistRequest(
@@ -141,8 +175,9 @@ struct ChecklistFormSheet: View {
 
 private extension ChecklistTemplateItem {
     /// Convenience initializer for previews (production decoding always goes through `init(from:)`).
-    init(name: String) {
+    init(name: String, required: Bool = false) {
         self.id = name
         self.name = name
+        self.required = required
     }
 }

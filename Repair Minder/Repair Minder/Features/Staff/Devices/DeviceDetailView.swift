@@ -1112,11 +1112,19 @@ struct DeviceDetailView: View {
         }
 
         isFetchingChecklistTemplate = true
+        viewModel.error = nil
         let templates = await viewModel.fetchChecklistTemplates(type: checklistType)
         isFetchingChecklistTemplate = false
 
         if let defaultTemplate = templates.first(where: { $0.isDefault }) ?? templates.first {
             checklistTemplate = defaultTemplate
+        } else if viewModel.error == nil {
+            // `fetchChecklistTemplates` already surfaces network/decoding failures via
+            // `viewModel.error` (set inside its catch block before returning `[]`).
+            // Clearing `error` above lets us tell that apart from the silent
+            // success-but-empty case (no error thrown, just no template configured)
+            // so the user gets feedback instead of nothing happening on tap.
+            viewModel.error = "No checklist template available for this stage."
         }
     }
 
