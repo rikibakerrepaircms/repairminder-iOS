@@ -523,6 +523,25 @@ final class DeviceDetailViewModel {
         }
     }
 
+    // MARK: - Device Report
+
+    /// Fetch the server-rendered, print-ready device report HTML document.
+    /// Returns nil on failure (sets `error`).
+    func fetchDeviceReportHTML() async -> String? {
+        do {
+            let resp: DeviceReportResponse = try await APIClient.shared.request(
+                .deviceReport(orderId: orderId, deviceId: deviceId)
+            )
+            return resp.html
+        } catch {
+            self.error = error.localizedDescription
+            #if DEBUG
+            print("Failed to fetch device report: \(error)")
+            #endif
+            return nil
+        }
+    }
+
     // MARK: - Message Handling
 
     /// Clear success message

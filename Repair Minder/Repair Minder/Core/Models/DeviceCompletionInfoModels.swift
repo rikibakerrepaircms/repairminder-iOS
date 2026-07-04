@@ -29,3 +29,10 @@ struct DeviceCompletionData: Decodable, Sendable {
 struct PendingItemsCount: Decodable, Sendable {
     let count: Int?
 }
+
+/// Response body (`data`) for `GET /api/orders/:orderId/devices/:deviceId/report`.
+/// The `report` structured object is intentionally ignored for v1 — only the
+/// server-rendered, print-ready `html` document is consumed by the app.
+struct DeviceReportResponse: Decodable, Sendable {
+    let html: String?
+}

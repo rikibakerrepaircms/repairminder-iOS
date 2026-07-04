@@ -52,6 +52,9 @@ struct DeviceDetailView: View {
     @State private var showingDeviceDespatchSheet = false
     @State private var showingAddAccessorySheet = false
 
+    // Device report state
+    @State private var showingDeviceReportSheet = false
+
     private var isRegularWidth: Bool {
         horizontalSizeClass == .regular
     }
@@ -216,6 +219,9 @@ struct DeviceDetailView: View {
             AddAccessorySheet { request in
                 await viewModel.addAccessory(request)
             }
+        }
+        .sheet(isPresented: $showingDeviceReportSheet) {
+            DeviceReportSheet(orderId: viewModel.orderId, deviceId: viewModel.deviceId)
         }
     }
 
@@ -583,6 +589,18 @@ struct DeviceDetailView: View {
                     }
                 }
             }
+
+            // Device report — server-rendered, print-ready HTML report
+            Button {
+                showingDeviceReportSheet = true
+            } label: {
+                HStack {
+                    Text("Device report")
+                    Spacer()
+                    Image(systemName: "doc.text")
+                }
+            }
+            .accessibilityIdentifier("device-report-button")
 
             // Staff authorize — only while awaiting customer/staff authorization
             if device.deviceStatus == .awaitingAuthorisation {
