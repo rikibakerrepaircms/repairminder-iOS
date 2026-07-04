@@ -261,19 +261,19 @@ struct OrderDetailView: View {
         }
         // MARK: - Close-out Sheets
         .sheet(isPresented: $showAuthorizeSheet) {
-            AuthorizeOrderSheet { req in await viewModel.authorize(req) }
+            AuthorizeOrderSheet { req in (await viewModel.authorize(req)) ? nil : (viewModel.actionError ?? "Could not authorize.") }
         }
         .sheet(isPresented: $showDespatchSheet) {
-            DespatchOrderSheet { req in await viewModel.despatch(req) }
+            DespatchOrderSheet { req in (await viewModel.despatch(req)) ? nil : (viewModel.actionError ?? "Could not despatch.") }
         }
         .sheet(isPresented: $showCollectSheet) {
-            CollectOrderSheet { req in await viewModel.collect(req) }
+            CollectOrderSheet { req in (await viewModel.collect(req)) ? nil : (viewModel.actionError ?? "Could not record collection.") }
         }
         .sheet(isPresented: $showAddNoteSheet) {
-            AddOrderNoteSheet { req in await viewModel.addNote(req) }
+            AddOrderNoteSheet { req in (await viewModel.addNote(req)) ? nil : (viewModel.actionError ?? "Could not add note.") }
         }
         .sheet(item: $refundTarget) { payment in
-            RefundPaymentSheet(payment: payment) { req in await viewModel.createRefund(req) }
+            RefundPaymentSheet(payment: payment) { req in (await viewModel.createRefund(req)) ? nil : (viewModel.actionError ?? "Refund failed.") }
         }
     }
 
@@ -686,6 +686,7 @@ struct OrderDetailView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
+                    .disabled(viewModel.isPerformingAction)
                 }
 
                 if order.status == .awaitingCollection || order.status == .serviceComplete {

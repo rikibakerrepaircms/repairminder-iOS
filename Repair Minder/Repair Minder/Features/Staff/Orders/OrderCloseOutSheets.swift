@@ -7,7 +7,7 @@ import SwiftUI
 
 // 1) Authorize
 struct AuthorizeOrderSheet: View {
-    let onAuthorize: (AuthorizeOrderRequest) async -> Bool
+    let onAuthorize: (AuthorizeOrderRequest) async -> String?
     @Environment(\.dismiss) private var dismiss
     @State private var type = "phone"
     @State private var targetStatus = "authorised_ready_to_repair"
@@ -32,14 +32,14 @@ struct AuthorizeOrderSheet: View {
             }
             .navigationTitle("Authorize order")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { errorText = nil; dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Authorize") {
                         Task {
                             busy = true
-                            let ok = await onAuthorize(.init(authorisationType: type, targetStatus: targetStatus, authorisationNotes: notes.isEmpty ? nil : notes))
+                            let err = await onAuthorize(.init(authorisationType: type, targetStatus: targetStatus, authorisationNotes: notes.isEmpty ? nil : notes))
                             busy = false
-                            if ok { dismiss() } else { errorText = "Could not authorize. Please try again." }
+                            if err == nil { dismiss() } else { errorText = err }
                         }
                     }.disabled(busy).accessibilityIdentifier("authorize-confirm")
                 }
@@ -50,7 +50,7 @@ struct AuthorizeOrderSheet: View {
 
 // 2) Despatch
 struct DespatchOrderSheet: View {
-    let onDespatch: (DespatchOrderRequest) async -> Bool
+    let onDespatch: (DespatchOrderRequest) async -> String?
     @Environment(\.dismiss) private var dismiss
     private let carriers = ["Royal Mail","DPD","DHL","UPS","FedEx","Hermes","Yodel","Other"]
     @State private var carrier = "Royal Mail"
@@ -68,14 +68,14 @@ struct DespatchOrderSheet: View {
             }
             .navigationTitle("Despatch order")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { errorText = nil; dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Despatch") {
                         Task {
                             busy = true
-                            let ok = await onDespatch(.init(carrier: carrier, trackingNumber: tracking.isEmpty ? nil : tracking, sendNotification: notify))
+                            let err = await onDespatch(.init(carrier: carrier, trackingNumber: tracking.isEmpty ? nil : tracking, sendNotification: notify))
                             busy = false
-                            if ok { dismiss() } else { errorText = "Could not despatch. Please try again." }
+                            if err == nil { dismiss() } else { errorText = err }
                         }
                     }.disabled(busy).accessibilityIdentifier("despatch-confirm")
                 }
@@ -86,20 +86,20 @@ struct DespatchOrderSheet: View {
 
 // 3) Collect (embeds the signature inner view)
 struct CollectOrderSheet: View {
-    let onCollect: (CollectOrderRequest) async -> Bool
+    let onCollect: (CollectOrderRequest) async -> String?
     @Environment(\.dismiss) private var dismiss
     @State private var errorText: String?
     var body: some View {
         NavigationStack {
             VStack {
                 OrderSignatureSheetInner { signatureData, typedName, agreed in
-                    let ok = await onCollect(.init(deviceIds: nil, signatureData: signatureData, typedName: typedName, termsAgreed: agreed))
-                    if ok { dismiss() } else { errorText = "Could not record collection." }
+                    let err = await onCollect(.init(deviceIds: nil, signatureData: signatureData, typedName: typedName, termsAgreed: agreed))
+                    if err == nil { dismiss() } else { errorText = err }
                 }
                 if let errorText { Text(errorText).foregroundStyle(.red).font(.footnote).padding() }
             }
             .navigationTitle("Collect order")
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { errorText = nil; dismiss() } } }
         }
     }
 }
@@ -107,13 +107,13 @@ struct CollectOrderSheet: View {
 // 4) Refund one payment
 struct RefundPaymentSheet: View {
     let payment: OrderPayment
-    let onRefund: (CreateRefundRequest) async -> Bool
+    let onRefund: (CreateRefundRequest) async -> String?
     @Environment(\.dismiss) private var dismiss
     @State private var amountText: String
     @State private var reason = ""
     @State private var busy = false
     @State private var errorText: String?
-    init(payment: OrderPayment, onRefund: @escaping (CreateRefundRequest) async -> Bool) {
+    init(payment: OrderPayment, onRefund: @escaping (CreateRefundRequest) async -> String?) {
         self.payment = payment; self.onRefund = onRefund
         _amountText = State(initialValue: String(format: "%.2f", payment.refundableAmount ?? payment.amount))
     }
@@ -131,16 +131,18 @@ struct RefundPaymentSheet: View {
             }
             .navigationTitle("Refund")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { errorText = nil; dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Refund") {
                         guard let amount = Double(amountText), amount > 0 else { errorText = "Enter a valid amount."; return }
                         Task {
                             busy = true
-                            let today = String(ISO8601DateFormatter().string(from: Date()).prefix(10))
-                            let ok = await onRefund(.init(orderPaymentId: payment.id, amount: amount, refundDate: today, reason: reason.isEmpty ? nil : reason))
+                            let df = DateFormatter()
+                            df.dateFormat = "yyyy-MM-dd"
+                            let today = df.string(from: Date())
+                            let err = await onRefund(.init(orderPaymentId: payment.id, amount: amount, refundDate: today, reason: reason.isEmpty ? nil : reason))
                             busy = false
-                            if ok { dismiss() } else { errorText = "Refund failed (over-refund or permission)." }
+                            if err == nil { dismiss() } else { errorText = err }
                         }
                     }.disabled(busy).accessibilityIdentifier("refund-confirm")
                 }
@@ -151,7 +153,7 @@ struct RefundPaymentSheet: View {
 
 // 5) Add note
 struct AddOrderNoteSheet: View {
-    let onAdd: (CreateTicketNoteRequest) async -> Bool
+    let onAdd: (CreateTicketNoteRequest) async -> String?
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
     @State private var busy = false
@@ -164,10 +166,10 @@ struct AddOrderNoteSheet: View {
             }
             .navigationTitle("Add note")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { errorText = nil; dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
-                        Task { busy = true; let ok = await onAdd(.init(body: text, deviceId: nil)); busy = false; if ok { dismiss() } else { errorText = "Could not add note." } }
+                        Task { busy = true; let err = await onAdd(.init(body: text, deviceId: nil)); busy = false; if err == nil { dismiss() } else { errorText = err } }
                     }.disabled(text.trimmingCharacters(in: .whitespaces).isEmpty || busy).accessibilityIdentifier("note-add")
                 }
             }
