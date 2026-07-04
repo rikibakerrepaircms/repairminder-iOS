@@ -293,7 +293,7 @@ private struct BookInSuccessStep: View {
             .listStyle(.plain)
             HStack {
                 if viewModel.hasUnreceived {
-                    Button("Receive More") { viewModel.step = .receive }.buttonStyle(.bordered)
+                    Button("Receive More") { viewModel.receiveMore() }.buttonStyle(.bordered)
                 }
                 Button("Done") { onDone() }.buttonStyle(.borderedProminent)
             }

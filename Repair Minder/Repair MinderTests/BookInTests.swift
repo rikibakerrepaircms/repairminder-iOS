@@ -264,6 +264,53 @@ final class BookInTests: XCTestCase {
         XCTAssertEqual(vm.drafts["l0"]?.quantity, 6)
     }
 
+    // MARK: - NTH-9: "Receive More" must reseed drafts + buildReceiveInputs must hard-clamp
+
+    /// The success screen's "Receive More" button used to set `step = .receive` directly,
+    /// bypassing `prepareReceive()` — so a stale draft quantity above the (possibly changed)
+    /// `remaining` would sail straight through to `receive()`. `receiveMore()` must reseed
+    /// drafts exactly like `prepareReceive()` does.
+    @MainActor
+    func testReceiveMoreReseedsDraftsToRemaining() async {
+        let spy = BookInSpy(); spy.lineCount = 1
+        let vm = BookInWizardViewModel(order: SupplierOrder(id: "o1", supplierName: "S", status: "pending"), service: spy)
+        await vm.reloadOrder()
+        vm.prepareReceive()
+        XCTAssertEqual(vm.drafts["l0"]?.quantity, 3)   // initial: full remaining (ordered 3, received 0)
+
+        // Simulate landing on the success screen after a partial receive, with the line's
+        // remaining having shrunk while a stale draft quantity is left behind.
+        vm.step = .success
+        vm.lines[0].quantityOrdered = 10
+        vm.lines[0].quantityReceived = 4   // remaining now 6
+        vm.drafts["l0"]?.quantity = 99
+
+        vm.receiveMore()
+
+        XCTAssertEqual(vm.step, .receive)
+        XCTAssertEqual(vm.drafts["l0"]?.quantity, 6)
+    }
+
+    /// Belt-and-suspenders: even if a draft's quantity is above `remaining` when
+    /// `buildReceiveInputs()` runs (UI clamp bypassed, stale state, or any other path),
+    /// the built input must never exceed `remaining` — and the positional serial slots
+    /// must be capped to the same count (first `remaining` slots, index-aligned).
+    @MainActor
+    func testBuildReceiveInputsClampsQuantityToRemaining() async {
+        let spy = BookInSpy(); spy.lineCount = 1
+        let vm = BookInWizardViewModel(order: SupplierOrder(id: "o1", supplierName: "S", status: "pending"), service: spy)
+        await vm.reloadOrder()
+        vm.prepareReceive()
+        vm.lines[0].quantityReceived = 1   // remaining now 2 (ordered 3, received 1)
+        vm.drafts["l0"]?.quantity = 8       // force above remaining, bypassing the Stepper bound
+        vm.drafts["l0"]?.serials = ["S0", "S1", "S2", "S3", "S4", "S5", "S6", "S7"]
+
+        let inputs = vm.buildReceiveInputs()
+
+        XCTAssertEqual(inputs.first?.quantity, 2)
+        XCTAssertEqual(inputs.first?.serialNumbers, ["S0", "S1"])
+    }
+
     @MainActor
     func testSupplierListStatusFilterAndCancel() async {
         let spy = BookInSpy()
