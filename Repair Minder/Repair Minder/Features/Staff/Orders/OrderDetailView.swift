@@ -31,6 +31,8 @@ struct OrderDetailView: View {
     @State private var showCollectSheet = false
     @State private var showAddNoteSheet = false
     @State private var showDiscountSheet = false
+    @State private var showReplySheet = false
+    @State private var showResolveConfirmation = false
     @State private var refundTarget: OrderPayment?
     @State private var refundToDelete: OrderRefund?
     @State private var showDeleteRefundAlert = false
@@ -128,6 +130,11 @@ struct OrderDetailView: View {
                 // Dates section
                 if let dates = order.dates {
                     datesSection(dates)
+                }
+
+                // Customer / ticket conversation section
+                if order.ticketId != nil {
+                    customerSection(order)
                 }
 
                 // Notes section
@@ -282,6 +289,23 @@ struct OrderDetailView: View {
                     (await viewModel.setGlobalDiscount(req)) ? nil : (viewModel.actionError ?? "Could not update discount.")
                 }
             }
+        }
+        .sheet(isPresented: $showReplySheet) {
+            ReplyToCustomerSheet(smsAvailable: viewModel.order?.client?.phone != nil) { htmlBody, sendSms in
+                (await viewModel.replyToCustomer(htmlBody: htmlBody, sendSms: sendSms)) ? nil : (viewModel.actionError ?? "Could not send reply.")
+            }
+        }
+        .confirmationDialog(
+            "Resolve Ticket",
+            isPresented: $showResolveConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Resolve") {
+                Task { _ = await viewModel.resolveTicket() }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Mark this customer's ticket as resolved?")
         }
         .sheet(item: $refundTarget) { payment in
             RefundPaymentSheet(payment: payment) { req in (await viewModel.createRefund(req)) ? nil : (viewModel.actionError ?? "Refund failed.") }
@@ -1233,6 +1257,117 @@ struct OrderDetailView: View {
         }
     }
 
+    // MARK: - Customer Section
+
+    /// Shows a read-only view of the order's ticket conversation plus
+    /// reply / resolve / reopen actions. Gated on `order.ticketId != nil`.
+    private func customerSection(_ order: Order) -> some View {
+        let ticket = order.ticket
+        let isClosedOrResolved = ["resolved", "closed"].contains(ticket?.status?.lowercased() ?? "")
+
+        return SectionCard(title: "Customer", icon: "bubble.left.and.bubble.right") {
+            VStack(alignment: .leading, spacing: 12) {
+                if let status = ticket?.status {
+                    HStack {
+                        Text("Ticket status")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(status.capitalized)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background((isClosedOrResolved ? Color.gray : Color.green).opacity(0.15))
+                            .foregroundStyle(isClosedOrResolved ? .gray : .green)
+                            .clipShape(Capsule())
+                    }
+                }
+
+                if let messages = ticket?.messages, !messages.isEmpty {
+                    Divider()
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(messages) { message in
+                            ticketMessageRow(message)
+                            if message.id != messages.last?.id {
+                                Divider()
+                            }
+                        }
+                    }
+                }
+
+                Divider()
+
+                HStack(spacing: 10) {
+                    Button {
+                        showReplySheet = true
+                    } label: {
+                        Label("Reply to customer", systemImage: "paperplane")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isClosedOrResolved || viewModel.isPerformingAction)
+                    .accessibilityIdentifier("order-reply-to-customer")
+
+                    if isClosedOrResolved {
+                        Button {
+                            Task { _ = await viewModel.reopenTicket() }
+                        } label: {
+                            Label("Reopen", systemImage: "arrow.uturn.backward")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(viewModel.isPerformingAction)
+                        .accessibilityIdentifier("order-reopen-ticket")
+                    } else {
+                        Button {
+                            showResolveConfirmation = true
+                        } label: {
+                            Label("Resolve", systemImage: "checkmark.circle")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.green)
+                        .disabled(viewModel.isPerformingAction)
+                        .accessibilityIdentifier("order-resolve-ticket")
+                    }
+                }
+
+                if let actionError = viewModel.actionError {
+                    Text(actionError)
+                        .foregroundStyle(.red)
+                        .font(.footnote)
+                }
+            }
+        }
+    }
+
+    private func ticketMessageRow(_ message: OrderTicketMessage) -> some View {
+        let isInbound = message.type == "email_inbound" || message.type == "sms_inbound"
+        let isNote = message.type == "note"
+
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(isNote ? "Note" : (message.fromName ?? (isInbound ? "Customer" : "Staff")))
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(isNote ? .orange : (isInbound ? .blue : .primary))
+
+                Spacer()
+
+                if let createdAt = message.createdAt {
+                    Text(DateFormatters.formatRelativeDate(createdAt) ?? createdAt)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            Text(message.bodyText ?? message.bodyHtml?.strippingOrderTicketHTML() ?? "")
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+        }
+    }
+
     // MARK: - Notes Section
 
     private func notesSection(_ notes: [OrderNote]) -> some View {
@@ -1364,5 +1499,25 @@ struct DeviceNavTarget: Identifiable, Hashable {
 #Preview {
     NavigationStack {
         OrderDetailView(orderId: "test")
+    }
+}
+
+// MARK: - HTML Stripping
+
+private extension String {
+    /// Strip HTML tags for a plain-text preview of a ticket message body.
+    func strippingOrderTicketHTML() -> String {
+        guard let data = self.data(using: .utf8) else { return self }
+
+        let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
+            .documentType: NSAttributedString.DocumentType.html,
+            .characterEncoding: String.Encoding.utf8.rawValue
+        ]
+
+        if let attributedString = try? NSAttributedString(data: data, options: options, documentAttributes: nil) {
+            return attributedString.string
+        }
+
+        return self.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
     }
 }

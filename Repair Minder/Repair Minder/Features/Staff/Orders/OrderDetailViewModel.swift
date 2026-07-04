@@ -323,6 +323,49 @@ final class OrderDetailViewModel: ObservableObject {
         }
     }
 
+    /// Reply to the customer on the order's associated ticket.
+    func replyToCustomer(htmlBody: String, sendSms: Bool) async -> Bool {
+        guard let ticketId = order?.ticketId else {
+            actionError = "This order has no ticket to reply on."
+            return false
+        }
+        let request = TicketReplyRequest(
+            htmlBody: htmlBody,
+            textBody: htmlBody,
+            status: nil,
+            fromCustomEmailId: nil,
+            pendingAttachmentIds: nil,
+            sendSms: sendSms ? true : nil
+        )
+        return await perform {
+            let _: TicketReplyResponse = try await self.apiClient.request(.ticketReply(id: ticketId), body: request)
+        }
+    }
+
+    /// Resolve the order's associated ticket. Idempotent — resolving an
+    /// already-resolved ticket still returns success.
+    func resolveTicket() async -> Bool {
+        guard let ticketId = order?.ticketId else {
+            actionError = "This order has no ticket to resolve."
+            return false
+        }
+        return await perform {
+            try await self.apiClient.requestVoid(.ticketResolve(id: ticketId))
+        }
+    }
+
+    /// Reopen (set back to open) the order's associated ticket. There's no
+    /// dedicated reopen endpoint — this uses the generic ticket update PATCH.
+    func reopenTicket() async -> Bool {
+        guard let ticketId = order?.ticketId else {
+            actionError = "This order has no ticket to reopen."
+            return false
+        }
+        return await perform {
+            try await self.apiClient.requestVoid(.updateTicket(id: ticketId), body: TicketStatusRequest(status: "open"))
+        }
+    }
+
     /// Shared runner for close-out mutations: manages loading/error state and refreshes the order on success.
     private func perform(_ op: @escaping () async throws -> Void) async -> Bool {
         isPerformingAction = true
