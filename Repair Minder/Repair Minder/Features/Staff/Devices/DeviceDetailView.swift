@@ -587,6 +587,25 @@ struct DeviceDetailView: View {
                 }
                 .disabled(viewModel.isUpdating)
             }
+
+            // Add to buyback — only once payment has been made on a buyback device
+            if device.workflow == .buyback && device.deviceStatus == .paymentMade {
+                Button {
+                    Task {
+                        if let message = await viewModel.addToBuyback() {
+                            viewModel.error = message
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text("Add to buyback")
+                        Spacer()
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                    }
+                }
+                .disabled(viewModel.isUpdating)
+                .accessibilityIdentifier("add-to-buyback-button")
+            }
         } header: {
             Text("Status")
         }
