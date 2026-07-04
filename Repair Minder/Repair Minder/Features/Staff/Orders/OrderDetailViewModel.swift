@@ -307,6 +307,11 @@ final class OrderDetailViewModel: ObservableObject {
         }
     }
 
+    /// Set (or clear, if all fields are nil) the whole-order discount
+    func setGlobalDiscount(_ request: OrderDiscountRequest) async -> Bool {
+        await perform { try await self.apiClient.requestVoid(.setOrderDiscount(orderId: self.orderId), body: request) }
+    }
+
     /// Add a note to the order's associated ticket
     func addNote(_ request: CreateTicketNoteRequest) async -> Bool {
         guard let ticketId = order?.ticketId else {

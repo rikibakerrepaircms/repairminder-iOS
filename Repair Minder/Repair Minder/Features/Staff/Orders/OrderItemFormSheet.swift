@@ -58,6 +58,26 @@ private enum FormItemType: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Discount Kind
+
+/// Discount kind for a line item. Percent and Amount are mutually exclusive
+/// per the backend's XOR validation rule (`validateDiscountFields`).
+private enum ItemDiscountKind: String, CaseIterable, Identifiable {
+    case none
+    case percent
+    case amount
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .none: return "None"
+        case .percent: return "Percent"
+        case .amount: return "Amount"
+        }
+    }
+}
+
 // MARK: - OrderItemFormSheet
 
 struct OrderItemFormSheet: View {
@@ -76,6 +96,9 @@ struct OrderItemFormSheet: View {
     @State private var quantity: Int = 1
     @State private var priceIncVatText: String = ""
     @State private var vatRate: Double = 20.0
+    @State private var discountKind: ItemDiscountKind = .none
+    @State private var discountValueText: String = ""
+    @State private var discountReasonText: String = ""
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var showError = false
@@ -106,7 +129,21 @@ struct OrderItemFormSheet: View {
            selectedDeviceId.isEmpty {
             return false
         }
+        if discountKind != .none {
+            guard let value = parseDecimal(discountValueText), value >= 0 else { return false }
+            if discountKind == .percent && value > 100 { return false }
+            if discountReasonMissing { return false }
+        }
         return true
+    }
+
+    private var discountReasonMissing: Bool {
+        discountKind != .none && discountReasonText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var discountPercentOutOfRange: Bool {
+        guard discountKind == .percent, let value = parseDecimal(discountValueText) else { return false }
+        return value < 0 || value > 100
     }
 
     private var vatRateBinding: Binding<String> {
@@ -169,6 +206,7 @@ struct OrderItemFormSheet: View {
                     descriptionField
                     quantityAndPriceSection
                     vatRateSection
+                    discountSection
                     totalsPreview
                     if selectedItemType == .devicePurchase {
                         devicePurchaseNote
@@ -581,6 +619,52 @@ struct OrderItemFormSheet: View {
         }
     }
 
+    // MARK: - Discount Section
+
+    private var discountSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Discount").font(.subheadline).fontWeight(.medium)
+
+            Picker("Discount Type", selection: $discountKind) {
+                ForEach(ItemDiscountKind.allCases) { kind in
+                    Text(kind.label).tag(kind)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            if discountKind != .none {
+                TextField(
+                    discountKind == .percent ? "Percent off (e.g. 10)" : "Amount off (\u{00A3})",
+                    text: $discountValueText
+                )
+                #if os(iOS)
+                .keyboardType(.decimalPad)
+                #endif
+                .padding()
+                .background(Color.platformGray6)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                FormTextField(
+                    label: "Reason",
+                    text: $discountReasonText,
+                    placeholder: "e.g. Loyalty discount",
+                    isRequired: true
+                )
+
+                if discountReasonMissing {
+                    Text("A reason is required when a discount is applied.")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+                if discountPercentOutOfRange {
+                    Text("Percent must be between 0 and 100.")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+    }
+
     // MARK: - Totals Preview
 
     private var totalsPreview: some View {
@@ -661,6 +745,18 @@ struct OrderItemFormSheet: View {
         let net = abs(item.unitPrice)
         let incVat = net * (1 + item.vatRate / 100)
         priceIncVatText = String(format: "%.2f", incVat)
+
+        if let percent = item.discountPercent, percent > 0 {
+            discountKind = .percent
+            discountValueText = formatDecimalForEditing(percent)
+        } else if let amount = item.discountAmount, amount > 0 {
+            discountKind = .amount
+            discountValueText = formatDecimalForEditing(amount)
+        } else {
+            discountKind = .none
+            discountValueText = ""
+        }
+        discountReasonText = item.discountReason ?? ""
     }
 
     // MARK: - Save
@@ -672,6 +768,19 @@ struct OrderItemFormSheet: View {
             : priceIncVat
         let isDevicePurchase = selectedItemType == .devicePurchase
 
+        var discountPercent: Double?
+        var discountAmount: Double?
+        var discountReason: String?
+        if discountKind != .none, let value = parseDecimal(discountValueText) {
+            if discountKind == .percent {
+                discountPercent = value
+            } else {
+                discountAmount = value
+            }
+            let reason = discountReasonText.trimmingCharacters(in: .whitespacesAndNewlines)
+            discountReason = reason.isEmpty ? nil : reason
+        }
+
         let request = OrderItemRequest(
             itemType: selectedItemType.rawValue,
             description: descriptionText.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -680,7 +789,10 @@ struct OrderItemFormSheet: View {
             priceIncVat: isDevicePurchase ? -abs(priceIncVat) : priceIncVat,
             vatRate: vatRate,
             deviceId: selectedDeviceId.isEmpty ? nil : selectedDeviceId,
-            productTypeId: selectedProductId
+            productTypeId: selectedProductId,
+            discountPercent: discountPercent,
+            discountAmount: discountAmount,
+            discountReason: discountReason
         )
 
         isSaving = true

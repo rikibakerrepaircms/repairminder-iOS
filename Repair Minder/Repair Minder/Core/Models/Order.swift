@@ -529,6 +529,42 @@ struct OrderItemRequest: Encodable {
     var discountReason: String?
 }
 
+// MARK: - Order Discount Request
+
+/// Encodable request body for `PATCH /api/orders/:id/discount` (whole-order discount).
+/// Sending all three fields as `nil` clears any existing discount. Uses a custom
+/// `encode(to:)` (rather than synthesized `encodeIfPresent`) so `nil` fields are sent
+/// as explicit JSON `null` instead of being omitted — the backend's clear-discount
+/// check requires all three keys present with `null` values, not absent keys.
+struct OrderDiscountRequest: Encodable {
+    var discountPercent: Double?
+    var discountAmount: Double?
+    var discountReason: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case discountPercent, discountAmount, discountReason
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if let discountPercent {
+            try container.encode(discountPercent, forKey: .discountPercent)
+        } else {
+            try container.encodeNil(forKey: .discountPercent)
+        }
+        if let discountAmount {
+            try container.encode(discountAmount, forKey: .discountAmount)
+        } else {
+            try container.encodeNil(forKey: .discountAmount)
+        }
+        if let discountReason {
+            try container.encode(discountReason, forKey: .discountReason)
+        } else {
+            try container.encodeNil(forKey: .discountReason)
+        }
+    }
+}
+
 // MARK: - Manual Payment Request
 
 /// Request body for recording a manual payment (cash, bank transfer, etc.).
