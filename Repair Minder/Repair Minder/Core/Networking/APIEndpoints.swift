@@ -213,6 +213,12 @@ enum APIEndpoint {
     case buybackDetail(id: String)
     case updateBuyback(buybackId: String)
     case buybackImageFile(imageId: String, width: Int?, height: Int?)
+    // Phase 3 — Buyback lifecycle (write actions)
+    case updateBuybackStatus(id: String)
+    case buybackNotes(id: String)
+    case addBuybackNote(id: String)
+    case sellBuyback(id: String)
+    case addDeviceToBuyback(deviceId: String)
 
     // MARK: - Inventory / Assets
 
@@ -578,6 +584,14 @@ enum APIEndpoint {
             return "/api/buyback/\(buybackId)"
         case .buybackImageFile(let imageId, _, _):
             return "/api/buyback/images/\(imageId)/file"
+        case .updateBuybackStatus(let id):
+            return "/api/buyback/\(id)/status"
+        case .buybackNotes(let id), .addBuybackNote(let id):
+            return "/api/buyback/\(id)/notes"
+        case .sellBuyback(let id):
+            return "/api/buyback/\(id)/sell"
+        case .addDeviceToBuyback(let deviceId):
+            return "/api/devices/\(deviceId)/add-to-buyback"
 
         // Inventory / Assets
         case .inventoryList: return "/api/assets"
@@ -697,7 +711,7 @@ enum APIEndpoint {
              .posIntegrations, .posTerminals, .pollTerminalPayment, .paymentLinks,
              .boardColumns, .boardCardPositions,
              .schedule, .teamSchedule, .boardPinnedPreferences,
-             .buybackList, .buybackDetail, .buybackImageFile,
+             .buybackList, .buybackDetail, .buybackImageFile, .buybackNotes,
              .inventoryList, .inventoryDetail, .inventoryByTag, .inventoryActivity,
              .inventoryAssetGroups, .inventoryExternalDeployment, .productTypeCategories, .assetGroupsList,
              .assetGroup, .assetGroupAssets, .assetGroupProducts,
@@ -733,12 +747,13 @@ enum APIEndpoint {
              .addMembership, .bulkAssignGroups, .promoteGroup, .createProductType,
              .bulkReturnToSupplier, .importAssets, .createSupplierOrder,
              .addSupplierOrderLine, .receiveSupplierOrder, .extractInvoice,
-             .salvageBuyback, .cancelDeviceWork, .completeDeviceChecklist, .deviceQC:
+             .salvageBuyback, .cancelDeviceWork, .completeDeviceChecklist, .deviceQC,
+             .addBuybackNote, .sellBuyback, .addDeviceToBuyback:
             return .post
 
         // PATCH endpoints
         case .updateOrderDevice, .updateDeviceStatus, .updateDeviceBankDetails,
-             .updateDeviceEngineer, .updateDeviceSubLocation, .updateBuyback,
+             .updateDeviceEngineer, .updateDeviceSubLocation, .updateBuyback, .updateBuybackStatus,
              .returnDeviceAccessory,
              .updateOrder, .updateOrderItem,
              .updateClient,

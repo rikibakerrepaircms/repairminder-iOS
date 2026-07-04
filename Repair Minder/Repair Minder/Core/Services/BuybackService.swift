@@ -1,0 +1,44 @@
+//
+//  BuybackService.swift
+//  Repair Minder
+//
+//  Buyback lifecycle write actions (Phase 3): status transitions, notes,
+//  selling, and adding a scanned device into the buyback pipeline. Mirrors
+//  the pattern used by InventoryService — thin wrappers over APIClient.
+//
+
+import Foundation
+
+@MainActor
+final class BuybackService {
+    private let api: APIClient
+    // APIClient.shared is @MainActor-isolated, so it cannot be a default-arg
+    // value (default args are evaluated in a nonisolated context). Use
+    // optional + nil-coalesce; the init body runs on the MainActor.
+    init(api: APIClient? = nil) { self.api = api ?? APIClient.shared }
+
+    /// PATCH /api/buyback/:id/status
+    func updateStatus(id: String, status: String) async throws -> BuybackStatusResponse {
+        try await api.request(.updateBuybackStatus(id: id), body: BuybackStatusRequest(status: status))
+    }
+
+    /// PATCH /api/buyback/:id — generic field patch, reused for purchase/listing edits.
+    func updateFields(id: String, fields: [String: AnyEncodable]) async throws {
+        try await api.requestVoid(.updateBuyback(buybackId: id), body: fields)
+    }
+
+    /// POST /api/buyback/:id/notes
+    func addNote(id: String, body: String) async throws -> BuybackNote {
+        try await api.request(.addBuybackNote(id: id), body: AddBuybackNoteRequest(body: body))
+    }
+
+    /// POST /api/buyback/:id/sell
+    func sell(id: String, request: SellBuybackRequest) async throws -> SellBuybackResponse {
+        try await api.request(.sellBuyback(id: id), body: request)
+    }
+
+    /// POST /api/devices/:deviceId/add-to-buyback
+    func addDeviceToBuyback(deviceId: String) async throws -> AddToBuybackResponse {
+        try await api.request(.addDeviceToBuyback(deviceId: deviceId))
+    }
+}
