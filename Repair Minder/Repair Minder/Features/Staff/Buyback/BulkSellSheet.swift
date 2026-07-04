@@ -49,7 +49,7 @@ struct BulkSellSheet: View {
         var prefill: [String: String] = [:]
         for item in items {
             if let price = item.sellPrice {
-                prefill[item.id] = String(price)
+                prefill[item.id] = formatDecimalForEditing(price)
             }
         }
         _salePrices = State(initialValue: prefill)
@@ -82,7 +82,7 @@ struct BulkSellSheet: View {
                 } header: {
                     Text("Items (\(items.count))")
                 } footer: {
-                    Text("Enter a sale price for each item to include it in the bulk order.")
+                    Text("Enter a sale price for every selected item.")
                 }
 
                 Section("Sale") {

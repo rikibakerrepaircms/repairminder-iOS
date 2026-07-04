@@ -22,6 +22,16 @@ func parseDecimal(_ s: String) -> Double? {
     return Double(t)
 }
 
+/// Formats a decimal amount for editing in a locale-aware way, matching what
+/// `parseDecimal` expects back — avoids `String(Double)`'s fixed "."
+/// separator corrupting the value in comma-decimal locales.
+/// Internal (not private) so `BulkSellSheet` and `RefurbishmentEditSheet` can reuse it.
+func formatDecimalForEditing(_ value: Double) -> String {
+    let f = NumberFormatter(); f.numberStyle = .decimal; f.locale = Locale.current
+    f.minimumFractionDigits = 0; f.maximumFractionDigits = 2; f.usesGroupingSeparator = false
+    return f.string(from: NSNumber(value: value)) ?? String(value)
+}
+
 private enum SaleChannelOption: String, CaseIterable, Identifiable {
     case direct
     case ebay

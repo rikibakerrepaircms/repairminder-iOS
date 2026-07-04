@@ -63,7 +63,7 @@ struct RefurbishmentEditSheet: View {
 
         _itemType = State(initialValue: RefurbishmentItemTypeOption(rawValueOrDefault: existingItem?.itemType))
         _description = State(initialValue: existingItem?.description ?? "")
-        _unitCost = State(initialValue: existingItem?.unitCost.map { String($0) } ?? "")
+        _unitCost = State(initialValue: existingItem?.unitCost.map { formatDecimalForEditing($0) } ?? "")
         _quantity = State(initialValue: existingItem?.quantity ?? 1)
         _partNumber = State(initialValue: existingItem?.partNumber ?? "")
         _supplier = State(initialValue: existingItem?.supplier ?? "")
@@ -178,6 +178,18 @@ struct RefurbishmentEditSheet: View {
             if newSupplier != existingItem.supplier {
                 request.supplier = newSupplier
             }
+
+            let hasChanges = request.description != nil
+                || request.quantity != nil
+                || request.unitCost != nil
+                || request.partNumber != nil
+                || request.supplier != nil
+
+            guard hasChanges else {
+                dismiss()
+                return
+            }
+
             result = await onSave(nil, request)
         } else {
             let request = AddRefurbishmentRequest(

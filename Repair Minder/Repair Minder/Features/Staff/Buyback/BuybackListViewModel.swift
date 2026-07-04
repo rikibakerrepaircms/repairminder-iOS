@@ -31,8 +31,6 @@ final class BuybackListViewModel: ObservableObject {
     // Bulk-sell multi-select
     @Published var isSelecting = false
     @Published var selectedIds: Set<String> = []
-    @Published private(set) var isBulkSelling = false
-    @Published var bulkSellError: String?
 
     // MARK: - Private
 
@@ -212,18 +210,10 @@ final class BuybackListViewModel: ObservableObject {
         }
     }
 
-    func clearSelection() {
-        selectedIds.removeAll()
-    }
-
     /// POST /api/buyback/sell-bulk — sells all currently-selected items in one
     /// order, then reloads the list and exits selection mode. Returns an error
     /// message on failure (per-item validation errors are joined by the API).
     func sellBulk(_ request: BulkSellRequest) async -> String? {
-        isBulkSelling = true
-        bulkSellError = nil
-        defer { isBulkSelling = false }
-
         do {
             _ = try await buybackService.sellBulk(request)
             selectedIds.removeAll()
@@ -231,11 +221,8 @@ final class BuybackListViewModel: ObservableObject {
             await loadItems()
             return nil
         } catch let e as APIError {
-            let message = e.localizedDescription
-            bulkSellError = message
-            return message
+            return e.localizedDescription
         } catch {
-            bulkSellError = error.localizedDescription
             return error.localizedDescription
         }
     }
