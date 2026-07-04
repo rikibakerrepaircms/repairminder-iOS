@@ -16,6 +16,7 @@ struct BuybackDetailView: View {
     @State private var showRefurbSheet = false
     @State private var editingRefurbItem: RefurbishmentItem?
     @State private var pendingDeleteRefurbItem: RefurbishmentItem?
+    @State private var showListingEdit = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var isRegularWidth: Bool {
@@ -71,6 +72,14 @@ struct BuybackDetailView: View {
                 return "Nothing to save"
             }
         }
+        .sheet(isPresented: $showListingEdit) {
+            if let buyback = viewModel.buyback {
+                ListingEditSheet(detail: buyback) { fields in
+                    let success = await viewModel.updateListing(fields: fields)
+                    return success ? nil : viewModel.actionError
+                }
+            }
+        }
         .confirmationDialog(
             "Delete this refurbishment item?",
             isPresented: Binding(
@@ -98,6 +107,7 @@ struct BuybackDetailView: View {
             VStack(spacing: 16) {
                 statusHeader(buyback)
                 publishSection(buyback)
+                listingSection(buyback)
                 costSummarySection(buyback)
 
                 if let images = buyback.images, !images.isEmpty {
@@ -196,6 +206,78 @@ struct BuybackDetailView: View {
                 )
             )
             .disabled(viewModel.isMutating)
+        }
+    }
+
+    // MARK: - AI Listing
+
+    private func listingSection(_ buyback: BuybackDetail) -> some View {
+        SectionCard(title: "Listing", icon: "sparkles") {
+            VStack(alignment: .leading, spacing: 8) {
+                if viewModel.isGeneratingListing {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("Generating…")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                } else if buyback.listingTitle != nil {
+                    Text(buyback.listingTitle ?? "")
+                        .font(.subheadline.weight(.semibold))
+
+                    if let short = buyback.listingShortDescription, !short.isEmpty {
+                        Text(short)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let sellPrice = buyback.formattedSellPrice {
+                        detailRow("Price", value: sellPrice)
+                    }
+                    if let condition = buyback.listingCondition, !condition.isEmpty {
+                        detailRow("Condition", value: condition.replacingOccurrences(of: "_", with: " ").capitalized)
+                    }
+                    if let generatedAt = buyback.listingGeneratedAt,
+                       let formatted = DateFormatters.formatRelativeDate(generatedAt) {
+                        detailRow("Generated", value: formatted)
+                    }
+
+                    HStack {
+                        Button("Edit listing") { showListingEdit = true }
+                            .font(.caption)
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .disabled(viewModel.isMutating)
+
+                        Button("Regenerate") {
+                            Task { await viewModel.generateListing() }
+                        }
+                        .font(.caption)
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(viewModel.isMutating || viewModel.isGeneratingListing)
+                    }
+                } else {
+                    Text("No AI listing generated yet.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    Button("Generate listing") {
+                        Task { await viewModel.generateListing() }
+                    }
+                    .font(.caption)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(viewModel.isMutating || viewModel.isGeneratingListing)
+                    .accessibilityIdentifier("buyback-generate-listing")
+                }
+
+                if let listingError = viewModel.listingError {
+                    Text(listingError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
         }
     }
 
