@@ -232,6 +232,9 @@ enum APIEndpoint {
     case addRefurbishmentItem(id: String)
     case updateRefurbishmentItem(id: String, itemId: String)
     case deleteRefurbishmentItem(id: String, itemId: String)
+    // AI listing generation (job-poll)
+    case generateBuybackListing(id: String)
+    case buybackListingStatus(id: String)
 
     // MARK: - Inventory / Assets
 
@@ -623,6 +626,8 @@ enum APIEndpoint {
             return "/api/buyback/\(id)/refurbishment"
         case .updateRefurbishmentItem(let id, let itemId), .deleteRefurbishmentItem(let id, let itemId):
             return "/api/buyback/\(id)/refurbishment/\(itemId)"
+        case .generateBuybackListing(let id), .buybackListingStatus(let id):
+            return "/api/buyback/\(id)/generate-listing"
 
         // Inventory / Assets
         case .inventoryList: return "/api/assets"
@@ -743,7 +748,7 @@ enum APIEndpoint {
              .posIntegrations, .posTerminals, .pollTerminalPayment, .paymentLinks,
              .boardColumns, .boardCardPositions,
              .schedule, .teamSchedule, .boardPinnedPreferences,
-             .buybackList, .buybackDetail, .buybackImageFile, .buybackNotes,
+             .buybackList, .buybackDetail, .buybackImageFile, .buybackNotes, .buybackListingStatus,
              .inventoryList, .inventoryDetail, .inventoryByTag, .inventoryActivity,
              .inventoryAssetGroups, .inventoryExternalDeployment, .productTypeCategories, .assetGroupsList,
              .assetGroup, .assetGroupAssets, .assetGroupProducts,
@@ -782,7 +787,7 @@ enum APIEndpoint {
              .salvageBuyback, .cancelDeviceWork, .completeDeviceChecklist, .deviceQC,
              .addBuybackNote, .sellBuyback, .sellBuybackBulk, .addDeviceToBuyback,
              .createKioskOrder, .staffAuthorizeDevice,
-             .addRefurbishmentItem:
+             .addRefurbishmentItem, .generateBuybackListing:
             return .post
 
         // PATCH endpoints

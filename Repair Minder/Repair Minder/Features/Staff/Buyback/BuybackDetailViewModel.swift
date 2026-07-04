@@ -16,11 +16,19 @@ final class BuybackDetailViewModel: ObservableObject {
     @Published var isMutating = false
     @Published var actionError: String?
 
+    @Published var isGeneratingListing = false
+    @Published var listingError: String?
+
     private let buybackId: String
     private let service = BuybackService()
+    private var listingTask: Task<Void, Never>?
 
     init(buybackId: String) {
         self.buybackId = buybackId
+    }
+
+    deinit {
+        listingTask?.cancel()
     }
 
     func loadDetail() async {
@@ -197,6 +205,94 @@ final class BuybackDetailViewModel: ObservableObject {
         defer { isMutating = false }
         do {
             try await service.deleteRefurbishment(id: buybackId, itemId: itemId)
+            await loadDetail()
+            return true
+        } catch let e as APIError {
+            actionError = e.localizedDescription
+            return false
+        } catch {
+            actionError = error.localizedDescription
+            return false
+        }
+    }
+
+    // MARK: - AI Listing Generation
+
+    /// Kicks off (or resumes visibility into) an async AI listing-generation job,
+    /// then polls GET /api/buyback/:id/generate-listing every ~2s until it reaches
+    /// a terminal state. On `"done"` the buyback is refetched so the newly
+    /// persisted listing fields show up; on `"error"` `listingError` is set to the
+    /// server-provided message. The 400 gate errors from the start call (missing
+    /// fields / activation-lock block) surface via `APIError.localizedDescription`,
+    /// which already contains the full "missing required field(s): ..." text.
+    ///
+    /// Cancellation: the caller wraps this in an owned, cancellable `Task` via
+    /// `beginListingGeneration()`/`cancelListingGeneration()` (see
+    /// `BuybackDetailView`). If that Task is cancelled or the view model is
+    /// deallocated, `Task.sleep` throws `CancellationError` and the loop simply
+    /// stops — no explicit cleanup needed since there is no persistent timer/handle.
+    func generateListing() async {
+        guard !isGeneratingListing else { return }
+        isGeneratingListing = true
+        listingError = nil
+        defer { isGeneratingListing = false }
+        do {
+            _ = try await service.startListingGeneration(id: buybackId) // 202 or 200 (already_running)
+
+            let deadline = 180 // client-side cap; server also auto-fails a job after 15 min
+            var elapsed = 0
+            while elapsed < deadline {
+                try await Task.sleep(nanoseconds: 2_000_000_000)
+                elapsed += 2
+
+                let state = try await service.listingStatus(id: buybackId)
+                switch ListingJobStatus(rawValue: state.status) {
+                case .done:
+                    await loadDetail()
+                    return
+                case .error:
+                    listingError = state.error ?? "Listing generation failed."
+                    return
+                case .running, .idle, .none:
+                    // Unknown/unmapped values keep polling too, bounded by the deadline above.
+                    continue
+                }
+            }
+            listingError = "Still generating — check back shortly."
+        } catch is CancellationError {
+            // Task was cancelled (e.g. view dismissed) — nothing to report.
+        } catch let e as APIError {
+            listingError = e.localizedDescription
+        } catch {
+            listingError = error.localizedDescription
+        }
+    }
+
+    /// Owns an unstructured `Task` for `generateListing()` so it can be cancelled
+    /// when the view disappears (otherwise the poll loop keeps running for up to
+    /// 3 minutes after navigating away). `[weak self]` avoids the Task retaining
+    /// this view model.
+    func beginListingGeneration() {
+        listingTask?.cancel()
+        listingTask = Task { [weak self] in
+            await self?.generateListing()
+        }
+    }
+
+    /// Cancels any in-flight listing-generation poll loop (e.g. on view disappear).
+    func cancelListingGeneration() {
+        listingTask?.cancel()
+        listingTask = nil
+    }
+
+    /// PATCH /api/buyback/:id — edits listing fields (title/description/price/condition).
+    /// Returns true on success.
+    func updateListing(fields: [String: AnyEncodable]) async -> Bool {
+        isMutating = true
+        actionError = nil
+        defer { isMutating = false }
+        do {
+            try await service.updateFields(id: buybackId, fields: fields)
             await loadDetail()
             return true
         } catch let e as APIError {

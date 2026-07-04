@@ -63,4 +63,17 @@ final class BuybackService {
     func deleteRefurbishment(id: String, itemId: String) async throws {
         try await api.requestVoid(.deleteRefurbishmentItem(id: id, itemId: itemId))
     }
+
+    // MARK: - AI Listing Generation
+
+    /// POST /api/buyback/:id/generate-listing — starts an async listing-generation
+    /// job (202), or reports the already-running job (200).
+    func startListingGeneration(id: String) async throws -> ListingJobStart {
+        try await api.request(.generateBuybackListing(id: id))
+    }
+
+    /// GET /api/buyback/:id/generate-listing — current job state (always 200).
+    func listingStatus(id: String) async throws -> ListingJobState {
+        try await api.request(.buybackListingStatus(id: id))
+    }
 }
