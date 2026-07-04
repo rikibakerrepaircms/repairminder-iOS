@@ -52,6 +52,9 @@ struct DeviceDetailView: View {
     @State private var showingDeviceDespatchSheet = false
     @State private var showingAddAccessorySheet = false
 
+    // Device report state
+    @State private var showingDeviceReportSheet = false
+
     private var isRegularWidth: Bool {
         horizontalSizeClass == .regular
     }
@@ -217,6 +220,9 @@ struct DeviceDetailView: View {
                 await viewModel.addAccessory(request)
             }
         }
+        .sheet(isPresented: $showingDeviceReportSheet) {
+            DeviceReportSheet(orderId: viewModel.orderId, deviceId: viewModel.deviceId)
+        }
     }
 
     // MARK: - Loading View
@@ -284,6 +290,11 @@ struct DeviceDetailView: View {
             // Checklist
             if !device.checklist.isEmpty {
                 checklistSection(device)
+            }
+
+            // Completion — pending items count, photo counts, quote line items
+            if viewModel.completionData != nil || viewModel.pendingItemsCount != nil {
+                completionSection
             }
 
             // Timestamps
@@ -579,6 +590,18 @@ struct DeviceDetailView: View {
                 }
             }
 
+            // Device report — server-rendered, print-ready HTML report
+            Button {
+                showingDeviceReportSheet = true
+            } label: {
+                HStack {
+                    Text("Device report")
+                    Spacer()
+                    Image(systemName: "doc.text")
+                }
+            }
+            .accessibilityIdentifier("device-report-button")
+
             // Staff authorize — only while awaiting customer/staff authorization
             if device.deviceStatus == .awaitingAuthorisation {
                 Button {
@@ -789,6 +812,31 @@ struct DeviceDetailView: View {
                 if let cycles = device.batteryCycleCount {
                     LabeledContent("Battery Cycles", value: "\(cycles)")
                 }
+            }
+
+            // Device type — editable via Menu. Excludes system types (Repair/Buyback),
+            // which are workflow markers, not user-selectable categories.
+            let selectableTypes = viewModel.deviceTypes.filter { $0.isSystem != true }
+            if !selectableTypes.isEmpty {
+                Menu {
+                    ForEach(selectableTypes) { type in
+                        Button(type.name) {
+                            Task { await viewModel.updateDevice(.deviceType(type.id)) }
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text("Device type")
+                        Spacer()
+                        Text(device.deviceType?.name ?? "Not set")
+                            .foregroundStyle(.secondary)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(viewModel.isUpdating)
             }
         }
     }
@@ -1293,6 +1341,64 @@ struct DeviceDetailView: View {
 
                 if let repairStarted = device.timestamps.formattedRepairStarted {
                     LabeledContent("Repair Started", value: repairStarted)
+                }
+            }
+        }
+    }
+
+    // MARK: - Completion Section
+
+    /// Read-only completion overview: pending items count, pre/post-repair photo
+    /// counts, and quote line items with authorization status.
+    private var completionSection: some View {
+        Section("Completion") {
+            if let pendingCount = viewModel.pendingItemsCount {
+                HStack {
+                    Text("Pending Items")
+                    Spacer()
+                    Text("\(pendingCount)")
+                        .foregroundStyle(pendingCount > 0 ? .orange : .secondary)
+                        .fontWeight(pendingCount > 0 ? .semibold : .regular)
+                }
+            }
+
+            if let counts = viewModel.completionData?.imageCounts {
+                if let preRepair = counts.preRepair {
+                    LabeledContent("Pre-Repair Photos", value: "\(preRepair)")
+                }
+                if let postRepair = counts.postRepair {
+                    LabeledContent("Post-Repair Photos", value: "\(postRepair)")
+                }
+                if let total = counts.total {
+                    LabeledContent("Total Photos", value: "\(total)")
+                }
+            }
+
+            if let lineItems = viewModel.completionData?.lineItems, !lineItems.isEmpty {
+                ForEach(lineItems) { item in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.description ?? "Item")
+                                .font(.subheadline)
+                            if let quantity = item.quantity {
+                                Text("Qty: \(quantity)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            if let lineTotal = item.lineTotalIncVat {
+                                Text(String(format: "£%.2f", lineTotal))
+                                    .font(.subheadline.weight(.medium))
+                            }
+                            if let status = item.authorizationStatus {
+                                Text(status.capitalized)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
                 }
             }
         }

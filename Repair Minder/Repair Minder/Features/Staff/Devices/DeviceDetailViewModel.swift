@@ -22,6 +22,9 @@ final class DeviceDetailViewModel {
     var isUpdating = false
     var error: String?
     var successMessage: String?
+    var deviceTypes: [DeviceType] = []
+    var completionData: DeviceCompletionData?
+    var pendingItemsCount: Int?
 
     // MARK: - Configuration
 
@@ -72,6 +75,8 @@ final class DeviceDetailViewModel {
                 .orderDevice(orderId: orderId, deviceId: deviceId)
             )
             await loadActions()
+            await loadDeviceTypes()
+            await loadCompletionInfo()
         } catch {
             self.error = error.localizedDescription
             #if DEBUG
@@ -80,6 +85,24 @@ final class DeviceDetailViewModel {
         }
 
         isLoading = false
+    }
+
+    /// Load selectable device types (for the device-type inline editor)
+    func loadDeviceTypes() async {
+        do {
+            deviceTypes = try await APIClient.shared.request(.deviceTypes)
+        } catch {
+            #if DEBUG
+            print("Failed to load device types: \(error)")
+            #endif
+        }
+    }
+
+    /// Load completion-data (line items + image counts) and pending-items count
+    func loadCompletionInfo() async {
+        completionData = try? await APIClient.shared.request(.deviceCompletionData(deviceId: deviceId))
+        let pending: PendingItemsCount? = try? await APIClient.shared.request(.devicePendingItemsCount(deviceId: deviceId))
+        pendingItemsCount = pending?.count
     }
 
     /// Refresh device data
@@ -497,6 +520,25 @@ final class DeviceDetailViewModel {
             print("Failed to add accessory: \(error)")
             #endif
             return error.localizedDescription
+        }
+    }
+
+    // MARK: - Device Report
+
+    /// Fetch the server-rendered, print-ready device report HTML document.
+    /// Returns nil on failure (sets `error`).
+    func fetchDeviceReportHTML() async -> String? {
+        do {
+            let resp: DeviceReportResponse = try await APIClient.shared.request(
+                .deviceReport(orderId: orderId, deviceId: deviceId)
+            )
+            return resp.html
+        } catch {
+            self.error = error.localizedDescription
+            #if DEBUG
+            print("Failed to fetch device report: \(error)")
+            #endif
+            return nil
         }
     }
 

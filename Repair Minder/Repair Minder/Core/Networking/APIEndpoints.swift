@@ -90,6 +90,9 @@ enum APIEndpoint {
     case despatchDevice(deviceId: String)
     case deviceReadyForCollection(deviceId: String)
     case addDeviceAccessory(orderId: String, deviceId: String)
+    case deviceCompletionData(deviceId: String)
+    case devicePendingItemsCount(deviceId: String)
+    case deviceReport(orderId: String, deviceId: String)
 
     // Device Images
     case deviceImages(orderId: String, deviceId: String)
@@ -473,6 +476,12 @@ enum APIEndpoint {
             return "/api/devices/\(deviceId)/ready-for-collection"
         case .addDeviceAccessory(let orderId, let deviceId):
             return "/api/orders/\(orderId)/devices/\(deviceId)/accessories"
+        case .deviceCompletionData(let deviceId):
+            return "/api/devices/\(deviceId)/completion-data"
+        case .devicePendingItemsCount(let deviceId):
+            return "/api/devices/\(deviceId)/pending-items-count"
+        case .deviceReport(let orderId, let deviceId):
+            return "/api/orders/\(orderId)/devices/\(deviceId)/report"
         case .deviceImages(let orderId, let deviceId),
              .uploadDeviceImage(let orderId, let deviceId):
             return "/api/orders/\(orderId)/devices/\(deviceId)/images"
@@ -789,6 +798,7 @@ enum APIEndpoint {
              .bookingHeatmap, .buybackStats, .bookingsByTime,
              .devices, .myQueue, .myActiveWork, .orderDevices, .orderDevice, .deviceActions,
              .deviceChecklistTemplates, .deviceQCRequirements,
+             .deviceCompletionData, .devicePendingItemsCount, .deviceReport,
              .deviceImages, .deviceImageFile(_, _, _, _, _),
              .orders, .order, .orderItems, .orderPayments, .orderSignatures, .orderRefunds, .orderDocument,
              .clients, .client, .clientSearch, .clientsExport, .clientGroupsForClient,
