@@ -76,15 +76,25 @@ final class InventoryListViewModel: ObservableObject {
         await loadMore()
     }
 
+    /// A snapshot of the query fields sent with a request — used to detect whether the
+    /// filters/search changed underneath an in-flight `loadMore()` before its result lands.
+    private func currentQuerySnapshot() -> AssetQuery { query }
+
     func loadMore() async {
-        guard hasMore, !isLoadingMore else { return }
+        // Coalesce against reloads: don't start a page fetch while a reload is in flight, and
+        // don't append a page whose query snapshot no longer matches — a filter/search change
+        // that fired loadAssets() mid-flight already reset the list; that reload's result wins.
+        guard hasMore, !isLoadingMore, !isLoading else { return }
+        let snapshot = currentQuerySnapshot()
         isLoadingMore = true
         do {
             let next = currentPage + 1
-            let page = try await service.fetchAssets(page: next, pageSize: pageSize, filters: query)
-            assets.append(contentsOf: page)
-            currentPage = next
-            hasMore = page.count == pageSize
+            let page = try await service.fetchAssets(page: next, pageSize: pageSize, filters: snapshot)
+            if !isLoading && snapshot == currentQuerySnapshot() {
+                assets.append(contentsOf: page)
+                currentPage = next
+                hasMore = page.count == pageSize
+            }
         } catch {
             #if DEBUG
             print("[InventoryList] pagination error: \(error)")
