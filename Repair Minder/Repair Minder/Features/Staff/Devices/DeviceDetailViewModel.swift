@@ -237,6 +237,31 @@ final class DeviceDetailViewModel {
         isUpdating = false
     }
 
+    // MARK: - Parts
+
+    /// Allocates an in-stock inventory asset onto this device as a used part.
+    /// Reuses the Inventory feature's allocate endpoint (`POST /api/assets/:id/allocate`)
+    /// with `device_id` set to this device — the same contract `DeployToOrderWizard`
+    /// uses with `order_id` for orders.
+    /// Returns nil on success (device is refreshed), or a human-readable error message.
+    func allocatePart(assetId: String) async -> String? {
+        isUpdating = true
+        defer { isUpdating = false }
+        do {
+            _ = try await InventoryService().allocateAsset(
+                id: assetId,
+                body: AllocateRequest(deviceId: deviceId, deploy: false)
+            )
+            await loadDevice()
+            return nil
+        } catch {
+            #if DEBUG
+            print("Failed to allocate part: \(error)")
+            #endif
+            return error.localizedDescription
+        }
+    }
+
     // MARK: - Cancel Work
 
     /// Cancel in-progress work on this device

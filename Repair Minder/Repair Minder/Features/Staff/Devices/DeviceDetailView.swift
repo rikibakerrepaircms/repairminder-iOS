@@ -41,6 +41,9 @@ struct DeviceDetailView: View {
     @State private var qcSheetItem: QCSheetItem?
     @State private var isFetchingQCRequirements = false
 
+    // Add part state
+    @State private var showAddPartSheet = false
+
     private var isRegularWidth: Bool {
         horizontalSizeClass == .regular
     }
@@ -181,6 +184,11 @@ struct DeviceDetailView: View {
                 await viewModel.submitQC(request)
             }
         }
+        .sheet(isPresented: $showAddPartSheet) {
+            AddPartSheet { assetId in
+                await viewModel.allocatePart(assetId: assetId)
+            }
+        }
     }
 
     // MARK: - Loading View
@@ -236,9 +244,7 @@ struct DeviceDetailView: View {
             }
 
             // Parts used
-            if !device.partsUsed.isEmpty {
-                partsSection(device)
-            }
+            partsSection(device)
 
             // Accessories
             if !device.accessories.isEmpty {
@@ -942,7 +948,7 @@ struct DeviceDetailView: View {
     // MARK: - Parts Section
 
     private func partsSection(_ device: DeviceDetail) -> some View {
-        Section("Parts Used") {
+        Section {
             ForEach(device.partsUsed) { part in
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
@@ -974,6 +980,24 @@ struct DeviceDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
+            }
+            if device.partsUsed.isEmpty {
+                Text("No parts added yet.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            HStack {
+                Text("Parts Used")
+                Spacer()
+                Button {
+                    showAddPartSheet = true
+                } label: {
+                    Label("Add Part", systemImage: "plus.circle")
+                }
+                .font(.caption)
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("add-part-button")
             }
         }
     }
