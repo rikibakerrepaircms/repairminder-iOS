@@ -34,6 +34,7 @@ final class SalvageViewModel: ObservableObject {
     @Published var notes: String = ""
 
     @Published var isBooking = false
+    @Published var removingId: String?
     @Published var error: String?
 
     init(buybackId: String, purchaseAmount: Double, salvaged: [SalvagedAssetSummary], service: InventoryServing? = nil) {
@@ -122,6 +123,8 @@ final class SalvageViewModel: ObservableObject {
 
     func removeSalvaged(_ assetId: String) async {
         error = nil
+        removingId = assetId
+        defer { removingId = nil }
         do {
             let resp = try await service.deleteSalvageItem(buybackId: buybackId, assetId: assetId)
             salvaged = resp.salvagedAssets

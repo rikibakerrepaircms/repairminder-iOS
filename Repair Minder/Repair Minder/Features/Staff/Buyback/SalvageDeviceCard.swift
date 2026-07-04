@@ -8,6 +8,7 @@ struct SalvageDeviceCard: View {
     let onChanged: () async -> Void
 
     @State private var showConfirm = false
+    @State private var selectedAssetId: String?
 
     init(buybackId: String, purchaseAmount: Double, salvaged: [SalvagedAssetSummary], onChanged: @escaping () async -> Void) {
         _viewModel = StateObject(wrappedValue: SalvageViewModel(buybackId: buybackId, purchaseAmount: purchaseAmount, salvaged: salvaged))
@@ -22,13 +23,14 @@ struct SalvageDeviceCard: View {
             }
             stagingForm
             if !viewModel.staged.isEmpty { stagedList; bookButton }
-            if !viewModel.salvaged.isEmpty { bookedList }
+            bookedList
             if let err = viewModel.error { Text(err).font(.footnote).foregroundStyle(.red) }
         }
         .padding()
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .task { await viewModel.loadReferenceData() }
+        .navigationDestination(item: $selectedAssetId) { InventoryDetailView(assetId: $0) }
         .alert("Mark device as Salvaged?", isPresented: $showConfirm) {
             Button("Cancel", role: .cancel) {}
             Button("Salvage", role: .destructive) { Task { await book() } }
@@ -100,13 +102,23 @@ struct SalvageDeviceCard: View {
             if !viewModel.subLocations.isEmpty {
                 Picker("Sub-location", selection: $viewModel.subLocationId) {
                     Text("None").tag(String?.none)
-                    ForEach(viewModel.subLocations) { Text($0.code ?? $0.description ?? "—").tag(String?.some($0.id)) }
+                    ForEach(viewModel.subLocations) { Text(subLocationLabel($0)).tag(String?.some($0.id)) }
                 }
             }
             TextField("Notes", text: $viewModel.notes, axis: .vertical).lineLimit(1...3)
             Button { viewModel.addToBatch() } label: { Label("Add to batch", systemImage: "plus.circle") }
-                .disabled(!viewModel.canAdd)
+                .disabled(!viewModel.canAdd || viewModel.isBooking)
                 .accessibilityIdentifier("salvage-add")
+        }
+    }
+
+    /// Compose "code — description" when both are present; fall back to whichever exists.
+    private func subLocationLabel(_ sl: AssetSubLocationOption) -> String {
+        switch (sl.code, sl.description) {
+        case let (code?, desc?): return "\(code) — \(desc)"
+        case let (code?, nil): return code
+        case let (nil, desc?): return desc
+        default: return "—"
         }
     }
 
@@ -132,23 +144,45 @@ struct SalvageDeviceCard: View {
         .buttonStyle(.borderedProminent)
         .disabled(!viewModel.canBook)
         .accessibilityIdentifier("salvage-book")
-        .overlay(alignment: .trailing) { if viewModel.overCap { Text("Over budget").font(.caption2).foregroundStyle(.red) } }
+        .overlay(alignment: .trailing) {
+            if viewModel.overCap {
+                Text("Over budget by \(CurrencyFormatter.format(abs(viewModel.remaining)))").font(.caption2).foregroundStyle(.red)
+            }
+        }
     }
 
     private var bookedList: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Salvaged assets").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            if viewModel.salvaged.isEmpty {
+                Text("No parts salvaged from this device yet.").font(.caption).foregroundStyle(.secondary)
+            }
             ForEach(viewModel.salvaged) { a in
                 HStack {
-                    VStack(alignment: .leading) {
-                        Text(a.assetTag).font(.caption.monospaced())
-                        Text("\(a.name) · Grade \(a.conditionGrade ?? "—") · \(CurrencyFormatter.format(a.cost ?? 0))").font(.caption2).foregroundStyle(.secondary)
-                    }
+                    Button { selectedAssetId = a.id } label: {
+                        VStack(alignment: .leading) {
+                            Text(a.assetTag).font(.caption.monospaced())
+                            Text(bookedRowCaption(a)).font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }.buttonStyle(.plain)
                     Spacer()
-                    Button(role: .destructive) { Task { await viewModel.removeSalvaged(a.id); await onChanged() } } label: { Image(systemName: "trash") }.buttonStyle(.plain)
+                    if viewModel.removingId == a.id {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Button(role: .destructive) { Task { await viewModel.removeSalvaged(a.id); await onChanged() } } label: { Image(systemName: "trash") }
+                            .buttonStyle(.plain)
+                            .disabled(viewModel.removingId != nil)
+                    }
                 }
             }
         }
+    }
+
+    private func bookedRowCaption(_ a: SalvagedAssetSummary) -> String {
+        var parts = ["\(a.name) · Grade \(a.conditionGrade ?? "—")"]
+        if let loc = a.locationName, !loc.isEmpty { parts.append(loc) }
+        parts.append(CurrencyFormatter.format(a.cost ?? 0))
+        return parts.joined(separator: " · ")
     }
 
     private func book() async {
