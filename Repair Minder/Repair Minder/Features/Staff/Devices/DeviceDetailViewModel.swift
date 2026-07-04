@@ -284,6 +284,26 @@ final class DeviceDetailViewModel {
         isUpdating = false
     }
 
+    // MARK: - Buyback
+
+    /// Add this device into the buyback pipeline (creates/links a buyback record).
+    /// Returns nil on success (device is refreshed), or a human-readable error
+    /// message on failure (e.g. wrong status, incomplete client details).
+    func addToBuyback() async -> String? {
+        isUpdating = true
+        defer { isUpdating = false }
+        do {
+            _ = try await BuybackService().addDeviceToBuyback(deviceId: deviceId)
+            await loadDevice()
+            return nil
+        } catch {
+            #if DEBUG
+            print("Failed to add device to buyback: \(error)")
+            #endif
+            return error.localizedDescription
+        }
+    }
+
     // MARK: - Checklists
 
     /// Fetch checklist templates of a given type (intake|pre_repair|post_repair|outgoing).

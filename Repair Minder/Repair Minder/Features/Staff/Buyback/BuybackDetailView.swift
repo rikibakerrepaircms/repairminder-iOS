@@ -10,6 +10,9 @@ import SwiftUI
 struct BuybackDetailView: View {
     @StateObject private var viewModel: BuybackDetailViewModel
     @State private var showPurchasePrice = false
+    @State private var showPurchaseEdit = false
+    @State private var showAddNote = false
+    @State private var showSell = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var isRegularWidth: Bool {
@@ -35,6 +38,26 @@ struct BuybackDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .task { await viewModel.loadDetail() }
+        .sheet(isPresented: $showPurchaseEdit) {
+            if let buyback = viewModel.buyback {
+                BuybackPurchaseEditSheet(detail: buyback) { fields in
+                    let success = await viewModel.updatePurchase(fields: fields)
+                    return success ? nil : viewModel.actionError
+                }
+            }
+        }
+        .sheet(isPresented: $showAddNote) {
+            AddBuybackNoteSheet { text in
+                await viewModel.addNote(text)
+            }
+        }
+        .sheet(isPresented: $showSell) {
+            if let buyback = viewModel.buyback {
+                SellBuybackSheet(detail: buyback) { request in
+                    await viewModel.sell(request)
+                }
+            }
+        }
     }
 
     // MARK: - Content
@@ -43,6 +66,7 @@ struct BuybackDetailView: View {
         ScrollView {
             VStack(spacing: 16) {
                 statusHeader(buyback)
+                publishSection(buyback)
                 costSummarySection(buyback)
 
                 if let images = buyback.images, !images.isEmpty {
@@ -72,9 +96,7 @@ struct BuybackDetailView: View {
                         onChanged: { await viewModel.refresh() })
                 }
 
-                if let notes = buyback.notes, !notes.isEmpty {
-                    notesSection(notes)
-                }
+                notesSection(buyback.notes ?? [])
             }
             .padding()
             .frame(maxWidth: isRegularWidth ? 700 : .infinity)
@@ -86,14 +108,65 @@ struct BuybackDetailView: View {
     // MARK: - Status Header
 
     private func statusHeader(_ buyback: BuybackDetail) -> some View {
-        HStack {
-            BuybackStatusBadge(status: buyback.status)
-            Spacer()
-            if buyback.isVatLocked {
-                Label("VAT Locked", systemImage: "lock.fill")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                BuybackStatusBadge(status: buyback.status)
+                Spacer()
+                if buyback.isVatLocked {
+                    Label("VAT Locked", systemImage: "lock.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
             }
+
+            HStack {
+                let currentStatus = buyback.buybackStatus ?? .unknown
+                let transitions = nextBuybackStatuses(for: currentStatus)
+                if !transitions.isEmpty {
+                    Menu {
+                        ForEach(transitions, id: \.self) { target in
+                            Button(target.displayName) {
+                                Task { _ = await viewModel.changeStatus(to: target.rawValue) }
+                            }
+                        }
+                    } label: {
+                        Label("Change Status", systemImage: "arrow.triangle.2.circlepath")
+                            .font(.caption)
+                    }
+                    .disabled(viewModel.isMutating)
+                }
+
+                Spacer()
+
+                if currentStatus == .forSale {
+                    Button("Sell") { showSell = true }
+                        .font(.caption.weight(.semibold))
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .disabled(viewModel.isMutating)
+                }
+            }
+
+            if let actionError = viewModel.actionError {
+                Text(actionError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    // MARK: - Storefront Publish
+
+    private func publishSection(_ buyback: BuybackDetail) -> some View {
+        SectionCard(title: "Storefront", icon: "storefront") {
+            Toggle(
+                "Published to storefront",
+                isOn: Binding(
+                    get: { buyback.storefrontPublished == 1 },
+                    set: { newValue in Task { _ = await viewModel.setPublished(newValue) } }
+                )
+            )
+            .disabled(viewModel.isMutating)
         }
     }
 
@@ -270,6 +343,15 @@ struct BuybackDetailView: View {
     private func purchaseInfoSection(_ buyback: BuybackDetail) -> some View {
         SectionCard(title: "Purchase Info", icon: "cart") {
             VStack(spacing: 6) {
+                HStack {
+                    Spacer()
+                    Button("Edit") { showPurchaseEdit = true }
+                        .font(.caption)
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(viewModel.isMutating)
+                }
+
                 if let date = buyback.purchaseDate {
                     detailRow("Date", value: DateFormatters.formatRelativeDate(date) ?? date)
                 }
@@ -384,6 +466,21 @@ struct BuybackDetailView: View {
     private func notesSection(_ notes: [BuybackNote]) -> some View {
         SectionCard(title: "Notes (\(notes.count))", icon: "note.text") {
             VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Spacer()
+                    Button("Add note") { showAddNote = true }
+                        .font(.caption)
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(viewModel.isMutating)
+                }
+
+                if notes.isEmpty {
+                    Text("No notes yet.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
                 ForEach(Array(notes.enumerated()), id: \.element.stableId) { index, note in
                     VStack(alignment: .leading, spacing: 4) {
                         if let body = note.body {
