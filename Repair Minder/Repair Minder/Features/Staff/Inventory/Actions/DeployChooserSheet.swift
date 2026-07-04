@@ -35,7 +35,7 @@ struct DeployChooserSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { viewModel.actionError = nil; dismiss() } }
             }
             .sheet(item: $route) { r in
                 switch r {

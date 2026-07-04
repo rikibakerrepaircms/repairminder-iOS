@@ -40,6 +40,7 @@ struct DeployToOrderWizard: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(step == .done ? "Done" : "Cancel") {
                         if step == .done { onFinished() }
+                        detailVM.actionError = nil
                         dismiss()
                     }
                 }
