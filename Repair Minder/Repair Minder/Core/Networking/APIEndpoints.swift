@@ -179,6 +179,13 @@ enum APIEndpoint {
     case productComponents(productTypeId: String)
     case quickCreateProductType
 
+    // MARK: - Kiosk POS
+
+    case createKioskOrder
+    case cancelKioskOrder(id: String)
+    case kioskAvailableAssets(productTypeId: String?, groupId: String?, search: String?)
+    case productTypeBySku(sku: String)
+
     // MARK: - Booking / Lookup
 
     case locations
@@ -527,6 +534,16 @@ enum APIEndpoint {
         case .quickCreateProductType:
             return "/api/product-types/quick-create"
 
+        // Kiosk POS
+        case .createKioskOrder:
+            return "/api/orders/kiosk"
+        case .cancelKioskOrder(let id):
+            return "/api/orders/\(id)/kiosk-cancel"
+        case .kioskAvailableAssets:
+            return "/api/kiosk/available-assets"
+        case .productTypeBySku(let sku):
+            return "/api/product-types/by-sku/\(sku)"
+
         // Booking / Lookup
         case .locations:
             return "/api/locations"
@@ -691,7 +708,8 @@ enum APIEndpoint {
              .tickets, .ticket, .ticketMacroExecutions,
              .ticketGenerateResponseStatus, .ticketRewriteResponseStatus,
              .macros, .macro, .macroExecutions, .macroExecution,
-             .productTypes, .assetFilterProductTypes, .productComponents,
+             .productTypes, .assetFilterProductTypes, .productComponents, .productTypeBySku,
+             .kioskAvailableAssets,
              .locations, .locationSubLocations, .deviceSearch, .deviceTypes, .companyPublicInfo, .aiReadiness,
              .pushPreferences,
              .posIntegrations, .posTerminals, .pollTerminalPayment, .paymentLinks,
@@ -733,7 +751,8 @@ enum APIEndpoint {
              .addMembership, .bulkAssignGroups, .promoteGroup, .createProductType,
              .bulkReturnToSupplier, .importAssets, .createSupplierOrder,
              .addSupplierOrderLine, .receiveSupplierOrder, .extractInvoice,
-             .salvageBuyback, .cancelDeviceWork, .completeDeviceChecklist, .deviceQC:
+             .salvageBuyback, .cancelDeviceWork, .completeDeviceChecklist, .deviceQC,
+             .createKioskOrder:
             return .post
 
         // PATCH endpoints
@@ -763,7 +782,7 @@ enum APIEndpoint {
              .boardDeleteColumn, .boardDeleteAction,
              .deleteDeviceImage, .deleteAsset, .removeMembership,
              .deleteSupplierOrderLine, .deleteSalvageItem, .deleteSupplierOrder,
-             .deleteOrderRefund:
+             .deleteOrderRefund, .cancelKioskOrder:
             return .delete
         }
     }
@@ -1044,6 +1063,13 @@ enum APIEndpoint {
             if let height = height { items.append(URLQueryItem(name: "h", value: String(height))) }
             guard !items.isEmpty else { return nil }
             items.append(URLQueryItem(name: "format", value: "auto"))
+            return items
+
+        case .kioskAvailableAssets(let productTypeId, let groupId, let search):
+            var items: [URLQueryItem] = []
+            if let productTypeId { items.append(URLQueryItem(name: "product_type_id", value: productTypeId)) }
+            if let groupId { items.append(URLQueryItem(name: "group_id", value: groupId)) }
+            if let search, !search.isEmpty { items.append(URLQueryItem(name: "search", value: search)) }
             return items
 
         default:
