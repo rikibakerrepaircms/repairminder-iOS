@@ -28,6 +28,14 @@ struct PosCardPaymentSheet: View {
     @State private var pollTask: Task<Void, Never>?
     @State private var isInitiating: Bool = false
 
+    // Payment-link management
+    @State private var existingLinks: [PosPaymentLink] = []
+    @State private var createdLinkId: String?
+    @State private var sendingEmail = false
+    @State private var linkEmailSent = false
+    @State private var linkError: String?
+    @Environment(\.openURL) private var openURL
+
     private let lastTerminalKey = "pos_last_terminal_id"
     private let pollInterval: TimeInterval = 2.0
     private let maxPollTime: Int = 120
@@ -114,6 +122,14 @@ struct PosCardPaymentSheet: View {
         return true
     }
 
+    // MARK: - Payment-Link Helpers
+
+    private var pendingLinks: [PosPaymentLink] { existingLinks.filter { $0.status == .pending } }
+    private var cancelledLinks: [PosPaymentLink] { existingLinks.filter { $0.status == .cancelled } }
+    private var pendingLinkAmountPence: Int { pendingLinks.reduce(0) { $0 + $1.amount } }
+    private var hasPendingLinkForFullAmount: Bool { pendingLinkAmountPence >= Int((balanceDue * 100).rounded()) }
+    private func money(_ pence: Int) -> String { String(format: "£%.2f", Double(pence) / 100) }
+
     // MARK: - Body
 
     var body: some View {
@@ -161,6 +177,7 @@ struct PosCardPaymentSheet: View {
                 selectedTerminalId = last
             }
             customerEmail = order.client?.email ?? ""
+            Task { await loadExistingLinks() }
         }
         .onDisappear {
             stopPolling()
@@ -185,6 +202,9 @@ struct PosCardPaymentSheet: View {
                     terminalPicker
                 } else {
                     emailField
+                    if !existingLinks.isEmpty {
+                        existingLinksPanel
+                    }
                 }
                 if let devices = order.devices, !devices.isEmpty {
                     deviceSelection(devices)
@@ -192,6 +212,18 @@ struct PosCardPaymentSheet: View {
                 amountInput
                 if isDepositPayment {
                     depositIndicator
+                }
+                if paymentMode == .link && hasPendingLinkForFullAmount {
+                    Label("A payment link has already been sent for this amount.", systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if let linkError, paymentMode == .link {
+                    Text(linkError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 initiateButton
             }
@@ -280,10 +312,13 @@ struct PosCardPaymentSheet: View {
 
     private func terminalCard(_ terminal: PosTerminal, isSelected: Bool) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: terminal.providerIcon)
-                .font(.title2)
-                .foregroundStyle(providerColor(terminal.provider))
-                .frame(width: 40)
+            RoundedRectangle(cornerRadius: 8)
+                .fill(providerBrandStyle(terminal.provider))
+                .frame(width: 40, height: 40)
+                .overlay(
+                    PosProviderLogo(provider: terminal.provider, height: 16)
+                        .foregroundStyle(.white)
+                )
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(terminal.displayName)
@@ -321,6 +356,24 @@ struct PosCardPaymentSheet: View {
         }
     }
 
+    /// Brand fill for the terminal-row logo tile, mirroring the web kiosk's
+    /// branded Card button (KioskPaymentActions.providerBackground).
+    private func providerBrandStyle(_ provider: String) -> AnyShapeStyle {
+        func c(_ r: Double, _ g: Double, _ b: Double) -> Color {
+            Color(.sRGB, red: r / 255, green: g / 255, blue: b / 255, opacity: 1)
+        }
+        switch provider {
+        case "revolut":
+            return AnyShapeStyle(LinearGradient(
+                colors: [c(13, 89, 236), c(0, 143, 225), c(32, 175, 255)],
+                startPoint: .topLeading, endPoint: .bottomTrailing))
+        case "square": return AnyShapeStyle(c(62, 67, 72))
+        case "sumup":  return AnyShapeStyle(c(26, 76, 255))
+        case "dojo":   return AnyShapeStyle(c(38, 38, 38))
+        default:       return AnyShapeStyle(c(55, 65, 81))
+        }
+    }
+
     // MARK: - Email Field
 
     private var emailField: some View {
@@ -331,6 +384,47 @@ struct PosCardPaymentSheet: View {
             keyboardType: .emailAddress,
             autocapitalization: .never
         )
+    }
+
+    // MARK: - Existing Payment Links
+
+    private var existingLinksPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Existing Payment Links")
+                .font(.subheadline.weight(.semibold))
+            if !pendingLinks.isEmpty {
+                Text("\(pendingLinks.count) pending for \(money(pendingLinkAmountPence))")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+            ForEach(pendingLinks) { link in
+                HStack {
+                    Text(money(link.amount))
+                    Text("(pending)")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    Spacer()
+                    Button("Cancel", role: .destructive) {
+                        Task { await cancelLink(link.id) }
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+            ForEach(cancelledLinks) { link in
+                HStack {
+                    Text(money(link.amount))
+                        .strikethrough()
+                        .foregroundStyle(.secondary)
+                    Text("cancelled")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
     }
 
     // MARK: - Device Selection
@@ -460,11 +554,16 @@ struct PosCardPaymentSheet: View {
             .fontWeight(.semibold)
             .frame(maxWidth: .infinity)
             .padding()
-            .background(canInitiate && !isInitiating ? Color.accentColor : Color.gray)
+            .background(canInitiate && !isInitiating && !linkGuardBlocks ? Color.accentColor : Color.gray)
             .foregroundStyle(.white)
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
-        .disabled(!canInitiate || isInitiating)
+        .disabled(!canInitiate || isInitiating || linkGuardBlocks)
+    }
+
+    /// The pending-full-amount guard only applies to the link flow — never blocks terminal payments.
+    private var linkGuardBlocks: Bool {
+        paymentMode == .link && hasPendingLinkForFullAmount
     }
 
     // MARK: - Processing View
@@ -749,6 +848,38 @@ struct PosCardPaymentSheet: View {
                         .foregroundStyle(linkCopied ? .green : Color.accentColor)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
+
+                HStack(spacing: 12) {
+                    Button {
+                        if let u = URL(string: url) { openURL(u) }
+                    } label: {
+                        Label("Open Link", systemImage: "arrow.up.right.square")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button {
+                        Task { await resendEmail() }
+                    } label: {
+                        Group {
+                            if sendingEmail {
+                                ProgressView()
+                            } else {
+                                Label(linkEmailSent ? "Email Sent" : "Email to Customer",
+                                      systemImage: linkEmailSent ? "checkmark.circle" : "envelope")
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(sendingEmail || linkEmailSent || (order.client?.email?.isEmpty ?? true))
+                }
+
+                if let linkError {
+                    Text(linkError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
             }
             .padding(.horizontal, 40)
 
@@ -809,16 +940,46 @@ struct PosCardPaymentSheet: View {
             currency: "GBP",
             customerEmail: customerEmail.isEmpty ? nil : customerEmail,
             description: "Order \(order.formattedOrderNumber)",
-            deviceIds: selectedDeviceIds.isEmpty ? nil : Array(selectedDeviceIds)
+            deviceIds: selectedDeviceIds.isEmpty ? nil : Array(selectedDeviceIds),
+            sendEmail: false   // Two-step: create link now, email on explicit "Email to Customer"
         )
 
         do {
             let response = try await paymentService.createPaymentLink(request)
             isInitiating = false
+            createdLinkId = response.paymentLinkId
+            linkEmailSent = false
+            linkError = nil
             state = .linkCreated(url: response.checkoutUrl, emailSent: response.emailSent == true)
         } catch {
             isInitiating = false
             state = .failed(reason: error.localizedDescription)
+        }
+    }
+
+    private func loadExistingLinks() async {
+        let links = (try? await paymentService.fetchPaymentLinks(orderId: order.id)) ?? []
+        existingLinks = links.filter { $0.status == .pending || $0.status == .cancelled }
+    }
+
+    private func cancelLink(_ id: String) async {
+        do {
+            try await paymentService.cancelPaymentLink(linkId: id)
+            await loadExistingLinks()
+        } catch {
+            linkError = error.localizedDescription
+        }
+    }
+
+    private func resendEmail() async {
+        guard let id = createdLinkId else { return }
+        sendingEmail = true
+        defer { sendingEmail = false }
+        do {
+            try await paymentService.resendPaymentLinkEmail(linkId: id)
+            linkEmailSent = true   // resend returns Void; no throw == sent
+        } catch {
+            linkError = error.localizedDescription
         }
     }
 

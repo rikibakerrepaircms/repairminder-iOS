@@ -164,6 +164,10 @@ struct CreatePaymentLinkRequest: Encodable {
     let customerEmail: String?
     let description: String?
     let deviceIds: [String]?
+    // Two-step link flow: when false, the link is created but no email is sent
+    // until the user explicitly triggers "Email to customer" (resend). Encodes
+    // to `send_email` via `.convertToSnakeCase`.
+    var sendEmail: Bool? = nil
     // Note: is_deposit is NOT read by the POS backend
 }
 
