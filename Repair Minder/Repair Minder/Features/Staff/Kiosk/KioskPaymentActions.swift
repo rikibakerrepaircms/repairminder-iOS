@@ -30,7 +30,7 @@ struct KioskPaymentActions: View {
                     Button { onCardPayment() } label: {
                         HStack(spacing: 8) {
                             if processing { ProgressView().tint(.white) }
-                            else { Image(systemName: "creditcard.fill") }
+                            else { PosProviderLogo(provider: posProvider, height: 20) }
                             Text("Card — \(money(balanceDue))").fontWeight(.semibold)
                         }
                         .frame(maxWidth: .infinity, minHeight: 52)
