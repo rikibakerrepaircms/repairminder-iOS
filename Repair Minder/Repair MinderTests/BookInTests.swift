@@ -111,6 +111,15 @@ final class BookInTests: XCTestCase {
         XCTAssertNil(dict["notes"])   // nil omitted
     }
 
+    /// The line editor's product-type link (NTH-8) round-trips through the same
+    /// `SupplierOrderLineRequest` used by add/update-line — the worker's
+    /// `handleUpdateOrderLine`/`handleAddOrderLine` already read `body.product_type_id`.
+    func testSupplierOrderLineRequestEncodesProductTypeId() throws {
+        let req = SupplierOrderLineRequest(productTypeId: "pt1", name: "Screen", quantityOrdered: 3, unitCost: 10.0)
+        let dict = try encodeToDict(req)
+        XCTAssertEqual(dict["product_type_id"] as? String, "pt1")
+    }
+
     func testReceiveItemInputEncodesSerialsAndIntBooleans() throws {
         let req = ReceiveItemsRequest(items: [
             ReceiveItemInput(lineId: "l1", quantity: 2, serialNumbers: ["SN1", "SN2"],
@@ -233,6 +242,22 @@ final class BookInTests: XCTestCase {
         let inputs = vm.buildReceiveInputs()
         XCTAssertEqual(inputs.count, 1)   // only l1
         XCTAssertEqual(inputs.first?.lineId, "l1")
+    }
+
+    // MARK: - NTH-8: receive step sub-location picker
+
+    /// The receive step's sub-location picker writes into `ReceiveDraft.subLocationId`;
+    /// confirm that value survives into the built `ReceiveItemInput` the worker's
+    /// `POST /api/supplier-orders/:id/receive` reads `sub_location_id` from.
+    @MainActor
+    func testReceiveInputCarriesChosenSubLocation() async {
+        let spy = BookInSpy(); spy.lineCount = 1
+        let vm = BookInWizardViewModel(order: SupplierOrder(id: "o1", supplierName: "S", status: "pending"), service: spy)
+        await vm.reloadOrder()
+        vm.prepareReceive()
+        vm.drafts["l0"]?.subLocationId = "sub-42"
+        let inputs = vm.buildReceiveInputs()
+        XCTAssertEqual(inputs.first?.subLocationId, "sub-42")
     }
 
     // MARK: - MF-3: receive quantity must cap at `remaining`, not `quantityOrdered`
