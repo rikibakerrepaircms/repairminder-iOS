@@ -700,14 +700,38 @@ struct CreateTicketNoteRequest: Encodable {
 
 // MARK: - Purchase Order Request (Package G)
 
-/// Request body for `PUT /api/orders/:id/purchase-order`. Both fields use the
-/// synthesized omit-if-nil encoding (unlike `BillingGroupRequest` below) —
-/// the endpoint treats an omitted field as "leave unchanged", and this sheet
-/// always sends both current values together, so tri-state clearing isn't
-/// needed here the way it is for the discount/billing-group endpoints.
+/// Request body for `PUT /api/orders/:id/purchase-order`. Uses a custom
+/// `encode(to:)` (rather than synthesized `encodeIfPresent`) so both fields
+/// are ALWAYS sent — as explicit JSON `null` when nil, never omitted. With
+/// synthesized encoding, blanking a PO reference/value would send nothing for
+/// that key, and the backend treats an omitted key as "leave unchanged" —
+/// so clearing would silently no-op. The backend clears the field only when
+/// the key is present with an explicit `null`.
+///
+/// Because a manual `encode(to:)` bypasses the encoder's `.convertToSnakeCase`
+/// key strategy, both keys are mapped to their snake_case wire names explicitly.
 struct PurchaseOrderRequest: Encodable {
     var poReference: String?
     var poValue: Double?
+
+    private enum CodingKeys: String, CodingKey {
+        case poReference = "po_reference"
+        case poValue = "po_value"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if let poReference {
+            try container.encode(poReference, forKey: .poReference)
+        } else {
+            try container.encodeNil(forKey: .poReference)
+        }
+        if let poValue {
+            try container.encode(poValue, forKey: .poValue)
+        } else {
+            try container.encodeNil(forKey: .poValue)
+        }
+    }
 }
 
 // MARK: - Billing Group Request (Package G)

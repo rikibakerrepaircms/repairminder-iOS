@@ -33,6 +33,12 @@ final class OrderDetailViewModel: ObservableObject {
     @Published private(set) var isPerformingAction = false
     @Published var actionError: String?
 
+    /// Order number of the newly-created order after a successful `recreateOrder`
+    /// call, when the backend includes it in the response. May be nil even on
+    /// success — the recreate succeeded (original cancelled + refreshed) whether
+    /// or not the new order's id/number came back in the response body.
+    @Published private(set) var recreatedOrderNumber: Int?
+
     // MARK: - Private
 
     private let orderId: String
@@ -417,22 +423,30 @@ final class OrderDetailViewModel: ObservableObject {
     /// Recreate the order (admin only): cancels the original order and creates
     /// a new one, copying devices/items across. Returns the new order's id on
     /// success, or nil on failure (with `actionError` set).
-    func recreateOrder(_ request: RecreateOrderRequest) async -> String? {
+    /// Recreates the order (admin only). Returns `true` on any successful (2xx)
+    /// response, regardless of whether the response body includes the new
+    /// order's id/number — the recreate has already happened server-side
+    /// (original cancelled, new order created) by the time we get a response,
+    /// so a missing id must not be reported as a failure.
+    @discardableResult
+    func recreateOrder(_ request: RecreateOrderRequest) async -> Bool {
         isPerformingAction = true
         actionError = nil
+        recreatedOrderNumber = nil
         defer { isPerformingAction = false }
         do {
             let response: RecreateOrderResponse = try await apiClient.requestFull(
                 .recreateOrder(orderId: orderId), body: request
             )
+            recreatedOrderNumber = response.newOrder?.orderNumber
             await refresh()
-            return response.newOrder?.id
+            return true
         } catch let e as APIError {
             actionError = e.localizedDescription
-            return nil
+            return false
         } catch {
             actionError = error.localizedDescription
-            return nil
+            return false
         }
     }
 

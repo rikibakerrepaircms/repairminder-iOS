@@ -350,10 +350,14 @@ struct OrderDetailView: View {
         }
         .sheet(isPresented: $showRecreateSheet) {
             RecreateOrderSheet(client: viewModel.order?.client) { req in
-                guard (await viewModel.recreateOrder(req)) != nil else {
+                guard await viewModel.recreateOrder(req) else {
                     return viewModel.actionError ?? "Could not recreate order."
                 }
-                recreateSuccessMessage = "New order created. The original order has been cancelled."
+                if let newOrderNumber = viewModel.recreatedOrderNumber {
+                    recreateSuccessMessage = "New order #\(newOrderNumber) created. The original order has been cancelled."
+                } else {
+                    recreateSuccessMessage = "New order created. The original order has been cancelled."
+                }
                 return nil
             }
         }
@@ -984,17 +988,20 @@ struct OrderDetailView: View {
                     }
                 }
 
-                Divider()
+                // Recreate order — admin only (backend returns 403 for non-admins),
+                // and only meaningful while the order hasn't already been cancelled.
+                if AuthManager.shared.currentUser?.role.isAdmin == true && order.status != .cancelled {
+                    Divider()
 
-                // Recreate order
-                Button(role: .destructive) {
-                    showRecreateConfirmation = true
-                } label: {
-                    Label("Recreate order", systemImage: "arrow.triangle.2.circlepath")
-                        .frame(maxWidth: .infinity)
+                    Button(role: .destructive) {
+                        showRecreateConfirmation = true
+                    } label: {
+                        Label("Recreate order", systemImage: "arrow.triangle.2.circlepath")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
                 }
-                .buttonStyle(.bordered)
-                .tint(.red)
             }
         }
         .accessibilityIdentifier("order-admin")
