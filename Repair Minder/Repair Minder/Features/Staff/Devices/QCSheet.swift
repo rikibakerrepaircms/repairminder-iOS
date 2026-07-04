@@ -80,7 +80,9 @@ struct QCSheet: View {
                 }
             }
             .navigationTitle("Quality Check")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

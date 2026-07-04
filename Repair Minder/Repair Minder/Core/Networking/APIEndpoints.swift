@@ -85,6 +85,7 @@ enum APIEndpoint {
     case completeDeviceChecklist(orderId: String, deviceId: String)
     case deviceQCRequirements(deviceId: String)
     case deviceQC(deviceId: String)
+    case staffAuthorizeDevice(deviceId: String)
 
     // Device Images
     case deviceImages(orderId: String, deviceId: String)
@@ -434,6 +435,8 @@ enum APIEndpoint {
             return "/api/devices/\(deviceId)/qc-requirements"
         case .deviceQC(let deviceId):
             return "/api/devices/\(deviceId)/qc"
+        case .staffAuthorizeDevice(let deviceId):
+            return "/api/devices/\(deviceId)/staff-authorize"
         case .deviceImages(let orderId, let deviceId),
              .uploadDeviceImage(let orderId, let deviceId):
             return "/api/orders/\(orderId)/devices/\(deviceId)/images"
@@ -767,7 +770,7 @@ enum APIEndpoint {
              .addSupplierOrderLine, .receiveSupplierOrder, .extractInvoice,
              .salvageBuyback, .cancelDeviceWork, .completeDeviceChecklist, .deviceQC,
              .addBuybackNote, .sellBuyback, .addDeviceToBuyback,
-             .createKioskOrder:
+             .createKioskOrder, .staffAuthorizeDevice:
             return .post
 
         // PATCH endpoints

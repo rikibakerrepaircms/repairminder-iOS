@@ -24,6 +24,9 @@ final class BuybackListViewModel: ObservableObject {
     @Published var selectedStatus: String?
     @Published var selectedLocationId: String?
     @Published var selectedEngineerId: String?
+    @Published var storefrontStatus: String?     // not_started|draft|coming_soon|ready|live
+    @Published var hasSellPriceOnly = false
+    @Published var missingImagesOnly = false
 
     // MARK: - Private
 
@@ -42,6 +45,7 @@ final class BuybackListViewModel: ObservableObject {
 
     var hasActiveFilters: Bool {
         selectedStatus != nil || selectedLocationId != nil || selectedEngineerId != nil || !searchText.isEmpty
+            || storefrontStatus != nil || hasSellPriceOnly || missingImagesOnly
     }
 
     var statusCounts: [BuybackStatusCount] {
@@ -125,6 +129,21 @@ final class BuybackListViewModel: ObservableObject {
         Task { await loadItems() }
     }
 
+    func selectStorefrontStatus(_ status: String?) {
+        storefrontStatus = (storefrontStatus == status) ? nil : status
+        Task { await loadItems() }
+    }
+
+    func toggleHasSellPriceOnly() {
+        hasSellPriceOnly.toggle()
+        Task { await loadItems() }
+    }
+
+    func toggleMissingImagesOnly() {
+        missingImagesOnly.toggle()
+        Task { await loadItems() }
+    }
+
     func applyFilter() async {
         await loadItems()
     }
@@ -134,6 +153,9 @@ final class BuybackListViewModel: ObservableObject {
         selectedLocationId = nil
         selectedEngineerId = nil
         searchText = ""
+        storefrontStatus = nil
+        hasSellPriceOnly = false
+        missingImagesOnly = false
         await loadItems()
     }
 
@@ -198,6 +220,15 @@ final class BuybackListViewModel: ObservableObject {
         }
         if let engineerId = selectedEngineerId {
             queryItems.append(URLQueryItem(name: "engineer_id", value: engineerId))
+        }
+        if let storefrontStatus, !storefrontStatus.isEmpty {
+            queryItems.append(URLQueryItem(name: "storefront_status", value: storefrontStatus))
+        }
+        if hasSellPriceOnly {
+            queryItems.append(URLQueryItem(name: "has_sell_price", value: "true"))
+        }
+        if missingImagesOnly {
+            queryItems.append(URLQueryItem(name: "missing_images", value: "true"))
         }
 
         components.queryItems = queryItems

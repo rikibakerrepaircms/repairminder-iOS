@@ -380,6 +380,31 @@ final class DeviceDetailViewModel {
         }
     }
 
+    // MARK: - Staff Authorize
+
+    /// Approve or reject a device that's awaiting staff authorization. Returns
+    /// nil on success (device is refreshed), or a human-readable error message
+    /// on failure (e.g. missing bank details on a buyback approve).
+    func staffAuthorize(_ request: StaffAuthorizeRequest) async -> String? {
+        isUpdating = true
+        defer { isUpdating = false }
+
+        do {
+            let _: StaffAuthorizeResponse = try await APIClient.shared.request(
+                .staffAuthorizeDevice(deviceId: deviceId),
+                body: request
+            )
+            await loadDevice()
+            await loadActions()
+            return nil
+        } catch {
+            #if DEBUG
+            print("Failed to staff-authorize device: \(error)")
+            #endif
+            return error.localizedDescription
+        }
+    }
+
     // MARK: - Message Handling
 
     /// Clear success message
