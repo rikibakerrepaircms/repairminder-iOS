@@ -91,6 +91,12 @@ struct Order: Decodable, Identifiable, Equatable, Hashable, Sendable {
     let globalDiscountAmount: Double?
     let globalDiscountReason: String?
 
+    // Admin extras (detail only) — Package G
+    let customerPoReference: String?
+    let customerPoValue: Double?
+    let customerPoReceivedAt: String?
+    let billingGroup: OrderBillingGroup?
+
     // MARK: - Computed Properties
 
     /// Display name for client
@@ -230,6 +236,14 @@ struct OrderLocation: Decodable, Equatable, Sendable {
 struct OrderAssignedUser: Decodable, Equatable, Sendable {
     let id: String
     let name: String
+}
+
+/// The client group an order's invoicing is attributed to (Package G).
+/// Set/cleared via `PATCH /api/orders/:id/billing-group`.
+struct OrderBillingGroup: Decodable, Equatable, Sendable {
+    let id: String
+    let name: String?
+    let postcode: String?
 }
 
 struct OrderItem: Decodable, Identifiable, Equatable, Sendable {
@@ -682,6 +696,89 @@ struct CreateRefundRequest: Encodable {
 struct CreateTicketNoteRequest: Encodable {
     var body: String
     var deviceId: String?
+}
+
+// MARK: - Purchase Order Request (Package G)
+
+/// Request body for `PUT /api/orders/:id/purchase-order`. Uses a custom
+/// `encode(to:)` (rather than synthesized `encodeIfPresent`) so both fields
+/// are ALWAYS sent — as explicit JSON `null` when nil, never omitted. With
+/// synthesized encoding, blanking a PO reference/value would send nothing for
+/// that key, and the backend treats an omitted key as "leave unchanged" —
+/// so clearing would silently no-op. The backend clears the field only when
+/// the key is present with an explicit `null`.
+///
+/// Because a manual `encode(to:)` bypasses the encoder's `.convertToSnakeCase`
+/// key strategy, both keys are mapped to their snake_case wire names explicitly.
+struct PurchaseOrderRequest: Encodable {
+    var poReference: String?
+    var poValue: Double?
+
+    private enum CodingKeys: String, CodingKey {
+        case poReference = "po_reference"
+        case poValue = "po_value"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if let poReference {
+            try container.encode(poReference, forKey: .poReference)
+        } else {
+            try container.encodeNil(forKey: .poReference)
+        }
+        if let poValue {
+            try container.encode(poValue, forKey: .poValue)
+        } else {
+            try container.encodeNil(forKey: .poValue)
+        }
+    }
+}
+
+// MARK: - Billing Group Request (Package G)
+
+/// Request body for `PATCH /api/orders/:id/billing-group`. Uses a custom
+/// `encode(to:)` (rather than synthesized `encodeIfPresent`) so `nil` is sent
+/// as an explicit JSON `null` instead of being omitted — the backend clears
+/// the billing group only when the key is present with a `null` value.
+struct BillingGroupRequest: Encodable {
+    var clientGroupId: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case clientGroupId
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if let clientGroupId {
+            try container.encode(clientGroupId, forKey: .clientGroupId)
+        } else {
+            try container.encodeNil(forKey: .clientGroupId)
+        }
+    }
+}
+
+// MARK: - Recreate Order Request/Response (Package G)
+
+/// Request body for `POST /api/orders/:id/recreate` (admin only). Cancels the
+/// original order and creates a new one, copying devices/items across.
+struct RecreateOrderRequest: Encodable {
+    var clientEmail: String
+    var clientFirstName: String?
+    var clientLastName: String?
+    var clientPhone: String?
+    var locationId: String?
+    var assignedUserId: String?
+}
+
+/// The `/recreate` response is NOT `data`-wrapped, so this is decoded via
+/// `APIClient.requestFull` rather than the usual `request`.
+struct RecreateOrderResponse: Decodable {
+    let newOrder: NewOrderRef?
+
+    struct NewOrderRef: Decodable {
+        let id: String
+        let orderNumber: Int?
+    }
 }
 
 // MARK: - Created Signature Response
