@@ -213,16 +213,18 @@ final class APIClient {
         }
     }
 
-    /// Extracts a human-readable error message from a JSON response body,
-    /// checking the `error` field first, then `message`. Used to surface
-    /// server-provided error text (e.g. "Asset is already a member of this
-    /// group") instead of a generic "HTTP error <code>" on non-2xx responses.
+    // MARK: - Error Parsing
+
+    /// Extracts a human-readable error message from a JSON response body by
+    /// decoding the standard `APIResponse<EmptyResponse>` envelope and reading
+    /// its `error` field — matching the other non-2xx branches in this file.
+    /// Used to surface server-provided error text (e.g. "Asset is already a
+    /// member of this group") instead of a generic "HTTP error <code>".
     nonisolated static func serverErrorMessage(from data: Data) -> String? {
-        struct Body: Decodable { let error: String?; let message: String? }
-        let d = JSONDecoder()
-        d.keyDecodingStrategy = .convertFromSnakeCase
-        let b = try? d.decode(Body.self, from: data)
-        return b?.error ?? b?.message
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let response = try? decoder.decode(APIResponse<EmptyResponse>.self, from: data)
+        return response?.error
     }
 
     /// Upload a file via multipart/form-data and decode the JSON `data` payload.

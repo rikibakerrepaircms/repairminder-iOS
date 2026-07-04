@@ -7,4 +7,8 @@ final class APIClientErrorTests: XCTestCase {
         let msg = APIClient.serverErrorMessage(from: body)
         XCTAssertEqual(msg, "Asset is already a member of this group")
     }
+
+    func testNonJSONBodyReturnsNil() {
+        XCTAssertNil(APIClient.serverErrorMessage(from: Data("not json".utf8)))
+    }
 }
