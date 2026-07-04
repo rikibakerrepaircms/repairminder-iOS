@@ -48,6 +48,33 @@ struct SellBuybackResponse: Decodable {
     let vatLiability: Double?
 }
 
+// MARK: - Bulk Sell
+
+struct BulkSellItemRequest: Encodable {
+    var id: String
+    var salePrice: Double
+    var platformFee: Double?
+}
+
+struct BulkSellRequest: Encodable {
+    var items: [BulkSellItemRequest]
+    var clientId: String?
+    var firstName: String?
+    var lastName: String?
+    var clientEmail: String?
+    var clientPhone: String?
+    var noEmail: Bool?
+    var saleChannel: String?     // "direct" | "ebay" | "shopify" — default "direct"
+}
+
+struct BulkSellResponse: Decodable {
+    let orderId: String
+    let orderTicketId: String?
+    let ticketNumber: String?
+    let itemsSold: Int?
+    let totalSaleAmount: Double?
+}
+
 // MARK: - Add device to buyback
 
 struct AddToBuybackResponse: Decodable {

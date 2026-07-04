@@ -11,7 +11,8 @@ import SwiftUI
 /// Parses a user-entered decimal amount using the current locale (handles
 /// locales where `,` is the decimal separator), falling back to a plain
 /// `Double(_:)` parse for inputs like a bare ".".
-private func parseDecimal(_ s: String) -> Double? {
+/// Internal (not private) so `BulkSellSheet` can reuse it.
+func parseDecimal(_ s: String) -> Double? {
     let t = s.trimmingCharacters(in: .whitespaces)
     if t.isEmpty { return nil }
     let f = NumberFormatter()

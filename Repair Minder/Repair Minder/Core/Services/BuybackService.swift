@@ -37,6 +37,11 @@ final class BuybackService {
         try await api.request(.sellBuyback(id: id), body: request)
     }
 
+    /// POST /api/buyback/sell-bulk — sell up to 20 `for_sale` items together in one order.
+    func sellBulk(_ request: BulkSellRequest) async throws -> BulkSellResponse {
+        try await api.request(.sellBuybackBulk, body: request)
+    }
+
     /// POST /api/devices/:deviceId/add-to-buyback
     func addDeviceToBuyback(deviceId: String) async throws -> AddToBuybackResponse {
         try await api.request(.addDeviceToBuyback(deviceId: deviceId))

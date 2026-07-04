@@ -226,6 +226,7 @@ enum APIEndpoint {
     case buybackNotes(id: String)
     case addBuybackNote(id: String)
     case sellBuyback(id: String)
+    case sellBuybackBulk
     case addDeviceToBuyback(deviceId: String)
     // Refurbishment items
     case addRefurbishmentItem(id: String)
@@ -614,6 +615,8 @@ enum APIEndpoint {
             return "/api/buyback/\(id)/notes"
         case .sellBuyback(let id):
             return "/api/buyback/\(id)/sell"
+        case .sellBuybackBulk:
+            return "/api/buyback/sell-bulk"
         case .addDeviceToBuyback(let deviceId):
             return "/api/devices/\(deviceId)/add-to-buyback"
         case .addRefurbishmentItem(let id):
@@ -777,7 +780,7 @@ enum APIEndpoint {
              .bulkReturnToSupplier, .importAssets, .createSupplierOrder,
              .addSupplierOrderLine, .receiveSupplierOrder, .extractInvoice,
              .salvageBuyback, .cancelDeviceWork, .completeDeviceChecklist, .deviceQC,
-             .addBuybackNote, .sellBuyback, .addDeviceToBuyback,
+             .addBuybackNote, .sellBuyback, .sellBuybackBulk, .addDeviceToBuyback,
              .createKioskOrder, .staffAuthorizeDevice,
              .addRefurbishmentItem:
             return .post
