@@ -16,4 +16,14 @@ final class InventoryEndpointTests: XCTestCase {
         XCTAssertEqual(items["limit"], "50")
         XCTAssertNil(items["product_kind"])
     }
+
+    func testAssetFilterProductTypesOmitsEmptySearch() {
+        for ep in [APIEndpoint.assetFilterProductTypes(search: nil),
+                   APIEndpoint.assetFilterProductTypes(search: "")] {
+            let names = (ep.queryItems ?? []).map(\.name)
+            XCTAssertFalse(names.contains("search"))
+            XCTAssertTrue(names.contains("is_active"))
+            XCTAssertTrue(names.contains("limit"))
+        }
+    }
 }
