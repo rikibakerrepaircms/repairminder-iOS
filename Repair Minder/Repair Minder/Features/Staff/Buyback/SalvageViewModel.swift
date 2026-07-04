@@ -56,18 +56,21 @@ final class SalvageViewModel: ObservableObject {
 
     // MARK: Reference data
     func loadReferenceData() async {
-        locations = (try? await service.fetchLocations()) ?? []
+        async let g = try? service.fetchGroups(search: nil)
+        async let l = try? service.fetchLocations()
+        groups = (await g) ?? []
+        locations = (await l) ?? []
     }
     func loadSubLocations(_ id: String) async {
         subLocations = (try? await service.fetchSubLocations(locationId: id)) ?? []
     }
 
-    /// Uncapped, searchable group/part lookup (NTH-3) — replaces the old one-shot
-    /// `limit:100`, no-search load so parts beyond the first page remain reachable.
+    /// Hybrid group/part lookup (NTH-3): the default list loads on appear so small
+    /// companies see their parts immediately; typing refines server-side to reach parts
+    /// beyond the first-page/100 cap; clearing the field restores the default list.
     /// Mirrors `AssetFilterOptions.searchGroups` in AssetFilterSheet.
     func searchGroups(_ query: String) async {
-        guard !query.isEmpty else { groups = []; return }
-        groups = (try? await service.fetchGroups(search: query)) ?? []
+        groups = (try? await service.fetchGroups(search: query.isEmpty ? nil : query)) ?? []
     }
 
     // MARK: Staging

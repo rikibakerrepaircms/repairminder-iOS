@@ -17,8 +17,10 @@ final class AssetFilterOptions: ObservableObject {
     func loadTopLevel() async {
         async let cats = try? service.fetchCategories()
         async let locs = try? service.fetchLocations()
+        async let grps = try? service.fetchGroups(search: nil)
         categories = await cats ?? []
         locations = await locs ?? []
+        groups = await grps ?? []
     }
 
     func loadSubLocations(locationId: String) async {
@@ -30,11 +32,11 @@ final class AssetFilterOptions: ObservableObject {
         productTypes = (try? await service.fetchProductTypes(search: query)) ?? []
     }
 
-    /// Uncapped, searchable group lookup (NTH-3) — the prior `limit:100`, no-search load
-    /// couldn't reach groups beyond the first page. Mirrors `searchProductTypes`.
+    /// Hybrid group lookup (NTH-3): the default list loads on appear so small companies
+    /// see their groups immediately; typing refines server-side to reach groups beyond
+    /// the first-page/100 cap; clearing the field restores the default list.
     func searchGroups(_ query: String) async {
-        guard !query.isEmpty else { groups = []; return }
-        groups = (try? await service.fetchGroups(search: query)) ?? []
+        groups = (try? await service.fetchGroups(search: query.isEmpty ? nil : query)) ?? []
     }
 }
 

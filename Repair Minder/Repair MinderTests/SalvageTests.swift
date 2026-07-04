@@ -143,12 +143,14 @@ final class SalvageTests: XCTestCase {
 
     @MainActor
     final class GroupSearchSpy: InventoryServingStub {
-        var lastSearch: String?
-        var searchCallCount = 0
+        var searches: [String?] = []
         override func fetchGroups(search: String?) async throws -> [AssetGroupListItem] {
-            searchCallCount += 1
-            lastSearch = search
-            guard let search, !search.isEmpty else { return [] }
+            searches.append(search)
+            guard let search, !search.isEmpty else {
+                // Default list (search:nil) — what small companies see immediately.
+                return [AssetGroupListItem(id: "default-1", name: "Battery"),
+                        AssetGroupListItem(id: "default-2", name: "Screen")]
+            }
             return [AssetGroupListItem(id: "g-\(search)", name: "Match for \(search)")]
         }
     }
@@ -158,19 +160,19 @@ final class SalvageTests: XCTestCase {
         let spy = GroupSearchSpy()
         let vm = SalvageViewModel(buybackId: "b1", purchaseAmount: 100, salvaged: [], service: spy)
         await vm.searchGroups("batt")
-        XCTAssertEqual(spy.lastSearch, "batt")
+        XCTAssertEqual(spy.searches, ["batt"])       // non-empty query reaches the service verbatim
         XCTAssertEqual(vm.groups.map(\.id), ["g-batt"])
     }
 
     @MainActor
-    func testSearchGroupsClearsResultsOnEmptyQueryWithoutCallingService() async {
+    func testClearingSearchRestoresDefaultGroupList() async {
         let spy = GroupSearchSpy()
         let vm = SalvageViewModel(buybackId: "b1", purchaseAmount: 100, salvaged: [], service: spy)
         await vm.searchGroups("batt")
-        XCTAssertFalse(vm.groups.isEmpty)
-        await vm.searchGroups("")
-        XCTAssertTrue(vm.groups.isEmpty)
-        XCTAssertEqual(spy.searchCallCount, 1)   // empty query short-circuits before hitting the service
+        XCTAssertEqual(vm.groups.map(\.id), ["g-batt"])
+        await vm.searchGroups("")                    // field cleared
+        XCTAssertEqual(spy.searches, ["batt", nil])  // empty query loads the default list (search:nil)
+        XCTAssertEqual(vm.groups.map(\.id), ["default-1", "default-2"])  // restored, not blank
     }
 
     @MainActor
