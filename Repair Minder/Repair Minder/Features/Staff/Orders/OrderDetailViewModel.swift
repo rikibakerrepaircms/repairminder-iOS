@@ -28,6 +28,11 @@ final class OrderDetailViewModel: ObservableObject {
     @Published private(set) var posTerminals: [PosTerminal] = []
     @Published private(set) var paymentLinks: [PosPaymentLink] = []
 
+    // MARK: - Close-out Action State
+
+    @Published private(set) var isPerformingAction = false
+    @Published var actionError: String?
+
     // MARK: - Private
 
     private let orderId: String
@@ -241,5 +246,74 @@ final class OrderDetailViewModel: ObservableObject {
 
     func clearPaymentError() {
         paymentError = nil
+    }
+
+    // MARK: - Close-out Mutations
+
+    /// Authorize the order for repair
+    func authorize(_ request: AuthorizeOrderRequest) async -> Bool {
+        await perform { try await self.apiClient.requestVoid(.authorizeOrder(orderId: self.orderId), body: request) }
+    }
+
+    /// Send the customer a quote
+    func sendQuote() async -> Bool {
+        await perform { try await self.apiClient.requestVoid(.sendQuote(orderId: self.orderId), body: SendQuoteRequest()) }
+    }
+
+    /// Mark the order as collected
+    func collect(_ request: CollectOrderRequest) async -> Bool {
+        await perform { try await self.apiClient.requestVoid(.collectOrder(orderId: self.orderId), body: request) }
+    }
+
+    /// Mark the order as despatched
+    func despatch(_ request: DespatchOrderRequest) async -> Bool {
+        await perform { try await self.apiClient.requestVoid(.despatchOrder(orderId: self.orderId), body: request) }
+    }
+
+    /// Capture a signature (authorization or collection)
+    func captureSignature(_ request: CreateSignatureRequest) async -> Bool {
+        await perform {
+            let _: CreatedSignatureResponse = try await self.apiClient.request(
+                .createOrderSignature(orderId: self.orderId), body: request)
+        }
+    }
+
+    /// Create a refund against the order
+    func createRefund(_ request: CreateRefundRequest) async -> Bool {
+        await perform { _ = try await self.paymentService.createRefund(orderId: self.orderId, request: request) }
+    }
+
+    /// Delete a refund
+    func deleteRefund(refundId: String) async -> Bool {
+        await perform { try await self.paymentService.deleteRefund(orderId: self.orderId, refundId: refundId) }
+    }
+
+    /// Add a note to the order's associated ticket
+    func addNote(_ request: CreateTicketNoteRequest) async -> Bool {
+        guard let ticketId = order?.ticketId else {
+            actionError = "This order has no ticket to attach a note to."
+            return false
+        }
+        return await perform {
+            let _: EmptyResponse = try await self.apiClient.request(.createTicketNote(ticketId: ticketId), body: request)
+        }
+    }
+
+    /// Shared runner for close-out mutations: manages loading/error state and refreshes the order on success.
+    private func perform(_ op: @escaping () async throws -> Void) async -> Bool {
+        isPerformingAction = true
+        actionError = nil
+        defer { isPerformingAction = false }
+        do {
+            try await op()
+            await refresh()
+            return true
+        } catch let e as APIError {
+            actionError = e.localizedDescription
+            return false
+        } catch {
+            actionError = error.localizedDescription
+            return false
+        }
     }
 }

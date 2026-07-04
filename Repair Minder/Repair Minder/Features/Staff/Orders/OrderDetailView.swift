@@ -23,6 +23,13 @@ struct OrderDetailView: View {
     @State private var selectedDeviceNav: DeviceNavTarget?
     @State private var selectedDocumentType: DocumentType?
     @State private var showDocumentSheet = false
+    @State private var showAuthorizeSheet = false
+    @State private var showDespatchSheet = false
+    @State private var showCollectSheet = false
+    @State private var showAddNoteSheet = false
+    @State private var refundTarget: OrderPayment?
+    @State private var refundToDelete: OrderRefund?
+    @State private var showDeleteRefundAlert = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var isRegularWidth: Bool {
@@ -85,6 +92,9 @@ struct OrderDetailView: View {
                 if let totals = order.totals {
                     totalsSection(totals, paymentStatus: order.effectivePaymentStatus)
                 }
+
+                // Close-out actions section
+                closeOutActionsSection(order)
 
                 // Payment actions section
                 if viewModel.isOrderEditable && viewModel.balanceDue > 0 {
@@ -233,11 +243,37 @@ struct OrderDetailView: View {
         } message: {
             Text(viewModel.paymentError ?? "")
         }
+        .alert("Delete Refund", isPresented: $showDeleteRefundAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                if let refund = refundToDelete {
+                    Task { _ = await viewModel.deleteRefund(refundId: refund.id) }
+                }
+            }
+        } message: {
+            Text("Are you sure you want to delete this refund? This cannot be undone.")
+        }
         // MARK: - Document Sheet
         .sheet(isPresented: $showDocumentSheet) {
             if let type = selectedDocumentType, let order = viewModel.order {
                 DocumentPreviewSheet(orderId: order.id, orderNumber: order.orderNumber, documentType: type)
             }
+        }
+        // MARK: - Close-out Sheets
+        .sheet(isPresented: $showAuthorizeSheet) {
+            AuthorizeOrderSheet { req in (await viewModel.authorize(req)) ? nil : (viewModel.actionError ?? "Could not authorize.") }
+        }
+        .sheet(isPresented: $showDespatchSheet) {
+            DespatchOrderSheet { req in (await viewModel.despatch(req)) ? nil : (viewModel.actionError ?? "Could not despatch.") }
+        }
+        .sheet(isPresented: $showCollectSheet) {
+            CollectOrderSheet { req in (await viewModel.collect(req)) ? nil : (viewModel.actionError ?? "Could not record collection.") }
+        }
+        .sheet(isPresented: $showAddNoteSheet) {
+            AddOrderNoteSheet { req in (await viewModel.addNote(req)) ? nil : (viewModel.actionError ?? "Could not add note.") }
+        }
+        .sheet(item: $refundTarget) { payment in
+            RefundPaymentSheet(payment: payment) { req in (await viewModel.createRefund(req)) ? nil : (viewModel.actionError ?? "Refund failed.") }
         }
     }
 
@@ -629,6 +665,66 @@ struct OrderDetailView: View {
         .font(.subheadline)
     }
 
+    // MARK: - Close-out Actions Section
+
+    private func closeOutActionsSection(_ order: Order) -> some View {
+        SectionCard(title: "Actions", icon: "checklist") {
+            VStack(spacing: 8) {
+                if order.status == .pending || order.status == .awaitingDevice || order.status == .inProgress {
+                    Button {
+                        showAuthorizeSheet = true
+                    } label: {
+                        Label("Authorize", systemImage: "checkmark.seal")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    Button {
+                        Task { _ = await viewModel.sendQuote() }
+                    } label: {
+                        Label("Send quote", systemImage: "paperplane")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(viewModel.isPerformingAction)
+                }
+
+                if order.status == .awaitingCollection || order.status == .serviceComplete {
+                    Button {
+                        showCollectSheet = true
+                    } label: {
+                        Label("Mark collected", systemImage: "hand.thumbsup")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    Button {
+                        showDespatchSheet = true
+                    } label: {
+                        Label("Despatch", systemImage: "shippingbox")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                Button {
+                    showAddNoteSheet = true
+                } label: {
+                    Label("Add note", systemImage: "note.text.badge.plus")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+
+                if let actionError = viewModel.actionError {
+                    Text(actionError)
+                        .foregroundStyle(.red)
+                        .font(.footnote)
+                }
+            }
+        }
+        .accessibilityIdentifier("order-actions")
+    }
+
     // MARK: - Payment Actions Section
 
     private func paymentActionsSection(_ order: Order) -> some View {
@@ -869,11 +965,25 @@ struct OrderDetailView: View {
 
             Spacer()
 
-            Text(payment.formattedAmount)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundStyle(amountColor)
-                .strikethrough(payment.isFullyRefunded, color: .secondary)
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(payment.formattedAmount)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(amountColor)
+                    .strikethrough(payment.isFullyRefunded, color: .secondary)
+
+                if payment.isRefundable == true, (payment.refundableAmount ?? 0) > 0 {
+                    Button {
+                        refundTarget = payment
+                    } label: {
+                        Label("Refund", systemImage: "arrow.counterclockwise")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
+                    .tint(.orange)
+                }
+            }
         }
         .padding(.vertical, 4)
         .contextMenu {
@@ -912,6 +1022,16 @@ struct OrderDetailView: View {
                             .font(.subheadline)
                             .fontWeight(.medium)
                             .foregroundStyle(.orange)
+
+                        Button(role: .destructive) {
+                            refundToDelete = refund
+                            showDeleteRefundAlert = true
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.red)
                     }
                     .padding(.vertical, 4)
                 }
