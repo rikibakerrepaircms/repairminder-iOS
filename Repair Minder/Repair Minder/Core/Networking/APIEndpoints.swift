@@ -105,6 +105,10 @@ enum APIEndpoint {
     case authorizeOrder(orderId: String)
     case despatchOrder(orderId: String)
     case collectOrder(orderId: String)
+    case orderRefunds(orderId: String)
+    case createOrderRefund(orderId: String)
+    case deleteOrderRefund(orderId: String, refundId: String)
+    case createTicketNote(ticketId: String)
     case orderDocument(orderId: String, type: DocumentType)
 
     // MARK: - Clients
@@ -430,6 +434,12 @@ enum APIEndpoint {
             return "/api/orders/\(orderId)/despatch"
         case .collectOrder(let orderId):
             return "/api/orders/\(orderId)/collect"
+        case .orderRefunds(let orderId), .createOrderRefund(let orderId):
+            return "/api/orders/\(orderId)/refunds"
+        case .deleteOrderRefund(let orderId, let refundId):
+            return "/api/orders/\(orderId)/refunds/\(refundId)"
+        case .createTicketNote(let ticketId):
+            return "/api/tickets/\(ticketId)/note"
         case .orderDocument(let orderId, let type):
             return "/api/orders/\(orderId)/documents/\(type.rawValue)"
 
@@ -657,7 +667,7 @@ enum APIEndpoint {
              .bookingHeatmap, .buybackStats, .bookingsByTime,
              .devices, .myQueue, .myActiveWork, .orderDevices, .orderDevice, .deviceActions,
              .deviceImages, .deviceImageFile(_, _, _, _, _),
-             .orders, .order, .orderItems, .orderPayments, .orderSignatures, .orderDocument,
+             .orders, .order, .orderItems, .orderPayments, .orderSignatures, .orderRefunds, .orderDocument,
              .clients, .client, .clientSearch, .clientsExport,
              .tickets, .ticket, .ticketMacroExecutions,
              .ticketGenerateResponseStatus, .ticketRewriteResponseStatus,
@@ -687,6 +697,7 @@ enum APIEndpoint {
              .createOrderDevice, .executeDeviceAction, .uploadDeviceImage,
              .createOrder, .createOrderItem, .createOrderPayment, .createOrderSignature,
              .sendQuote, .authorizeOrder, .despatchOrder, .collectOrder,
+             .createOrderRefund, .createTicketNote,
              .createClient, .clientsImport,
              .createTicket, .ticketReply, .ticketNote, .ticketGenerateResponse, .ticketRewriteResponse, .ticketExecuteMacro, .ticketPreviewMacro,
              .ticketResolve, .ticketReassign, .createEnquiry,
@@ -731,7 +742,8 @@ enum APIEndpoint {
              .cancelMacroExecution,
              .boardDeleteColumn, .boardDeleteAction,
              .deleteDeviceImage, .deleteAsset, .removeMembership,
-             .deleteSupplierOrderLine, .deleteSalvageItem, .deleteSupplierOrder:
+             .deleteSupplierOrderLine, .deleteSalvageItem, .deleteSupplierOrder,
+             .deleteOrderRefund:
             return .delete
         }
     }

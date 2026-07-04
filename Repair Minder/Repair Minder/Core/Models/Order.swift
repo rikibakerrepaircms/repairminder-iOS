@@ -542,6 +542,59 @@ struct ManualPaymentRequest: Encodable {
     var isPayout: Bool?
 }
 
+// MARK: - Close-out request models
+
+struct AuthorizeOrderRequest: Encodable {
+    var authorisationType: String
+    var targetStatus: String?
+    var authorisationNotes: String?
+}
+
+struct SendQuoteRequest: Encodable {}
+
+struct CollectOrderRequest: Encodable {
+    var deviceIds: [String]?
+    var signatureData: String?
+    var typedName: String?
+    var termsAgreed: Bool?
+}
+
+struct DespatchOrderRequest: Encodable {
+    var carrier: String
+    var trackingNumber: String?
+    var sendNotification: Bool?
+}
+
+struct CreateSignatureRequest: Encodable {
+    var signatureType: String
+    var signatureData: String?
+    var typedName: String?
+    var termsAgreed: Bool?
+}
+
+struct CreateRefundRequest: Encodable {
+    var orderPaymentId: String
+    var amount: Double
+    var refundDate: String
+    var reason: String?
+}
+
+struct CreateTicketNoteRequest: Encodable {
+    var body: String
+    var deviceId: String?
+}
+
+// MARK: - Created Signature Response
+
+struct CreatedSignatureResponse: Decodable, Sendable {
+    let id: String
+    let signatureType: SignatureType?
+    let hasSignature: Bool
+    let typedName: String?
+    let termsAgreed: Bool?
+    let capturedAt: String?
+}
+
 // MARK: - Product Type (Search Result)
 
 /// Lightweight product type for search-as-you-type in line item forms.
