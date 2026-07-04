@@ -68,6 +68,25 @@ extension InventoryModelTests {
         XCTAssertEqual(ed.history?.count, 0)
     }
 
+    // Reserved parts (external claims e.g. mmi.services) surface via the same
+    // GET /api/assets/:id/external-deployment "active" record once the worker
+    // broadens its `status='deployed'` filter to also include `status='reserved'`.
+    // The Swift model must decode `status` and `external_reference` so the UI can
+    // distinguish a reservation from a real deployment (see InventoryDetailView).
+    func testExternalDeploymentDecodesReservedClaim() throws {
+        let json = #"""
+        { "active": {"id":"d2","asset_id":"a1","customer_name":"mmi.services",
+                      "external_reference":"CLAIM-4821","status":"reserved",
+                      "deployment_date":"2026-07-01","created_at":"2026-07-01"},
+          "history": [] }
+        """#
+        let ed = try decode(ExternalDeployment.self, json)
+        XCTAssertEqual(ed.active?.status, "reserved")
+        XCTAssertEqual(ed.active?.externalReference, "CLAIM-4821")
+        XCTAssertEqual(ed.active?.customerName, "mmi.services")
+        XCTAssertEqual(ed.active?.deploymentDate, "2026-07-01")
+    }
+
     func testCategoriesResponseDecodes() throws {
         let json = #"{"categories":[{"category":"Screens","count":5},{"category":"Batteries","count":2}],"suggested":["X"]}"#
         let r = try decode(CategoriesResponse.self, json)

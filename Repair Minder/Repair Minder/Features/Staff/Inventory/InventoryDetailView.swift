@@ -177,8 +177,13 @@ struct InventoryDetailView: View {
                 row("Device", a.checkedOutDeviceName)
             }
             if let ext = viewModel.externalDeployment?.active {
-                row("Deployed to", ext.customerName); row("Reference", ext.externalReference); row("Deployed", ext.deploymentDate)
-                row("Deployed by", ext.deployedBy)
+                if ext.status == "reserved" {
+                    row("Reserved for", ext.customerName); row("Claim reference", ext.externalReference)
+                    row("Reserved", ext.deploymentDate)
+                } else {
+                    row("Deployed to", ext.customerName); row("Reference", ext.externalReference); row("Deployed", ext.deploymentDate)
+                    row("Deployed by", ext.deployedBy)
+                }
                 if let history = viewModel.externalDeployment?.history, !history.isEmpty {
                     row("Previous deployments", String(history.count))
                 }
