@@ -184,7 +184,7 @@ final class BulkScanViewModel: ObservableObject {
     var readyCount: Int { readyAssets.count }
 
     func onScan(tag: String) async {
-        let trimmed = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = AssetScan.parse(tag)
         guard !trimmed.isEmpty else { return }
         if entries.contains(where: { $0.tag == trimmed }) {
             lastMessage = "Already scanned \(trimmed)"

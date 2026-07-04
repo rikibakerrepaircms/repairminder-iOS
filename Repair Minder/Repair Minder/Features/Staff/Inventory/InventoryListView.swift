@@ -342,11 +342,12 @@ struct InventoryListView: View {
     #if os(iOS)
     @MainActor
     private func lookupTag(_ tag: String) async {
+        let parsedTag = AssetScan.parse(tag)
         do {
-            let asset = try await service.fetchAssetByTag(tag)
+            let asset = try await service.fetchAssetByTag(parsedTag)
             selectedAssetId = asset.id
         } catch {
-            scanError = "No asset found for tag \"\(tag)\"."
+            scanError = "No asset found for tag \"\(parsedTag)\"."
         }
     }
     #endif
