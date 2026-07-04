@@ -217,6 +217,48 @@ final class DeviceDetailViewModel {
         await updateDevice(.repairNotes(notes))
     }
 
+    // MARK: - Accessories
+
+    /// Mark an accessory as returned
+    func markAccessoryReturned(accessoryId: String) async {
+        isUpdating = true
+        error = nil
+        do {
+            try await APIClient.shared.requestVoid(
+                .returnDeviceAccessory(orderId: orderId, deviceId: deviceId, accessoryId: accessoryId)
+            )
+            await loadDevice()
+        } catch {
+            self.error = error.localizedDescription
+            #if DEBUG
+            print("Failed to mark accessory returned: \(error)")
+            #endif
+        }
+        isUpdating = false
+    }
+
+    // MARK: - Cancel Work
+
+    /// Cancel in-progress work on this device
+    func cancelWork(reason: String?) async {
+        isUpdating = true
+        error = nil
+        do {
+            try await APIClient.shared.requestVoid(
+                .cancelDeviceWork(deviceId: deviceId),
+                body: CancelWorkRequest(reassignTo: nil, cancelReason: reason)
+            )
+            await loadDevice()
+            await loadActions()
+        } catch {
+            self.error = error.localizedDescription
+            #if DEBUG
+            print("Failed to cancel work: \(error)")
+            #endif
+        }
+        isUpdating = false
+    }
+
     // MARK: - Message Handling
 
     /// Clear success message

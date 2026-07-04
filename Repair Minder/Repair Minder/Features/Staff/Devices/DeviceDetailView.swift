@@ -25,9 +25,26 @@ struct DeviceDetailView: View {
     @State private var editingRepairNotes = false
     @State private var repairNotesText = ""
 
+    // Due date editor state
+    @State private var showingDueDatePicker = false
+    @State private var dueDatePickerValue = Date()
+
+    // Cancel work state
+    @State private var showingCancelWorkSheet = false
+    @State private var cancelWorkReason = ""
+
     private var isRegularWidth: Bool {
         horizontalSizeClass == .regular
     }
+
+    /// Formats a `Date` as `yyyy-MM-dd` using the device's LOCAL time zone
+    /// (no explicit `timeZone` set → defaults to the system's current time zone).
+    private static let localDateFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        df.locale = Locale(identifier: "en_US_POSIX")
+        return df
+    }()
 
     init(orderId: String, deviceId: String) {
         _viewModel = State(initialValue: DeviceDetailViewModel(orderId: orderId, deviceId: deviceId))
@@ -96,6 +113,55 @@ struct DeviceDetailView: View {
                     collectedInputs = [:]
                 }
             }
+        }
+        .sheet(isPresented: $showingDueDatePicker) {
+            NavigationStack {
+                Form {
+                    DatePicker("Due date", selection: $dueDatePickerValue, displayedComponents: .date)
+                        .datePickerStyle(.graphical)
+                }
+                .navigationTitle("Due Date")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { showingDueDatePicker = false }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") {
+                            let dateString = Self.localDateFormatter.string(from: dueDatePickerValue)
+                            showingDueDatePicker = false
+                            Task { await viewModel.updateDevice(.dueDate(dateString)) }
+                        }
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showingCancelWorkSheet) {
+            NavigationStack {
+                Form {
+                    Section("Reason (optional)") {
+                        TextEditor(text: $cancelWorkReason)
+                            .frame(minHeight: 80)
+                    }
+                }
+                .navigationTitle("Cancel Work")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") { showingCancelWorkSheet = false }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Cancel Work", role: .destructive) {
+                            let reason = cancelWorkReason.trimmingCharacters(in: .whitespacesAndNewlines)
+                            showingCancelWorkSheet = false
+                            cancelWorkReason = ""
+                            Task { await viewModel.cancelWork(reason: reason.isEmpty ? nil : reason) }
+                        }
+                    }
+                }
+            }
+            .presentationDetents([.medium])
         }
     }
 
@@ -224,7 +290,22 @@ struct DeviceDetailView: View {
                     }
                     GridRow {
                         gridField("Workflow") {
-                            WorkflowTypeBadge(workflowType: device.workflow)
+                            Menu {
+                                Button(DeviceWorkflowType.repair.displayName) {
+                                    Task { await viewModel.updateDevice(.workflowType(.repair)) }
+                                }
+                                Button(DeviceWorkflowType.buyback.displayName) {
+                                    Task { await viewModel.updateDevice(.workflowType(.buyback)) }
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    WorkflowTypeBadge(workflowType: device.workflow)
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .disabled(viewModel.isUpdating)
                         }
                         if let engineer = device.assignedEngineer {
                             gridField("Assigned To") {
@@ -232,26 +313,39 @@ struct DeviceDetailView: View {
                             }
                         }
                     }
-                    if device.subLocation != nil || device.formattedDueDate != nil {
-                        GridRow {
-                            if let subLocation = device.subLocation {
-                                gridField("Location") {
-                                    VStack(alignment: .leading) {
-                                        Text(subLocation.code)
-                                        if let description = subLocation.description {
-                                            Text(description)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
+                    GridRow {
+                        if let subLocation = device.subLocation {
+                            gridField("Location") {
+                                VStack(alignment: .leading) {
+                                    Text(subLocation.code)
+                                    if let description = subLocation.description {
+                                        Text(description)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
                                     }
                                 }
                             }
-                            if let dueDate = device.formattedDueDate {
-                                gridField("Due") {
-                                    Text(dueDate)
-                                        .foregroundStyle(device.isOverdue ? .red : .primary)
+                        }
+                        gridField("Due") {
+                            Button {
+                                dueDatePickerValue = device.dueDate.flatMap { DateFormatters.parseISO8601($0) } ?? Date()
+                                showingDueDatePicker = true
+                            } label: {
+                                HStack(spacing: 4) {
+                                    if let dueDate = device.formattedDueDate {
+                                        Text(dueDate)
+                                            .foregroundStyle(device.isOverdue ? .red : .primary)
+                                    } else {
+                                        Text("Set due date")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
                                 }
                             }
+                            .buttonStyle(.plain)
+                            .disabled(viewModel.isUpdating)
                         }
                     }
                 }
@@ -296,11 +390,24 @@ struct DeviceDetailView: View {
                 }
                 .disabled(viewModel.isUpdating)
 
-                HStack {
-                    Text("Workflow")
-                    Spacer()
-                    WorkflowTypeBadge(workflowType: device.workflow)
+                Menu {
+                    Button(DeviceWorkflowType.repair.displayName) {
+                        Task { await viewModel.updateDevice(.workflowType(.repair)) }
+                    }
+                    Button(DeviceWorkflowType.buyback.displayName) {
+                        Task { await viewModel.updateDevice(.workflowType(.buyback)) }
+                    }
+                } label: {
+                    HStack {
+                        Text("Workflow")
+                        Spacer()
+                        WorkflowTypeBadge(workflowType: device.workflow)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                .disabled(viewModel.isUpdating)
                 if let engineers = device.availableEngineers, !engineers.isEmpty {
                     Menu {
                         Button("Unassigned") {
@@ -372,14 +479,27 @@ struct DeviceDetailView: View {
                         }
                     }
                 }
-                if let dueDate = device.formattedDueDate {
+                Button {
+                    dueDatePickerValue = device.dueDate.flatMap { DateFormatters.parseISO8601($0) } ?? Date()
+                    showingDueDatePicker = true
+                } label: {
                     HStack {
                         Text("Due")
                         Spacer()
-                        Text(dueDate)
-                            .foregroundStyle(device.isOverdue ? .red : .secondary)
+                        if let dueDate = device.formattedDueDate {
+                            Text(dueDate)
+                                .foregroundStyle(device.isOverdue ? .red : .secondary)
+                        } else {
+                            Text("Set due date")
+                                .foregroundStyle(.secondary)
+                        }
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
                 }
+                .buttonStyle(.plain)
+                .disabled(viewModel.isUpdating)
             }
 
             // Available actions always full width
@@ -406,6 +526,21 @@ struct DeviceDetailView: View {
                         }
                     }
                 }
+            }
+
+            // Cancel work — only while diagnosis/repair is actively in progress
+            if device.deviceStatus == .diagnosing || device.deviceStatus == .repairing {
+                Button(role: .destructive) {
+                    cancelWorkReason = ""
+                    showingCancelWorkSheet = true
+                } label: {
+                    HStack {
+                        Text("Cancel Work")
+                        Spacer()
+                        Image(systemName: "xmark.circle")
+                    }
+                }
+                .disabled(viewModel.isUpdating)
             }
         } header: {
             Text("Status")
@@ -823,6 +958,14 @@ struct DeviceDetailView: View {
                     if accessory.isReturned {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(.green)
+                    } else {
+                        Button("Mark returned") {
+                            Task { await viewModel.markAccessoryReturned(accessoryId: accessory.id) }
+                        }
+                        .font(.caption)
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(viewModel.isUpdating)
                     }
                 }
             }

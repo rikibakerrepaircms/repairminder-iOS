@@ -79,6 +79,8 @@ enum APIEndpoint {
     case updateDeviceBankDetails(deviceId: String)
     case updateDeviceEngineer(deviceId: String)
     case updateDeviceSubLocation(deviceId: String)
+    case returnDeviceAccessory(orderId: String, deviceId: String, accessoryId: String)
+    case cancelDeviceWork(deviceId: String)
 
     // Device Images
     case deviceImages(orderId: String, deviceId: String)
@@ -403,6 +405,10 @@ enum APIEndpoint {
             return "/api/devices/\(deviceId)/engineer"
         case .updateDeviceSubLocation(let deviceId):
             return "/api/devices/\(deviceId)/sub-location"
+        case .returnDeviceAccessory(let orderId, let deviceId, let accessoryId):
+            return "/api/orders/\(orderId)/devices/\(deviceId)/accessories/\(accessoryId)/return"
+        case .cancelDeviceWork(let deviceId):
+            return "/api/devices/\(deviceId)/cancel-work"
         case .deviceImages(let orderId, let deviceId),
              .uploadDeviceImage(let orderId, let deviceId):
             return "/api/orders/\(orderId)/devices/\(deviceId)/images"
@@ -714,12 +720,13 @@ enum APIEndpoint {
              .addMembership, .bulkAssignGroups, .promoteGroup, .createProductType,
              .bulkReturnToSupplier, .importAssets, .createSupplierOrder,
              .addSupplierOrderLine, .receiveSupplierOrder, .extractInvoice,
-             .salvageBuyback:
+             .salvageBuyback, .cancelDeviceWork:
             return .post
 
         // PATCH endpoints
         case .updateOrderDevice, .updateDeviceStatus, .updateDeviceBankDetails,
              .updateDeviceEngineer, .updateDeviceSubLocation, .updateBuyback,
+             .returnDeviceAccessory,
              .updateOrder, .updateOrderItem,
              .updateClient,
              .updateTicket,
