@@ -123,4 +123,8 @@ final class StubKioskService: KioskServicing {
     }
     func cancelOrder(id: String) async throws { cancelledOrderId = id }
     func availableAssets(productTypeId: String?, search: String?) async throws -> [KioskAvailableAsset] { [] }
+    func fetchProducts(page: Int, limit: Int, category: String?, search: String?) async throws -> KioskProductListResponse {
+        KioskProductListResponse(success: true, data: [], meta: KioskProductListMeta(page: 1, limit: 50, total: 0, totalPages: 1))
+    }
+    func fetchCategories() async throws -> [KioskCategory] { [] }
 }

@@ -185,6 +185,8 @@ enum APIEndpoint {
     case cancelKioskOrder(id: String)
     case kioskAvailableAssets(productTypeId: String?, groupId: String?, search: String?)
     case productTypeBySku(sku: String)
+    case kioskProductList(page: Int, limit: Int, category: String?, search: String?)
+    case productTypeImage(id: String)
 
     // MARK: - Booking / Lookup
 
@@ -549,6 +551,10 @@ enum APIEndpoint {
             return "/api/kiosk/available-assets"
         case .productTypeBySku(let sku):
             return "/api/product-types/by-sku/\(sku)"
+        case .kioskProductList:
+            return "/api/product-types"
+        case .productTypeImage(let id):
+            return "/api/product-types/\(id)/image"
 
         // Booking / Lookup
         case .locations:
@@ -723,6 +729,7 @@ enum APIEndpoint {
              .ticketGenerateResponseStatus, .ticketRewriteResponseStatus,
              .macros, .macro, .macroExecutions, .macroExecution,
              .productTypes, .assetFilterProductTypes, .productComponents, .productTypeBySku,
+             .kioskProductList, .productTypeImage,
              .kioskAvailableAssets,
              .locations, .locationSubLocations, .deviceSearch, .deviceTypes, .companyPublicInfo, .aiReadiness,
              .pushPreferences,
@@ -1078,6 +1085,19 @@ enum APIEndpoint {
             if let height = height { items.append(URLQueryItem(name: "h", value: String(height))) }
             guard !items.isEmpty else { return nil }
             items.append(URLQueryItem(name: "format", value: "auto"))
+            return items
+
+        case .kioskProductList(let page, let limit, let category, let search):
+            var items: [URLQueryItem] = [
+                URLQueryItem(name: "product_kind", value: "product"),
+                URLQueryItem(name: "is_active", value: "true"),
+                URLQueryItem(name: "page", value: String(page)),
+                URLQueryItem(name: "limit", value: String(limit)),
+                URLQueryItem(name: "sort_by", value: "name"),
+                URLQueryItem(name: "sort_order", value: "asc"),
+            ]
+            if let category, !category.isEmpty { items.append(URLQueryItem(name: "category", value: category)) }
+            if let search, !search.isEmpty { items.append(URLQueryItem(name: "search", value: search)) }
             return items
 
         case .kioskAvailableAssets(let productTypeId, let groupId, let search):

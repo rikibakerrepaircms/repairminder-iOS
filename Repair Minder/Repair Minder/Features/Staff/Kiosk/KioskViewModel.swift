@@ -8,6 +8,8 @@ protocol KioskServicing {
     func createOrder(_ request: KioskOrderRequest) async throws -> KioskOrderResponse
     func cancelOrder(id: String) async throws
     func availableAssets(productTypeId: String?, search: String?) async throws -> [KioskAvailableAsset]
+    func fetchProducts(page: Int, limit: Int, category: String?, search: String?) async throws -> KioskProductListResponse
+    func fetchCategories() async throws -> [KioskCategory]
 }
 
 @MainActor
@@ -23,6 +25,13 @@ final class KioskService: KioskServicing {
     }
     func availableAssets(productTypeId: String?, search: String?) async throws -> [KioskAvailableAsset] {
         try await api.request(.kioskAvailableAssets(productTypeId: productTypeId, groupId: nil, search: search))
+    }
+    func fetchProducts(page: Int, limit: Int, category: String?, search: String?) async throws -> KioskProductListResponse {
+        try await api.requestFull(.kioskProductList(page: page, limit: limit, category: category, search: search))
+    }
+    func fetchCategories() async throws -> [KioskCategory] {
+        let resp: KioskCategoriesResponse = try await api.requestFull(.productTypeCategories)
+        return resp.data.categories
     }
 }
 
