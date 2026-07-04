@@ -42,6 +42,7 @@ struct BuybackDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .task { await viewModel.loadDetail() }
+        .onDisappear { viewModel.cancelListingGeneration() }
         .sheet(isPresented: $showPurchaseEdit) {
             if let buyback = viewModel.buyback {
                 BuybackPurchaseEditSheet(detail: buyback) { fields in
@@ -250,7 +251,7 @@ struct BuybackDetailView: View {
                             .disabled(viewModel.isMutating)
 
                         Button("Regenerate") {
-                            Task { await viewModel.generateListing() }
+                            viewModel.beginListingGeneration()
                         }
                         .font(.caption)
                         .buttonStyle(.bordered)
@@ -263,7 +264,7 @@ struct BuybackDetailView: View {
                         .foregroundStyle(.secondary)
 
                     Button("Generate listing") {
-                        Task { await viewModel.generateListing() }
+                        viewModel.beginListingGeneration()
                     }
                     .font(.caption)
                     .buttonStyle(.borderedProminent)
