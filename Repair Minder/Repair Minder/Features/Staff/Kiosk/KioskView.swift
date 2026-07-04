@@ -14,7 +14,6 @@ struct KioskView: View {
     @State private var editingDiscountItemId: String?
     @State private var showGlobalDiscount = false
     @State private var showCustomItem = false
-    @State private var showCashSheet = false
 
     // Card payment bridge state
     @State private var cardKioskOrder: KioskOrderResponse?
@@ -57,8 +56,8 @@ struct KioskView: View {
                                  set: { editingDiscountItemId = $0?.id })) { box in
                 itemDiscountSheet(box.id)
             }
-            .sheet(isPresented: $showCashSheet) { cashSheet }
             .sheet(item: $cardFullOrder) { order in cardSheet(order) }
+            .task { await viewModel.loadPosProvider() }
             .alert("Discard sale?", isPresented: $showExitConfirm) {
                 Button("Discard", role: .destructive) { dismiss() }
                 Button("Keep", role: .cancel) {}
@@ -150,7 +149,9 @@ struct KioskView: View {
         KioskCartPanel(
             viewModel: viewModel,
             onPayCard: { Task { await startCardPayment() } },
-            onPayCashOrManual: { showCashSheet = true },
+            onSubmitPayment: { method, amount, notes in
+                Task { await viewModel.submitCashOrManual(method: method, amount: amount, notes: notes) }
+            },
             onEditItemDiscount: { editingDiscountItemId = $0.id },
             onEditGlobalDiscount: { showGlobalDiscount = true },
             onManageAssets: { item in
@@ -259,12 +260,6 @@ struct KioskView: View {
                 viewModel.globalDiscountAmount = value.amount
                 viewModel.globalDiscountReason = value.reason
             })
-    }
-
-    private var cashSheet: some View {
-        KioskCashPaymentSheet(balanceDue: viewModel.totals.grandTotal) { method, amount, notes in
-            Task { await viewModel.submitCashOrManual(method: method, amount: amount, notes: notes) }
-        }
     }
 
     // MARK: - Card payment bridge

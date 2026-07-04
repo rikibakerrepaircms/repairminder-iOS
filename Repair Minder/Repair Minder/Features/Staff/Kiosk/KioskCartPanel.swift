@@ -3,7 +3,7 @@ import SwiftUI
 struct KioskCartPanel: View {
     @ObservedObject var viewModel: KioskViewModel
     let onPayCard: () -> Void
-    let onPayCashOrManual: () -> Void
+    let onSubmitPayment: (_ method: String, _ amount: Double, _ notes: String?) -> Void
     let onEditItemDiscount: (KioskCartItem) -> Void
     let onEditGlobalDiscount: () -> Void
     let onManageAssets: (KioskCartItem) -> Void
@@ -56,21 +56,13 @@ struct KioskCartPanel: View {
                       systemImage: "percent").font(.caption)
             }.buttonStyle(.borderless)
 
-            HStack(spacing: 12) {
-                Button { onPayCashOrManual() } label: {
-                    Label("Cash / Other", systemImage: "banknote")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .disabled(viewModel.items.isEmpty)
-
-                Button { onPayCard() } label: {
-                    Label("Card", systemImage: "creditcard")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(viewModel.items.isEmpty)
-            }
+            KioskPaymentActions(
+                hasItems: !viewModel.items.isEmpty,
+                balanceDue: viewModel.totals.grandTotal,
+                posProvider: viewModel.posProvider,
+                processing: false,
+                onCardPayment: onPayCard,
+                onSubmitPayment: onSubmitPayment)
         }
         .padding()
     }

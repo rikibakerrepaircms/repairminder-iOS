@@ -63,6 +63,7 @@ final class KioskViewModel: ObservableObject {
     @Published var globalDiscountReason: String?
     @Published var completedOrder: KioskOrderResponse?
     @Published var errorMessage: String?
+    @Published var posProvider: String?     // "revolut" | "square" | "sumup" | "dojo" | nil
     let locationId: String?
 
     private let service: KioskServicing
@@ -199,6 +200,13 @@ final class KioskViewModel: ObservableObject {
 
     func cancelUnpaidOrder(id: String) async {
         try? await service.cancelOrder(id: id)
+    }
+
+    // MARK: - POS provider
+
+    func loadPosProvider() async {
+        let provider = try? await PaymentService().fetchIntegrations().first?.provider
+        posProvider = provider?.lowercased()
     }
 
     // MARK: - Reset
