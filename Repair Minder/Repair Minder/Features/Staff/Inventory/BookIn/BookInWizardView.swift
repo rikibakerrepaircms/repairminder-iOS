@@ -280,6 +280,17 @@ private struct ReceiveLineEditor: View {
     @State private var locations: [Location] = []
     @State private var subLocations: [AssetSubLocationOption] = []
     @State private var seeded = false
+    /// Raw text for the unit-cost field, seeded once from the draft's cost. Kept as its
+    /// own @State (rather than a computed Binding that reformats `draft.unitCost` via
+    /// `%.2f` on every read) so typing doesn't get reformatted or cleared mid-keystroke —
+    /// it only commits into `draft.unitCost` on change.
+    @State private var costText: String
+
+    init(line: SupplierOrderLine, draft: Binding<ReceiveDraft>) {
+        self.line = line
+        self._draft = draft
+        self._costText = State(initialValue: draft.wrappedValue.unitCost.map { String(format: "%.2f", $0) } ?? "")
+    }
 
     var body: some View {
         Stepper("Quantity: \(draft.quantity)", value: $draft.quantity, in: 0...max(line.remaining, 1))
@@ -290,12 +301,15 @@ private struct ReceiveLineEditor: View {
         HStack {
             Text("Unit cost")
             Spacer()
-            TextField("Unit cost", text: unitCostBinding)
+            TextField("Unit cost", text: $costText)
                 #if os(iOS)
                 .keyboardType(.decimalPad)
                 #endif
                 .multilineTextAlignment(.trailing)
                 .frame(maxWidth: 100)
+                .onChange(of: costText) { _, newValue in
+                    draft.unitCost = Double(newValue)
+                }
         }
         Toggle("OEM", isOn: $draft.isOem)
         Toggle("Refurbished", isOn: $draft.isRefurbished)
@@ -340,12 +354,6 @@ private struct ReceiveLineEditor: View {
     }
 
     private var serialCount: Int { min(draft.quantity, line.remaining) }
-
-    private var unitCostBinding: Binding<String> {
-        Binding(
-            get: { draft.unitCost.map { String(format: "%.2f", $0) } ?? "" },
-            set: { draft.unitCost = Double($0) })
-    }
 
     private func serialBinding(_ i: Int) -> Binding<String> {
         Binding(

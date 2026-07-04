@@ -2,7 +2,6 @@ import SwiftUI
 
 struct GroupSelectorSheet: View {
     let assetId: String
-    let initialSelection: [String]
     let onSave: ([String]) async -> Bool
 
     @Environment(\.dismiss) private var dismiss

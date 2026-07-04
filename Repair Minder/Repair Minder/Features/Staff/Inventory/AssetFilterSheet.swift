@@ -137,7 +137,16 @@ struct AssetFilterSheet: View {
                     Button("Apply") { viewModel.applyFilters(); dismiss() }
                 }
             }
-            .task { await options.loadTopLevel() }
+            .task {
+                await options.loadTopLevel()
+                // Cosmetic parity: if a group is already selected, seed the search field
+                // with its name so the user sees what's currently applied. Best-effort
+                // only — uses the already-loaded default group list, no extra fetch.
+                if groupQuery.isEmpty, let selectedId = viewModel.selectedGroupId,
+                   let match = options.groups.first(where: { $0.id == selectedId }) {
+                    groupQuery = match.name
+                }
+            }
         }
     }
 }
