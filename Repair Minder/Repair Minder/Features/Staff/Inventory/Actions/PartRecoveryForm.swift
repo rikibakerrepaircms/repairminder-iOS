@@ -13,8 +13,9 @@ struct PartRecoveryState {
     /// The asset's category, used to decide whether the LCD/glass questions apply.
     var category: String?
 
-    /// Matches web's `category.toLowerCase().includes('screen')` detection exactly
-    /// (see src/components/assets/PartRecoveryForm.tsx).
+    /// Matches web's `(asset.category || asset.product_type_category).toLowerCase().includes('screen')`
+    /// detection exactly (see src/components/assets/PartRecoveryForm.tsx). The wizard seeds
+    /// `category` with `asset.category ?? asset.productTypeCategory`, replicating that fallback order.
     var isScreen: Bool { (category ?? "").lowercased().contains("screen") }
 
     /// Valid unless enabled without a grade (A/B/C) + a location, or — for screen

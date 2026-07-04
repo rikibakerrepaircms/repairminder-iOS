@@ -62,6 +62,34 @@ final class InventoryWriteModelTests: XCTestCase {
         XCTAssertNil(input?.glassCracked)
     }
 
+    func testPartRecoveryScreenDetectionFallsBackToProductTypeCategory() throws {
+        // Web uses `asset.category || asset.product_type_category`; the wizard seeds
+        // PartRecoveryState.category with `asset.category ?? asset.productTypeCategory`.
+        // A bulk-imported asset with no explicit category but a "Screens" product type
+        // (category omitted, product_type_category present) must still gate.
+        let d = JSONDecoder(); d.keyDecodingStrategy = .convertFromSnakeCase
+        let json = #"""
+        { "id":"a1","asset_tag":"AST1","name":"LCD","status":"in_stock",
+          "product_type_category":"Screens" }
+        """#
+        let asset = try d.decode(Asset.self, from: Data(json.utf8))
+        XCTAssertNil(asset.category)
+        XCTAssertEqual(asset.productTypeCategory, "Screens")
+
+        var f = PartRecoveryState(category: asset.category ?? asset.productTypeCategory)
+        f.enabled = true
+        f.locationId = "loc1"
+        XCTAssertTrue(f.isScreen)
+        XCTAssertFalse(f.isValid)          // both screen answers still required
+        XCTAssertNil(f.toInput())
+        f.lcdWorking = true
+        f.glassCracked = true
+        XCTAssertTrue(f.isValid)
+        let input = f.toInput()
+        XCTAssertEqual(input?.lcdWorking, 1)
+        XCTAssertEqual(input?.glassCracked, 1)
+    }
+
     func testReturnToSupplierAndResolveEncode() throws {
         let r1 = ReturnToSupplierRequest(supplierReturnReason: "defective", supplierReturnNotes: nil)
         XCTAssertEqual(try encodeToObject(r1)["supplier_return_reason"] as? String, "defective")

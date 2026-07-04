@@ -62,6 +62,7 @@ struct Asset: Decodable, Identifiable, Equatable, Sendable, Hashable {
     // Joined / computed by the API
     var productTypeName: String?
     var productTypeSku: String?
+    var productTypeCategory: String?
     var enablePartRecovery: Int?
     var locationName: String?
     var subLocationCode: String?

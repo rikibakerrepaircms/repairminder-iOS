@@ -19,7 +19,7 @@ struct DeployToOrderWizard: View {
         self.asset = asset
         self.detailVM = detailVM
         self.onFinished = onFinished
-        _recovery = State(initialValue: PartRecoveryState(category: asset.category))
+        _recovery = State(initialValue: PartRecoveryState(category: asset.category ?? asset.productTypeCategory))
     }
 
     var body: some View {
