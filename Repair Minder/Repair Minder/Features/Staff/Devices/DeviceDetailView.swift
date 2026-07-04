@@ -47,6 +47,11 @@ struct DeviceDetailView: View {
     // Staff authorize state
     @State private var showingStaffAuthorizeSheet = false
 
+    // Collect / Despatch / Ready-for-collection / Add-accessory state
+    @State private var showingDeviceCollectSheet = false
+    @State private var showingDeviceDespatchSheet = false
+    @State private var showingAddAccessorySheet = false
+
     private var isRegularWidth: Bool {
         horizontalSizeClass == .regular
     }
@@ -197,6 +202,21 @@ struct DeviceDetailView: View {
                 await viewModel.staffAuthorize(request)
             }
         }
+        .sheet(isPresented: $showingDeviceCollectSheet) {
+            DeviceCollectSheet { request in
+                await viewModel.collectDevice(request)
+            }
+        }
+        .sheet(isPresented: $showingDeviceDespatchSheet) {
+            DeviceDespatchSheet { request in
+                await viewModel.despatchDevice(request)
+            }
+        }
+        .sheet(isPresented: $showingAddAccessorySheet) {
+            AddAccessorySheet { request in
+                await viewModel.addAccessory(request)
+            }
+        }
     }
 
     // MARK: - Loading View
@@ -254,10 +274,9 @@ struct DeviceDetailView: View {
             // Parts used
             partsSection(device)
 
-            // Accessories
-            if !device.accessories.isEmpty {
-                accessoriesSection(device)
-            }
+            // Accessories — always shown (mirrors partsSection) so "Add accessory"
+            // is reachable even before the first accessory is recorded.
+            accessoriesSection(device)
 
             // Images
             imagesSection(device)
@@ -628,6 +647,49 @@ struct DeviceDetailView: View {
                 }
                 .disabled(viewModel.isUpdating)
                 .accessibilityIdentifier("add-to-buyback-button")
+            }
+
+            // Collect / Despatch — once the device is ready for the customer to take
+            // away (repair complete) or ready to send back (rejected before repair)
+            if device.deviceStatus == .repairedReady || device.deviceStatus == .rejectionReady {
+                Button {
+                    showingDeviceCollectSheet = true
+                } label: {
+                    HStack {
+                        Text("Collect")
+                        Spacer()
+                        Image(systemName: "hand.raised")
+                    }
+                }
+                .disabled(viewModel.isUpdating)
+                .accessibilityIdentifier("device-collect-button")
+
+                Button {
+                    showingDeviceDespatchSheet = true
+                } label: {
+                    HStack {
+                        Text("Despatch")
+                        Spacer()
+                        Image(systemName: "shippingbox")
+                    }
+                }
+                .disabled(viewModel.isUpdating)
+                .accessibilityIdentifier("device-despatch-button")
+            }
+
+            // Ready for collection — only from repaired_ready (not rejection_ready)
+            if device.deviceStatus == .repairedReady {
+                Button {
+                    Task { if let err = await viewModel.markReadyForCollection() { viewModel.error = err } }
+                } label: {
+                    HStack {
+                        Text("Ready for collection")
+                        Spacer()
+                        Image(systemName: "bell")
+                    }
+                }
+                .disabled(viewModel.isUpdating)
+                .accessibilityIdentifier("device-ready-for-collection-button")
             }
         } header: {
             Text("Status")
@@ -1047,7 +1109,7 @@ struct DeviceDetailView: View {
     // MARK: - Accessories Section
 
     private func accessoriesSection(_ device: DeviceDetail) -> some View {
-        Section("Accessories") {
+        Section {
             ForEach(device.accessories) { accessory in
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
@@ -1073,6 +1135,24 @@ struct DeviceDetailView: View {
                         .disabled(viewModel.isUpdating)
                     }
                 }
+            }
+            if device.accessories.isEmpty {
+                Text("No accessories added yet.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            HStack {
+                Text("Accessories")
+                Spacer()
+                Button {
+                    showingAddAccessorySheet = true
+                } label: {
+                    Label("Add accessory", systemImage: "plus.circle")
+                }
+                .font(.caption)
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("add-accessory-button")
             }
         }
     }

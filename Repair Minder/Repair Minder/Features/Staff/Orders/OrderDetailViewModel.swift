@@ -288,6 +288,25 @@ final class OrderDetailViewModel: ObservableObject {
         await perform { try await self.paymentService.deleteRefund(orderId: self.orderId, refundId: refundId) }
     }
 
+    /// Update a device's due date
+    func updateDeviceDueDate(deviceId: String, dueDate: String) async -> Bool {
+        await perform {
+            try await self.apiClient.requestVoid(
+                .updateOrderDevice(orderId: self.orderId, deviceId: deviceId),
+                body: DeviceUpdateRequest.dueDate(dueDate)
+            )
+        }
+    }
+
+    /// Delete a device from the order
+    func deleteDevice(deviceId: String) async -> Bool {
+        await perform {
+            try await self.apiClient.requestVoid(
+                .deleteOrderDevice(orderId: self.orderId, deviceId: deviceId)
+            )
+        }
+    }
+
     /// Add a note to the order's associated ticket
     func addNote(_ request: CreateTicketNoteRequest) async -> Bool {
         guard let ticketId = order?.ticketId else {
