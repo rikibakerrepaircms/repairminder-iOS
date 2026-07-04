@@ -30,7 +30,7 @@ final class KioskService: KioskServicing {
         try await api.requestFull(.kioskProductList(page: page, limit: limit, category: category, search: search))
     }
     func fetchCategories() async throws -> [KioskCategory] {
-        let resp: KioskCategoriesResponse = try await api.requestFull(.productTypeCategories)
+        let resp: KioskCategoriesResponse = try await api.requestFull(.kioskProductCategories)
         return resp.data.categories
     }
 }
@@ -79,6 +79,15 @@ final class KioskViewModel: ObservableObject {
     }
     var isGuestCheckout: Bool { selectedClient == nil }
     var isEmpty: Bool { items.isEmpty }
+
+    // MARK: - Catalog passthroughs
+
+    func loadProducts(page: Int, category: String?, search: String?) async throws -> KioskProductListResponse {
+        try await service.fetchProducts(page: page, limit: 50, category: category, search: search)
+    }
+    func loadCategories() async throws -> [KioskCategory] {
+        try await service.fetchCategories()
+    }
 
     // MARK: - Cart operations
 

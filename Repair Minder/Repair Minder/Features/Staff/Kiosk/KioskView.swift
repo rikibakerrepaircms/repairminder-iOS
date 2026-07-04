@@ -168,7 +168,7 @@ struct KioskView: View {
 
     // MARK: - Product selection
 
-    private func handleSelectProduct(_ product: ProductTypeSearchResult) {
+    private func handleSelectProduct(_ product: KioskProduct) {
         if !product.id.isEmpty {
             Task {
                 let assets = (try? await KioskService()
@@ -190,7 +190,7 @@ struct KioskView: View {
         }
     }
 
-    private func addDirect(_ product: ProductTypeSearchResult) {
+    private func addDirect(_ product: KioskProduct) {
         viewModel.addItem(KioskCartItem(
             productTypeId: product.id.isEmpty ? nil : product.id,
             description: product.name,

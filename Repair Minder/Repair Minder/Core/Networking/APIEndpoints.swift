@@ -186,6 +186,7 @@ enum APIEndpoint {
     case kioskAvailableAssets(productTypeId: String?, groupId: String?, search: String?)
     case productTypeBySku(sku: String)
     case kioskProductList(page: Int, limit: Int, category: String?, search: String?)
+    case kioskProductCategories
     case productTypeImage(id: String)
 
     // MARK: - Booking / Lookup
@@ -553,6 +554,8 @@ enum APIEndpoint {
             return "/api/product-types/by-sku/\(sku)"
         case .kioskProductList:
             return "/api/product-types"
+        case .kioskProductCategories:
+            return "/api/product-types/categories"
         case .productTypeImage(let id):
             return "/api/product-types/\(id)/image"
 
@@ -729,7 +732,7 @@ enum APIEndpoint {
              .ticketGenerateResponseStatus, .ticketRewriteResponseStatus,
              .macros, .macro, .macroExecutions, .macroExecution,
              .productTypes, .assetFilterProductTypes, .productComponents, .productTypeBySku,
-             .kioskProductList, .productTypeImage,
+             .kioskProductList, .kioskProductCategories, .productTypeImage,
              .kioskAvailableAssets,
              .locations, .locationSubLocations, .deviceSearch, .deviceTypes, .companyPublicInfo, .aiReadiness,
              .pushPreferences,
@@ -1099,6 +1102,9 @@ enum APIEndpoint {
             if let category, !category.isEmpty { items.append(URLQueryItem(name: "category", value: category)) }
             if let search, !search.isEmpty { items.append(URLQueryItem(name: "search", value: search)) }
             return items
+
+        case .kioskProductCategories:
+            return [URLQueryItem(name: "product_kind", value: "product")]
 
         case .kioskAvailableAssets(let productTypeId, let groupId, let search):
             var items: [URLQueryItem] = []
