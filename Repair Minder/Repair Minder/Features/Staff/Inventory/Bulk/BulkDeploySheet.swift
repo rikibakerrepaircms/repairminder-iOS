@@ -22,6 +22,7 @@ struct BulkDeploySheet: View {
     @State private var customerName = ""
     @State private var externalReference = ""
     @State private var externalNotes = ""
+    @State private var deploymentDate = Date()
 
     init(assets: [Asset], onDone: @escaping () -> Void) {
         _viewModel = StateObject(wrappedValue: BulkDeployViewModel(assets: assets))
@@ -103,20 +104,33 @@ struct BulkDeploySheet: View {
             Section("Customer") {
                 TextField("Customer name", text: $customerName)
                 TextField("Reference / job number", text: $externalReference)
+            }
+            Section("Deployment") {
+                DatePicker("Date", selection: $deploymentDate, displayedComponents: .date)
                 TextField("Notes", text: $externalNotes, axis: .vertical).lineLimit(2...4)
             }
             Section {
                 Button("Deploy \(viewModel.assets.count)") {
                     step = .progress
                     Task {
-                        await viewModel.runExternal(DeployExternalRequest(
-                            customerName: customerName.isEmpty ? nil : customerName,
-                            externalReference: externalReference.isEmpty ? nil : externalReference,
-                            notes: externalNotes.isEmpty ? nil : externalNotes))
+                        await viewModel.runExternal(BulkDeploySheet.buildExternalRequest(
+                            customerName: customerName,
+                            externalReference: externalReference,
+                            notes: externalNotes,
+                            deploymentDate: deploymentDate))
                     }
                 }
             }
         }
+    }
+
+    /// Pure builder (testable) — mirrors the single-asset `DeployExternalSheet` encoding exactly.
+    static func buildExternalRequest(customerName: String, externalReference: String, notes: String, deploymentDate: Date) -> DeployExternalRequest {
+        DeployExternalRequest(
+            customerName: customerName.isEmpty ? nil : customerName,
+            externalReference: externalReference.isEmpty ? nil : externalReference,
+            notes: notes.isEmpty ? nil : notes,
+            deploymentDate: DeployExternalRequest.isoDateString(from: deploymentDate))
     }
 
     private var progressView: some View {

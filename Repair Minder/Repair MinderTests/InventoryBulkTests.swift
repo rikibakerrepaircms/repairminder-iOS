@@ -161,6 +161,13 @@ final class InventoryBulkTests: XCTestCase {
         XCTAssertTrue(vm.finished)
     }
 
+    func testBulkDeployExternalCarriesDate() {
+        let req = BulkDeploySheet.buildExternalRequest(
+            customerName: "Acme", externalReference: "JOB-1", notes: "", deploymentDate: Date())
+        XCTAssertNotNil(req.deploymentDate)
+        XCTAssertEqual(req.deploymentDate, DeployExternalRequest.isoDateString(from: Date()))
+    }
+
     @MainActor
     func testBulkDeployOrderOnlyInStock() async {
         let spy = SpyService()
