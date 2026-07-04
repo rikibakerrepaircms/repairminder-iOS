@@ -13,7 +13,6 @@ struct KioskView: View {
     @State private var allocationContext: AllocationContext?
     @State private var editingDiscountItemId: String?
     @State private var showGlobalDiscount = false
-    @State private var showCustomItem = false
 
     // Card payment bridge state
     @State private var cardKioskOrder: KioskOrderResponse?
@@ -48,9 +47,6 @@ struct KioskView: View {
         content
             .overlay(alignment: .top) { header }
             .sheet(item: $allocationContext) { ctx in allocationSheet(ctx) }
-            .sheet(isPresented: $showCustomItem) {
-                KioskCustomItemSheet { viewModel.addItem($0) }
-            }
             .sheet(isPresented: $showGlobalDiscount) { globalDiscountSheet }
             .sheet(item: Binding(get: { editingDiscountItemId.map { IdBox(id: $0) } },
                                  set: { editingDiscountItemId = $0?.id })) { box in
@@ -141,8 +137,7 @@ struct KioskView: View {
     private var catalogPanel: some View {
         KioskCatalogPanel(
             viewModel: viewModel,
-            onSelectProduct: { handleSelectProduct($0) },
-            onAddCustomItem: { showCustomItem = true })
+            onSelectProduct: { handleSelectProduct($0) })
     }
 
     private var cartPanel: some View {

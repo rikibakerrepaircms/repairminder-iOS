@@ -13,6 +13,7 @@ struct KioskDiscountSheet: View {
     @State private var amountText: String
     @State private var reason: String
     let onSave: (KioskDiscountValue) -> Void
+    private let hasExisting: Bool
     @Environment(\.dismiss) private var dismiss
 
     enum Mode: String, CaseIterable { case percent = "Percent", amount = "Amount" }
@@ -20,6 +21,7 @@ struct KioskDiscountSheet: View {
     init(title: String, initial: KioskDiscountValue, onSave: @escaping (KioskDiscountValue) -> Void) {
         self.title = title
         self.onSave = onSave
+        self.hasExisting = initial.percent != nil || initial.amount != nil
         _mode = State(initialValue: initial.percent != nil ? .percent : .amount)
         _percentText = State(initialValue: initial.percent.map { String($0) } ?? "")
         _amountText = State(initialValue: initial.amount.map { String($0) } ?? "")
@@ -38,19 +40,27 @@ struct KioskDiscountSheet: View {
                 } else {
                     TextField("Amount (£)", text: $amountText).keyboardTypeNumberIfIOS()
                 }
-                TextField("Reason (optional)", text: $reason)
+                TextField("Reason (required)", text: $reason)
             }
             .navigationTitle(title)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Apply") { apply(); dismiss() }
+                    Button("Apply") { apply(); dismiss() }.disabled(!canApply)
                 }
-                ToolbarItem(placement: .destructiveAction) {
-                    Button("Clear") { onSave(KioskDiscountValue()); dismiss() }
+                if hasExisting {
+                    ToolbarItem(placement: .destructiveAction) {
+                        Button("Remove") { onSave(KioskDiscountValue()); dismiss() }
+                    }
                 }
             }
         }
+    }
+
+    private var canApply: Bool {
+        guard !reason.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
+        let value = mode == .percent ? Double(percentText) : Double(amountText)
+        return (value ?? 0) > 0
     }
 
     private func apply() {

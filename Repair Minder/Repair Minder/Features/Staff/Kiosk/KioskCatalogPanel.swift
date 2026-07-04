@@ -3,7 +3,6 @@ import SwiftUI
 struct KioskCatalogPanel: View {
     @ObservedObject var viewModel: KioskViewModel
     let onSelectProduct: (KioskProduct) -> Void
-    let onAddCustomItem: () -> Void
 
     @State private var viewMode: ViewMode = .grid
     @State private var searchText = ""
@@ -69,9 +68,6 @@ struct KioskCatalogPanel: View {
             .pickerStyle(.segmented)
             .frame(width: 90)
             .labelsHidden()
-
-            Button { onAddCustomItem() } label: { Image(systemName: "plus.circle") }
-                .buttonStyle(.bordered)
         }
         .padding(10)
     }
