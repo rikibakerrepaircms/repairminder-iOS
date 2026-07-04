@@ -69,15 +69,25 @@ final class BookInTests: XCTestCase {
     }
 
     func testImportValidationBodyDecodes() throws {
+        // Real worker shape (asset_handlers.js validateImportRow): {row, field, message}.
         let json = #"""
         {"success":false,"error":"validation_failed","message":"CSV validation failed",
-         "errors":[{"row":3,"sku":"BAD","error":"Missing name"},{"row":5,"error":"Invalid status"}],"totalErrors":2}
+         "errors":[{"row":3,"field":"sku","message":"SKU is required"},{"row":5,"field":"status","message":"Invalid status"}],"totalErrors":2}
         """#
         let b = try decode(AssetImportValidationBody.self, json)
         XCTAssertEqual(b.error, "validation_failed")
         XCTAssertEqual(b.totalErrors, 2)
         XCTAssertEqual(b.errors?.count, 2)
-        XCTAssertEqual(b.errors?.first?.display, "Row 3: Missing name")
+        XCTAssertEqual(b.errors?.first?.display, "Row 3 (sku): SKU is required")
+    }
+
+    /// NTH: the worker's import validation rows carry `{row, field, message}` — never a
+    /// bare `sku`/`error` pair. Confirm the model decodes the real contract.
+    func testImportRowErrorDecodesFieldAndMessage() throws {
+        let d = JSONDecoder(); d.keyDecodingStrategy = .convertFromSnakeCase
+        let e = try d.decode(AssetImportRowError.self, from: #"{"row":3,"field":"sku","message":"required"}"#.data(using: .utf8)!)
+        XCTAssertEqual(e.field, "sku")
+        XCTAssertTrue(e.display.contains("Row 3"))
     }
 
     func testExtractInvoiceResponseDecodes() throws {
