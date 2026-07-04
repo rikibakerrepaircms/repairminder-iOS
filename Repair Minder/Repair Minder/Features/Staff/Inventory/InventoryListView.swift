@@ -323,7 +323,9 @@ struct InventoryListView: View {
             ToolbarItem(placement: .automatic) {
                 Menu {
                     Button { showBookIn = true } label: { Label("Book In Stock", systemImage: "tray.and.arrow.down") }
-                    Button { showImport = true } label: { Label("Import CSV", systemImage: "square.and.arrow.down.on.square") }
+                    if AuthManager.shared.currentUser?.role.isAdmin == true {
+                        Button { showImport = true } label: { Label("Import CSV", systemImage: "square.and.arrow.down.on.square") }
+                    }
                 } label: { Image(systemName: "tray.and.arrow.down") }
                 .accessibilityIdentifier("inventory-tools-menu")
             }
