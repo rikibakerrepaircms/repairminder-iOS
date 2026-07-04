@@ -162,6 +162,10 @@ enum APIEndpoint {
     // MARK: - Product Types
 
     case productTypes(search: String)
+    /// Product-type search scoped for the asset filter picker (inventory-kind aware).
+    /// Unlike `.productTypes`, this does NOT restrict `product_kind` — assets commonly
+    /// reference `inventory_item`-kind product types via `product_type_id`.
+    case assetFilterProductTypes(search: String?)
     case productComponents(productTypeId: String)
     case quickCreateProductType
 
@@ -487,7 +491,7 @@ enum APIEndpoint {
             return "/api/macro-executions/\(id)/resume"
 
         // Product Types
-        case .productTypes:
+        case .productTypes, .assetFilterProductTypes:
             return "/api/product-types"
         case .productComponents(let productTypeId):
             return "/api/product-types/\(productTypeId)/components"
@@ -656,7 +660,7 @@ enum APIEndpoint {
              .tickets, .ticket, .ticketMacroExecutions,
              .ticketGenerateResponseStatus, .ticketRewriteResponseStatus,
              .macros, .macro, .macroExecutions, .macroExecution,
-             .productTypes, .productComponents,
+             .productTypes, .assetFilterProductTypes, .productComponents,
              .locations, .locationSubLocations, .deviceSearch, .deviceTypes, .companyPublicInfo, .aiReadiness,
              .pushPreferences,
              .posIntegrations, .posTerminals, .pollTerminalPayment, .paymentLinks,
@@ -867,6 +871,15 @@ enum APIEndpoint {
                 URLQueryItem(name: "is_active", value: "true"),
                 URLQueryItem(name: "product_kind", value: "product,service")
             ]
+
+        case .assetFilterProductTypes(let search):
+            var items: [URLQueryItem] = []
+            if let search = search, !search.isEmpty {
+                items.append(URLQueryItem(name: "search", value: search))
+            }
+            items.append(URLQueryItem(name: "is_active", value: "true"))
+            items.append(URLQueryItem(name: "limit", value: "50"))
+            return items
 
         case .posTerminals(let locationId):
             if let locationId {

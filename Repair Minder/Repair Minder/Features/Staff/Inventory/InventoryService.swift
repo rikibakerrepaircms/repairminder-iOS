@@ -134,7 +134,7 @@ final class InventoryService: InventoryServing {
         try await api.request(.assetGroupsList(page: 1, limit: 100, search: search, category: nil, hasProducts: nil, unlinkedOnly: nil, sortBy: nil, sortOrder: nil))
     }
     func fetchProductTypes(search: String) async throws -> [ProductTypeOption] {
-        try await api.request(.productTypes(search: search))
+        try await api.request(.assetFilterProductTypes(search: search))
     }
     func fetchLocations() async throws -> [Location] {
         try await api.request(.locations)
