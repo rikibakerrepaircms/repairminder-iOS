@@ -49,24 +49,46 @@ final class InventoryWriteViewModelTests: XCTestCase {
     // MARK: - Detail view-model mutations
 
     /// Canned-result service for the detail mutation tests.
+    ///
+    /// `fetchAsset` mimics the real GET /api/assets/:id join by returning whatever the most
+    /// recent mutation produced (`latest`), rather than a fixed value — this is what makes it
+    /// a faithful stand-in for MF-7's re-fetch-after-mutation behaviour: the refetch is a
+    /// join-ed superset of the SAME underlying row, not a different snapshot, so every
+    /// existing assertion here still holds once `InventoryDetailViewModel` reconciles against it.
     final class MutatingService: InventoryServingStub {
         var deleted = false
-        override func fetchAsset(id: String) async throws -> Asset { Asset(id: id, assetTag: "T", name: "n", status: .inStock) }
+        private var latest = Asset(id: "a1", assetTag: "T", name: "n", status: .inStock)
+
+        override func fetchAsset(id: String) async throws -> Asset { latest }
         override func updateAsset(id: String, body: UpdateAssetRequest) async throws -> EditAssetResponse {
-            EditAssetResponse(success: true, data: Asset(id: id, assetTag: "T", name: "Edited", status: .inStock), skuUpdatedCount: 2)
+            latest = Asset(id: id, assetTag: "T", name: "Edited", status: .inStock)
+            return EditAssetResponse(success: true, data: latest, skuUpdatedCount: 2)
         }
-        override func moveAsset(id: String, body: MoveAssetRequest) async throws -> Asset { Asset(id: id, assetTag: "T", name: "Moved", status: .inStock) }
+        override func moveAsset(id: String, body: MoveAssetRequest) async throws -> Asset {
+            latest = Asset(id: id, assetTag: "T", name: "Moved", status: .inStock)
+            return latest
+        }
         override func allocateAsset(id: String, body: AllocateRequest) async throws -> AllocateResponse {
-            AllocateResponse(success: true, data: Asset(id: id, assetTag: "T", name: "n", status: .allocated),
+            latest = Asset(id: id, assetTag: "T", name: "n", status: .allocated)
+            return AllocateResponse(success: true, data: latest,
                              promptReadyToRepair: true, allocatedParts: nil, device: nil, recoveredAsset: nil)
         }
         override func deployExternal(id: String, body: DeployExternalRequest) async throws -> DeployExternalData {
-            DeployExternalData(asset: Asset(id: id, assetTag: "T", name: "n", status: .deployed),
-                               deployment: ExternalDeploymentRecord(id: "dep1"))
+            latest = Asset(id: id, assetTag: "T", name: "n", status: .deployed)
+            return DeployExternalData(asset: latest, deployment: ExternalDeploymentRecord(id: "dep1"))
         }
-        override func returnExternal(id: String, body: ReturnExternalRequest) async throws -> Asset { Asset(id: id, assetTag: "T", name: "n", status: .inStock) }
-        override func returnToSupplier(id: String, body: ReturnToSupplierRequest) async throws -> Asset { Asset(id: id, assetTag: "T", name: "n", status: .pendingReturn) }
-        override func resolveSupplierReturn(id: String, body: ResolveReturnRequest) async throws -> Asset { Asset(id: id, assetTag: "T", name: "n", status: .returned) }
+        override func returnExternal(id: String, body: ReturnExternalRequest) async throws -> Asset {
+            latest = Asset(id: id, assetTag: "T", name: "n", status: .inStock)
+            return latest
+        }
+        override func returnToSupplier(id: String, body: ReturnToSupplierRequest) async throws -> Asset {
+            latest = Asset(id: id, assetTag: "T", name: "n", status: .pendingReturn)
+            return latest
+        }
+        override func resolveSupplierReturn(id: String, body: ResolveReturnRequest) async throws -> Asset {
+            latest = Asset(id: id, assetTag: "T", name: "n", status: .returned)
+            return latest
+        }
         override func deleteAsset(id: String) async throws { deleted = true }
     }
 
@@ -131,5 +153,50 @@ final class InventoryWriteViewModelTests: XCTestCase {
         await vm.load()
         await vm.returnToStock(ReturnExternalRequest(deploymentId: "dep1", returnToStock: true))
         XCTAssertEqual(vm.asset?.status, .inStock)
+    }
+
+    // MARK: - MF-7: re-fetch the joined asset after every mutation
+
+    /// Mimics the real worker: mutation handlers (move/edit/allocate/return*/deploy-external)
+    /// return a join-LESS `SELECT * FROM assets` row (no `location_name`/`product_type_name`),
+    /// while the GET /api/assets/:id detail read returns the fully-joined row.
+    final class JoinLessMutationService: InventoryServingStub {
+        override func fetchAsset(id: String) async throws -> Asset {
+            Asset(id: id, assetTag: "T", name: "n", status: .inStock,
+                  productTypeName: "Screen", locationName: "Shelf B")
+        }
+        override func moveAsset(id: String, body: MoveAssetRequest) async throws -> Asset {
+            // Join-less, as the real /move handler's `SELECT * FROM assets` returns.
+            Asset(id: id, assetTag: "T", name: "n", status: .inStock)
+        }
+    }
+
+    func testMutationRefetchesJoinedAsset() async {
+        let vm = InventoryDetailViewModel(assetId: "a1", service: JoinLessMutationService())
+        await vm.load()
+        await vm.move(MoveAssetRequest(locationId: "loc1"))
+        XCTAssertEqual(vm.asset?.locationName, "Shelf B")
+        XCTAssertEqual(vm.asset?.productTypeName, "Screen")
+    }
+
+    /// If the re-fetch fails, the VM must degrade gracefully and keep the optimistic
+    /// mutation result rather than blanking the screen.
+    final class RefetchFailingService: InventoryServingStub {
+        struct RefetchError: Error {}
+        override func fetchAsset(id: String) async throws -> Asset {
+            throw RefetchError()
+        }
+        override func moveAsset(id: String, body: MoveAssetRequest) async throws -> Asset {
+            Asset(id: id, assetTag: "T", name: "Moved", status: .inStock)
+        }
+    }
+
+    func testMutationKeepsOptimisticResultWhenRefetchFails() async {
+        let vm = InventoryDetailViewModel(assetId: "a1", service: RefetchFailingService())
+        // Skip vm.load() — its fetchAsset would also throw, leaving asset nil, which isn't
+        // what we're testing here. Directly exercise the mutation's own degrade path.
+        await vm.move(MoveAssetRequest(locationId: "loc1"))
+        XCTAssertEqual(vm.asset?.name, "Moved")
+        XCTAssertNil(vm.actionError)
     }
 }
