@@ -235,6 +235,35 @@ final class BookInTests: XCTestCase {
         XCTAssertEqual(inputs.first?.lineId, "l1")
     }
 
+    // MARK: - MF-3: receive quantity must cap at `remaining`, not `quantityOrdered`
+
+    func testReceiveLineRemaining() {
+        let line = SupplierOrderLine(id: "l1", name: "Screen", quantityOrdered: 10, quantityReceived: 4)
+        XCTAssertEqual(line.remaining, 6)
+    }
+
+    /// A draft can go stale relative to the current `remaining` (e.g. the order line's
+    /// quantity/receipts changed underneath it while a receive draft already existed).
+    /// Re-preparing the receive step must clamp any such draft down to the new `remaining`
+    /// rather than leaving it able to over-receive.
+    @MainActor
+    func testPrepareReceiveClampsStaleDraftAboveRemaining() async {
+        let spy = BookInSpy(); spy.lineCount = 1
+        let vm = BookInWizardViewModel(order: SupplierOrder(id: "o1", supplierName: "S", status: "pending"), service: spy)
+        await vm.reloadOrder()
+        vm.prepareReceive()
+        XCTAssertEqual(vm.drafts["l0"]?.quantity, 3)   // initial: full remaining (ordered 3, received 0)
+
+        // Simulate the line's remaining shrinking (ordered 10, received 4 -> remaining 6)
+        // while the existing draft is still stuck at a stale 99.
+        vm.lines[0].quantityOrdered = 10
+        vm.lines[0].quantityReceived = 4
+        vm.drafts["l0"]?.quantity = 99
+
+        vm.prepareReceive()
+        XCTAssertEqual(vm.drafts["l0"]?.quantity, 6)
+    }
+
     @MainActor
     func testSupplierListStatusFilterAndCancel() async {
         let spy = BookInSpy()

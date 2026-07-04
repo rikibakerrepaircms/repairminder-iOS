@@ -240,13 +240,16 @@ private struct ReceiveLineEditor: View {
     @State private var locations: [Location] = []
 
     var body: some View {
-        Stepper("Quantity: \(draft.quantity)", value: $draft.quantity, in: 0...max(line.quantityOrdered, 1))
+        Stepper("Quantity: \(draft.quantity)", value: $draft.quantity, in: 0...max(line.remaining, 1))
         Picker("Condition", selection: $draft.conditionGrade) {
             ForEach(["A", "B", "C", "D", "F"], id: \.self) { Text($0).tag($0) }
         }
         Stepper("Warranty: \(draft.warrantyMonths) mo", value: $draft.warrantyMonths, in: 0...60, step: 3)
-        if draft.quantity > 0 {
-            ForEach(0..<draft.quantity, id: \.self) { i in
+        // Defensive: even if `draft.quantity` is momentarily stale above `remaining` (e.g. a
+        // draft carried over from before the order's receipts changed), never render more
+        // serial fields than units left to receive.
+        if serialCount > 0 {
+            ForEach(0..<serialCount, id: \.self) { i in
                 TextField("Serial \(i + 1) (optional)", text: serialBinding(i))
             }
         }
@@ -256,6 +259,8 @@ private struct ReceiveLineEditor: View {
         }
         .task { locations = (try? await InventoryService().fetchLocations()) ?? [] }
     }
+
+    private var serialCount: Int { min(draft.quantity, line.remaining) }
 
     private func serialBinding(_ i: Int) -> Binding<String> {
         Binding(

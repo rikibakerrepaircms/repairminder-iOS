@@ -160,9 +160,16 @@ final class BookInWizardViewModel: ObservableObject {
     // MARK: Receive
 
     /// Seed a receive draft per line, defaulting quantity to the remaining amount.
+    /// A draft that already exists is clamped down to the line's current `remaining` — the
+    /// line's ordered/received counts may have changed since the draft was created (e.g. an
+    /// edit to the line, or a previous partial receive), and a stale draft quantity above the
+    /// new remaining would allow over-receiving (MF-3).
     func prepareReceive() {
         for line in lines where !line.isFullyReceived {
-            if drafts[line.id] == nil {
+            if var draft = drafts[line.id] {
+                draft.quantity = min(draft.quantity, line.remaining)
+                drafts[line.id] = draft
+            } else {
                 drafts[line.id] = ReceiveDraft(quantity: line.remaining, locationId: line.locationId, subLocationId: line.subLocationId)
             }
         }
