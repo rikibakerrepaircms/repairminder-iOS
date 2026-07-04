@@ -10,6 +10,12 @@ struct ReceiveDraft: Equatable {
     var serials: [String] = []
     var locationId: String?
     var subLocationId: String?
+    /// Per-line cost override for this receive (defaults from the line's own `unitCost` in
+    /// `prepareReceive()`). The worker's receive handler falls back to the line's cost when
+    /// omitted (`item.unit_cost ?? line.unit_cost`), so this is only a genuine override.
+    var unitCost: Double?
+    var isOem: Bool = false
+    var isRefurbished: Bool = false
 }
 
 @MainActor
@@ -160,10 +166,18 @@ final class BookInWizardViewModel: ObservableObject {
     // MARK: Receive
 
     /// Seed a receive draft per line, defaulting quantity to the remaining amount.
+    /// A draft that already exists is clamped down to the line's current `remaining` — the
+    /// line's ordered/received counts may have changed since the draft was created (e.g. an
+    /// edit to the line, or a previous partial receive), and a stale draft quantity above the
+    /// new remaining would allow over-receiving (MF-3).
     func prepareReceive() {
         for line in lines where !line.isFullyReceived {
-            if drafts[line.id] == nil {
-                drafts[line.id] = ReceiveDraft(quantity: line.remaining, locationId: line.locationId, subLocationId: line.subLocationId)
+            if var draft = drafts[line.id] {
+                draft.quantity = min(draft.quantity, line.remaining)
+                drafts[line.id] = draft
+            } else {
+                drafts[line.id] = ReceiveDraft(quantity: line.remaining, locationId: line.locationId,
+                                                subLocationId: line.subLocationId, unitCost: line.unitCost)
             }
         }
         step = .receive
@@ -175,17 +189,26 @@ final class BookInWizardViewModel: ObservableObject {
     /// array when at least one serial is non-empty. Never filter out interior blanks
     /// (that would shift later serials onto the wrong unit) and truncate stale entries
     /// left behind if the quantity was lowered after typing.
+    ///
+    /// Hard clamp (MF-3/NTH-9): regardless of how the draft got here — the Stepper's own
+    /// bound, `prepareReceive()`'s reseed, or a caller that skipped both — the submitted
+    /// quantity can never exceed the line's current `remaining`. This is the last line of
+    /// defence against over-receiving. When clamping, take the FIRST `remaining` positional
+    /// serial slots so indices stay aligned with the units actually being received.
     func buildReceiveInputs() -> [ReceiveItemInput] {
         lines.compactMap { line in
             guard let d = drafts[line.id], d.quantity > 0 else { return nil }
-            let positional = (0..<d.quantity).map { i -> String in
+            let quantity = min(d.quantity, line.remaining)
+            guard quantity > 0 else { return nil }
+            let positional = (0..<quantity).map { i -> String in
                 i < d.serials.count ? d.serials[i].trimmingCharacters(in: .whitespaces) : ""
             }
             let hasAnySerial = positional.contains { !$0.isEmpty }
             return ReceiveItemInput(
-                lineId: line.id, quantity: d.quantity,
+                lineId: line.id, quantity: quantity,
                 serialNumbers: hasAnySerial ? positional : nil,
-                warrantyMonths: d.warrantyMonths, conditionGrade: d.conditionGrade,
+                unitCost: d.unitCost, warrantyMonths: d.warrantyMonths, conditionGrade: d.conditionGrade,
+                isOem: d.isOem ? 1 : 0, isRefurbished: d.isRefurbished ? 1 : 0,
                 locationId: d.locationId, subLocationId: d.subLocationId)
         }
     }
@@ -211,6 +234,19 @@ final class BookInWizardViewModel: ObservableObject {
     }
 
     var hasUnreceived: Bool { lines.contains { !$0.isFullyReceived } }
+
+    /// Called from the success screen's "Receive More" button. Previously this button set
+    /// `step = .receive` directly, which skipped `prepareReceive()`'s reseed — a draft left
+    /// over from the prior batch could carry a quantity above the line's now-current
+    /// `remaining`, and SwiftUI's Stepper doesn't retroactively clamp an already-out-of-range
+    /// bound value (NTH-9, closes the residual MF-3 hole). Reseeding via `prepareReceive()`
+    /// here guarantees drafts always reflect the latest `remaining`, and clears the previous
+    /// batch's success state so the wizard returns cleanly to the receive step.
+    func receiveMore() {
+        createdAssets = []
+        error = nil
+        prepareReceive()
+    }
 }
 
 extension Array {

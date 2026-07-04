@@ -15,6 +15,7 @@ final class SalvageViewModel: ObservableObject {
 
     // Reference data
     @Published var groups: [AssetGroupListItem] = []
+    @Published var groupQuery: String = ""
     @Published var locations: [Location] = []
     @Published var subLocations: [AssetSubLocationOption] = []
 
@@ -33,6 +34,7 @@ final class SalvageViewModel: ObservableObject {
     @Published var notes: String = ""
 
     @Published var isBooking = false
+    @Published var removingId: String?
     @Published var error: String?
 
     init(buybackId: String, purchaseAmount: Double, salvaged: [SalvagedAssetSummary], service: InventoryServing? = nil) {
@@ -64,6 +66,14 @@ final class SalvageViewModel: ObservableObject {
         subLocations = (try? await service.fetchSubLocations(locationId: id)) ?? []
     }
 
+    /// Hybrid group/part lookup (NTH-3): the default list loads on appear so small
+    /// companies see their parts immediately; typing refines server-side to reach parts
+    /// beyond the first-page/100 cap; clearing the field restores the default list.
+    /// Mirrors `AssetFilterOptions.searchGroups` in AssetFilterSheet.
+    func searchGroups(_ query: String) async {
+        groups = (try? await service.fetchGroups(search: query.isEmpty ? nil : query)) ?? []
+    }
+
     // MARK: Staging
     func addToBatch() {
         guard canAdd, let group = selectedGroup, let locationId else { return }
@@ -83,7 +93,7 @@ final class SalvageViewModel: ObservableObject {
     func removeStaged(_ id: String) { staged.removeAll { $0.id == id } }
 
     private func resetForm() {
-        selectedGroup = nil; grade = "A"; value = ""; lcdWorking = nil; glassCracked = nil
+        selectedGroup = nil; groupQuery = ""; grade = "A"; value = ""; lcdWorking = nil; glassCracked = nil
         subLocationId = nil; notes = ""
     }
 
@@ -113,6 +123,8 @@ final class SalvageViewModel: ObservableObject {
 
     func removeSalvaged(_ assetId: String) async {
         error = nil
+        removingId = assetId
+        defer { removingId = nil }
         do {
             let resp = try await service.deleteSalvageItem(buybackId: buybackId, assetId: assetId)
             salvaged = resp.salvagedAssets

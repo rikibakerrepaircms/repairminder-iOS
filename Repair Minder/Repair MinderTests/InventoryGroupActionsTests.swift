@@ -2,14 +2,6 @@ import XCTest
 @testable import Repair_Minder
 
 final class InventoryGroupActionsTests: XCTestCase {
-    private func asset(_ status: AssetStatus) -> Asset {
-        Asset(id: "a", assetTag: "T", name: "n", status: status)
-    }
-    func testOnlyInStockAssetsAreAddable() {
-        XCTAssertTrue(GroupActions.isAssetAddable(asset(.inStock)))
-        XCTAssertFalse(GroupActions.isAssetAddable(asset(.allocated)))
-        XCTAssertFalse(GroupActions.isAssetAddable(asset(.deployed)))
-    }
     func testAlreadyLinked() {
         var g = InventoryGroup(id: "g", name: "n"); g.linkedProductCount = 0
         XCTAssertFalse(GroupActions.alreadyLinked(g))

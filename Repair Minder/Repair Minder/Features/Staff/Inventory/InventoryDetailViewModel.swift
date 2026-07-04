@@ -46,8 +46,21 @@ final class InventoryDetailViewModel: ObservableObject {
 
     // MARK: - Mutations (Phase 2)
 
-    private func applyUpdated(_ updated: Asset) {
-        asset = updated
+    /// Reconciles a mutation with the fully joined GET /api/assets/:id row. The mutation
+    /// handlers (move/edit/allocate/return*/deploy-external) return a join-less
+    /// `SELECT * FROM assets` row — no `location_name`, `product_type_name`,
+    /// `checked_out_order_number`, `checked_out_device_name`, `enable_part_recovery` — so
+    /// publishing that row would blank those fields on screen (the exact MF-7 symptom).
+    /// We publish the joined value once on success: during the await the UI keeps showing the
+    /// prior asset (no blank-joined-fields flicker), then updates to the joined row. Only if
+    /// the re-fetch fails do we fall back to the optimistic join-less `updated` row rather
+    /// than blanking the screen. Posts `.inventoryAssetDidChange` exactly once.
+    private func applyUpdated(_ updated: Asset) async {
+        if let joined = try? await service.fetchAsset(id: assetId) {
+            asset = joined
+        } else {
+            asset = updated
+        }
         NotificationCenter.default.post(name: .inventoryAssetDidChange, object: nil)
     }
 
@@ -62,7 +75,7 @@ final class InventoryDetailViewModel: ObservableObject {
         isMutating = true; actionError = nil
         do {
             let resp = try await service.updateAsset(id: assetId, body: body)
-            applyUpdated(resp.data)
+            await applyUpdated(resp.data)
             lastSkuUpdatedCount = (resp.skuUpdatedCount ?? 0) > 0 ? resp.skuUpdatedCount : nil
             await refreshSubResources()
         } catch { actionError = error.localizedDescription }
@@ -89,7 +102,7 @@ final class InventoryDetailViewModel: ObservableObject {
         defer { isMutating = false }
         do {
             let resp = try await service.allocateAsset(id: assetId, body: body)
-            applyUpdated(resp.data)
+            await applyUpdated(resp.data)
             readyToRepairPrompt = resp.promptReadyToRepair ?? false
             await refreshSubResources()
             return resp
@@ -100,7 +113,7 @@ final class InventoryDetailViewModel: ObservableObject {
         isMutating = true; actionError = nil
         do {
             let data = try await service.deployExternal(id: assetId, body: body)
-            applyUpdated(data.asset)
+            await applyUpdated(data.asset)
             await refreshSubResources()
         } catch { actionError = error.localizedDescription }
         isMutating = false
@@ -119,7 +132,7 @@ final class InventoryDetailViewModel: ObservableObject {
     /// Shared helper for mutations that just return an updated `Asset`.
     private func run(_ op: @escaping () async throws -> Asset) async {
         isMutating = true; actionError = nil
-        do { applyUpdated(try await op()); await refreshSubResources() }
+        do { await applyUpdated(try await op()); await refreshSubResources() }
         catch { actionError = error.localizedDescription }
         isMutating = false
     }

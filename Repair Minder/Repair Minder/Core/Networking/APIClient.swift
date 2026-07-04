@@ -201,7 +201,7 @@ final class APIClient {
             default:
                 throw APIError.httpError(
                     statusCode: httpResponse.statusCode,
-                    message: nil
+                    message: APIClient.serverErrorMessage(from: data)
                 )
             }
         } catch let error as APIError {
@@ -211,6 +211,20 @@ final class APIClient {
         } catch {
             throw APIError.networkError(error)
         }
+    }
+
+    // MARK: - Error Parsing
+
+    /// Extracts a human-readable error message from a JSON response body by
+    /// decoding the standard `APIResponse<EmptyResponse>` envelope and reading
+    /// its `error` field — matching the other non-2xx branches in this file.
+    /// Used to surface server-provided error text (e.g. "Asset is already a
+    /// member of this group") instead of a generic "HTTP error <code>".
+    nonisolated static func serverErrorMessage(from data: Data) -> String? {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let response = try? decoder.decode(APIResponse<EmptyResponse>.self, from: data)
+        return response?.error
     }
 
     /// Upload a file via multipart/form-data and decode the JSON `data` payload.

@@ -6,6 +6,12 @@ import Foundation
 @MainActor
 class InventoryServingStub: InventoryServing {
     func fetchAssets(page: Int, pageSize: Int, filters: AssetQuery) async throws -> [Asset] { [] }
+    /// Default: delegate to `fetchAssets` with a nil total. Declared directly on this class
+    /// (not via a protocol-extension default) so subclasses can `override` it normally —
+    /// subclasses that only override `fetchAssets` still get its result via this delegation.
+    func fetchAssetsWithTotal(page: Int, pageSize: Int, filters: AssetQuery) async throws -> (items: [Asset], total: Int?) {
+        (try await fetchAssets(page: page, pageSize: pageSize, filters: filters), nil)
+    }
     func fetchAsset(id: String) async throws -> Asset { Asset(id: id, assetTag: "T", name: "n", status: .inStock) }
     func fetchAssetByTag(_ tag: String) async throws -> Asset { Asset(id: "a", assetTag: tag, name: "n", status: .inStock) }
     func fetchActivity(id: String) async throws -> [AssetActivity] { [] }
@@ -35,6 +41,10 @@ class InventoryServingStub: InventoryServing {
     func searchOrders(search: String) async throws -> [Order] { [] }
     func fetchOrderItems(orderId: String) async throws -> [OrderItem] { [] }
     func listGroups(page: Int, limit: Int, search: String?, category: String?, hasProducts: Bool?, unlinkedOnly: Bool?, sortBy: String?, sortOrder: String?) async throws -> [InventoryGroup] { [] }
+    /// Default: delegate to `listGroups` with a nil total (see `fetchAssetsWithTotal` note).
+    func listGroupsWithTotal(page: Int, limit: Int, search: String?, category: String?, hasProducts: Bool?, unlinkedOnly: Bool?, sortBy: String?, sortOrder: String?) async throws -> (items: [InventoryGroup], total: Int?) {
+        (try await listGroups(page: page, limit: limit, search: search, category: category, hasProducts: hasProducts, unlinkedOnly: unlinkedOnly, sortBy: sortBy, sortOrder: sortOrder), nil)
+    }
     func fetchGroup(id: String) async throws -> InventoryGroup { InventoryGroup(id: id, name: "n") }
     func fetchGroupAssets(id: String, page: Int, limit: Int) async throws -> [Asset] { [] }
     func fetchGroupProducts(id: String) async throws -> [LinkedProduct] { [] }
@@ -55,7 +65,7 @@ class InventoryServingStub: InventoryServing {
     }
     func salvageBuyback(id: String, items: [SalvageItemRequest]) async throws -> SalvageResponse {
         SalvageResponse(assets: [], salvagedAssets: [], newStatus: "salvaged",
-                        salvageBudget: SalvageBudgetInfo(cap: nil, booked: nil, remaining: nil))
+                        salvageBudget: SalvageBudget(cap: nil, booked: nil, remaining: nil))
     }
     func deleteSalvageItem(buybackId: String, assetId: String) async throws -> DeleteSalvageResult {
         DeleteSalvageResult(salvagedAssets: [], booked: 0, revertedTo: nil)
@@ -70,6 +80,7 @@ class InventoryServingStub: InventoryServing {
     func updateSupplierOrder(id: String, body: UpdateSupplierOrderRequest) async throws -> SupplierOrder {
         SupplierOrder(id: id, supplierName: body.supplierName ?? "S", status: body.status ?? "pending")
     }
+    func deleteSupplierOrder(id: String) async throws {}
     func addOrderLine(orderId: String, body: SupplierOrderLineRequest) async throws -> SupplierOrderLine {
         SupplierOrderLine(id: "line1", name: body.name, quantityOrdered: body.quantityOrdered ?? 1, quantityReceived: 0, unitCost: body.unitCost ?? 0)
     }

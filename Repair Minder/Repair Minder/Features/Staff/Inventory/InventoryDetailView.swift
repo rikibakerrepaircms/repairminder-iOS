@@ -52,8 +52,7 @@ struct InventoryDetailView: View {
         .sheet(isPresented: $showResolveReplacement) { if let a = viewModel.asset { ResolveReplacementSheet(asset: a, viewModel: viewModel) } }
         .sheet(isPresented: $showManageGroups) {
             GroupSelectorSheet(
-                assetId: assetId,
-                initialSelection: viewModel.groups.map(\.id)
+                assetId: assetId
             ) { desired in await viewModel.manageGroups(groupIds: desired) }
         }
         .confirmationDialog("Delete asset \(viewModel.asset?.assetTag ?? "")? This cannot be undone.",

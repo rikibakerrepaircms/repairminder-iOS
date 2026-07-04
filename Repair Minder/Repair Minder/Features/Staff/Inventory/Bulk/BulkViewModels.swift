@@ -91,9 +91,6 @@ final class BulkMoveViewModel: ObservableObject {
         self.service = service ?? InventoryService()
     }
 
-    var successCount: Int { outcomes.filter(\.success).count }
-    var failureCount: Int { outcomes.filter { !$0.success }.count }
-
     func run(locationId: String, subLocationId: String?) async {
         guard !isRunning else { return }
         isRunning = true; outcomes = []
@@ -126,9 +123,6 @@ final class BulkDeployViewModel: ObservableObject {
         self.assets = BulkActions.deployableAssets(assets)
         self.service = service ?? InventoryService()
     }
-
-    var successCount: Int { outcomes.filter(\.success).count }
-    var failureCount: Int { outcomes.filter { !$0.success }.count }
 
     func runOrder(orderId: String, orderItemId: String?) async {
         await run { asset in
@@ -184,7 +178,7 @@ final class BulkScanViewModel: ObservableObject {
     var readyCount: Int { readyAssets.count }
 
     func onScan(tag: String) async {
-        let trimmed = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = AssetScan.parse(tag)
         guard !trimmed.isEmpty else { return }
         if entries.contains(where: { $0.tag == trimmed }) {
             lastMessage = "Already scanned \(trimmed)"

@@ -44,4 +44,11 @@ final class AssetActionsTests: XCTestCase {
         XCTAssertFalse(AssetActions.canReturnToStock(asset(.deployed), hasActiveExternalDeployment: false))
         XCTAssertFalse(AssetActions.canReturnToStock(asset(.inStock), hasActiveExternalDeployment: true))
     }
+
+    /// Deploy-to-order (single + bulk) requires a selected line item, matching web
+    /// (DeployToOrderModal/BulkDeployModal never offer an id-only allocate path).
+    func testCanConfirmDeployToOrderRequiresLineItem() {
+        XCTAssertFalse(AssetActions.canConfirmDeployToOrder(hasLineItem: false))
+        XCTAssertTrue(AssetActions.canConfirmDeployToOrder(hasLineItem: true))
+    }
 }

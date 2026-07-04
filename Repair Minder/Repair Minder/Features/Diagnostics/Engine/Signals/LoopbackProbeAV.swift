@@ -1,4 +1,5 @@
 import Foundation
+#if os(iOS)
 import AVFoundation
 
 @MainActor
@@ -73,3 +74,4 @@ final class LoopbackProbeAV: LoopbackProbe {
         return buf
     }
 }
+#endif

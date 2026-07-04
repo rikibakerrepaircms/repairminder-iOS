@@ -167,12 +167,20 @@ private struct LineEditSheet: View {
     @State private var name: String
     @State private var qty: String
     @State private var cost: String
+    // Product-type link (web `BookInForm` parity). The backend already auto-links a
+    // line's product type on receive via SKU/name mapping, so this is optional —
+    // it just lets staff correct/set it up front from the line editor.
+    @State private var productTypeId: String?
+    @State private var productTypeQuery: String
+    @State private var productTypeOptions: [ProductTypeOption] = []
 
     init(line: SupplierOrderLine, onSave: @escaping (SupplierOrderLineRequest) -> Void) {
         self.line = line; self.onSave = onSave
         _name = State(initialValue: line.name)
         _qty = State(initialValue: String(line.quantityOrdered))
         _cost = State(initialValue: String(line.unitCost ?? 0))
+        _productTypeId = State(initialValue: line.productTypeId)
+        _productTypeQuery = State(initialValue: line.productTypeName ?? "")
     }
 
     var body: some View {
@@ -184,6 +192,33 @@ private struct LineEditSheet: View {
                 #if os(iOS)
                     .keyboardType(.decimalPad)
                 #endif
+                Section("Product Type (optional)") {
+                    TextField("Search product types…", text: $productTypeQuery)
+                        .onChange(of: productTypeQuery) { _, q in Task { await searchProductTypes(q) } }
+                    ForEach(productTypeOptions) { pt in
+                        Button {
+                            productTypeId = pt.id
+                            productTypeQuery = pt.name
+                            productTypeOptions = []
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(pt.name)
+                                    if let sku = pt.sku, !sku.isEmpty {
+                                        Text(sku).font(.caption).foregroundStyle(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                if productTypeId == pt.id { Image(systemName: "checkmark") }
+                            }
+                        }
+                    }
+                    if productTypeId != nil {
+                        Button("Clear product type", role: .destructive) {
+                            productTypeId = nil; productTypeQuery = ""
+                        }
+                    }
+                }
             }
             .navigationTitle("Edit Line")
             #if os(iOS)
@@ -193,12 +228,17 @@ private struct LineEditSheet: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        onSave(SupplierOrderLineRequest(name: name, quantityOrdered: Int(qty) ?? line.quantityOrdered, unitCost: Double(cost) ?? line.unitCost))
+                        onSave(SupplierOrderLineRequest(productTypeId: productTypeId, name: name, quantityOrdered: Int(qty) ?? line.quantityOrdered, unitCost: Double(cost) ?? line.unitCost))
                         dismiss()
                     }.disabled(name.isEmpty)
                 }
             }
         }
+    }
+
+    private func searchProductTypes(_ query: String) async {
+        guard !query.isEmpty else { productTypeOptions = []; return }
+        productTypeOptions = (try? await InventoryService().fetchProductTypes(search: query)) ?? []
     }
 }
 
@@ -238,15 +278,46 @@ private struct ReceiveLineEditor: View {
     let line: SupplierOrderLine
     @Binding var draft: ReceiveDraft
     @State private var locations: [Location] = []
+    @State private var subLocations: [AssetSubLocationOption] = []
+    @State private var seeded = false
+    /// Raw text for the unit-cost field, seeded once from the draft's cost. Kept as its
+    /// own @State (rather than a computed Binding that reformats `draft.unitCost` via
+    /// `%.2f` on every read) so typing doesn't get reformatted or cleared mid-keystroke —
+    /// it only commits into `draft.unitCost` on change.
+    @State private var costText: String
+
+    init(line: SupplierOrderLine, draft: Binding<ReceiveDraft>) {
+        self.line = line
+        self._draft = draft
+        self._costText = State(initialValue: draft.wrappedValue.unitCost.map { String(format: "%.2f", $0) } ?? "")
+    }
 
     var body: some View {
-        Stepper("Quantity: \(draft.quantity)", value: $draft.quantity, in: 0...max(line.quantityOrdered, 1))
+        Stepper("Quantity: \(draft.quantity)", value: $draft.quantity, in: 0...max(line.remaining, 1))
         Picker("Condition", selection: $draft.conditionGrade) {
             ForEach(["A", "B", "C", "D", "F"], id: \.self) { Text($0).tag($0) }
         }
         Stepper("Warranty: \(draft.warrantyMonths) mo", value: $draft.warrantyMonths, in: 0...60, step: 3)
-        if draft.quantity > 0 {
-            ForEach(0..<draft.quantity, id: \.self) { i in
+        HStack {
+            Text("Unit cost")
+            Spacer()
+            TextField("Unit cost", text: $costText)
+                #if os(iOS)
+                .keyboardType(.decimalPad)
+                #endif
+                .multilineTextAlignment(.trailing)
+                .frame(maxWidth: 100)
+                .onChange(of: costText) { _, newValue in
+                    draft.unitCost = Double(newValue)
+                }
+        }
+        Toggle("OEM", isOn: $draft.isOem)
+        Toggle("Refurbished", isOn: $draft.isRefurbished)
+        // Defensive: even if `draft.quantity` is momentarily stale above `remaining` (e.g. a
+        // draft carried over from before the order's receipts changed), never render more
+        // serial fields than units left to receive.
+        if serialCount > 0 {
+            ForEach(0..<serialCount, id: \.self) { i in
                 TextField("Serial \(i + 1) (optional)", text: serialBinding(i))
             }
         }
@@ -254,8 +325,35 @@ private struct ReceiveLineEditor: View {
             Text("Default").tag(String?.none)
             ForEach(locations) { Text($0.name).tag(String?.some($0.id)) }
         }
-        .task { locations = (try? await InventoryService().fetchLocations()) ?? [] }
+        .onChange(of: draft.locationId) { _, new in
+            // Ignore the initial programmatic seed — only clear the sub-location
+            // on a user-driven location change (matches AssetMoveSheet's pattern).
+            guard seeded else { return }
+            draft.subLocationId = nil
+            subLocations = []
+            if let id = new { Task { await loadSubs(id) } }
+        }
+        .task {
+            locations = (try? await InventoryService().fetchLocations()) ?? []
+            // Default the picker from the line's own location (draft is seeded with it in
+            // `prepareReceive()`), loading the option list so the draft's existing
+            // sub-location (also seeded from the line) resolves to a real row.
+            if let id = draft.locationId ?? line.locationId { await loadSubs(id) }
+            seeded = true
+        }
+        if !subLocations.isEmpty {
+            Picker("Sub-location", selection: $draft.subLocationId) {
+                Text("None").tag(String?.none)
+                ForEach(subLocations) { Text($0.code ?? $0.description ?? "—").tag(String?.some($0.id)) }
+            }
+        }
     }
+
+    private func loadSubs(_ id: String) async {
+        subLocations = (try? await InventoryService().fetchSubLocations(locationId: id)) ?? []
+    }
+
+    private var serialCount: Int { min(draft.quantity, line.remaining) }
 
     private func serialBinding(_ i: Int) -> Binding<String> {
         Binding(
@@ -288,7 +386,7 @@ private struct BookInSuccessStep: View {
             .listStyle(.plain)
             HStack {
                 if viewModel.hasUnreceived {
-                    Button("Receive More") { viewModel.step = .receive }.buttonStyle(.bordered)
+                    Button("Receive More") { viewModel.receiveMore() }.buttonStyle(.bordered)
                 }
                 Button("Done") { onDone() }.buttonStyle(.borderedProminent)
             }

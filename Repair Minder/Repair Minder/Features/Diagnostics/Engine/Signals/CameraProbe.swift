@@ -1,4 +1,5 @@
 import Foundation
+#if os(iOS)
 @preconcurrency import AVFoundation
 import CoreMedia
 
@@ -145,3 +146,4 @@ extension CameraProbe: AVCaptureMetadataOutputObjectsDelegate {
         Task { @MainActor in self.onCode?(s) }
     }
 }
+#endif

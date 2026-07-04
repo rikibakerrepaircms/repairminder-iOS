@@ -31,6 +31,13 @@ final class AssetFilterOptions: ObservableObject {
         guard !query.isEmpty else { productTypes = []; return }
         productTypes = (try? await service.fetchProductTypes(search: query)) ?? []
     }
+
+    /// Hybrid group lookup (NTH-3): the default list loads on appear so small companies
+    /// see their groups immediately; typing refines server-side to reach groups beyond
+    /// the first-page/100 cap; clearing the field restores the default list.
+    func searchGroups(_ query: String) async {
+        groups = (try? await service.fetchGroups(search: query.isEmpty ? nil : query)) ?? []
+    }
 }
 
 struct AssetFilterSheet: View {
@@ -38,6 +45,7 @@ struct AssetFilterSheet: View {
     @StateObject private var options = AssetFilterOptions()
     @Environment(\.dismiss) private var dismiss
     @State private var productTypeQuery = ""
+    @State private var groupQuery = ""
 
     var body: some View {
         NavigationStack {
@@ -66,9 +74,24 @@ struct AssetFilterSheet: View {
                     }
                 }
                 Section("Group") {
-                    Picker("Group", selection: $viewModel.selectedGroupId) {
-                        Text("Any").tag(String?.none)
-                        ForEach(options.groups) { Text($0.name).tag(String?.some($0.id)) }
+                    TextField("Search groups…", text: $groupQuery)
+                        .onChange(of: groupQuery) { _, q in Task { await options.searchGroups(q) } }
+                    ForEach(options.groups) { g in
+                        Button {
+                            viewModel.selectedGroupId = g.id
+                            groupQuery = g.name
+                        } label: {
+                            HStack {
+                                Text(g.name)
+                                Spacer()
+                                if viewModel.selectedGroupId == g.id { Image(systemName: "checkmark") }
+                            }
+                        }
+                    }
+                    if viewModel.selectedGroupId != nil {
+                        Button("Clear group", role: .destructive) {
+                            viewModel.selectedGroupId = nil; groupQuery = ""
+                        }
                     }
                 }
                 Section("Product Type") {
@@ -80,7 +103,12 @@ struct AssetFilterSheet: View {
                             productTypeQuery = pt.name
                         } label: {
                             HStack {
-                                Text(pt.name)
+                                VStack(alignment: .leading) {
+                                    Text(pt.name)
+                                    if let sku = pt.sku, !sku.isEmpty {
+                                        Text(sku).font(.caption).foregroundStyle(.secondary)
+                                    }
+                                }
                                 Spacer()
                                 if viewModel.selectedProductTypeId == pt.id { Image(systemName: "checkmark") }
                             }
@@ -109,7 +137,16 @@ struct AssetFilterSheet: View {
                     Button("Apply") { viewModel.applyFilters(); dismiss() }
                 }
             }
-            .task { await options.loadTopLevel() }
+            .task {
+                await options.loadTopLevel()
+                // Cosmetic parity: if a group is already selected, seed the search field
+                // with its name so the user sees what's currently applied. Best-effort
+                // only — uses the already-loaded default group list, no extra fetch.
+                if groupQuery.isEmpty, let selectedId = viewModel.selectedGroupId,
+                   let match = options.groups.first(where: { $0.id == selectedId }) {
+                    groupQuery = match.name
+                }
+            }
         }
     }
 }

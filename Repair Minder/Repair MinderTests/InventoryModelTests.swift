@@ -94,4 +94,78 @@ extension InventoryModelTests {
         XCTAssertEqual(a.status, .allocated)
         XCTAssertEqual(a.checkedOutOrderNumber, 100000021)
     }
+
+    // MF-5 regression: a single row with `status: null` must not throw and
+    // must not blank the entire [Asset] list decode.
+    func testAssetStatusNullDecodesToUnknownAndListSurvives() throws {
+        let json = #"""
+        [{"id":"a1","asset_tag":"AST-1","name":"Part","status":null},
+         {"id":"a2","asset_tag":"AST-2","name":"Part2","status":"in_stock"}]
+        """#
+        let assets = try decode([Asset].self, json)
+        XCTAssertEqual(assets.count, 2)
+        XCTAssertEqual(assets[0].status, .unknown)
+        XCTAssertEqual(assets[1].status, .inStock)
+    }
+
+    // MF-5 completion: the spec was "null OR ABSENT". An asset object with the
+    // `status` key missing entirely (not just null) must also fall back to
+    // `.unknown` rather than throwing keyNotFound and blanking the whole list.
+    func testAssetAbsentStatusKeyDecodesToUnknown() throws {
+        let json = #"[{"id":"a1","asset_tag":"AST-1","name":"Part"}]"#
+        let assets = try decode([Asset].self, json)
+        XCTAssertEqual(assets.count, 1)
+        XCTAssertEqual(assets[0].status, .unknown)
+    }
+
+    // Guards the @DefaultUnknown-wrapped `status` property against drift: a full,
+    // realistic asset payload (as the SELECT a.* handlers return) must still decode
+    // every field correctly now that `status` is a property-wrapper-backed var.
+    func testAssetFullJSONDecodesAllFields() throws {
+        let json = #"""
+        {
+          "id": "a1", "asset_tag": "AST000000001", "name": "iPhone 13 Screen",
+          "status": "allocated", "company_id": "c1", "product_type_id": "pt1",
+          "serial_number": "SN123", "sku": "SKU-1", "category": "Screens",
+          "manufacturer": "Apple", "model_number": "A2482",
+          "cost": 42.5, "cost_inc_vat": 51.0, "is_oem": 1, "is_refurbished": 0,
+          "warranty_months": 12, "location_id": "loc1", "location_name": "Main Store",
+          "sub_location_id": "sub1", "sub_location_code": "A1",
+          "checked_out_to_order_id": "o1", "checked_out_order_number": 100000021,
+          "product_type_name": "Screens", "product_type_category": "parts",
+          "group_names": "Screens, Genuine", "group_ids": "g1,g2",
+          "notes": "handle with care", "created_at": "2026-01-01", "updated_at": "2026-01-02"
+        }
+        """#
+        let a = try decode(Asset.self, json)
+        XCTAssertEqual(a.id, "a1")
+        XCTAssertEqual(a.assetTag, "AST000000001")
+        XCTAssertEqual(a.name, "iPhone 13 Screen")
+        XCTAssertEqual(a.status, .allocated)
+        XCTAssertEqual(a.companyId, "c1")
+        XCTAssertEqual(a.productTypeId, "pt1")
+        XCTAssertEqual(a.serialNumber, "SN123")
+        XCTAssertEqual(a.sku, "SKU-1")
+        XCTAssertEqual(a.category, "Screens")
+        XCTAssertEqual(a.manufacturer, "Apple")
+        XCTAssertEqual(a.modelNumber, "A2482")
+        XCTAssertEqual(a.cost, 42.5)
+        XCTAssertEqual(a.costIncVat, 51.0)
+        XCTAssertTrue(a.isOemBool)
+        XCTAssertFalse(a.isRefurbishedBool)
+        XCTAssertEqual(a.warrantyMonths, 12)
+        XCTAssertEqual(a.locationId, "loc1")
+        XCTAssertEqual(a.locationName, "Main Store")
+        XCTAssertEqual(a.subLocationId, "sub1")
+        XCTAssertEqual(a.subLocationCode, "A1")
+        XCTAssertEqual(a.checkedOutToOrderId, "o1")
+        XCTAssertEqual(a.checkedOutOrderNumber, 100000021)
+        XCTAssertEqual(a.productTypeName, "Screens")
+        XCTAssertEqual(a.productTypeCategory, "parts")
+        XCTAssertEqual(a.groupNamesList, ["Screens", "Genuine"])
+        XCTAssertEqual(a.groupIdsList, ["g1", "g2"])
+        XCTAssertEqual(a.notes, "handle with care")
+        XCTAssertEqual(a.createdAt, "2026-01-01")
+        XCTAssertEqual(a.updatedAt, "2026-01-02")
+    }
 }

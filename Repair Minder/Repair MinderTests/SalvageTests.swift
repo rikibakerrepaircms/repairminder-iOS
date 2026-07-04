@@ -41,11 +41,22 @@ final class SalvageTests: XCTestCase {
          "salvage_budget":{"cap":100.0,"booked":5.0,"remaining":95.0}}
         """#
         let resp = try decode(SalvageResponse.self, json)
-        XCTAssertEqual(resp.assets.first?.sourceType, "salvaged")
-        XCTAssertEqual(resp.assets.first?.lcdWorking, 1)
+        XCTAssertEqual(resp.assets?.first?.sourceType, "salvaged")
+        XCTAssertEqual(resp.assets?.first?.lcdWorking, 1)
         XCTAssertEqual(resp.salvagedAssets.first?.cost, 5.0)
         XCTAssertEqual(resp.newStatus, "salvaged")
         XCTAssertEqual(resp.salvageBudget.remaining, 95.0)
+    }
+
+    /// NTH-12: `assets` (the full re-decoded Asset rows) is a nice-to-have, not something
+    /// the VM actually reads (`book()` only uses `salvagedAssets`). If the field drifts or
+    /// is omitted, decoding must still succeed rather than throwing a false failure after
+    /// the worker has already created the salvage assets.
+    func testSalvageResponseDecodesWithoutAssets() throws {
+        let json = #"""
+        {"salvaged_assets":[],"new_status":"salvaged","salvage_budget":{"cap":100,"booked":0,"remaining":100}}
+        """#
+        XCTAssertNoThrow(try decode(SalvageResponse.self, json))
     }
 
     func testDeleteSalvageResultDecodes() throws {
@@ -89,7 +100,7 @@ final class SalvageTests: XCTestCase {
                                      glassCracked: it.glassCracked, createdAt: nil, locationName: nil)
             }
             return SalvageResponse(assets: [], salvagedAssets: summaries, newStatus: "salvaged",
-                                   salvageBudget: SalvageBudgetInfo(cap: 100, booked: 0, remaining: 100))
+                                   salvageBudget: SalvageBudget(cap: 100, booked: 0, remaining: 100))
         }
         override func deleteSalvageItem(buybackId: String, assetId: String) async throws -> DeleteSalvageResult {
             deletedAssetId = assetId
@@ -137,6 +148,42 @@ final class SalvageTests: XCTestCase {
         XCTAssertFalse(vm.canBook)
         let ok = await vm.book()
         XCTAssertFalse(ok)
+    }
+
+    // MARK: - Searchable group/part picker (NTH-3)
+
+    @MainActor
+    final class GroupSearchSpy: InventoryServingStub {
+        var searches: [String?] = []
+        override func fetchGroups(search: String?) async throws -> [AssetGroupListItem] {
+            searches.append(search)
+            guard let search, !search.isEmpty else {
+                // Default list (search:nil) — what small companies see immediately.
+                return [AssetGroupListItem(id: "default-1", name: "Battery"),
+                        AssetGroupListItem(id: "default-2", name: "Screen")]
+            }
+            return [AssetGroupListItem(id: "g-\(search)", name: "Match for \(search)")]
+        }
+    }
+
+    @MainActor
+    func testSearchGroupsForwardsNonEmptyQueryToService() async {
+        let spy = GroupSearchSpy()
+        let vm = SalvageViewModel(buybackId: "b1", purchaseAmount: 100, salvaged: [], service: spy)
+        await vm.searchGroups("batt")
+        XCTAssertEqual(spy.searches, ["batt"])       // non-empty query reaches the service verbatim
+        XCTAssertEqual(vm.groups.map(\.id), ["g-batt"])
+    }
+
+    @MainActor
+    func testClearingSearchRestoresDefaultGroupList() async {
+        let spy = GroupSearchSpy()
+        let vm = SalvageViewModel(buybackId: "b1", purchaseAmount: 100, salvaged: [], service: spy)
+        await vm.searchGroups("batt")
+        XCTAssertEqual(vm.groups.map(\.id), ["g-batt"])
+        await vm.searchGroups("")                    // field cleared
+        XCTAssertEqual(spy.searches, ["batt", nil])  // empty query loads the default list (search:nil)
+        XCTAssertEqual(vm.groups.map(\.id), ["default-1", "default-2"])  // restored, not blank
     }
 
     @MainActor

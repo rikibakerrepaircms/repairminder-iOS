@@ -27,6 +27,7 @@ struct InventoryGroup: Decodable, Identifiable, Equatable, Sendable {
     var minCost: Double?
     var avgCost: Double?
     var maxCost: Double?
+    // contract mirror; decoded for API fidelity, not yet rendered
     var linkedProducts: [LinkedProduct]?
 
     var isOemBool: Bool { (isOem ?? 0) == 1 }

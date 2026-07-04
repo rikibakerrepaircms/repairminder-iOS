@@ -182,15 +182,19 @@ struct AssetImportValidationBody: Decodable, Equatable, Sendable {
     var totalErrors: Int?
 }
 
+/// Matches the worker's per-row shape exactly (`asset_handlers.js` `validateImportRow`
+/// pushes `{row, field, message}` — never a bare `sku`/`error` pair).
 struct AssetImportRowError: Decodable, Equatable, Sendable, Identifiable {
     var row: Int?
-    var sku: String?
-    var error: String?
+    var field: String?
     var message: String?
-    var id: String { "\(row ?? -1)-\(sku ?? "")-\(error ?? message ?? "")" }
+    var id: String { "\(row ?? -1)-\(field ?? "")-\(message ?? "")" }
 
     var display: String {
-        let prefix = row.map { "Row \($0): " } ?? ""
-        return prefix + (error ?? message ?? "Invalid")
+        let prefix = row.map { "Row \($0)" } ?? "Row ?"
+        if let field, !field.isEmpty {
+            return "\(prefix) (\(field)): \(message ?? "Invalid")"
+        }
+        return "\(prefix): \(message ?? "Invalid")"
     }
 }

@@ -44,7 +44,8 @@ final class InventoryGroupsUITest: XCTestCase {
         snap(app, "01-inventory-list")
 
         // Prime: a neutral tap dismisses the app-wide FAB overlay that swallows the first tap.
-        app.staticTexts["Inventory"].firstMatch.tap()
+        let invTitle = app.staticTexts["Inventory"].firstMatch
+        if invTitle.exists { invTitle.tap() }
         Thread.sleep(forTimeInterval: 1)
 
         // Open the first asset (skip if the demo company has none).

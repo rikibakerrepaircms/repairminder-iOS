@@ -2,9 +2,6 @@ import SwiftUI
 
 /// Pure, testable gating + presentation rules for Inventory Groups (mirrors web).
 enum GroupActions {
-    /// Only in-stock assets can be added to a group (web filters add-search to status=in_stock).
-    static func isAssetAddable(_ asset: Asset) -> Bool { asset.status == .inStock }
-
     /// Group is already linked to at least one product (drives the amber warning; promote still allowed).
     static func alreadyLinked(_ group: InventoryGroup) -> Bool { (group.linkedProductCount ?? 0) > 0 }
 

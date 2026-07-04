@@ -208,6 +208,11 @@ struct InventoryListView: View {
             emptyView
         } else {
             List {
+                if let total = viewModel.total {
+                    Text("\(total) asset\(total == 1 ? "" : "s") found")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .listRowSeparator(.hidden)
+                }
                 ForEach(viewModel.assets) { asset in
                     assetRow(asset)
                         .task { await viewModel.loadMoreIfNeeded(currentItem: asset) }
@@ -318,7 +323,9 @@ struct InventoryListView: View {
             ToolbarItem(placement: .automatic) {
                 Menu {
                     Button { showBookIn = true } label: { Label("Book In Stock", systemImage: "tray.and.arrow.down") }
-                    Button { showImport = true } label: { Label("Import CSV", systemImage: "square.and.arrow.down.on.square") }
+                    if AuthManager.shared.currentUser?.role.isAdmin == true {
+                        Button { showImport = true } label: { Label("Import CSV", systemImage: "square.and.arrow.down.on.square") }
+                    }
                 } label: { Image(systemName: "tray.and.arrow.down") }
                 .accessibilityIdentifier("inventory-tools-menu")
             }
@@ -335,11 +342,12 @@ struct InventoryListView: View {
     #if os(iOS)
     @MainActor
     private func lookupTag(_ tag: String) async {
+        let parsedTag = AssetScan.parse(tag)
         do {
-            let asset = try await service.fetchAssetByTag(tag)
+            let asset = try await service.fetchAssetByTag(parsedTag)
             selectedAssetId = asset.id
         } catch {
-            scanError = "No asset found for tag \"\(tag)\"."
+            scanError = "No asset found for tag \"\(parsedTag)\"."
         }
     }
     #endif
@@ -351,6 +359,9 @@ private struct AssetRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(asset.assetTag).font(.subheadline.weight(.semibold).monospaced())
+                if let grade = asset.conditionGrade, !grade.isEmpty {
+                    ConditionGradeBadge(grade: grade)
+                }
                 Spacer()
                 AssetStatusBadge(status: asset.status)
             }
@@ -358,6 +369,16 @@ private struct AssetRow: View {
             HStack(spacing: 8) {
                 if let cat = asset.category { Text(cat).font(.caption).foregroundStyle(.secondary) }
                 if let loc = asset.locationDisplay { Label(loc, systemImage: "mappin.and.ellipse").font(.caption).foregroundStyle(.secondary) }
+            }
+            if asset.serialNumber != nil || asset.sku != nil {
+                HStack(spacing: 8) {
+                    if let serial = asset.serialNumber, !serial.isEmpty {
+                        Text("SN: \(serial)").font(.caption2.monospaced()).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    if let sku = asset.sku, !sku.isEmpty {
+                        Text("SKU: \(sku)").font(.caption2.monospaced()).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                }
             }
             if asset.status == .allocated || asset.status == .deployed,
                asset.checkedOutOrderNumber != nil || asset.checkedOutDeviceName != nil {

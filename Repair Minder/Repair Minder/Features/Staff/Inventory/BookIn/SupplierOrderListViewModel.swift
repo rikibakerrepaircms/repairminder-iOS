@@ -35,11 +35,19 @@ final class SupplierOrderListViewModel: ObservableObject {
         isLoading = false
     }
 
-    /// Cancel an order (allowed unless already received/cancelled). Returns true on success.
+    /// Cancel an order (allowed unless already received/cancelled). Matches the web app / worker's
+    /// `DELETE /api/supplier-orders/:id` semantics: an order with zero received lines is hard-deleted
+    /// rather than left behind as an empty cancelled row; an order with received items is PATCHed to
+    /// `cancelled` instead (the worker itself refuses to hard-delete once `total_received > 0`).
+    /// Returns true on success.
     @discardableResult
     func cancel(_ order: SupplierOrder) async -> Bool {
         do {
-            _ = try await service.updateSupplierOrder(id: order.id, body: UpdateSupplierOrderRequest(status: "cancelled"))
+            if (order.totalReceived ?? 0) == 0 {
+                try await service.deleteSupplierOrder(id: order.id)
+            } else {
+                _ = try await service.updateSupplierOrder(id: order.id, body: UpdateSupplierOrderRequest(status: "cancelled"))
+            }
             await load()
             return true
         } catch {

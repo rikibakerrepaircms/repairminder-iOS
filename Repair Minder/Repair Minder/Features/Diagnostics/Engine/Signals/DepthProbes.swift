@@ -1,4 +1,5 @@
 import Foundation
+#if os(iOS)
 @preconcurrency import AVFoundation
 import ARKit
 import CoreMedia
@@ -99,3 +100,4 @@ final class LiDARProbe: NSObject, DepthProbe, ARSessionDelegate {
 
     func stop() { arSession.pause() }
 }
+#endif

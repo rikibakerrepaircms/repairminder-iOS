@@ -13,6 +13,7 @@ enum CSVExporter {
             let fields = [
                 a.assetTag,
                 a.name,
+                // Intentional divergence from web: iOS exports human-readable status.displayName; web exports the raw status value. See spec Group E.
                 a.status.displayName,
                 a.category ?? "",
                 a.locationName ?? "",

@@ -12,8 +12,15 @@ struct DeployToOrderWizard: View {
     @State private var step: Step = .search
     @State private var selectedOrder: Order?
     @State private var selectedItem: OrderItem?
-    @State private var recovery = PartRecoveryState()
+    @State private var recovery: PartRecoveryState
     @State private var recoveredAsset: Asset?
+
+    init(asset: Asset, detailVM: InventoryDetailViewModel, onFinished: @escaping () -> Void) {
+        self.asset = asset
+        self.detailVM = detailVM
+        self.onFinished = onFinished
+        _recovery = State(initialValue: PartRecoveryState(category: asset.category ?? asset.productTypeCategory))
+    }
 
     var body: some View {
         NavigationStack {
@@ -33,6 +40,7 @@ struct DeployToOrderWizard: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(step == .done ? "Done" : "Cancel") {
                         if step == .done { onFinished() }
+                        detailVM.actionError = nil
                         dismiss()
                     }
                 }
@@ -67,12 +75,10 @@ struct DeployToOrderWizard: View {
                 ProgressView()
             } else if vm.items.isEmpty {
                 Section {
-                    Text("This order has no line items.").foregroundStyle(.secondary)
-                    Button("Allocate without a line item") { selectedItem = nil; step = .confirm }
+                    Text("This order has no line items. Add one first.").foregroundStyle(.secondary)
                 }
             } else {
-                Section("Select a line item (optional)") {
-                    Button("No specific line item") { selectedItem = nil; step = .confirm }
+                Section("Select a line item") {
                     ForEach(vm.items) { item in
                         Button {
                             selectedItem = item; step = .confirm
@@ -92,7 +98,7 @@ struct DeployToOrderWizard: View {
             if asset.enablePartRecoveryBool { PartRecoveryForm(state: $recovery) }
             Section {
                 Button("Allocate") { Task { await allocate() } }
-                    .disabled(!recovery.isValid || detailVM.isMutating)
+                    .disabled(!AssetActions.canConfirmDeployToOrder(hasLineItem: selectedItem != nil) || !recovery.isValid || detailVM.isMutating)
             }
             if let err = detailVM.actionError {
                 Text(err).font(.caption).foregroundStyle(.red)

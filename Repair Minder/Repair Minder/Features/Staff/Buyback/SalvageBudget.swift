@@ -5,9 +5,6 @@ import Foundation
 enum SalvageBudgetMath {
     static func round2(_ x: Double) -> Double { (x * 100).rounded() / 100 }
 
-    /// Booked + pending spent so far.
-    static func spent(booked: Double, pending: Double) -> Double { round2(booked + pending) }
-
     static func remaining(cap: Double, booked: Double, pending: Double) -> Double {
         round2(cap - booked - pending)
     }

@@ -20,6 +20,15 @@ final class GroupEditModel: ObservableObject {
     @Published var errorMessage: String?
     private let service: InventoryServing
 
+    // Snapshot of the values the group had on open — used to tell "field was
+    // cleared by the user" (should send "" so the backend blanks it) apart
+    // from "field was never set" (stays omitted from the request body).
+    private let originalSku: String
+    private let originalSubcategory: String
+    private let originalManufacturer: String
+    private let originalModelNumber: String
+    private let originalPreferredSupplierName: String
+
     init(group: InventoryGroup, service: InventoryServing? = nil) {
         self.service = service ?? InventoryService()
         self.groupId = group.id
@@ -36,26 +45,46 @@ final class GroupEditModel: ObservableObject {
         self.preferredSupplierName = group.preferredSupplierName ?? ""
         self.isOem = group.isOemBool
         self.isRefurbished = group.isRefurbishedBool
+        self.originalSku = group.sku ?? ""
+        self.originalSubcategory = group.subcategory ?? ""
+        self.originalManufacturer = group.manufacturer ?? ""
+        self.originalModelNumber = group.modelNumber ?? ""
+        self.originalPreferredSupplierName = group.preferredSupplierName ?? ""
+    }
+
+    /// Empty text -> "" if the field was previously populated (an explicit clear
+    /// the backend will honour), or nil if it was never set (nothing to clear).
+    private static func clearableValue(original: String, current: String) -> String? {
+        if !current.isEmpty { return current }
+        if !original.isEmpty { return "" }
+        return nil
+    }
+
+    /// Pure request builder — split out from `submit()` so it can be unit tested
+    /// without going through the async service call.
+    func buildRequest() -> GroupFormRequest {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        return GroupFormRequest(
+            name: trimmed,
+            category: category.isEmpty ? "General" : category,   // backend requires non-empty category
+            sku: Self.clearableValue(original: originalSku, current: sku),
+            subcategory: Self.clearableValue(original: originalSubcategory, current: subcategory),
+            manufacturer: Self.clearableValue(original: originalManufacturer, current: manufacturer),
+            modelNumber: Self.clearableValue(original: originalModelNumber, current: modelNumber),
+            reorderLevel: Int(reorderLevel),
+            reorderQuantity: Int(reorderQuantity),
+            defaultCost: Double(defaultCost),
+            defaultSellPrice: Double(defaultSellPrice),
+            preferredSupplierName: Self.clearableValue(original: originalPreferredSupplierName, current: preferredSupplierName),
+            isOem: isOem ? 1 : 0,
+            isRefurbished: isRefurbished ? 1 : 0)
     }
 
     func submit() async -> Bool {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { errorMessage = "Name is required"; return false }
         isSubmitting = true; defer { isSubmitting = false }; errorMessage = nil
-        let body = GroupFormRequest(
-            name: trimmed,
-            category: category.isEmpty ? "General" : category,   // backend requires non-empty category
-            sku: sku.isEmpty ? nil : sku,
-            subcategory: subcategory.isEmpty ? nil : subcategory,
-            manufacturer: manufacturer.isEmpty ? nil : manufacturer,
-            modelNumber: modelNumber.isEmpty ? nil : modelNumber,
-            reorderLevel: Int(reorderLevel),
-            reorderQuantity: Int(reorderQuantity),
-            defaultCost: Double(defaultCost),
-            defaultSellPrice: Double(defaultSellPrice),
-            preferredSupplierName: preferredSupplierName.isEmpty ? nil : preferredSupplierName,
-            isOem: isOem ? 1 : 0,
-            isRefurbished: isRefurbished ? 1 : 0)
+        let body = buildRequest()
         do { _ = try await service.updateGroup(id: groupId, body: body); return true }
         catch { errorMessage = error.localizedDescription; return false }
     }

@@ -62,6 +62,9 @@ struct UIColor {
     static let tertiarySystemBackground = UIColor(nsColor: .underPageBackgroundColor)
     static let tertiarySystemFill = UIColor(nsColor: .quaternaryLabelColor)
     static let systemGroupedBackground = UIColor(nsColor: .windowBackgroundColor)
+    static let systemBackground = UIColor(nsColor: .windowBackgroundColor)
+    static let systemGray3 = UIColor(nsColor: .systemGray)
+    static let systemGray5 = UIColor(nsColor: .separatorColor)
 }
 
 extension Color {

@@ -60,6 +60,16 @@ struct DeployExternalRequest: Encodable {
     var externalReference: String? = nil
     var notes: String? = nil
     var deploymentDate: String? = nil
+
+    /// Formats a `Date` as the "yyyy-MM-dd" string the API expects for `deploymentDate`.
+    /// Shared by the single-asset and bulk deploy-external flows so both encode identically.
+    static func isoDateString(from date: Date) -> String {
+        let df = DateFormatter()
+        df.calendar = Calendar(identifier: .iso8601)
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "yyyy-MM-dd"
+        return df.string(from: date)
+    }
 }
 
 /// POST /api/assets/:id/return-external
@@ -117,5 +127,6 @@ struct AllocateDevice: Decodable, Equatable, Sendable {
 /// POST /api/assets/:id/deploy-external — this shape sits UNDER `data`.
 struct DeployExternalData: Decodable, Equatable, Sendable {
     let asset: Asset
+    // contract mirror; decoded for API fidelity, not yet rendered
     let deployment: ExternalDeploymentRecord   // reused from Phase 1 (Core/Models/Inventory.swift)
 }

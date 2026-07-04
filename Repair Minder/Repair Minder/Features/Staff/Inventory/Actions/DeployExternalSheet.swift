@@ -39,15 +39,11 @@ struct DeployExternalSheet: View {
     }
 
     private func submit() async {
-        let df = DateFormatter()
-        df.calendar = Calendar(identifier: .iso8601)
-        df.locale = Locale(identifier: "en_US_POSIX")
-        df.dateFormat = "yyyy-MM-dd"
         await viewModel.deployExternal(DeployExternalRequest(
             customerName: customerName.isEmpty ? nil : customerName,
             externalReference: externalReference.isEmpty ? nil : externalReference,
             notes: notes.isEmpty ? nil : notes,
-            deploymentDate: df.string(from: deploymentDate)))
+            deploymentDate: DeployExternalRequest.isoDateString(from: deploymentDate)))
         if viewModel.actionError == nil { dismiss() }
     }
 }

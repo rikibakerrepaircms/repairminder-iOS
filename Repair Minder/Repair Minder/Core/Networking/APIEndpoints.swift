@@ -162,6 +162,10 @@ enum APIEndpoint {
     // MARK: - Product Types
 
     case productTypes(search: String)
+    /// Product-type search scoped for the asset filter picker (inventory-kind aware).
+    /// Unlike `.productTypes`, this does NOT restrict `product_kind` — assets commonly
+    /// reference `inventory_item`-kind product types via `product_type_id`.
+    case assetFilterProductTypes(search: String?)
     case productComponents(productTypeId: String)
     case quickCreateProductType
 
@@ -241,6 +245,7 @@ enum APIEndpoint {
     case supplierOrder(id: String)
     case createSupplierOrder
     case updateSupplierOrder(id: String)
+    case deleteSupplierOrder(id: String)
     case addSupplierOrderLine(orderId: String)
     case updateSupplierOrderLine(orderId: String, lineId: String)
     case deleteSupplierOrderLine(orderId: String, lineId: String)
@@ -487,7 +492,7 @@ enum APIEndpoint {
             return "/api/macro-executions/\(id)/resume"
 
         // Product Types
-        case .productTypes:
+        case .productTypes, .assetFilterProductTypes:
             return "/api/product-types"
         case .productComponents(let productTypeId):
             return "/api/product-types/\(productTypeId)/components"
@@ -581,6 +586,7 @@ enum APIEndpoint {
         case .supplierOrder(let id): return "/api/supplier-orders/\(id)"
         case .createSupplierOrder: return "/api/supplier-orders"
         case .updateSupplierOrder(let id): return "/api/supplier-orders/\(id)"
+        case .deleteSupplierOrder(let id): return "/api/supplier-orders/\(id)"
         case .addSupplierOrderLine(let orderId): return "/api/supplier-orders/\(orderId)/lines"
         case .updateSupplierOrderLine(let orderId, let lineId): return "/api/supplier-orders/\(orderId)/lines/\(lineId)"
         case .deleteSupplierOrderLine(let orderId, let lineId): return "/api/supplier-orders/\(orderId)/lines/\(lineId)"
@@ -656,7 +662,7 @@ enum APIEndpoint {
              .tickets, .ticket, .ticketMacroExecutions,
              .ticketGenerateResponseStatus, .ticketRewriteResponseStatus,
              .macros, .macro, .macroExecutions, .macroExecution,
-             .productTypes, .productComponents,
+             .productTypes, .assetFilterProductTypes, .productComponents,
              .locations, .locationSubLocations, .deviceSearch, .deviceTypes, .companyPublicInfo, .aiReadiness,
              .pushPreferences,
              .posIntegrations, .posTerminals, .pollTerminalPayment, .paymentLinks,
@@ -725,7 +731,7 @@ enum APIEndpoint {
              .cancelMacroExecution,
              .boardDeleteColumn, .boardDeleteAction,
              .deleteDeviceImage, .deleteAsset, .removeMembership,
-             .deleteSupplierOrderLine, .deleteSalvageItem:
+             .deleteSupplierOrderLine, .deleteSalvageItem, .deleteSupplierOrder:
             return .delete
         }
     }
@@ -867,6 +873,15 @@ enum APIEndpoint {
                 URLQueryItem(name: "is_active", value: "true"),
                 URLQueryItem(name: "product_kind", value: "product,service")
             ]
+
+        case .assetFilterProductTypes(let search):
+            var items: [URLQueryItem] = []
+            if let search = search, !search.isEmpty {
+                items.append(URLQueryItem(name: "search", value: search))
+            }
+            items.append(URLQueryItem(name: "is_active", value: "true"))
+            items.append(URLQueryItem(name: "limit", value: "50"))
+            return items
 
         case .posTerminals(let locationId):
             if let locationId {

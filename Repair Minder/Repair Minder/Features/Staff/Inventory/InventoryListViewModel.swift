@@ -9,6 +9,9 @@ final class InventoryListViewModel: ObservableObject {
     @Published private(set) var isLoadingMore = false
     @Published private(set) var hasMore = false
     @Published private(set) var error: String?
+    /// Total matching-result count from the last first-page load's `meta.total`
+    /// (nil until a load completes; not updated by `loadMore()` — see NTH-10b).
+    @Published private(set) var total: Int?
 
     // Filter state (bound to UI)
     @Published var searchText = ""
@@ -28,6 +31,14 @@ final class InventoryListViewModel: ObservableObject {
     private var searchTask: Task<Void, Never>?
     /// A filter/search change arrived while a load was in flight — reload once it finishes.
     private var pendingReload = false
+    /// Bumped every time a first-page reload (`loadAssets()`, which `refresh()` now routes
+    /// through) starts. `loadMore()` snapshots this before its fetch and compares it after —
+    /// if a reload happened in between (even one that finished quickly, so `isLoading` is
+    /// already back to `false` by the time the stale page lands), the page is discarded. This
+    /// closes the case the plain `isLoading` check on its own can't: `refresh()` starting and
+    /// finishing entirely while a `loadMore()` page-2 fetch for the SAME (unchanged) query is
+    /// still in flight.
+    private var loadGeneration = 0
 
     init(service: InventoryServing? = nil, pageSize: Int = 24) {
         self.service = service ?? InventoryService()
@@ -60,10 +71,12 @@ final class InventoryListViewModel: ObservableObject {
         repeat {
             pendingReload = false
             isLoading = true; error = nil; currentPage = 1
+            loadGeneration += 1
             do {
-                let page = try await service.fetchAssets(page: 1, pageSize: pageSize, filters: query)
-                assets = page
-                hasMore = page.count == pageSize
+                let result = try await service.fetchAssetsWithTotal(page: 1, pageSize: pageSize, filters: query)
+                assets = result.items
+                total = result.total
+                hasMore = result.items.count == pageSize
             } catch {
                 self.error = error.localizedDescription
             }
@@ -76,15 +89,26 @@ final class InventoryListViewModel: ObservableObject {
         await loadMore()
     }
 
+    /// A snapshot of the query fields sent with a request — used to detect whether the
+    /// filters/search changed underneath an in-flight `loadMore()` before its result lands.
+    private func currentQuerySnapshot() -> AssetQuery { query }
+
     func loadMore() async {
-        guard hasMore, !isLoadingMore else { return }
+        // Coalesce against reloads: don't start a page fetch while a reload is in flight, and
+        // don't append a page whose query snapshot no longer matches — a filter/search change
+        // that fired loadAssets() mid-flight already reset the list; that reload's result wins.
+        guard hasMore, !isLoadingMore, !isLoading else { return }
+        let snapshot = currentQuerySnapshot()
+        let generation = loadGeneration
         isLoadingMore = true
         do {
             let next = currentPage + 1
-            let page = try await service.fetchAssets(page: next, pageSize: pageSize, filters: query)
-            assets.append(contentsOf: page)
-            currentPage = next
-            hasMore = page.count == pageSize
+            let page = try await service.fetchAssets(page: next, pageSize: pageSize, filters: snapshot)
+            if !isLoading && generation == loadGeneration && snapshot == currentQuerySnapshot() {
+                assets.append(contentsOf: page)
+                currentPage = next
+                hasMore = page.count == pageSize
+            }
         } catch {
             #if DEBUG
             print("[InventoryList] pagination error: \(error)")
@@ -93,16 +117,12 @@ final class InventoryListViewModel: ObservableObject {
         isLoadingMore = false
     }
 
+    /// Pull-to-refresh. Routed through `loadAssets()` (rather than duplicating its fetch
+    /// logic) so it participates in the same coalescing (`pendingReload`) and load-generation
+    /// bookkeeping — a `loadMore()` in flight for the same query when a refresh lands must not
+    /// append its stale page onto the freshly-reloaded list (see `loadGeneration`).
     func refresh() async {
-        currentPage = 1
-        do {
-            let page = try await service.fetchAssets(page: 1, pageSize: pageSize, filters: query)
-            assets = page
-            hasMore = page.count == pageSize
-            error = nil
-        } catch {
-            self.error = error.localizedDescription
-        }
+        await loadAssets()
     }
 
     // MARK: Filtering

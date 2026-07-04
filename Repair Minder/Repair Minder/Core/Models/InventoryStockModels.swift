@@ -57,17 +57,21 @@ struct HierarchyAsset: Decodable, Equatable, Sendable, Identifiable {
     let assetTag: String
     let name: String
     var status: AssetStatus
+    // contract mirror; decoded for API fidelity, not yet rendered
     var locationName: String?
 }
 
 // MARK: - Low stock (GET /api/assets/low-stock)
 
 struct LowStockResponse: Decodable, Equatable, Sendable {
+    // contract mirror; decoded for API fidelity, not yet rendered — the UI renders the
+    // flat `all` array + `summary` counts instead of these pre-split buckets.
     var alerts: LowStockBuckets
     var all: [LowStockAlert]
     var summary: LowStockSummary
 }
 
+// contract mirror; decoded for API fidelity, not yet rendered
 struct LowStockBuckets: Decodable, Equatable, Sendable {
     var parts: [LowStockAlert]
     var masters: [LowStockAlert]
