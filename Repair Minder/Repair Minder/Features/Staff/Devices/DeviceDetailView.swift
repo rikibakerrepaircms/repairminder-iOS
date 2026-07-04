@@ -680,7 +680,7 @@ struct DeviceDetailView: View {
             // Ready for collection — only from repaired_ready (not rejection_ready)
             if device.deviceStatus == .repairedReady {
                 Button {
-                    Task { _ = await viewModel.markReadyForCollection() }
+                    Task { if let err = await viewModel.markReadyForCollection() { viewModel.error = err } }
                 } label: {
                     HStack {
                         Text("Ready for collection")

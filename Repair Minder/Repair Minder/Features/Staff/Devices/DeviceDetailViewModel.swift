@@ -412,6 +412,7 @@ final class DeviceDetailViewModel {
     /// failure (e.g. wrong status, missing signature/typed name).
     func collectDevice(_ req: DeviceCollectRequest) async -> String? {
         isUpdating = true
+        error = nil
         defer { isUpdating = false }
 
         do {
@@ -435,6 +436,7 @@ final class DeviceDetailViewModel {
     /// error message on failure.
     func despatchDevice(_ req: DespatchOrderRequest) async -> String? {
         isUpdating = true
+        error = nil
         defer { isUpdating = false }
 
         do {
@@ -457,6 +459,7 @@ final class DeviceDetailViewModel {
     /// is refreshed), or a human-readable error message on failure.
     func markReadyForCollection() async -> String? {
         isUpdating = true
+        error = nil
         defer { isUpdating = false }
 
         do {
@@ -479,6 +482,7 @@ final class DeviceDetailViewModel {
     /// (device is refreshed), or a human-readable error message on failure.
     func addAccessory(_ req: AddAccessoryRequest) async -> String? {
         isUpdating = true
+        error = nil
         defer { isUpdating = false }
 
         do {
