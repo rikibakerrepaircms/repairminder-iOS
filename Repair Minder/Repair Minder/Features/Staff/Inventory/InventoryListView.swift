@@ -351,6 +351,9 @@ private struct AssetRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(asset.assetTag).font(.subheadline.weight(.semibold).monospaced())
+                if let grade = asset.conditionGrade, !grade.isEmpty {
+                    ConditionGradeBadge(grade: grade)
+                }
                 Spacer()
                 AssetStatusBadge(status: asset.status)
             }
@@ -358,6 +361,16 @@ private struct AssetRow: View {
             HStack(spacing: 8) {
                 if let cat = asset.category { Text(cat).font(.caption).foregroundStyle(.secondary) }
                 if let loc = asset.locationDisplay { Label(loc, systemImage: "mappin.and.ellipse").font(.caption).foregroundStyle(.secondary) }
+            }
+            if asset.serialNumber != nil || asset.sku != nil {
+                HStack(spacing: 8) {
+                    if let serial = asset.serialNumber, !serial.isEmpty {
+                        Text("SN: \(serial)").font(.caption2.monospaced()).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    if let sku = asset.sku, !sku.isEmpty {
+                        Text("SKU: \(sku)").font(.caption2.monospaced()).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                }
             }
             if asset.status == .allocated || asset.status == .deployed,
                asset.checkedOutOrderNumber != nil || asset.checkedOutDeviceName != nil {
