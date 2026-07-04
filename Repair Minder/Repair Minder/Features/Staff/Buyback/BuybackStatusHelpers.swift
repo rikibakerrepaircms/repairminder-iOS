@@ -45,3 +45,25 @@ struct BuybackStatusBadge: View {
             .clipShape(Capsule())
     }
 }
+
+// MARK: - Status Transitions
+
+/// Valid next statuses for a manual "change status" action. `sold` is never
+/// offered here — that transition only happens via the Sell flow. `sold` and
+/// `salvaged` are terminal (no further manual transitions).
+func nextBuybackStatuses(for status: BuybackStatus) -> [BuybackStatus] {
+    switch status {
+    case .purchased:
+        return [.awaitingParts, .readyToRepair, .forSale]
+    case .awaitingParts:
+        return [.readyToRepair]
+    case .readyToRepair:
+        return [.refurbishing, .forSale]
+    case .refurbishing:
+        return [.forSale, .awaitingParts, .readyToRepair]
+    case .forSale:
+        return [.salvaged, .refurbishing, .readyToRepair]
+    case .sold, .salvaged, .unknown:
+        return []
+    }
+}
