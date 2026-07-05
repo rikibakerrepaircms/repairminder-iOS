@@ -803,6 +803,9 @@ private struct WorkflowExecutionSheet: View {
     @State private var previewContent = ""
     @State private var previewLoading = false
     @State private var previewError: String?
+    @State private var previewSourcedByAi = false
+    @State private var suggestNote: String?
+    @State private var isAutoDetecting = false
 
     /// Variables that require user input when executing (matches web app PER_USE_VARIABLES)
     private static let perUseVariables = ["device_type", "repair_type", "price", "reply"]
@@ -834,6 +837,11 @@ private struct WorkflowExecutionSheet: View {
         return Self.perUseVariables.filter { allContent.contains("{{\($0)}}") }
     }
 
+    /// True when the macro uses any quote variable — gates the Auto-detect UI.
+    private var hasQuoteVars: Bool {
+        usedPerUseVariables.contains { $0 == "device_type" || $0 == "repair_type" || $0 == "price" }
+    }
+
     private func label(for variable: String) -> String {
         Self.variableLabels[variable] ?? variable.replacingOccurrences(of: "_", with: " ").capitalized
     }
@@ -855,6 +863,34 @@ private struct WorkflowExecutionSheet: View {
                 previewError = viewModel.error ?? "Failed to load preview"
             }
             previewLoading = false
+        }
+    }
+
+    private func runAutoDetect() {
+        isAutoDetecting = true
+        suggestNote = nil
+        Task {
+            defer { isAutoDetecting = false }
+            guard let result = await viewModel.suggestQuote(for: macro) else {
+                suggestNote = viewModel.error ?? "Auto-detect failed — fill in manually."
+                return
+            }
+            switch resolveQuoteAutoDetect(result, isEmailMacro: macro.isEmailMacro) {
+            case let .composed(subject, body, note):
+                previewSubject = subject
+                previewContent = body
+                previewSourcedByAi = true       // set BEFORE step change so onChange skips fetch
+                suggestNote = note
+                withAnimation { step = .preview }
+            case let .filled(values, note):
+                for (key, value) in values {
+                    variableValues[key] = value
+                    validationErrors.remove(key)
+                }
+                suggestNote = note
+            case let .manual(note):
+                suggestNote = note
+            }
         }
     }
 
@@ -901,6 +937,7 @@ private struct WorkflowExecutionSheet: View {
                                 validationErrors = Set(missing)
                                 return
                             }
+                            previewSourcedByAi = false
                             withAnimation { step = .preview }
                         } label: {
                             HStack(spacing: 4) {
@@ -925,7 +962,7 @@ private struct WorkflowExecutionSheet: View {
                 }
             }
             .onChange(of: step) { _, newStep in
-                if newStep == .preview && macro.isEmailMacro {
+                if newStep == .preview && macro.isEmailMacro && !previewSourcedByAi {
                     fetchPreview()
                 }
             }
@@ -972,6 +1009,36 @@ private struct WorkflowExecutionSheet: View {
                             .foregroundStyle(.secondary)
                         Text(macro.replyBehaviorDescription)
                             .font(.subheadline)
+                    }
+                }
+            }
+
+            // Quick Quote auto-detect
+            if hasQuoteVars {
+                Section {
+                    Button {
+                        runAutoDetect()
+                    } label: {
+                        HStack(spacing: 8) {
+                            if isAutoDetecting {
+                                ProgressView()
+                                Text("Matching catalog…")
+                            } else {
+                                Image(systemName: "sparkles")
+                                Text("Auto-detect from ticket")
+                            }
+                        }
+                    }
+                    .disabled(isAutoDetecting)
+
+                    Text("Match this enquiry against your service catalog and pre-fill device, repair and price. You can still edit.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    if let note = suggestNote {
+                        Text(note)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
