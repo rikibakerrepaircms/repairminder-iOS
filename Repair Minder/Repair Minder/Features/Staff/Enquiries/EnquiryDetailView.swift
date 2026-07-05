@@ -946,6 +946,7 @@ private struct WorkflowExecutionSheet: View {
                             }
                         }
                         .fontWeight(.semibold)
+                        .disabled(isAutoDetecting)
                     } else {
                         Button("Add Note") {
                             let missing = usedPerUseVariables.filter { (variableValues[$0] ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
@@ -958,6 +959,7 @@ private struct WorkflowExecutionSheet: View {
                             dismiss()
                         }
                         .fontWeight(.semibold)
+                        .disabled(isAutoDetecting)
                     }
                 }
             }
