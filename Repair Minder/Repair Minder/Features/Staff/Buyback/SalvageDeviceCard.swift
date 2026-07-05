@@ -63,15 +63,20 @@ struct SalvageDeviceCard: View {
                         }.font(.caption)
                     }
                 }
-                ForEach(viewModel.groups) { g in
-                    Button {
-                        viewModel.selectedGroup = g
-                        viewModel.groupQuery = g.name
-                    } label: {
-                        HStack {
-                            Text(g.name)
-                            Spacer()
-                            if viewModel.selectedGroup?.id == g.id { Image(systemName: "checkmark") }
+                // Only show matches once the user is actively searching (and hasn't
+                // picked one yet) — otherwise the field dumps every inventory group.
+                if viewModel.selectedGroup == nil,
+                   !viewModel.groupQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    ForEach(viewModel.groups) { g in
+                        Button {
+                            viewModel.selectedGroup = g
+                            viewModel.groupQuery = g.name
+                        } label: {
+                            HStack {
+                                Text(g.name)
+                                Spacer()
+                                if viewModel.selectedGroup?.id == g.id { Image(systemName: "checkmark") }
+                            }
                         }
                     }
                 }

@@ -18,6 +18,7 @@ struct BuybackDetailView: View {
     @State private var pendingDeleteRefurbItem: RefurbishmentItem?
     @State private var showListingEdit = false
     @State private var showImageManager = false
+    @State private var navigateOrderId: String?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var isRegularWidth: Bool {
@@ -43,6 +44,7 @@ struct BuybackDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .task { await viewModel.loadDetail() }
+        .navigationDestination(item: $navigateOrderId) { OrderDetailView(orderId: $0) }
         .onDisappear { viewModel.cancelListingGeneration() }
         .sheet(isPresented: $showPurchaseEdit) {
             if let buyback = viewModel.buyback {
@@ -443,6 +445,28 @@ struct BuybackDetailView: View {
         .font(.subheadline)
     }
 
+    /// A detail row that navigates to the linked order's detail page (web parity: the
+    /// purchase/sale order reference links to the order).
+    private func orderLinkRow(_ label: String, value: String, orderId: String) -> some View {
+        Button { navigateOrderId = orderId } label: {
+            HStack {
+                Text(label)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 80, alignment: .leading)
+                HStack(spacing: 4) {
+                    Text(value)
+                    Image(systemName: "chevron.right").font(.caption2)
+                }
+                .foregroundStyle(.blue)
+                Spacer()
+            }
+            .font(.subheadline)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("buyback-order-link-\(label.lowercased())")
+    }
+
     private func checkRow(_ label: String, status: String?, goodValues: [String]) -> some View {
         HStack {
             Text(label)
@@ -492,7 +516,13 @@ struct BuybackDetailView: View {
                 if let method = buyback.purchasePaymentMethod {
                     detailRow("Payment", value: method.replacingOccurrences(of: "_", with: " ").capitalized)
                 }
-                if let ref = buyback.purchaseOrderReference, !ref.isEmpty {
+                if let orderId = buyback.purchaseOrderId, !orderId.isEmpty {
+                    let trimmedRef = buyback.purchaseOrderReference?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let ref = (trimmedRef?.isEmpty == false ? trimmedRef : nil)
+                        ?? buyback.purchaseOrderNumber.map { "#\($0)" }
+                        ?? "View order"
+                    orderLinkRow("Reference", value: ref, orderId: orderId)
+                } else if let ref = buyback.purchaseOrderReference, !ref.isEmpty {
                     detailRow("Reference", value: ref)
                 }
                 if let notes = buyback.purchaseNotes, !notes.isEmpty {
@@ -520,6 +550,13 @@ struct BuybackDetailView: View {
                 }
                 if let fee = buyback.formattedPlatformFee {
                     detailRow("Platform Fee", value: fee)
+                }
+                if let orderId = buyback.linkedOrderId, !orderId.isEmpty {
+                    let trimmedRef = buyback.saleOrderReference?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let ref = (trimmedRef?.isEmpty == false ? trimmedRef : nil) ?? "View order"
+                    orderLinkRow("Order", value: ref, orderId: orderId)
+                } else if let ref = buyback.saleOrderReference, !ref.isEmpty {
+                    detailRow("Order", value: ref)
                 }
             }
         }
