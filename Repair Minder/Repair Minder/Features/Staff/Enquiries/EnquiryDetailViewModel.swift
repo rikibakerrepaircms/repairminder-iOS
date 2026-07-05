@@ -21,6 +21,7 @@ final class EnquiryDetailViewModel: ObservableObject {
     @Published private(set) var isSending = false
     @Published private(set) var isGeneratingAI = false
     @Published private(set) var isRewritingAI = false
+    @Published private(set) var isSuggestingQuote = false
     @Published private(set) var hasRewrittenAI = false
     /// Per-feature AI readiness. `nil` while loading/unknown — gating stays off
     /// until we have a definitive answer (the backend still fails safely).
@@ -326,6 +327,54 @@ final class EnquiryDetailViewModel: ObservableObject {
             }
         }
         throw APIError.serverError(message: "AI generation timed out", code: nil)
+    }
+
+    /// Quick Quote auto-detect: match the enquiry against the company's service
+    /// catalog via the async suggest-quote job. Returns nil (and sets `error`)
+    /// on failure so the caller can fall back to manual entry.
+    func suggestQuote(for macro: Macro) async -> QuoteSuggestionResult? {
+        guard !isSuggestingQuote else { return nil }
+        isSuggestingQuote = true
+        error = nil
+        defer { isSuggestingQuote = false }
+
+        do {
+            let request = SuggestQuoteRequest(macroId: macro.id)
+            let start: SuggestQuoteJobStatus = try await APIClient.shared.request(
+                .ticketSuggestQuote(id: ticketId), body: request
+            )
+            // The job may already be done on POST (cached); otherwise poll.
+            if start.status == "done", let result = start.result {
+                return result
+            }
+            return try await pollSuggestQuoteJob(.ticketSuggestQuoteStatus(id: ticketId))
+        } catch let apiError as APIError {
+            error = friendlyAIError(apiError)
+            return nil
+        } catch {
+            self.error = error.localizedDescription
+            return nil
+        }
+    }
+
+    /// Poll the suggest-quote job until done. Longer budget than pollAIJob — the
+    /// catalog-match engine (reasoning-high) can run up to ~180s server-side.
+    private func pollSuggestQuoteJob(_ endpoint: APIEndpoint) async throws -> QuoteSuggestionResult {
+        let maxAttempts = 120           // ~240s
+        for attempt in 0..<maxAttempts {
+            try await Task.sleep(for: .milliseconds(attempt == 0 ? 1500 : 2000))
+            let status: SuggestQuoteJobStatus = try await APIClient.shared.request(endpoint)
+            switch status.status {
+            case "done":
+                if let result = status.result { return result }
+                throw APIError.serverError(message: "Suggest-quote finished without a result", code: nil)
+            case "error":
+                throw APIError.serverError(message: "Auto-detect failed", code: nil)
+            default:
+                continue                // idle / running
+            }
+        }
+        throw APIError.serverError(message: "Auto-detect timed out", code: nil)
     }
 
     /// Map an AI-endpoint error to a friendly, non-scary message when it's the
