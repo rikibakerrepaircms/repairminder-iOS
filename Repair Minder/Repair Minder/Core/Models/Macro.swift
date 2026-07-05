@@ -250,3 +250,49 @@ enum MacroCategory: String, CaseIterable, Sendable {
         }
     }
 }
+
+// MARK: - Quick Quote auto-detect (AI suggest-quote job)
+
+/// Request body for POST /api/tickets/:id/macro/suggest-quote
+struct SuggestQuoteRequest: Encodable {
+    let macroId: String   // encoded as macro_id
+}
+
+/// One catalog match returned alongside a suggestion.
+struct QuoteMatch: Decodable, Sendable, Equatable {
+    let sku: String?
+    let name: String?
+    let price: String?
+}
+
+/// A single-option field suggestion for the quote macro variables.
+struct QuoteSuggestion: Decodable, Sendable, Equatable {
+    let deviceType: String?
+    let repairType: String?
+    let price: String?
+    let productName: String?
+    let sku: String?
+    let confidence: String?
+}
+
+/// A fully composed quote email (used when the catalog has multiple tiers).
+struct ComposedEmail: Decodable, Sendable, Equatable {
+    let subject: String
+    let body: String
+}
+
+/// The `result` payload of a finished suggest-quote job.
+struct QuoteSuggestionResult: Decodable, Sendable, Equatable {
+    let suggestion: QuoteSuggestion?
+    let composedEmail: ComposedEmail?
+    let matches: [QuoteMatch]?
+    let reason: String?
+}
+
+/// Start/poll response for the suggest-quote job (the unwrapped `data`).
+/// Reused for both the POST start (result nil, status "running") and the GET
+/// poll (status "done" carries the result).
+struct SuggestQuoteJobStatus: Decodable, Sendable {
+    let status: String            // idle | running | done | error
+    let result: QuoteSuggestionResult?
+}
