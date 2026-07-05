@@ -158,6 +158,8 @@ enum APIEndpoint {
     case ticketMacroExecutions(id: String)
     case ticketExecuteMacro(id: String)
     case ticketPreviewMacro(id: String)
+    case ticketSuggestQuote(id: String)
+    case ticketSuggestQuoteStatus(id: String)
     case ticketResolve(id: String)
     case ticketReassign(id: String)
     case createEnquiry
@@ -567,6 +569,10 @@ enum APIEndpoint {
             return "/api/tickets/\(id)/macro"
         case .ticketPreviewMacro(let id):
             return "/api/tickets/\(id)/macro/preview"
+        case .ticketSuggestQuote(let id):
+            return "/api/tickets/\(id)/macro/suggest-quote"
+        case .ticketSuggestQuoteStatus(let id):
+            return "/api/tickets/\(id)/macro/suggest-quote"
         case .ticketResolve(let id):
             return "/api/tickets/\(id)/resolve"
         case .ticketReassign(let id):
@@ -803,7 +809,7 @@ enum APIEndpoint {
              .orders, .order, .orderItems, .orderPayments, .orderSignatures, .orderRefunds, .orderDocument,
              .clients, .client, .clientSearch, .clientsExport, .clientGroupsForClient,
              .tickets, .ticket, .ticketMacroExecutions,
-             .ticketGenerateResponseStatus, .ticketRewriteResponseStatus,
+             .ticketGenerateResponseStatus, .ticketRewriteResponseStatus, .ticketSuggestQuoteStatus,
              .macros, .macro, .macroExecutions, .macroExecution,
              .productTypes, .assetFilterProductTypes, .productComponents, .productTypeBySku,
              .kioskProductList, .kioskProductCategories, .productTypeImage,
@@ -835,7 +841,7 @@ enum APIEndpoint {
              .sendQuote, .authorizeOrder, .despatchOrder, .collectOrder,
              .createOrderRefund, .createTicketNote, .recreateOrder,
              .createClient, .clientsImport,
-             .createTicket, .ticketReply, .ticketNote, .ticketGenerateResponse, .ticketRewriteResponse, .ticketExecuteMacro, .ticketPreviewMacro,
+             .createTicket, .ticketReply, .ticketNote, .ticketGenerateResponse, .ticketRewriteResponse, .ticketExecuteMacro, .ticketPreviewMacro, .ticketSuggestQuote,
              .ticketResolve, .ticketReassign, .createEnquiry,
              .registerDeviceToken, .customerRegisterDeviceToken,
              .initiateTerminalPayment, .cancelTerminalPayment, .refundTerminalPayment,
