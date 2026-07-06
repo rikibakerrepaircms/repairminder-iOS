@@ -341,6 +341,9 @@ enum APIEndpoint {
     case customerOrderReply(orderId: String)
     case customerOrderInvoice(orderId: String)
     case customerDeviceImage(deviceId: String, imageId: String)
+    case customerCompetitionEntries
+    case customerMarketingPreferences
+    case customerRequestWithdrawal(campaignId: String)
 
     // MARK: - Diagnostics
 
@@ -790,6 +793,12 @@ enum APIEndpoint {
             return "/api/customer/orders/\(orderId)/invoice"
         case .customerDeviceImage(let deviceId, let imageId):
             return "/api/customer/devices/\(deviceId)/images/\(imageId)/file"
+        case .customerCompetitionEntries:
+            return "/api/customer/marketing/entries"
+        case .customerMarketingPreferences:
+            return "/api/customer/marketing/preferences"
+        case .customerRequestWithdrawal(let campaignId):
+            return "/api/customer/marketing/entries/\(campaignId)/withdraw-request"
         }
     }
 
@@ -826,7 +835,8 @@ enum APIEndpoint {
              .assetGroup, .assetGroupAssets, .assetGroupProducts,
              .stockSummary, .assetHierarchy, .lowStock,
              .supplierOrders, .supplierOrder, .supplierMappingsSuppliers,
-             .customerOrders, .customerOrder, .customerOrderInvoice, .customerDeviceImage:
+             .customerOrders, .customerOrder, .customerOrderInvoice, .customerDeviceImage,
+             .customerCompetitionEntries, .customerMarketingPreferences:
             return .get
 
         // POST endpoints
@@ -861,7 +871,8 @@ enum APIEndpoint {
              .createKioskOrder, .staffAuthorizeDevice,
              .addRefurbishmentItem, .generateBuybackListing,
              .uploadBuybackSourceImage, .generateBuybackProductPhotos, .setBuybackImageFinal,
-             .collectDevice, .despatchDevice, .deviceReadyForCollection, .addDeviceAccessory:
+             .collectDevice, .despatchDevice, .deviceReadyForCollection, .addDeviceAccessory,
+             .customerRequestWithdrawal:
             return .post
 
         // PATCH endpoints
