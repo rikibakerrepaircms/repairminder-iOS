@@ -85,6 +85,12 @@ struct CustomerCompetitionEntriesView: View {
                         .foregroundStyle(.green)
                 }
 
+                if entry.entryStatus == "pending" {
+                    Text("Confirmation pending")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+
                 Button("Withdraw entry", role: .destructive) {
                     pendingWithdraw = entry
                 }

@@ -16,13 +16,14 @@ struct CustomerCompetitionEntry: Codable, Identifiable, Sendable {
     let prize: String?
     let enteredAt: Date?
     let status: String
+    let entryStatus: String?
     let isWinner: Bool
     let marketingOptIn: Bool
 
     var id: String { campaignId }
 
     enum CodingKeys: String, CodingKey {
-        case campaignId, campaignName, prize, enteredAt, status, isWinner, marketingOptIn
+        case campaignId, campaignName, prize, enteredAt, status, entryStatus, isWinner, marketingOptIn
     }
 
     init(from decoder: Decoder) throws {
@@ -32,6 +33,7 @@ struct CustomerCompetitionEntry: Codable, Identifiable, Sendable {
         prize = try c.decodeIfPresent(String.self, forKey: .prize)
         enteredAt = MarketingDate.parse(try c.decodeIfPresent(String.self, forKey: .enteredAt))
         status = try c.decodeIfPresent(String.self, forKey: .status) ?? ""
+        entryStatus = try c.decodeIfPresent(String.self, forKey: .entryStatus)
         isWinner = (try? c.decode(Bool.self, forKey: .isWinner)) ?? ((try? c.decode(Int.self, forKey: .isWinner)) == 1)
         marketingOptIn = (try? c.decode(Bool.self, forKey: .marketingOptIn)) ?? ((try? c.decode(Int.self, forKey: .marketingOptIn)) == 1)
     }
