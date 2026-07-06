@@ -298,6 +298,16 @@ struct CustomerOrderListView: View {
 
             Divider()
 
+            NavigationLink("My Competition Entries") {
+                CustomerCompetitionEntriesView()
+            }
+
+            NavigationLink("Email Preferences") {
+                CustomerMarketingPreferencesView()
+            }
+
+            Divider()
+
             Button("Switch Role") {
                 Task {
                     await appState.switchRole()
