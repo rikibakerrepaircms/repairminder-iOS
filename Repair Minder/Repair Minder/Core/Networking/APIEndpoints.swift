@@ -1234,4 +1234,22 @@ enum APIEndpoint {
             return true
         }
     }
+
+    // MARK: - Masked-proxy routing
+
+    /// Whether this endpoint is routed through the masked `api.kimrelay.com` proxy (`/w/<path>`,
+    /// leading `/api/` stripped) instead of hitting `api.repairminder.com` directly — Bridge
+    /// secrecy Layer 1 (spec 2026-07-10). Only the diagnostics session endpoints are proxy-routed
+    /// today; everything else is unaffected. The relay-edge `/w/` route + `webproxy.ts`
+    /// allow-list already cover `/api/public/diagnostics/session` and the `/api/diagnostics/*`
+    /// family (deployed — see `docs/superpowers/plans/2026-07-10-live-diagnostics-progress.md`
+    /// Task 5), so no backend change is required alongside this iOS change.
+    var isDiagnosticsProxyRouted: Bool {
+        switch self {
+        case .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete:
+            return true
+        default:
+            return false
+        }
+    }
 }

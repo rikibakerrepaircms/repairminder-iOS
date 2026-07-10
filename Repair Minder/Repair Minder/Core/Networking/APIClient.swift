@@ -33,6 +33,9 @@ final class APIClient {
     // MARK: - Configuration
 
     private let baseURL = URL(string: "https://api.repairminder.com")!
+    /// Masked-proxy host for the diagnostics session endpoints (Bridge secrecy Layer 1). Only
+    /// endpoints where `APIEndpoint.isDiagnosticsProxyRouted` is true are sent here.
+    private let diagnosticsProxyBase = URL(string: "https://api.kimrelay.com")!
     private let session: URLSession
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
@@ -509,7 +512,10 @@ final class APIClient {
     }
 
     private func buildRequest(_ endpoint: APIEndpoint, body: Encodable? = nil) throws -> URLRequest {
-        var components = URLComponents(url: baseURL.appendingPathComponent(endpoint.path), resolvingAgainstBaseURL: true)!
+        let resolvedURL: URL = endpoint.isDiagnosticsProxyRouted
+            ? DiagnosticsProxyURL.resolve(path: endpoint.path, proxyBase: diagnosticsProxyBase)
+            : baseURL.appendingPathComponent(endpoint.path)
+        var components = URLComponents(url: resolvedURL, resolvingAgainstBaseURL: true)!
         components.queryItems = endpoint.queryItems
 
         guard let url = components.url else {
@@ -684,6 +690,21 @@ final class APIClient {
         let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
 
         return "RepairMinder-iOS/\(appVersion).\(buildNumber) (iPhone; iOS \(osVersion))"
+    }
+}
+
+// MARK: - Masked-proxy URL resolution
+
+/// Pure URL construction for the masked diagnostics proxy: `/api/<x>` → `{proxyBase}/w/<x>`
+/// (leading `/api` stripped, NOT re-added). Factored out of `APIClient.buildRequest` so it's
+/// unit-testable without exercising the network stack. The relay-edge `/w/` route rebuilds the
+/// real RM path as `/api/` + everything after `/w/` (see `relay/edge/src/index.ts` /
+/// `webproxy.ts`), so sending `/w/api/...` would double the prefix and 404 at the edge — the
+/// wire form is `/w/public/diagnostics/session`, `/w/diagnostics/results`, etc.
+enum DiagnosticsProxyURL {
+    static func resolve(path: String, proxyBase: URL) -> URL {
+        let stripped = path.hasPrefix("/api") ? String(path.dropFirst("/api".count)) : path
+        return proxyBase.appendingPathComponent("w").appendingPathComponent(stripped)
     }
 }
 

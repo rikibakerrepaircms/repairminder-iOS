@@ -29,11 +29,18 @@ struct CreateSessionRequest: Codable, Sendable {
     /// Run verdict ("pass"/"partial"/"fail") computed by the runner; sent as `overall_result`.
     /// Additive — older Workers ignore it.
     let overallResult: String?
+    /// Number of checks selected for this run, known at run start; sent as `total_tests` so the
+    /// dashboard's live board can render "N of M" before any result exists. Additive/nullable —
+    /// older Workers ignore it.
+    let totalTests: Int?
+    /// ISO-8601 timestamp of when the run started (client clock); sent as `started_at`.
+    /// Additive/nullable — older Workers ignore it.
+    let startedAt: String?
 
     init(shopCode: String? = nil, pairingToken: String? = nil, platform: String = "ios",
          deviceIdentifier: String? = nil, deviceDescription: String? = nil,
          imei: String? = nil, serial: String? = nil, reportID: String? = nil,
-         overallResult: String? = nil) {
+         overallResult: String? = nil, totalTests: Int? = nil, startedAt: String? = nil) {
         self.shopCode = shopCode
         self.pairingToken = pairingToken
         self.platform = platform
@@ -43,6 +50,8 @@ struct CreateSessionRequest: Codable, Sendable {
         self.serial = serial
         self.reportID = reportID
         self.overallResult = overallResult
+        self.totalTests = totalTests
+        self.startedAt = startedAt
     }
 }
 

@@ -28,7 +28,20 @@ final class DiagnosticRunner: ObservableObject {
     /// Tests whose background pass earns a 1–2s banner during preparing, in display order.
     static let backgroundBannerIds = ["wifi", "accelerometer", "gyroscope", "bluetooth"]
 
-    init(tests: [DiagnosticTest]) { self.tests = tests }
+    /// The backend session for live (incremental) reporting, opened at run start on a
+    /// shop-paired device (see `beginLiveSessionIfPaired`). `nil` for an unpaired consumer run,
+    /// or if opening it hasn't succeeded (yet) — those cases stay on the batch `transmit` path.
+    @Published private(set) var liveSession: DiagnosticSessionResponse? = nil
+    /// Test-injected transport (unit tests only) — always wins over the default resolution.
+    private let injectedDiagnosticsAPI: DiagnosticsAPI?
+    /// In-flight fire-and-forget live-submit tasks, tracked ONLY so tests can await them
+    /// deterministically (`waitForPendingLiveSubmits`) — production call sites never read this.
+    private var pendingLiveSubmits: [Task<Void, Never>] = []
+
+    init(tests: [DiagnosticTest], diagnosticsAPI: DiagnosticsAPI? = nil) {
+        self.tests = tests
+        self.injectedDiagnosticsAPI = diagnosticsAPI
+    }
 
     // MARK: Report identity
     /// Unique reference for this run, generated lazily on first use (when the report is shared
@@ -60,6 +73,7 @@ final class DiagnosticRunner: ObservableObject {
         phase = .permissions
         _reportID = nil          // a fresh run gets a fresh report reference
         _reportDate = nil
+        liveSession = nil        // a fresh run gets a fresh live session too (new report_id)
     }
 
     // MARK: Selection
@@ -91,16 +105,98 @@ final class DiagnosticRunner: ObservableObject {
     }
 
     // MARK: Results
-    func record(_ outcome: TestOutcome) { outcomes[outcome.id] = outcome }
+    /// Records the outcome locally AND — on a shop-paired device with a live session open —
+    /// posts it to the backend immediately (live). A retest calls this again for the same id;
+    /// the local map overwrites (existing behaviour) and the live POST re-submits under the
+    /// same `test_name` (the Worker UPSERTs), so the dashboard reflects the latest attempt.
+    func record(_ outcome: TestOutcome) {
+        outcomes[outcome.id] = outcome
+        submitLive(outcome)
+    }
     func outcome(for id: String) -> TestOutcome? { outcomes[id] }
 
     /// Run all selected automatic, supported tests. Unsupported selections are dropped entirely
-    /// (capability exclusion: never run, graded, or reported).
+    /// (capability exclusion: never run, graded, or reported). Opens the live backend session
+    /// FIRST (if paired) so the dashboard sees the run as `in_progress` from the very start,
+    /// before the first result exists.
     func runAuto() async {
+        try? await beginLiveSessionIfPaired()
         for test in selectedTests where test.isSupported && !test.requiresInteraction {
             record(await test.run())
         }
         autoRan = true
+    }
+
+    // MARK: Live (incremental) reporting
+
+    /// The transport used for live reporting. A test-injected API always wins. Otherwise this
+    /// mirrors the existing UI-test-stub convention used by `SummaryView`/`TransmitView`, and —
+    /// outside of that — is suppressed entirely inside a unit-test host process (`XCTestCase`
+    /// present) so the runner's existing unit-test suite (which constructs runners directly and
+    /// never expects network I/O) can't flake by hitting production if `DiagnosticsShopPairing`
+    /// state happens to leak between tests.
+    private var liveService: DiagnosticsService? {
+        if let injectedDiagnosticsAPI { return DiagnosticsService(api: injectedDiagnosticsAPI) }
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-uiTestStubTransmit") {
+            return DiagnosticsService(api: StubDiagnosticsAPI())
+        }
+        if NSClassFromString("XCTestCase") != nil { return nil }
+        #endif
+        return DiagnosticsService()
+    }
+
+    /// Best-effort device description available at the time it's needed — the marketing name is
+    /// known instantly; the OS version only once `device_info` has actually run, so an early call
+    /// (at run start) gets just the model name and a later one (e.g. a Summary-time catch-up)
+    /// gets the fuller string. Never blocks on a test that hasn't run yet.
+    private var currentDeviceDescription: String? {
+        let os = outcomes["device_info"]?.details?["os_version"]
+        let parts = [DeviceModelName.marketingName, os].compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+
+    /// Open the live backend session, if this device is paired to a shop (token or remembered
+    /// shop code) and one isn't already open. An unpaired (consumer) run never opens one here —
+    /// we don't know which company to attribute results to until the user types a shop code at
+    /// Submit time, so that path stays on the batch `transmit` flow. Safe to call repeatedly
+    /// (fast no-op once `liveSession` is set); on success, catches up any outcomes already
+    /// recorded before the session existed. Throws on failure so callers can classify
+    /// revoked-vs-transient (`DiagnosticsTransmitOutcome`); `runAuto` swallows this (best-effort
+    /// at run start — the batch path at Submit time is the fallback).
+    @discardableResult
+    func beginLiveSessionIfPaired() async throws -> DiagnosticSessionResponse? {
+        guard let service = liveService, DiagnosticsShopPairing.isPaired else { return nil }
+        if let liveSession { return liveSession }
+        let session = try await service.begin(
+            shopCode: DiagnosticsShopPairing.shopCode, pairingToken: DiagnosticsShopPairing.token,
+            platform: "ios", imei: nil, serial: nil, deviceDescription: currentDeviceDescription,
+            reportID: reportID, totalTests: selectedTests.count,
+            startedAt: ISO8601DateFormatter().string(from: Date()))
+        liveSession = session
+        DiagnosticsShopPairing.setName(session.companyName)
+        for outcome in orderedOutcomes { submitLive(outcome) }   // catch up anything recorded before now
+        return session
+    }
+
+    /// Fire-and-forget live submit for a just-recorded outcome. No-op when there's no live
+    /// session (unpaired run, or `beginLiveSessionIfPaired` hasn't succeeded). A transient
+    /// failure here is swallowed rather than buffered — buffering would replay through
+    /// `complete` on the next flush, which must only ever fire from the operator's explicit
+    /// Submit/Finish tap; the eventual Submit sends the full outcome set again (idempotent
+    /// UPSERT) and buffers on failure exactly as before (`TransmitView.submit`).
+    private func submitLive(_ outcome: TestOutcome) {
+        guard let session = liveSession, let service = liveService else { return }
+        pendingLiveSubmits.append(Task { try? await service.submitOne(session: session, outcome: outcome) })
+    }
+
+    /// Test hook: await every live-submit task scheduled so far so assertions can be made
+    /// deterministically instead of racing the fire-and-forget `Task` in `submitLive`. Not used
+    /// by any production call site.
+    func waitForPendingLiveSubmits() async {
+        let pending = pendingLiveSubmits
+        pendingLiveSubmits.removeAll()
+        for task in pending { await task.value }
     }
 
     /// Resolve any selected interactive, supported test that can verify itself in the background.

@@ -100,6 +100,55 @@ struct DiagnosticsService: Sendable {
         return session.companyName
     }
 
+    // MARK: - Live (incremental) reporting
+    //
+    // Split of `transmit` for the live-diagnostics flow: `begin` opens the session at the START
+    // of a run (before any result exists, so the dashboard shows it `in_progress` immediately);
+    // `submitOne` posts a single check's result as it completes (or re-completes, on retest —
+    // the Worker UPSERTs by (session, test_name)); `finish` fires ONLY on the operator's explicit
+    // Submit/Finish tap. `transmit`/`flushPending` above are untouched and remain the batch path
+    // used for the offline-buffer replay and for a never-paired (consumer) run.
+
+    /// Create the backend session at the start of a run. Only meaningful once a company can be
+    /// resolved (`shopCode` or `pairingToken` set) — callers gate on `DiagnosticsShopPairing.isPaired`
+    /// before calling this; a fully-unpaired consumer run stays batch-at-end via `transmit`.
+    func begin(shopCode: String?, pairingToken: String? = nil, platform: String,
+               imei: String?, serial: String?, deviceDescription: String?,
+               reportID: String?, totalTests: Int?, startedAt: String?) async throws -> DiagnosticSessionResponse {
+        try await api.createSession(CreateSessionRequest(
+            shopCode: shopCode, pairingToken: pairingToken, platform: platform, deviceIdentifier: nil,
+            deviceDescription: deviceDescription, imei: imei, serial: serial, reportID: reportID,
+            overallResult: nil, totalTests: totalTests, startedAt: startedAt))
+    }
+
+    /// Submit one completed check's result against a session already opened with `begin`.
+    func submitOne(session: DiagnosticSessionResponse, outcome: TestOutcome) async throws {
+        try await api.submitResult(DiagnosticResultPayload(
+            sessionId: session.sessionId, token: session.sessionToken,
+            testName: outcome.id, status: outcome.status, details: outcome.details))
+    }
+
+    /// Finalise a live session on explicit Submit/Finish. `/complete` has no field for the final
+    /// verdict, so the verdict travels the same way it always has — via `createSession` — which
+    /// is idempotent by `report_id`: calling it again for the same (company, report_id) updates
+    /// `overall_result` on the existing row instead of creating a duplicate (see
+    /// `handlePublicCreateDiagnosticSession`). `outcomes` is the FULL current set (not just
+    /// deltas) so this also covers any check whose live `submitOne` failed transiently — the
+    /// Worker UPSERTs, so re-sending an already-live result is a cheap no-op.
+    @discardableResult
+    func finish(session: DiagnosticSessionResponse, shopCode: String?, pairingToken: String? = nil,
+                platform: String, reportID: String?, overallResult: String?,
+                outcomes: [TestOutcome]) async throws -> String? {
+        for o in outcomes {
+            try await submitOne(session: session, outcome: o)
+        }
+        let refreshed = try await api.createSession(CreateSessionRequest(
+            shopCode: shopCode, pairingToken: pairingToken, platform: platform, reportID: reportID,
+            overallResult: overallResult))
+        try await api.complete(sessionId: session.sessionId, token: session.sessionToken)
+        return refreshed.companyName
+    }
+
     /// Best-effort replay of any buffered (offline) sessions. Each is re-sent through `transmit`
     /// (create -> results -> complete), so a replayed session is fully completed, never stranded
     /// `in_progress`. Removes the file on success or on a hard-auth failure (revoked token = dead

@@ -142,13 +142,27 @@ struct TransmitView: View {
         let token = DiagnosticsShopPairing.token
         let code = shopCode
         let overall = runner.overallResult
+        let outcomes = runner.orderedOutcomes
+        let reportID = runner.reportID
+        let desc = deviceDescription
+        let liveSession = runner.liveSession
         Task {
             do {
-                let companyName = try await service.transmit(
-                    shopCode: codeIsValid ? code : nil, pairingToken: token, platform: "ios",
-                    imei: nil, serial: nil, deviceDescription: deviceDescription,
-                    reportID: runner.reportID, overallResult: runner.overallResult,
-                    outcomes: runner.orderedOutcomes)
+                // A live session (paired device, opened at run start) is already `in_progress`
+                // with most/all checks posted — `finish` submits anything not yet confirmed live,
+                // refreshes the final verdict, then completes. Otherwise (never paired until
+                // now, or the live session never opened) fall back to the batch path, unchanged.
+                let companyName: String?
+                if let liveSession {
+                    companyName = try await service.finish(
+                        session: liveSession, shopCode: codeIsValid ? code : nil, pairingToken: token,
+                        platform: "ios", reportID: reportID, overallResult: overall, outcomes: outcomes)
+                } else {
+                    companyName = try await service.transmit(
+                        shopCode: codeIsValid ? code : nil, pairingToken: token, platform: "ios",
+                        imei: nil, serial: nil, deviceDescription: desc,
+                        reportID: reportID, overallResult: overall, outcomes: outcomes)
+                }
                 // Persist pairing per the toggle. Only a freshly-typed valid code re-pairs by code;
                 // a token pairing is preserved (do NOT downgrade it to a shop code). If the user
                 // turned "remember" off, forget entirely.
