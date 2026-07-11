@@ -45,4 +45,20 @@ struct DiagnosticModelsTests {
         #expect(!s.contains("total_tests"))
         #expect(!s.contains("started_at"))
     }
+
+    @Test func createRequestEncodesSelectedTests() throws {
+        let req = CreateSessionRequest(shopCode: "123456", platform: "ios", reportID: "RM-1",
+                                       totalTests: 2, startedAt: "2026-07-11T09:00:00Z",
+                                       selectedTests: ["battery", "wifi"])
+        let s = String(data: try encoder().encode(req), encoding: .utf8)!
+        #expect(s.contains("\"selected_tests\":[\"battery\",\"wifi\"]"))
+    }
+
+    @Test func createRequestOmitsSelectedTestsWhenNil() throws {
+        // Additive/optional: nil selectedTests must not appear in the wire body so older
+        // batch callers stay byte-identical to before this field existed.
+        let req = CreateSessionRequest(shopCode: "123456", platform: "ios", reportID: "RM-1")
+        let s = String(data: try encoder().encode(req), encoding: .utf8)!
+        #expect(!s.contains("selected_tests"))
+    }
 }

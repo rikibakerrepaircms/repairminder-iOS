@@ -36,11 +36,16 @@ struct CreateSessionRequest: Codable, Sendable {
     /// ISO-8601 timestamp of when the run started (client clock); sent as `started_at`.
     /// Additive/nullable — older Workers ignore it.
     let startedAt: String?
+    /// Ordered list of test ids selected for this run (ids equal the `test_name` sent in results),
+    /// so the dashboard's live board can render the full checklist before any result exists.
+    /// Sent as `selected_tests` via `.convertToSnakeCase`. Additive/nullable — older Workers ignore it.
+    let selectedTests: [String]?
 
     init(shopCode: String? = nil, pairingToken: String? = nil, platform: String = "ios",
          deviceIdentifier: String? = nil, deviceDescription: String? = nil,
          imei: String? = nil, serial: String? = nil, reportID: String? = nil,
-         overallResult: String? = nil, totalTests: Int? = nil, startedAt: String? = nil) {
+         overallResult: String? = nil, totalTests: Int? = nil, startedAt: String? = nil,
+         selectedTests: [String]? = nil) {
         self.shopCode = shopCode
         self.pairingToken = pairingToken
         self.platform = platform
@@ -52,6 +57,7 @@ struct CreateSessionRequest: Codable, Sendable {
         self.overallResult = overallResult
         self.totalTests = totalTests
         self.startedAt = startedAt
+        self.selectedTests = selectedTests
     }
 }
 

@@ -136,11 +136,13 @@ struct DiagnosticsService: Sendable {
     /// before calling this; a fully-unpaired consumer run stays batch-at-end via `transmit`.
     func begin(shopCode: String?, pairingToken: String? = nil, platform: String,
                imei: String?, serial: String?, deviceDescription: String?,
-               reportID: String?, totalTests: Int?, startedAt: String?) async throws -> DiagnosticSessionResponse {
+               reportID: String?, totalTests: Int?, startedAt: String?,
+               selectedTests: [String]? = nil) async throws -> DiagnosticSessionResponse {
         try await api.createSession(CreateSessionRequest(
             shopCode: shopCode, pairingToken: pairingToken, platform: platform, deviceIdentifier: nil,
             deviceDescription: deviceDescription, imei: imei, serial: serial, reportID: reportID,
-            overallResult: nil, totalTests: totalTests, startedAt: startedAt))
+            overallResult: nil, totalTests: totalTests, startedAt: startedAt,
+            selectedTests: selectedTests))
     }
 
     /// Submit one completed check's result against a session already opened with `begin`.

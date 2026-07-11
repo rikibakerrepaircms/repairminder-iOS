@@ -179,7 +179,8 @@ final class DiagnosticRunner: ObservableObject {
             shopCode: DiagnosticsShopPairing.shopCode, pairingToken: DiagnosticsShopPairing.token,
             platform: "ios", imei: nil, serial: nil, deviceDescription: currentDeviceDescription,
             reportID: reportID, totalTests: selectedTests.count,
-            startedAt: ISO8601DateFormatter().string(from: Date()))
+            startedAt: ISO8601DateFormatter().string(from: Date()),
+            selectedTests: selectedTests.map(\.id))
         liveSession = session
         DiagnosticsShopPairing.setName(session.companyName)
         for outcome in orderedOutcomes { submitLive(outcome) }   // catch up anything recorded before now
