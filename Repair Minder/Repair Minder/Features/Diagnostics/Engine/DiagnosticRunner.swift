@@ -120,7 +120,7 @@ final class DiagnosticRunner: ObservableObject {
     /// FIRST (if paired) so the dashboard sees the run as `in_progress` from the very start,
     /// before the first result exists.
     func runAuto() async {
-        try? await beginLiveSessionIfPaired()
+        _ = try? await beginLiveSessionIfPaired()
         for test in selectedTests where test.isSupported && !test.requiresInteraction {
             record(await test.run())
         }
