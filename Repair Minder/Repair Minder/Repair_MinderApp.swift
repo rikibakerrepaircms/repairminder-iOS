@@ -31,7 +31,10 @@ struct Repair_MinderApp: App {
                         _ = DeepLinkHandler.shared.handleURL(url)
                     }
                     #if os(iOS)
-                    .task { DiagnosticsPairingFile.consumeIfPresent() }
+                    .task {
+                        DiagnosticsPairingFile.consumeIfPresent()
+                        DiagnosticsBridgeHandshake.shared.start()
+                    }
                     #endif
                     #if os(macOS)
                     .frame(minWidth: 900, minHeight: 600)
@@ -103,7 +106,13 @@ struct Repair_MinderApp: App {
             backgroundTime = Date()
             // Always lock when going to background so content is never visible on return
             passcodeService.lockApp()
+            #if os(iOS)
+            DiagnosticsBridgeHandshake.shared.stop()
+            #endif
         case .active:
+            #if os(iOS)
+            DiagnosticsBridgeHandshake.shared.start()
+            #endif
             if passcodeService.isLocked {
                 if passcodeService.timeoutMinutes == 0 {
                     // "On App Close" — always stay locked
