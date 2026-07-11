@@ -150,6 +150,11 @@ struct DiagnosticsService: Sendable {
             testName: outcome.id, status: outcome.status, details: outcome.details, resumeCapable: true))
     }
 
+    /// Reopen a session the Worker had closed on inactivity, so its results can keep streaming.
+    func resume(sessionId: String, token: String) async throws {
+        try await api.resume(sessionId: sessionId, token: token)
+    }
+
     /// Finalise a live session on explicit Submit/Finish. `/complete` has no field for the final
     /// verdict, so the verdict travels the same way it always has — via `createSession` — which
     /// is idempotent by `report_id`: calling it again for the same (company, report_id) updates
