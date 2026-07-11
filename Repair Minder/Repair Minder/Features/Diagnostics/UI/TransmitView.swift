@@ -123,7 +123,7 @@ struct TransmitView: View {
                     if phase == .sending {
                         ProgressView()
                     } else {
-                        Text("Submit")
+                        Text("Save and Sync")
                             .font(.headline)
                     }
                 }
