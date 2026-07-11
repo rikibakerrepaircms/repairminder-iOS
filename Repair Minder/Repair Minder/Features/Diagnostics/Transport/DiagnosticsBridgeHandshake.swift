@@ -88,6 +88,9 @@ final class DiagnosticsBridgeHandshake {
         defer { stop() }
         guard DiagnosticsShopPairing.token == nil else { return }
         DiagnosticsShopPairing.pairWithToken(token, name: name)
+        // Confirm recognition to the operator with a transient banner.
+        let display = (name?.isEmpty == false) ? name : DiagnosticsShopPairing.companyName
+        ShopPairingBanner.shared.show(shopName: display)
     }
 }
 #endif

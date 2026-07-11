@@ -305,6 +305,9 @@ struct RootView: View {
         .task {
             await appState.initialize()
         }
+        .overlay(alignment: .top) {
+            ShopConnectedBanner()
+        }
     }
 }
 
