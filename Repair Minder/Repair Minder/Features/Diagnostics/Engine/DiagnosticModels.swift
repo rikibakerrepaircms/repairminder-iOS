@@ -81,7 +81,7 @@ struct DiagnosticResultPayload: Codable, Sendable {
     /// Signals to the Worker that this client can honour a `409 session_closed` by prompting the
     /// operator to Resume vs Start again (rather than silently reopening). Additive; the encoder
     /// uses `.convertToSnakeCase`, so it serialises as `resume_capable`.
-    let resumeCapable: Bool
+    let resumeCapable: Bool = true
 }
 
 /// Local outcome of a single test run (UI + buffering use this).
