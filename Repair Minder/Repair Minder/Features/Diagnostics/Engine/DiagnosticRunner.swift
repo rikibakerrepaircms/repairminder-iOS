@@ -32,6 +32,13 @@ final class DiagnosticRunner: ObservableObject {
     /// shop-paired device (see `beginLiveSessionIfPaired`). `nil` for an unpaired consumer run,
     /// or if opening it hasn't succeeded (yet) — those cases stay on the batch `transmit` path.
     @Published private(set) var liveSession: DiagnosticSessionResponse? = nil
+    /// Raised when a live submit is rejected with `409 session_closed` (the run had timed out on
+    /// inactivity). Drives the Resume / Start-again prompt; cleared by `resumeLive` /
+    /// `startNewRunFromPrompt`. Default false so an ordinary run never shows the prompt.
+    @Published private(set) var resumePrompt: Bool = false
+    /// The outcome whose live submit hit `session_closed`, stashed so whichever choice the operator
+    /// makes (Resume or Start again) can re-submit it once the session is live again.
+    private var pendingClosedOutcome: TestOutcome?
     /// Test-injected transport (unit tests only) — always wins over the default resolution.
     private let injectedDiagnosticsAPI: DiagnosticsAPI?
     /// In-flight fire-and-forget live-submit tasks, tracked ONLY so tests can await them
@@ -187,7 +194,44 @@ final class DiagnosticRunner: ObservableObject {
     /// UPSERT) and buffers on failure exactly as before (`TransmitView.submit`).
     private func submitLive(_ outcome: TestOutcome) {
         guard let session = liveSession, let service = liveService else { return }
-        pendingLiveSubmits.append(Task { try? await service.submitOne(session: session, outcome: outcome) })
+        pendingLiveSubmits.append(Task { @MainActor in
+            do {
+                try await service.submitOne(session: session, outcome: outcome)
+            } catch {
+                // A `409 session_closed` means the run timed out on inactivity: stash the outcome
+                // and raise the Resume / Start-again prompt instead of silently reopening. Any other
+                // error keeps today's swallow-and-buffer-at-Submit behaviour.
+                if DiagnosticsResumeSignal.isSessionClosed(error) {
+                    self.pendingClosedOutcome = outcome
+                    self.resumePrompt = true
+                }
+            }
+        })
+    }
+
+    /// Operator dismissed the prompt without choosing (Cancel / swipe). Keeps the stashed outcome so
+    /// a later live submit or the explicit Submit tap still carries it; only lowers the prompt.
+    func dismissResumePrompt() { resumePrompt = false }
+
+    /// Operator chose "Resume diagnostics": reopen the SAME session on the Worker, then re-submit
+    /// the stashed outcome so the run continues where it left off. Clears the prompt regardless.
+    func resumeLive() async {
+        defer { resumePrompt = false }
+        guard let session = liveSession, let service = liveService else { return }
+        try? await service.resume(sessionId: session.sessionId, token: session.sessionToken)
+        if let o = pendingClosedOutcome { pendingClosedOutcome = nil; submitLive(o) }
+    }
+
+    /// Operator chose "Start a new run": drop the closed session + report id so a fresh
+    /// `beginLiveSessionIfPaired()` opens a brand-new session (new `report_id`), then re-submit the
+    /// stashed outcome against it. Clears the prompt.
+    func startNewRunFromPrompt() async {
+        resumePrompt = false
+        liveSession = nil
+        _reportID = nil          // fresh run -> fresh report_id -> new session/DO
+        _reportDate = nil
+        _ = try? await beginLiveSessionIfPaired()
+        if let o = pendingClosedOutcome { pendingClosedOutcome = nil; submitLive(o) }
     }
 
     /// Test hook: await every live-submit task scheduled so far so assertions can be made

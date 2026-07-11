@@ -2,6 +2,19 @@
 import Testing
 @testable import Repair_Minder
 
+/// Live-submit stub whose `submitResult` always rejects with `409 session_closed` — models a run
+/// the Worker closed on inactivity, so the runner should raise `resumePrompt`.
+actor ClosingAPI: DiagnosticsAPI {
+    func createSession(_ req: CreateSessionRequest) async throws -> DiagnosticSessionResponse {
+        DiagnosticSessionResponse(sessionId: String(repeating: "a", count: 32), sessionToken: "tok", expiresAt: nil, companyName: "Shop")
+    }
+    func submitResult(_ p: DiagnosticResultPayload) async throws {
+        throw APIError.httpError(statusCode: 409, message: "session_closed")
+    }
+    func complete(sessionId: String, token: String) async throws {}
+    func resume(sessionId: String, token: String) async throws {}
+}
+
 @MainActor
 struct DiagnosticRunnerTests {
     struct FakeTest: DiagnosticTest {
@@ -103,6 +116,19 @@ struct DiagnosticRunnerLiveReportingTests {
         #expect(runner.liveSession == nil)
         #expect(await api.created == 0)
         #expect(await api.results.isEmpty)
+    }
+
+    @Test func sessionClosedOnLiveSubmitRaisesResumePrompt() async throws {
+        DiagnosticsShopPairing.unpair()
+        DiagnosticsShopPairing.pair("123456")
+        defer { DiagnosticsShopPairing.unpair() }
+
+        let runner = DiagnosticRunner(tests: [FakeTest(id: "a", name: "A", result: .pass)], diagnosticsAPI: ClosingAPI())
+        runner.select(ids: ["a"])
+        await runner.runAuto()
+        await runner.waitForPendingLiveSubmits()   // let the fire-and-forget live submit run
+
+        #expect(runner.resumePrompt)               // a 409 session_closed raised the Resume prompt
     }
 
     @Test func retestResubmitsTheSameTestNameLiveWithoutCompleting() async throws {
