@@ -39,6 +39,21 @@ protocol DiagnosticsAPI: Sendable {
     func createSession(_ req: CreateSessionRequest) async throws -> DiagnosticSessionResponse
     func submitResult(_ p: DiagnosticResultPayload) async throws
     func complete(sessionId: String, token: String) async throws
+    /// Reopen a session the Worker had closed on inactivity, so its results can keep streaming.
+    func resume(sessionId: String, token: String) async throws
+}
+
+/// True when the worker rejected a result because the session already closed on inactivity —
+/// the app should offer Resume vs Start again (not silently reopen). Matches only a
+/// `409` whose message carries `session_closed`.
+enum DiagnosticsResumeSignal {
+    static func isSessionClosed(_ error: Error) -> Bool {
+        guard let api = error as? APIError else { return false }
+        if case let .httpError(statusCode, message) = api {
+            return statusCode == 409 && (message?.contains("session_closed") ?? false)
+        }
+        return false
+    }
 }
 
 /// Live implementation backed by APIClient. Endpoints are the ones shipped + verified
@@ -57,6 +72,12 @@ struct LiveDiagnosticsAPI: DiagnosticsAPI {
         }
         let _: EmptyResponse = try await APIClient.shared.request(.diagnosticsComplete(sessionId: sessionId), body: CompleteBody(token: token))
     }
+    func resume(sessionId: String, token: String) async throws {
+        guard DiagnosticsSessionID.isValid(sessionId) else {
+            throw DiagnosticsError.malformedSessionId(sessionId)
+        }
+        let _: EmptyResponse = try await APIClient.shared.request(.diagnosticsResume(sessionId: sessionId), body: CompleteBody(token: token))
+    }
     private struct CompleteBody: Encodable { let token: String }
 }
 
@@ -68,6 +89,7 @@ struct StubDiagnosticsAPI: DiagnosticsAPI {
     }
     func submitResult(_ p: DiagnosticResultPayload) async throws {}
     func complete(sessionId: String, token: String) async throws {}
+    func resume(sessionId: String, token: String) async throws {}
 }
 #endif
 
@@ -94,7 +116,7 @@ struct DiagnosticsService: Sendable {
         for o in outcomes {
             try await api.submitResult(DiagnosticResultPayload(
                 sessionId: session.sessionId, token: session.sessionToken,
-                testName: o.id, status: o.status, details: o.details))
+                testName: o.id, status: o.status, details: o.details, resumeCapable: true))
         }
         try await api.complete(sessionId: session.sessionId, token: session.sessionToken)
         return session.companyName
@@ -125,7 +147,7 @@ struct DiagnosticsService: Sendable {
     func submitOne(session: DiagnosticSessionResponse, outcome: TestOutcome) async throws {
         try await api.submitResult(DiagnosticResultPayload(
             sessionId: session.sessionId, token: session.sessionToken,
-            testName: outcome.id, status: outcome.status, details: outcome.details))
+            testName: outcome.id, status: outcome.status, details: outcome.details, resumeCapable: true))
     }
 
     /// Finalise a live session on explicit Submit/Finish. `/complete` has no field for the final

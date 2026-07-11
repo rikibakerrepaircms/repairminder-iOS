@@ -350,6 +350,7 @@ enum APIEndpoint {
     case diagnosticsPublicCreate
     case diagnosticsSubmitResult
     case diagnosticsComplete(sessionId: String)
+    case diagnosticsResume(sessionId: String)
 
     // MARK: - Path
 
@@ -362,6 +363,8 @@ enum APIEndpoint {
             return "/api/diagnostics/results"
         case .diagnosticsComplete(let sessionId):
             return "/api/diagnostics/session/\(sessionId)/complete"
+        case .diagnosticsResume(let sessionId):
+            return "/api/diagnostics/session/\(sessionId)/resume"
         // Auth
         case .login:
             return "/api/auth/login"
@@ -860,7 +863,7 @@ enum APIEndpoint {
              .createPaymentLink, .cancelPaymentLink, .resendPaymentLinkEmail,
              .customerApproveQuote, .customerOrderReply,
              .quickCreateProductType,
-             .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete,
+             .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete, .diagnosticsResume,
              .moveAsset, .allocateAsset, .deployExternalAsset,
              .returnExternalAsset, .returnToSupplierAsset, .resolveSupplierReturn,
              .addMembership, .bulkAssignGroups, .promoteGroup, .createProductType,
@@ -1228,7 +1231,7 @@ enum APIEndpoint {
              .magicLinkRequest, .magicLinkVerifyCode, .refreshToken,
              .customerMagicLinkRequest, .customerVerifyCode,
              .createEnquiry,
-             .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete:
+             .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete, .diagnosticsResume:
             return false
         default:
             return true
@@ -1246,7 +1249,7 @@ enum APIEndpoint {
     /// Task 5), so no backend change is required alongside this iOS change.
     var isDiagnosticsProxyRouted: Bool {
         switch self {
-        case .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete:
+        case .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete, .diagnosticsResume:
             return true
         default:
             return false

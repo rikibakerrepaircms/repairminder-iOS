@@ -18,9 +18,17 @@ actor StubAPI: DiagnosticsAPI {
     }
     func submitResult(_ p: DiagnosticResultPayload) async throws { results.append(p) }
     func complete(sessionId: String, token: String) async throws { completed += 1 }
+    func resume(sessionId: String, token: String) async throws {}
 }
 
 struct DiagnosticsServiceTests {
+    @Test func resultPayloadEncodesResumeCapableSnakeCase() throws {
+        let p = DiagnosticResultPayload(sessionId: "a", token: "t", testName: "wifi", status: .pass, details: nil, resumeCapable: true)
+        let enc = JSONEncoder(); enc.keyEncodingStrategy = .convertToSnakeCase
+        let json = String(decoding: try enc.encode(p), as: UTF8.self)
+        #expect(json.contains("\"resume_capable\":true"))
+    }
+
     @Test func transmitCreatesSessionSubmitsEachResultThenCompletes() async throws {
         let api = StubAPI()
         let svc = DiagnosticsService(api: api)
@@ -137,6 +145,16 @@ actor FlushStubAPI: DiagnosticsAPI {
     }
     func submitResult(_ p: DiagnosticResultPayload) async throws { results.append(p) }
     func complete(sessionId: String, token: String) async throws { completed += 1 }
+    func resume(sessionId: String, token: String) async throws {}
+}
+
+struct DiagnosticsResumeSignalTests {
+    @Test func detectsSessionClosed() {
+        #expect(DiagnosticsResumeSignal.isSessionClosed(APIError.httpError(statusCode: 409, message: "session_closed")))
+        #expect(!DiagnosticsResumeSignal.isSessionClosed(APIError.httpError(statusCode: 410, message: "expired")))
+        #expect(!DiagnosticsResumeSignal.isSessionClosed(APIError.httpError(statusCode: 409, message: nil)))
+        #expect(!DiagnosticsResumeSignal.isSessionClosed(APIError.notFound))
+    }
 }
 
 struct DiagnosticsFlushTests {
