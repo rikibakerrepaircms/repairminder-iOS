@@ -121,15 +121,15 @@ struct TestSelectionView: View {
             Image(systemName: "checkmark.seal.fill")
                 .font(.title2)
                 .foregroundStyle(Color.accentColor)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .center, spacing: 2) {
                 Text("Welcome back")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Text(shopName)
                     .font(.headline)
                     .foregroundStyle(.primary)
+                    .multilineTextAlignment(.center)
             }
-            Spacer()
         }
         .padding()
         .frame(maxWidth: .infinity)
