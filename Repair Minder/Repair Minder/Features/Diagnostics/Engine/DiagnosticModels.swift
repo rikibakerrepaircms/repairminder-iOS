@@ -81,7 +81,9 @@ struct DiagnosticResultPayload: Codable, Sendable {
     /// Signals to the Worker that this client can honour a `409 session_closed` by prompting the
     /// operator to Resume vs Start again (rather than silently reopening). Additive; the encoder
     /// uses `.convertToSnakeCase`, so it serialises as `resume_capable`.
-    let resumeCapable: Bool = true
+    /// `var` (not `let`) so it stays in the synthesised memberwise initializer — call sites pass
+    /// `resumeCapable: true` explicitly, and a `let` with a default is excluded from that init.
+    var resumeCapable: Bool = true
 }
 
 /// Local outcome of a single test run (UI + buffering use this).
