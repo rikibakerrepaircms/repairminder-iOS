@@ -181,6 +181,7 @@ struct TransmitView: View {
                 } else {
                     DiagnosticsShopPairing.unpair()
                 }
+                DiagnosticsResumeStore.clear()   // session genuinely completed — nothing left to resume
                 phase = .success
             } catch {
                 let wasToken = token != nil && !codeIsValid

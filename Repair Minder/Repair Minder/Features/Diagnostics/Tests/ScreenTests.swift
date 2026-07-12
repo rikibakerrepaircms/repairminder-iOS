@@ -13,11 +13,12 @@ enum ForceTouchGate {
     }
 }
 
-/// Touchscreen pass decision: cover ≥99% of cells so a single unreachable edge cell can't block a
-/// pass on an otherwise-perfect panel. The actual coverage is still recorded.
+/// Touchscreen pass decision: require every cell to register a touch. The 30pt cells are large
+/// enough to be fully sweepable in one drag, so there's no "unreachable edge cell" to allow for —
+/// a real dead spot must not be forgiven. The actual coverage is still recorded.
 enum TouchCoverageGate {
     static func passed(touched: Int, total: Int) -> Bool {
-        total > 0 && Double(touched) >= Double(total) * 0.99
+        total > 0 && touched >= total
     }
 }
 

@@ -354,6 +354,10 @@ enum APIEndpoint {
     /// Server-rendered HTML report for a session (single source for the PDF report — see
     /// `DiagnosticReportShare`). Raw text, not JSON — fetched via `APIClient.requestRawText`.
     case diagnosticsReport(sessionId: String, token: String)
+    /// Session status + results (dual-auth: session token here, or staff JWT elsewhere) — used to
+    /// check whether a session persisted by `DiagnosticsResumeStore` is still resumable after an
+    /// app relaunch. JSON envelope (not raw text, unlike `diagnosticsReport`).
+    case diagnosticsGetSession(sessionId: String, token: String)
 
     // MARK: - Path
 
@@ -371,6 +375,9 @@ enum APIEndpoint {
         case .diagnosticsReport(let sessionId, let token):
             let encodedToken = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? token
             return "/api/diagnostics/session/\(sessionId)/report?token=\(encodedToken)"
+        case .diagnosticsGetSession(let sessionId, let token):
+            let encodedToken = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? token
+            return "/api/diagnostics/session/\(sessionId)?token=\(encodedToken)"
         // Auth
         case .login:
             return "/api/auth/login"
@@ -846,7 +853,7 @@ enum APIEndpoint {
              .supplierOrders, .supplierOrder, .supplierMappingsSuppliers,
              .customerOrders, .customerOrder, .customerOrderInvoice, .customerDeviceImage,
              .customerCompetitionEntries, .customerMarketingPreferences,
-             .diagnosticsReport:
+             .diagnosticsReport, .diagnosticsGetSession:
             return .get
 
         // POST endpoints
@@ -1239,7 +1246,7 @@ enum APIEndpoint {
              .customerMagicLinkRequest, .customerVerifyCode,
              .createEnquiry,
              .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete, .diagnosticsResume,
-             .diagnosticsReport:
+             .diagnosticsReport, .diagnosticsGetSession:
             return false
         default:
             return true
@@ -1258,7 +1265,7 @@ enum APIEndpoint {
     var isDiagnosticsProxyRouted: Bool {
         switch self {
         case .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete, .diagnosticsResume,
-             .diagnosticsReport:
+             .diagnosticsReport, .diagnosticsGetSession:
             return true
         default:
             return false

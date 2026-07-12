@@ -8,6 +8,12 @@ struct TestSelectionView: View {
     @StateObject private var runner = DiagnosticRunner(tests: TestRegistry.allTests())
     @State private var showRunner = false
 
+    /// Resume-or-new prompt (Task 4): a session persisted by `DiagnosticsResumeStore` that the
+    /// server confirms is still `in_progress`/`pending`, discovered when Start is tapped.
+    @State private var resumeCandidate: (state: DiagnosticSessionState, sessionId: String, token: String)?
+    @State private var showResumeConfirm = false
+    @State private var checkingResume = false
+
     /// Ids of tests the current device actually supports. Computed once on appear because some
     /// `isSupported` checks do real work (front-camera discovery, haptics capability query) that we
     /// don't want to repeat on every body re-render. Unsupported tests (e.g. 3D Touch on a phone
@@ -93,10 +99,7 @@ struct TestSelectionView: View {
         }
         .safeAreaInset(edge: .bottom) {
             Button {
-                // Resume an in-progress session; otherwise (re)start fresh so a completed run's
-                // results don't leak into a new selection.
-                if !runner.isInProgress { runner.reset() }
-                showRunner = true
+                Task { await handleStartTapped() }
             } label: {
                 Text(startLabel)
                     .font(.headline)
@@ -104,14 +107,61 @@ struct TestSelectionView: View {
             }
             .controlSize(.large)
             .buttonStyle(.rmGlassProminent(tint: runner.selectedIds.isEmpty ? .gray : .accentColor))
-            .disabled(runner.selectedIds.isEmpty)
+            .disabled(runner.selectedIds.isEmpty || checkingResume)
             .padding()
             .background(.ultraThinMaterial)
             .accessibilityIdentifier("start-tests")
         }
+        .confirmationDialog("Resume diagnostics?", isPresented: $showResumeConfirm, titleVisibility: .visible) {
+            Button("Continue") {
+                if let candidate = resumeCandidate {
+                    runner.rehydrate(sessionId: candidate.sessionId, token: candidate.token, state: candidate.state)
+                }
+                resumeCandidate = nil
+                showRunner = true
+            }
+            .accessibilityIdentifier("resume-continue")
+            Button("Start New", role: .destructive) {
+                resumeCandidate = nil
+                DiagnosticsResumeStore.clear()
+                runner.reset()
+                showRunner = true
+            }
+            .accessibilityIdentifier("resume-start-new")
+            Button("Cancel", role: .cancel) { resumeCandidate = nil }
+        } message: {
+            Text("We can see a diagnostics session mid-progress — continue or start new?")
+        }
         .navigationDestination(isPresented: $showRunner) {
             TestRunnerView(runner: runner)
         }
+    }
+
+    /// Start tapped: if a previous run's session was persisted (survives an app close) and the
+    /// server confirms it's still open, offer Resume vs Start-new before entering the runner.
+    /// Otherwise behaves exactly as before — resume an in-progress local run, or (re)start fresh so
+    /// a completed run's results don't leak into a new selection.
+    private func handleStartTapped() async {
+        if !runner.isInProgress, let candidate = await checkedResumeCandidate() {
+            resumeCandidate = candidate
+            showResumeConfirm = true
+            return
+        }
+        if !runner.isInProgress { runner.reset() }
+        showRunner = true
+    }
+
+    /// Fetches the persisted session's server state, if any. Best-effort: any failure (offline,
+    /// expired, decode issue) just means "nothing to resume" — Start proceeds normally.
+    private func checkedResumeCandidate() async -> (state: DiagnosticSessionState, sessionId: String, token: String)? {
+        guard DiagnosticsResumeStore.load() != nil else { return nil }
+        checkingResume = true
+        defer { checkingResume = false }
+        guard let found = await runner.fetchResumableSession() else {
+            DiagnosticsResumeStore.clear()   // stale/finished — stop checking on every future Start
+            return nil
+        }
+        return found
     }
 
     /// "Welcome back …" banner for a shop-paired device (name comes from the server, never hard-coded).

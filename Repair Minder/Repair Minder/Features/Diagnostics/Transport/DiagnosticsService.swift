@@ -47,6 +47,18 @@ protocol DiagnosticsAPI: Sendable {
     /// Fetch the server-rendered HTML report for a session — the SINGLE source for the PDF report
     /// (see `DiagnosticReportShare`). Raw text (HTML), not a JSON envelope.
     func fetchReport(sessionId: String, token: String) async throws -> String
+    /// Fetch a persisted session's current status + results — used to decide whether a session
+    /// saved by `DiagnosticsResumeStore` is still resumable (Start-screen "continue?" prompt).
+    /// Defaulted below so existing test stubs don't all need an explicit implementation.
+    func getSession(sessionId: String, token: String) async throws -> DiagnosticSessionState
+}
+
+extension DiagnosticsAPI {
+    /// Default: unavailable. Only `LiveDiagnosticsAPI` overrides this with a real network call;
+    /// test/stub conformers that don't exercise the resume flow inherit this no-op.
+    func getSession(sessionId: String, token: String) async throws -> DiagnosticSessionState {
+        throw DiagnosticsError.sessionUnavailable
+    }
 }
 
 /// True when the worker rejected a result because the session already closed on inactivity —
@@ -86,6 +98,12 @@ struct LiveDiagnosticsAPI: DiagnosticsAPI {
     }
     func fetchReport(sessionId: String, token: String) async throws -> String {
         try await APIClient.shared.requestRawText(.diagnosticsReport(sessionId: sessionId, token: token))
+    }
+    func getSession(sessionId: String, token: String) async throws -> DiagnosticSessionState {
+        guard DiagnosticsSessionID.isValid(sessionId) else {
+            throw DiagnosticsError.malformedSessionId(sessionId)
+        }
+        return try await APIClient.shared.request(.diagnosticsGetSession(sessionId: sessionId, token: token))
     }
     private struct CompleteBody: Encodable { let token: String }
 }
@@ -165,6 +183,11 @@ struct DiagnosticsService: Sendable {
     /// Reopen a session the Worker had closed on inactivity, so its results can keep streaming.
     func resume(sessionId: String, token: String) async throws {
         try await api.resume(sessionId: sessionId, token: token)
+    }
+
+    /// Fetch a persisted session's current status + results (see `DiagnosticsResumeStore`).
+    func getSession(sessionId: String, token: String) async throws -> DiagnosticSessionState {
+        try await api.getSession(sessionId: sessionId, token: token)
     }
 
     /// Finalise a live session on explicit Submit/Finish. `/complete` has no field for the final

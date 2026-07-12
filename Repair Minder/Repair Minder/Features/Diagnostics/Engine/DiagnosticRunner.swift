@@ -183,6 +183,7 @@ final class DiagnosticRunner: ObservableObject {
             selectedTests: selectedTests.map(\.id))
         liveSession = session
         DiagnosticsShopPairing.setName(session.companyName)
+        DiagnosticsResumeStore.save(sessionId: session.sessionId, token: session.sessionToken, reportID: reportID)
         for outcome in orderedOutcomes { submitLive(outcome) }   // catch up anything recorded before now
         return session
     }
@@ -206,6 +207,7 @@ final class DiagnosticRunner: ObservableObject {
             totalTests: selectedTests.count, startedAt: ISO8601DateFormatter().string(from: Date()),
             selectedTests: selectedTests.map(\.id))
         liveSession = session
+        DiagnosticsResumeStore.save(sessionId: session.sessionId, token: session.sessionToken, reportID: reportID)
         for outcome in orderedOutcomes { submitLive(outcome) }   // catch up anything recorded before now
         return session
     }
@@ -254,8 +256,42 @@ final class DiagnosticRunner: ObservableObject {
         liveSession = nil
         _reportID = nil          // fresh run -> fresh report_id -> new session/DO
         _reportDate = nil
+        DiagnosticsResumeStore.clear()   // abandon the old session's persisted identity
         _ = try? await beginLiveSessionIfPaired()
         if let o = pendingClosedOutcome { pendingClosedOutcome = nil; submitLive(o) }
+    }
+
+    // MARK: Resume-from-relaunch (persisted server session)
+
+    /// If a session was persisted (survives app close — see `DiagnosticsResumeStore`), fetch its
+    /// current server state. Returns nil when there's nothing persisted, the fetch fails (offline,
+    /// expired, malformed), or the session has already finished — any of which means the Start
+    /// screen should behave normally rather than offering to resume.
+    func fetchResumableSession() async -> (state: DiagnosticSessionState, sessionId: String, token: String)? {
+        guard let saved = DiagnosticsResumeStore.load(), let service = liveService else { return nil }
+        guard let state = try? await service.getSession(sessionId: saved.sessionId, token: saved.token) else {
+            return nil
+        }
+        guard state.status == "in_progress" || state.status == "pending" else { return nil }
+        return (state, saved.sessionId, saved.token)
+    }
+
+    /// Operator chose "Continue" on the resume prompt: restore the live session plus whatever
+    /// selection/outcomes the server already has, then re-enter the flow at `preparing` (permissions
+    /// were already resolved earlier in this same session). Best-effort reopens the session
+    /// server-side too, in case it had been closed on inactivity while the app was away.
+    func rehydrate(sessionId: String, token: String, state: DiagnosticSessionState) {
+        liveSession = DiagnosticSessionResponse(sessionId: sessionId, sessionToken: token, expiresAt: nil, companyName: nil)
+        if let ids = state.selectedTests, !ids.isEmpty { selectedIds = Set(ids) }
+        for entry in state.tests ?? [] {
+            outcomes[entry.testName] = TestOutcome(
+                id: entry.testName, name: entry.testName,
+                status: TestStatus(rawValue: entry.status) ?? .error, details: entry.details)
+        }
+        phase = .preparing
+        if let service = liveService {
+            Task { try? await service.resume(sessionId: sessionId, token: token) }
+        }
     }
 
     /// Test hook: await every live-submit task scheduled so far so assertions can be made

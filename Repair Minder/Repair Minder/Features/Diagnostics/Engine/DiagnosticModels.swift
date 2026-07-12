@@ -93,3 +93,22 @@ struct TestOutcome: Identifiable, Sendable {
     var status: TestStatus
     var details: [String: String]?
 }
+
+/// One previously-recorded result row on a persisted session, as returned by
+/// `GET /api/diagnostics/session/:id`. Used only to rehydrate `DiagnosticRunner.outcomes` when the
+/// operator chooses "Continue" on the resume prompt (see `DiagnosticsResumeStore`).
+struct DiagnosticSessionTestEntry: Decodable, Sendable {
+    let testName: String
+    let status: String
+    let details: [String: String]?
+}
+
+/// Server state for a persisted session, fetched via `GET /api/diagnostics/session/:id?token=` to
+/// decide whether a session saved by `DiagnosticsResumeStore` is still resumable. Deliberately
+/// decodes only the fields the resume flow needs (additive/decode-safe — the endpoint returns more).
+struct DiagnosticSessionState: Decodable, Sendable {
+    let sessionId: String
+    let status: String
+    let selectedTests: [String]?
+    let tests: [DiagnosticSessionTestEntry]?
+}
