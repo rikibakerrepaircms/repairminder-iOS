@@ -93,9 +93,19 @@ final class DiagnosticRunner: ObservableObject {
     var autoChecklistTests: [DiagnosticTest] {
         selectedTests.filter { !$0.requiresInteraction && $0.isSupported }
     }
+    /// The first selected interactive test at or after `interactiveIndex` that doesn't already have
+    /// an outcome. On a fresh run nothing has an outcome yet, so this always returns `list[interactiveIndex]`
+    /// unchanged. On a resume (outcomes pre-loaded by `rehydrate`), it skips forward over already-completed
+    /// tests so the operator lands on the first one still needing to be done — a pure scan over the
+    /// existing index, so it can't loop or double-skip.
     var currentInteractiveTest: DiagnosticTest? {
         let list = selectedInteractiveTests
-        return interactiveIndex < list.count ? list[interactiveIndex] : nil
+        var i = interactiveIndex
+        while i < list.count {
+            if outcomes[list[i].id] == nil { return list[i] }
+            i += 1
+        }
+        return nil
     }
     func select(ids: [String]) { selectedIds = Set(ids) }
     /// Select every test the current device actually supports. Unsupported tests are never selected.
@@ -126,9 +136,12 @@ final class DiagnosticRunner: ObservableObject {
     /// (capability exclusion: never run, graded, or reported). Opens the live backend session
     /// FIRST (if paired) so the dashboard sees the run as `in_progress` from the very start,
     /// before the first result exists.
+    /// Skips tests that already have an outcome — a no-op on a fresh run (no outcomes exist yet)
+    /// but on a resume (outcomes pre-loaded by `rehydrate`) it avoids re-running and overwriting
+    /// results the server already has.
     func runAuto() async {
         _ = try? await beginLiveSessionIfPaired()
-        for test in selectedTests where test.isSupported && !test.requiresInteraction {
+        for test in selectedTests where test.isSupported && !test.requiresInteraction && outcomes[test.id] == nil {
             record(await test.run())
         }
         autoRan = true
