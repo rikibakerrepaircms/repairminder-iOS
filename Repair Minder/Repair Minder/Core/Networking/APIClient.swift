@@ -216,6 +216,94 @@ final class APIClient {
         }
     }
 
+    /// Perform a GET request and return the raw response body decoded as UTF-8 text (e.g. the
+    /// server-rendered diagnostics report HTML — see `APIEndpoint.diagnosticsReport`). Unlike
+    /// `buildRequest`/`requestRawData`, this tolerates an `endpoint.path` that already embeds its
+    /// own query string (`.../report?token=...`): `URL.appendingPathComponent` percent-encodes a
+    /// literal "?" into the path instead of treating it as the query delimiter, which would send
+    /// the token as part of the path rather than as a real query parameter. `buildRawTextRequest`
+    /// splits path/query before URL construction to avoid that.
+    func requestRawText(
+        _ endpoint: APIEndpoint
+    ) async throws -> String {
+        let request = try buildRawTextRequest(endpoint)
+
+        do {
+            let (data, response) = try await session.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.networkError(URLError(.badServerResponse))
+            }
+
+            switch httpResponse.statusCode {
+            case 200...299:
+                guard let text = String(data: data, encoding: .utf8) else {
+                    throw APIError.decodingError(URLError(.cannotDecodeContentData))
+                }
+                return text
+
+            case 401:
+                if endpoint.requiresAuth {
+                    try await handleTokenRefresh()
+                    let retryRequest = try buildRawTextRequest(endpoint)
+                    let (retryData, retryResponse) = try await session.data(for: retryRequest)
+                    guard let retryHttp = retryResponse as? HTTPURLResponse,
+                          (200...299).contains(retryHttp.statusCode),
+                          let retryText = String(data: retryData, encoding: .utf8) else {
+                        throw APIError.unauthorized
+                    }
+                    return retryText
+                }
+                throw APIError.unauthorized
+
+            case 403:
+                let errorResponse = try? decodeResponse(data) as APIResponse<EmptyResponse>
+                throw APIError.forbidden(message: errorResponse?.error, code: errorResponse?.code)
+
+            case 404:
+                throw APIError.notFound
+
+            case 429:
+                throw APIError.rateLimited
+
+            default:
+                throw APIError.httpError(
+                    statusCode: httpResponse.statusCode,
+                    message: APIClient.serverErrorMessage(from: data)
+                )
+            }
+        } catch let error as APIError {
+            throw error
+        } catch let error as URLError where error.code == .cancelled {
+            throw APIError.cancelled
+        } catch {
+            throw APIError.networkError(error)
+        }
+    }
+
+    /// Build a request for `requestRawText`. Resolves the URL via `RawTextRequestURL` (see its
+    /// doc comment for why `buildRequest`'s `appendingPathComponent` approach would corrupt a
+    /// literal "?" embedded in `endpoint.path`, e.g. the diagnostics report endpoint's `?token=`).
+    private func buildRawTextRequest(_ endpoint: APIEndpoint) throws -> URLRequest {
+        guard let url = RawTextRequestURL.resolve(endpoint: endpoint, baseURL: baseURL, proxyBase: diagnosticsProxyBase) else {
+            throw APIError.invalidRequest("Invalid URL")
+        }
+
+        #if DEBUG
+        print("🌐 [API] \(endpoint.method.rawValue) \(url.absoluteString)")
+        #endif
+
+        var request = URLRequest(url: url)
+        request.httpMethod = endpoint.method.rawValue
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+
+        if endpoint.requiresAuth, let token = tokenProvider?.accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        return request
+    }
+
     // MARK: - Error Parsing
 
     /// Extracts a human-readable error message from a JSON response body by
@@ -705,6 +793,44 @@ enum DiagnosticsProxyURL {
     static func resolve(path: String, proxyBase: URL) -> URL {
         let stripped = path.hasPrefix("/api") ? String(path.dropFirst("/api".count)) : path
         return proxyBase.appendingPathComponent("w").appendingPathComponent(stripped)
+    }
+}
+
+// MARK: - Raw-text request URL resolution
+
+/// Pure URL construction for `APIClient.requestRawText` — the diagnostics report endpoint embeds
+/// its own query string directly in `APIEndpoint.path` (`.../report?token=...`) rather than via
+/// `queryItems`, because the id/token pair reads naturally as one path+query literal. Passing that
+/// straight to `URL.appendingPathComponent` (as `buildRequest` does for the JSON endpoints) would
+/// percent-encode the literal "?" into the path itself (`report%3Ftoken=...`) instead of producing
+/// a real query component — the server would then never see `token` as a query parameter. `split`
+/// separates path from query BEFORE URL construction so `URLComponents.percentEncodedQuery` can
+/// attach it correctly. Factored out (mirrors `DiagnosticsProxyURL`) so it's unit-testable without
+/// exercising the network stack.
+enum RawTextRequestURL {
+    /// Split `path` into (path, query) at the first "?", if any.
+    static func split(path: String) -> (path: String, query: String?) {
+        guard let qIndex = path.firstIndex(of: "?") else { return (path, nil) }
+        return (String(path[path.startIndex..<qIndex]), String(path[path.index(after: qIndex)...]))
+    }
+
+    /// Resolve `endpoint` to a full URL against `baseURL` (or `proxyBase` when
+    /// `endpoint.isDiagnosticsProxyRouted`), preserving any query embedded in `endpoint.path` plus
+    /// `endpoint.queryItems`.
+    static func resolve(endpoint: APIEndpoint, baseURL: URL, proxyBase: URL) -> URL? {
+        let (pathOnly, query) = split(path: endpoint.path)
+        let resolvedURL: URL = endpoint.isDiagnosticsProxyRouted
+            ? DiagnosticsProxyURL.resolve(path: pathOnly, proxyBase: proxyBase)
+            : baseURL.appendingPathComponent(pathOnly)
+
+        guard var components = URLComponents(url: resolvedURL, resolvingAgainstBaseURL: true) else { return nil }
+        components.percentEncodedQuery = query
+        if let extra = endpoint.queryItems {
+            var items = components.queryItems ?? []
+            items.append(contentsOf: extra)
+            components.queryItems = items
+        }
+        return components.url
     }
 }
 

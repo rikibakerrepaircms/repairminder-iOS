@@ -32,10 +32,12 @@ enum ResultTilePresentation {
 /// Every tile is tappable to retest — pass, fail, or skip alike.
 struct SummaryView: View {
     @ObservedObject var runner: DiagnosticRunner
+    private let service: DiagnosticsService
     @State private var showTransmit = false
     @State private var retestTest: RetestBox?
     @State private var isGeneratingPDF = false
     @State private var autoSend: AutoSend = .idle
+    @State private var reportError: String?
     @Namespace private var resultGlass
 
     /// Auto-send state for a shop-paired device (idle until the run is sent on appear / retest).
@@ -43,6 +45,19 @@ struct SummaryView: View {
 
     /// Identifiable wrapper so we can drive a sheet with the chosen interactive test.
     struct RetestBox: Identifiable { let id: String; let test: any DiagnosticTest }
+
+    init(runner: DiagnosticRunner) {
+        self.runner = runner
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-uiTestStubTransmit") {
+            service = DiagnosticsService(api: StubDiagnosticsAPI())
+        } else {
+            service = DiagnosticsService()
+        }
+        #else
+        service = DiagnosticsService()
+        #endif
+    }
 
     // MARK: - Filtered outcome lists
 
@@ -127,6 +142,14 @@ struct SummaryView: View {
         }
         .sheet(item: $retestTest) { box in
             interactiveRetestSheet(box.test)
+        }
+        .alert("Couldn't Generate Report", isPresented: Binding(
+            get: { reportError != nil },
+            set: { if !$0 { reportError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(reportError ?? "Please check your connection and try again.")
         }
     }
 
@@ -382,21 +405,46 @@ struct SummaryView: View {
         .accessibilityIdentifier("generate-pdf")
     }
 
-    /// Top-right arrow: build the report and present the system share sheet.
+    /// Top-right arrow: ensure a server session (anon if never paired — see
+    /// `DiagnosticRunner.ensureSession()`), fetch the server-rendered report, and present the
+    /// system share sheet. Online-only: a fetch failure surfaces an alert, no local HTML fallback.
     private func sharePDF() {
         guard !isGeneratingPDF else { return }
         isGeneratingPDF = true
-        DiagnosticReportShare.presentShareSheet(for: runner) { _ in
-            isGeneratingPDF = false
+        Task {
+            do {
+                let session = try await runner.ensureSession()
+                DiagnosticReportShare.presentShareSheet(
+                    sessionId: session.sessionId, token: session.sessionToken,
+                    reportID: runner.reportID, service: service.api
+                ) { _ in
+                    isGeneratingPDF = false
+                }
+            } catch {
+                isGeneratingPDF = false
+                reportError = error.localizedDescription
+            }
         }
     }
 
-    /// "Generate PDF" row: build the same report and preview it on-device (Quick Look).
+    /// "Generate PDF" row: ensure a server session, fetch the same report and preview it
+    /// on-device (Quick Look).
     private func previewPDF() {
         guard !isGeneratingPDF else { return }
         isGeneratingPDF = true
-        DiagnosticReportShare.presentPreview(for: runner) { _ in
-            isGeneratingPDF = false
+        Task {
+            do {
+                let session = try await runner.ensureSession()
+                DiagnosticReportShare.presentPreview(
+                    sessionId: session.sessionId, token: session.sessionToken,
+                    reportID: runner.reportID, service: service.api
+                ) { _ in
+                    isGeneratingPDF = false
+                }
+            } catch {
+                isGeneratingPDF = false
+                reportError = error.localizedDescription
+            }
         }
     }
     #endif

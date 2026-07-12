@@ -13,6 +13,9 @@ enum DiagnosticsSessionID {
 
 enum DiagnosticsError: Error, Equatable {
     case malformedSessionId(String)
+    /// `DiagnosticRunner.ensureSession()` couldn't reach a transport (e.g. running inside the
+    /// unit-test host, where live network calls are deliberately suppressed — see `liveService`).
+    case sessionUnavailable
 }
 
 /// How the UI should react to a failed transmit.
@@ -41,6 +44,9 @@ protocol DiagnosticsAPI: Sendable {
     func complete(sessionId: String, token: String) async throws
     /// Reopen a session the Worker had closed on inactivity, so its results can keep streaming.
     func resume(sessionId: String, token: String) async throws
+    /// Fetch the server-rendered HTML report for a session — the SINGLE source for the PDF report
+    /// (see `DiagnosticReportShare`). Raw text (HTML), not a JSON envelope.
+    func fetchReport(sessionId: String, token: String) async throws -> String
 }
 
 /// True when the worker rejected a result because the session already closed on inactivity —
@@ -78,6 +84,9 @@ struct LiveDiagnosticsAPI: DiagnosticsAPI {
         }
         let _: EmptyResponse = try await APIClient.shared.request(.diagnosticsResume(sessionId: sessionId), body: CompleteBody(token: token))
     }
+    func fetchReport(sessionId: String, token: String) async throws -> String {
+        try await APIClient.shared.requestRawText(.diagnosticsReport(sessionId: sessionId, token: token))
+    }
     private struct CompleteBody: Encodable { let token: String }
 }
 
@@ -90,6 +99,7 @@ struct StubDiagnosticsAPI: DiagnosticsAPI {
     func submitResult(_ p: DiagnosticResultPayload) async throws {}
     func complete(sessionId: String, token: String) async throws {}
     func resume(sessionId: String, token: String) async throws {}
+    func fetchReport(sessionId: String, token: String) async throws -> String { "<html></html>" }
 }
 #endif
 

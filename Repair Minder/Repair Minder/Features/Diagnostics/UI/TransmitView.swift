@@ -18,6 +18,7 @@ struct TransmitView: View {
     @State private var remember: Bool
     @State private var phase: Phase = .idle
     @State private var isGeneratingPDF = false
+    @State private var reportError: String?
 
     enum Phase: Equatable { case idle, sending, success, failed, unlinked }
 
@@ -135,6 +136,14 @@ struct TransmitView: View {
             .padding()
             .accessibilityIdentifier("submit-results")
         }
+        .alert("Couldn't Generate Report", isPresented: Binding(
+            get: { reportError != nil },
+            set: { if !$0 { reportError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(reportError ?? "Please check your connection and try again.")
+        }
     }
 
     private func submit() {
@@ -190,12 +199,26 @@ struct TransmitView: View {
     }
 
     #if os(iOS)
-    /// Build the branded PDF report and present a share sheet (see DiagnosticReportShare).
+    /// Ensure a server session exists (anon if this device was never paired — see
+    /// `DiagnosticRunner.ensureSession()`), fetch the server-rendered report, and present a share
+    /// sheet (see DiagnosticReportShare). Online-only: a fetch failure surfaces an alert, no local
+    /// HTML fallback.
     private func sharePDF() {
         guard !isGeneratingPDF else { return }
         isGeneratingPDF = true
-        DiagnosticReportShare.presentShareSheet(for: runner) { _ in
-            isGeneratingPDF = false
+        Task {
+            do {
+                let session = try await runner.ensureSession()
+                DiagnosticReportShare.presentShareSheet(
+                    sessionId: session.sessionId, token: session.sessionToken,
+                    reportID: runner.reportID, service: service.api
+                ) { _ in
+                    isGeneratingPDF = false
+                }
+            } catch {
+                isGeneratingPDF = false
+                reportError = error.localizedDescription
+            }
         }
     }
     #endif

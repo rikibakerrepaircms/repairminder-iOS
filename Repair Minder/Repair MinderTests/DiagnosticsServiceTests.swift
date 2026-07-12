@@ -19,6 +19,7 @@ actor StubAPI: DiagnosticsAPI {
     func submitResult(_ p: DiagnosticResultPayload) async throws { results.append(p) }
     func complete(sessionId: String, token: String) async throws { completed += 1 }
     func resume(sessionId: String, token: String) async throws {}
+    func fetchReport(sessionId: String, token: String) async throws -> String { "<html></html>" }
 }
 
 struct DiagnosticsServiceTests {
@@ -146,6 +147,7 @@ actor FlushStubAPI: DiagnosticsAPI {
     func submitResult(_ p: DiagnosticResultPayload) async throws { results.append(p) }
     func complete(sessionId: String, token: String) async throws { completed += 1 }
     func resume(sessionId: String, token: String) async throws {}
+    func fetchReport(sessionId: String, token: String) async throws -> String { "<html></html>" }
 }
 
 struct DiagnosticsResumeSignalTests {

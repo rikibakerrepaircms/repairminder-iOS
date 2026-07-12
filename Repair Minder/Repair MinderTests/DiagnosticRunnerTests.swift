@@ -13,6 +13,7 @@ actor ClosingAPI: DiagnosticsAPI {
     }
     func complete(sessionId: String, token: String) async throws {}
     func resume(sessionId: String, token: String) async throws {}
+    func fetchReport(sessionId: String, token: String) async throws -> String { "<html></html>" }
 }
 
 @MainActor

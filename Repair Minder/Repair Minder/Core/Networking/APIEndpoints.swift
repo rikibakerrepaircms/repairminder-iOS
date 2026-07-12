@@ -351,6 +351,9 @@ enum APIEndpoint {
     case diagnosticsSubmitResult
     case diagnosticsComplete(sessionId: String)
     case diagnosticsResume(sessionId: String)
+    /// Server-rendered HTML report for a session (single source for the PDF report — see
+    /// `DiagnosticReportShare`). Raw text, not JSON — fetched via `APIClient.requestRawText`.
+    case diagnosticsReport(sessionId: String, token: String)
 
     // MARK: - Path
 
@@ -365,6 +368,9 @@ enum APIEndpoint {
             return "/api/diagnostics/session/\(sessionId)/complete"
         case .diagnosticsResume(let sessionId):
             return "/api/diagnostics/session/\(sessionId)/resume"
+        case .diagnosticsReport(let sessionId, let token):
+            let encodedToken = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? token
+            return "/api/diagnostics/session/\(sessionId)/report?token=\(encodedToken)"
         // Auth
         case .login:
             return "/api/auth/login"
@@ -839,7 +845,8 @@ enum APIEndpoint {
              .stockSummary, .assetHierarchy, .lowStock,
              .supplierOrders, .supplierOrder, .supplierMappingsSuppliers,
              .customerOrders, .customerOrder, .customerOrderInvoice, .customerDeviceImage,
-             .customerCompetitionEntries, .customerMarketingPreferences:
+             .customerCompetitionEntries, .customerMarketingPreferences,
+             .diagnosticsReport:
             return .get
 
         // POST endpoints
@@ -1231,7 +1238,8 @@ enum APIEndpoint {
              .magicLinkRequest, .magicLinkVerifyCode, .refreshToken,
              .customerMagicLinkRequest, .customerVerifyCode,
              .createEnquiry,
-             .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete, .diagnosticsResume:
+             .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete, .diagnosticsResume,
+             .diagnosticsReport:
             return false
         default:
             return true
@@ -1249,7 +1257,8 @@ enum APIEndpoint {
     /// Task 5), so no backend change is required alongside this iOS change.
     var isDiagnosticsProxyRouted: Bool {
         switch self {
-        case .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete, .diagnosticsResume:
+        case .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete, .diagnosticsResume,
+             .diagnosticsReport:
             return true
         default:
             return false

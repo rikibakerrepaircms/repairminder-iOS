@@ -187,6 +187,29 @@ final class DiagnosticRunner: ObservableObject {
         return session
     }
 
+    /// Ensure a server session exists before generating/sharing the report — the report HTML is
+    /// fetched from the Worker (`DiagnosticReportShare`), so a real session is required even for a
+    /// never-paired (consumer) run: reuses `liveSession` if already open; else opens one via
+    /// `beginLiveSessionIfPaired()` on a paired device; else (fully unpaired) creates an ANONYMOUS
+    /// session — neither `shopCode` nor `pairingToken` — which the Worker routes to the sentinel
+    /// company. Idempotent: a second call after either branch just returns the now-set
+    /// `liveSession`. Throws `DiagnosticsError.sessionUnavailable` if no transport is available
+    /// (e.g. inside the unit-test host, where `liveService` deliberately suppresses network I/O).
+    @discardableResult
+    func ensureSession() async throws -> DiagnosticSessionResponse {
+        if let liveSession { return liveSession }
+        if let paired = try await beginLiveSessionIfPaired() { return paired }
+        guard let service = liveService else { throw DiagnosticsError.sessionUnavailable }
+        let session = try await service.begin(
+            shopCode: nil, pairingToken: nil, platform: "ios", imei: nil, serial: nil,
+            deviceDescription: currentDeviceDescription, reportID: reportID,
+            totalTests: selectedTests.count, startedAt: ISO8601DateFormatter().string(from: Date()),
+            selectedTests: selectedTests.map(\.id))
+        liveSession = session
+        for outcome in orderedOutcomes { submitLive(outcome) }   // catch up anything recorded before now
+        return session
+    }
+
     /// Fire-and-forget live submit for a just-recorded outcome. No-op when there's no live
     /// session (unpaired run, or `beginLiveSessionIfPaired` hasn't succeeded). A transient
     /// failure here is swallowed rather than buffered — buffering would replay through
