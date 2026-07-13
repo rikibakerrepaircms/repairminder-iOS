@@ -39,11 +39,11 @@ struct TransmitView: View {
     }
 
     private var deviceDescription: String? {
-        // Prefer the precise marketing name (e.g. "iPhone 15 Pro"), matching the PDF banner,
-        // rather than UIDevice's generic "iPhone". os_version comes from the device_info test.
-        let os = runner.outcome(for: "device_info")?.details?["os_version"]
-        let parts = [DeviceModelName.marketingName, os].compactMap { $0 }.filter { !$0.isEmpty }
-        return parts.isEmpty ? nil : parts.joined(separator: " ")
+        // Same composition as DiagnosticRunner.currentDeviceDescription — DRY'd into
+        // DeviceModelName.diagnosticsDescription (A4): the precise marketing name
+        // (e.g. "iPhone 15 Pro"), matching the PDF banner, never the raw hw.machine
+        // identifier. os_version comes from the device_info test.
+        DeviceModelName.diagnosticsDescription(osVersion: runner.outcome(for: "device_info")?.details?["os_version"])
     }
 
     private var codeIsValid: Bool { shopCode.count == 6 && shopCode.allSatisfy(\.isNumber) }

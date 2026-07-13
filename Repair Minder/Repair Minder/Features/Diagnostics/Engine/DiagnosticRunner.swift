@@ -171,9 +171,7 @@ final class DiagnosticRunner: ObservableObject {
     /// (at run start) gets just the model name and a later one (e.g. a Summary-time catch-up)
     /// gets the fuller string. Never blocks on a test that hasn't run yet.
     private var currentDeviceDescription: String? {
-        let os = outcomes["device_info"]?.details?["os_version"]
-        let parts = [DeviceModelName.marketingName, os].compactMap { $0 }.filter { !$0.isEmpty }
-        return parts.isEmpty ? nil : parts.joined(separator: " ")
+        DeviceModelName.diagnosticsDescription(osVersion: outcomes["device_info"]?.details?["os_version"])
     }
 
     /// Open the live backend session, if this device is paired to a shop (token or remembered
