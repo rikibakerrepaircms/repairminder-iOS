@@ -57,3 +57,43 @@ struct CustomerReturnLabel: Decodable, Equatable, Sendable {
         return daysRemaining <= 0
     }
 }
+
+/// Whether the seller has asked us to post them packaging, and when.
+///
+/// Backs `GET|POST /api/customer/enquiries/:ticketId/packaging-request`. This is
+/// a REQUEST and not a label: the outbound leg is Royal Mail Tracked 24, billed
+/// at manifest whether the parcel ships or not, so a customer press records this
+/// timestamp and a human decides whether to send anything.
+///
+/// `packaging_requested_at` comes from D1 as "yyyy-MM-dd HH:mm:ss" (UTC, no
+/// timezone marker), so it goes through `MarketingDate.parse` for the same
+/// reason `createdAt`/`expiresAt` above do - a plain ISO8601 decoder yields nil.
+struct PackagingRequest: Decodable, Equatable, Sendable {
+    /// The parsed timestamp, for anywhere a date is actually displayed. Nil both
+    /// when the seller never asked AND when the string could not be parsed - so
+    /// this must not be what the view branches on. Use `hasAsked`.
+    let packagingRequestedAt: Date?
+
+    /// Whether the API sent a timestamp at all, independent of whether it parsed.
+    /// This is what the view branches on: a date format we failed to read must
+    /// still count as "asked", or we would re-offer a button the seller has
+    /// already pressed and invite a duplicate request.
+    let hasAsked: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case packagingRequestedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let raw = try c.decodeIfPresent(String.self, forKey: .packagingRequestedAt)
+        hasAsked = raw != nil
+        packagingRequestedAt = MarketingDate.parse(raw)
+    }
+
+    /// Memberwise init for previews and tests, which have no JSON to decode.
+    init(packagingRequestedAt: Date?) {
+        self.packagingRequestedAt = packagingRequestedAt
+        self.hasAsked = packagingRequestedAt != nil
+    }
+}

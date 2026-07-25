@@ -177,6 +177,52 @@ struct CustomerEnquiryService {
         return data
     }
 
+    // MARK: - Packaging request
+
+    /// `GET /api/customer/enquiries/:ticketId/packaging-request`
+    ///
+    /// Read-only. Safe on view appear and pull-to-refresh.
+    static func fetchPackagingRequest(ticketId: String) async throws -> PackagingRequest? {
+        do {
+            let response: APIResponse<PackagingRequest> =
+                try await get("/api/customer/enquiries/\(ticketId)/packaging-request")
+            return response.success ? response.data : nil
+        } catch APIError.notFound {
+            return nil
+        }
+    }
+
+    /// `POST /api/customer/enquiries/:ticketId/packaging-request`
+    ///
+    /// Records the customer's ask for packaging. This creates NO Royal Mail
+    /// label and bills nothing: the outbound leg is Tracked 24, charged at
+    /// manifest whether the parcel ships or not, so staff decide whether to
+    /// send anything. Do not repoint this at a label-creating endpoint.
+    ///
+    /// Idempotent server-side (pressing again keeps the first timestamp), but
+    /// call it ONLY from a button action - never from `.task` or `.onAppear`.
+    static func requestPackaging(ticketId: String) async throws -> PackagingRequest {
+        guard let token = customerAuth.accessToken else { throw APIError.unauthorized }
+
+        let url = URL(string: "\(baseURL)/api/customer/enquiries/\(ticketId)/packaging-request")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkStatus(response)
+
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let apiResponse = try decoder.decode(APIResponse<PackagingRequest>.self, from: data)
+        guard apiResponse.success, let result = apiResponse.data else {
+            throw APIError.serverError(
+                message: apiResponse.error ?? "Failed to ask for packaging", code: nil)
+        }
+        return result
+    }
+
     // MARK: - Transport
 
     private static func get<T: Decodable>(_ path: String) async throws -> APIResponse<T> {

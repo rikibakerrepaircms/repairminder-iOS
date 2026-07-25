@@ -35,6 +35,7 @@ struct CustomerSellNextStepsCard: View {
             wipeStep
             fulfilmentStep
             CustomerReturnLabelStep(ticketId: ticketId, fulfilment: fulfilment)
+            CustomerPackagingStep(ticketId: ticketId)
             arrivalStep
         }
         .padding()
