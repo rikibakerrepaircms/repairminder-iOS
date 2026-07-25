@@ -63,6 +63,51 @@ struct CustomerEnquiryService {
         }
     }
 
+    // MARK: - Collection slot
+
+    /// `POST /api/customer/enquiries/:ticketId/collection-slot/confirm`
+    ///
+    /// Returns the slot the server actually wrote, so the caller renders from that
+    /// rather than assuming the transition took.
+    static func confirmCollectionSlot(ticketId: String) async throws -> CollectionSlot? {
+        try await postSlot(path: "/api/customer/enquiries/\(ticketId)/collection-slot/confirm", body: [:])
+    }
+
+    /// `POST /api/customer/enquiries/:ticketId/collection-slot/request`
+    ///
+    /// Asking for a different day is allowed at any point, including after
+    /// confirming: plans change, and the alternative is a phone call.
+    static func requestCollectionSlot(
+        ticketId: String, date: String, window: String
+    ) async throws -> CollectionSlot? {
+        try await postSlot(
+            path: "/api/customer/enquiries/\(ticketId)/collection-slot/request",
+            body: ["date": date, "window": window])
+    }
+
+    private static func postSlot(path: String, body: [String: Any]) async throws -> CollectionSlot? {
+        guard let token = customerAuth.accessToken else { throw APIError.unauthorized }
+
+        let url = URL(string: "\(baseURL)\(path)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkStatus(response)
+
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let apiResponse = try decoder.decode(APIResponse<CollectionSlotResponse>.self, from: data)
+        guard apiResponse.success else {
+            throw APIError.serverError(
+                message: apiResponse.error ?? "Could not update the collection time", code: nil)
+        }
+        return apiResponse.data?.collectionSlot
+    }
+
     // MARK: - Transport
 
     private static func get<T: Decodable>(_ path: String) async throws -> APIResponse<T> {

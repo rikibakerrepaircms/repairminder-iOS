@@ -56,6 +56,21 @@ struct CustomerEnquiryDetailView: View {
                 // messages, because it is the first thing someone who has just
                 // agreed to sell a device needs to read. A nil enquiry_kind is an
                 // ordinary enquiry and renders nothing here.
+                // Above the next steps: someone with a window waiting on them should
+                // not have to read four generic steps first. Renders nothing when no
+                // collection is in play.
+                if let slot = viewModel.collectionSlot {
+                    CustomerCollectionSlotCard(
+                        slot: slot,
+                        isBusy: viewModel.isUpdatingSlot,
+                        errorMessage: viewModel.slotError,
+                        onConfirm: { Task { await viewModel.confirmCollectionSlot() } },
+                        onRequest: { date, window in
+                            Task { await viewModel.requestCollectionSlot(date: date, window: window) }
+                        }
+                    )
+                }
+
                 if viewModel.showsSellNextSteps {
                     CustomerSellNextStepsCard(fulfilment: enquiry.fulfilment)
                 }

@@ -152,6 +152,8 @@ enum APIEndpoint {
     case ticket(id: String)
     case updateTicket(id: String)
     case ticketReply(id: String)
+    /// Staff offer a two-hour doorstep collection window. POST { date, start_time }.
+    case ticketOfferCollectionSlot(id: String)
     case ticketNote(id: String)
     case ticketGenerateResponse(id: String)
     case ticketRewriteResponse(id: String)
@@ -578,6 +580,8 @@ enum APIEndpoint {
             return "/api/tickets/\(id)"
         case .ticketReply(let id):
             return "/api/tickets/\(id)/reply"
+        case .ticketOfferCollectionSlot(let id):
+            return "/api/tickets/\(id)/collection-slot/offer"
         case .ticketNote(let id):
             return "/api/tickets/\(id)/note"
         case .ticketGenerateResponse(let id):
@@ -876,7 +880,7 @@ enum APIEndpoint {
              .sendQuote, .authorizeOrder, .despatchOrder, .collectOrder,
              .createOrderRefund, .createTicketNote, .recreateOrder,
              .createClient, .clientsImport,
-             .createTicket, .ticketReply, .ticketNote, .ticketGenerateResponse, .ticketRewriteResponse, .ticketExecuteMacro, .ticketPreviewMacro, .ticketSuggestQuote,
+             .createTicket, .ticketReply, .ticketOfferCollectionSlot, .ticketNote, .ticketGenerateResponse, .ticketRewriteResponse, .ticketExecuteMacro, .ticketPreviewMacro, .ticketSuggestQuote,
              .ticketResolve, .ticketReassign, .createEnquiry,
              .registerDeviceToken, .customerRegisterDeviceToken,
              .initiateTerminalPayment, .cancelTerminalPayment, .refundTerminalPayment,

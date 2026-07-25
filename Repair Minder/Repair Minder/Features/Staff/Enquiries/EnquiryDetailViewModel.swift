@@ -127,6 +127,35 @@ final class EnquiryDetailViewModel: ObservableObject {
         await performLoad()
     }
 
+    // MARK: - Collection slot
+
+    /// Held separately from `ticket` so offering a window renders the server's own
+    /// answer without refetching the whole thread.
+    @Published private(set) var slotOverride: CollectionSlot?
+    @Published private(set) var isOfferingSlot: Bool = false
+    @Published var slotError: String?
+
+    var collectionSlot: CollectionSlot? { slotOverride ?? ticket?.collectionSlot }
+
+    func offerCollectionSlot(date: String, startTime: String) async {
+        guard !isOfferingSlot else { return }
+        isOfferingSlot = true
+        slotError = nil
+        do {
+            let response: CollectionSlotResponse = try await APIClient.shared.request(
+                .ticketOfferCollectionSlot(id: ticketId),
+                body: CollectionSlotOfferBody(date: date, startTime: startTime)
+            )
+            slotOverride = response.collectionSlot
+        } catch {
+            slotError = "Could not offer that window"
+            #if DEBUG
+            print("[EnquiryDetailVM] Offer collection slot failed: \(error)")
+            #endif
+        }
+        isOfferingSlot = false
+    }
+
     private func performLoad() async {
         isLoading = true
         error = nil
