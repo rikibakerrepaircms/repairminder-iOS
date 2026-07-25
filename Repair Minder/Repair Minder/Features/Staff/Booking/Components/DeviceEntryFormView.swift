@@ -21,6 +21,10 @@ struct DeviceEntryFormView: View {
     /// to be wrong, but nothing was confirmed either, and for a purchase that
     /// difference is the whole point.
     @State private var lookupUnknowns: [String] = []
+    /// Set when the lookup CONFIRMED the device is reported lost or stolen.
+    /// Separate from lookupWarning because this one blocks: we will not buy a
+    /// stolen handset, whereas Find My being on is the customer's to resolve.
+    @State private var lookupBlocked = false
     @State private var isShowingCamera = false
 
     init(
@@ -298,7 +302,9 @@ struct DeviceEntryFormView: View {
     private var isValid: Bool {
         let hasDisplayName = !device.displayName.trimmingCharacters(in: .whitespaces).isEmpty
         let hasBrandOrCustomBrand = device.brandId != nil || !(device.customBrand ?? "").trimmingCharacters(in: .whitespaces).isEmpty
-        return hasDisplayName && hasBrandOrCustomBrand
+        // A device confirmed as reported lost or stolen cannot be added to a
+        // buyback at all. Warning and carrying on is not a gate.
+        return hasDisplayName && hasBrandOrCustomBrand && !lookupBlocked
     }
 
     // MARK: - Device Check
@@ -329,9 +335,17 @@ struct DeviceEntryFormView: View {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.red)
-                    Text(lookupWarning)
-                        .font(.caption)
-                        .foregroundStyle(.red)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(lookupWarning)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                        if lookupBlocked {
+                            Text("This device cannot be added to a buyback.")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.red)
+                        }
+                    }
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -376,6 +390,7 @@ struct DeviceEntryFormView: View {
         lookupError = nil
         lookupWarning = nil
         lookupUnknowns = []
+        lookupBlocked = false
         defer { isLookingUp = false }
 
         // Buying, not repairing: also pay for the blacklist check. This is the
@@ -417,6 +432,10 @@ struct DeviceEntryFormView: View {
             }
             // Only meaningful when we were actually buying - a repair intake
             // never paid for the blacklist call, so listing it is noise.
+            // A confirmed blacklist hit stops the purchase outright. Find My
+            // stays a warning: the customer can clear it and come back.
+            lookupBlocked = forBuyback && found.isBlacklisted
+
             if forBuyback {
                 var unknown = found.unconfirmedChecks
                 if result.blacklistError != nil {
