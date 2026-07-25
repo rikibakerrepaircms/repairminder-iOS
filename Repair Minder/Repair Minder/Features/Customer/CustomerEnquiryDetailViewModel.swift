@@ -59,6 +59,47 @@ final class CustomerEnquiryDetailViewModel: ObservableObject {
         await load()
     }
 
+    // MARK: - Collection slot
+
+    /// The slot shown by the view. Held separately from `enquiry` so an action can
+    /// render the server's own answer without refetching the whole thread.
+    @Published private(set) var slotOverride: CollectionSlot?
+    @Published private(set) var isUpdatingSlot: Bool = false
+    @Published var slotError: String?
+
+    var collectionSlot: CollectionSlot? { slotOverride ?? enquiry?.collectionSlot }
+
+    func confirmCollectionSlot() async {
+        await updateSlot { try await CustomerEnquiryService.confirmCollectionSlot(ticketId: self.ticketId) }
+    }
+
+    func requestCollectionSlot(date: String, window: String) async {
+        await updateSlot {
+            try await CustomerEnquiryService.requestCollectionSlot(
+                ticketId: self.ticketId, date: date, window: window)
+        }
+    }
+
+    private func updateSlot(_ work: @escaping () async throws -> CollectionSlot?) async {
+        guard !isUpdatingSlot else { return }
+        isUpdatingSlot = true
+        slotError = nil
+        do {
+            slotOverride = try await work()
+        } catch let error as APIError {
+            slotError = error.localizedDescription
+            #if DEBUG
+            print("[CustomerEnquiryDetailVM] Slot update failed: \(error)")
+            #endif
+        } catch {
+            slotError = "Could not update the collection time"
+            #if DEBUG
+            print("[CustomerEnquiryDetailVM] Slot update failed: \(error)")
+            #endif
+        }
+        isUpdatingSlot = false
+    }
+
     func sendReply() async {
         let message = replyText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !message.isEmpty, !isSendingReply else { return }

@@ -154,6 +154,22 @@ struct EnquiryDetailView: View {
                 workflowSection
             }
 
+            // Doorstep collection. Above the messages, not inside them: a collection
+            // waiting on a window is an action, and burying it in a thread is how it
+            // gets missed. Renders nothing when no collection is in play.
+            if let slot = viewModel.collectionSlot {
+                CollectionSlotOfferCard(
+                    slot: slot,
+                    isBusy: viewModel.isOfferingSlot,
+                    errorMessage: viewModel.slotError,
+                    onOffer: { date, startTime in
+                        Task { await viewModel.offerCollectionSlot(date: date, startTime: startTime) }
+                    }
+                )
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+            }
+
             // Messages
             messagesList
 

@@ -34,6 +34,12 @@ struct Ticket: Codable, Identifiable, Sendable, Equatable, Hashable {
     let smsAvailable: Bool?
     let smsRemaining: Int?
     let smsAlreadySent: Bool?
+    /// 'sell' | 'repair_order' | 'enquiry', or nil on anything not from the storefront.
+    let enquiryKind: String?
+    /// 'visit' | 'collection', or nil when the customer was never asked.
+    let fulfilment: String?
+    /// Nil on every ticket with no doorstep collection in play, which is most.
+    let collectionSlot: CollectionSlot?
 
     // MARK: - Computed Properties
 

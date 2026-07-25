@@ -86,9 +86,12 @@ struct CustomerEnquiryDetail: Decodable, Sendable {
     let createdAt: Date?
     let messages: [CustomerMessage]
     let company: CustomerEnquiryCompany?
+    /// Nil on every enquiry with no doorstep collection in play, which is most.
+    let collectionSlot: CollectionSlot?
 
     enum CodingKeys: String, CodingKey {
         case ticketNumber, subject, status, ticketType, enquiryKind, fulfilment, createdAt, messages, company
+        case collectionSlot
     }
 
     init(from decoder: Decoder) throws {
@@ -102,6 +105,7 @@ struct CustomerEnquiryDetail: Decodable, Sendable {
         createdAt = MarketingDate.parse(try c.decodeIfPresent(String.self, forKey: .createdAt))
         messages = try c.decodeIfPresent([CustomerMessage].self, forKey: .messages) ?? []
         company = try c.decodeIfPresent(CustomerEnquiryCompany.self, forKey: .company)
+        collectionSlot = try c.decodeIfPresent(CollectionSlot.self, forKey: .collectionSlot)
     }
 
     var isSell: Bool { enquiryKind == CustomerEnquiryKind.sell }
