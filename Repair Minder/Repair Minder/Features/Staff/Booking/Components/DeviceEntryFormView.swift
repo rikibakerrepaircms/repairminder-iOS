@@ -59,6 +59,14 @@ struct DeviceEntryFormView: View {
 
             Divider()
 
+            // Buying: the identifier leads. Everything below is filled FROM the
+            // lookup, so asking for brand and model first is asking staff to type
+            // what we are about to tell them - and it buries the one check that
+            // decides whether we may buy the device at all.
+            if device.workflowType == .buyback {
+                buybackIdentifyFirst
+            }
+
             // Brand & Model Selection (unified search)
             DeviceSearchPicker(
                 viewModel: viewModel,
@@ -111,25 +119,30 @@ struct DeviceEntryFormView: View {
                     .fontWeight(.medium)
                     .foregroundStyle(.secondary)
 
-                HStack(spacing: 12) {
-                    FormTextField(
-                        label: "Serial Number",
-                        text: $device.serialNumber,
-                        placeholder: "ABC123XYZ"
-                    )
+                // For a buyback these live at the top of the form instead - see
+                // buybackIdentifyFirst. Rendering them twice would put two
+                // editors on one binding on the same screen.
+                if device.workflowType != .buyback {
+                    HStack(spacing: 12) {
+                        FormTextField(
+                            label: "Serial Number",
+                            text: $device.serialNumber,
+                            placeholder: "ABC123XYZ"
+                        )
 
-                    FormTextField(
-                        label: "IMEI",
-                        text: $device.imei,
-                        placeholder: "123456789012345",
-                        keyboardType: .numberPad
-                    )
+                        FormTextField(
+                            label: "IMEI",
+                            text: $device.imei,
+                            placeholder: "123456789012345",
+                            keyboardType: .numberPad
+                        )
+                    }
+
+                    // One lookup fills the model, colour and storage, and tells
+                    // us whether the device is locked or reported stolen before
+                    // any money changes hands.
+                    deviceCheckRow
                 }
-
-                // One lookup fills the model, colour and storage, and tells us
-                // whether the device is locked or reported stolen before any
-                // money changes hands.
-                deviceCheckRow
 
                 HStack(spacing: 12) {
                     FormTextField(
@@ -318,6 +331,47 @@ struct DeviceEntryFormView: View {
         return hasDisplayName && hasBrandOrCustomBrand
     }
 
+    // MARK: - Identify First (buyback)
+
+    /// The identifier and its check, given top billing on a purchase.
+    ///
+    /// One lookup fills the model, colour, storage and serial, and answers the
+    /// two questions that decide whether we may buy at all: is Find My still on,
+    /// and is it reported lost or stolen. Everything else on this form follows
+    /// from it, so it goes first and looks like the primary action.
+    @ViewBuilder
+    private var buybackIdentifyFirst: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Start here", systemImage: "barcode.viewfinder")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+
+            Text("Enter the IMEI or serial and check it. That fills the rest of this form and tells us whether we can buy the device.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 12) {
+                FormTextField(
+                    label: "IMEI",
+                    text: $device.imei,
+                    placeholder: "123456789012345",
+                    keyboardType: .numberPad
+                )
+
+                FormTextField(
+                    label: "Serial Number",
+                    text: $device.serialNumber,
+                    placeholder: "ABC123XYZ"
+                )
+            }
+
+            deviceCheckRow
+        }
+        .padding(14)
+        .background(Color.platformGray6)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
     // MARK: - Device Check
 
     @ViewBuilder
@@ -335,7 +389,22 @@ struct DeviceEntryFormView: View {
                     Text(isLookingUp ? "Checking..." : "Check device")
                 }
                 .font(.subheadline)
+                .fontWeight(device.workflowType == .buyback ? .semibold : .regular)
+                // On a purchase this is the primary action of the whole form, so
+                // it is filled rather than a plain row of text.
+                .frame(maxWidth: device.workflowType == .buyback ? .infinity : nil)
+                .padding(.vertical, device.workflowType == .buyback ? 10 : 0)
+                .background(
+                    device.workflowType == .buyback
+                        ? AnyShapeStyle(lookupIdentifier.isEmpty ? AnyShapeStyle(Color.platformGray6) : AnyShapeStyle(Color.accentColor))
+                        : AnyShapeStyle(Color.clear)
+                )
+                .foregroundStyle(
+                    device.workflowType == .buyback && !lookupIdentifier.isEmpty ? Color.white : Color.accentColor
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 10))
             }
+            .buttonStyle(.plain)
             .disabled(isLookingUp || lookupIdentifier.isEmpty)
             // Buying: run the check as soon as a complete IMEI or serial is in,
             // rather than waiting for someone to remember the button. Debounced

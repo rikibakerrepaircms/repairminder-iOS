@@ -13,9 +13,21 @@ import UIKit
 struct CameraPicker: UIViewControllerRepresentable {
     let onImage: (UIImage) -> Void
 
+    /// Is a live camera actually usable right now?
+    ///
+    /// UIImagePickerController RAISES AN EXCEPTION and terminates the app if
+    /// sourceType is set to .camera when no camera is available - it is not a
+    /// silent no-op. That is a hard crash on the Simulator, and on any device
+    /// where the camera is restricted by MDM or parental controls. Apple's docs
+    /// require this check before assigning sourceType.
+    static var cameraAvailable: Bool {
+        UIImagePickerController.isSourceTypeAvailable(.camera)
+    }
+
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
-        picker.sourceType = .camera
+        // Never assign .camera unguarded - see cameraAvailable above.
+        picker.sourceType = Self.cameraAvailable ? .camera : .photoLibrary
         picker.delegate = context.coordinator
         return picker
     }
