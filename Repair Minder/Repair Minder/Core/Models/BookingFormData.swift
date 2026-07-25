@@ -28,6 +28,16 @@ struct BookingDeviceEntry: Identifiable, Equatable {
     var lineItems: [BookingLineItem]
     var aftermarketConsent: Bool
 
+    /// What we agreed to pay for a buyback device, as typed. Kept as a String
+    /// because it is bound to a text field; parsed once on submit.
+    /// Defaulted so existing call sites keep their shorter memberwise init.
+    var agreedPrice: String = ""
+
+    /// Photos captured during booking, before the order exists. Uploaded on
+    /// submit once the device has a server id. Already compressed to <= 150KB
+    /// by ImageCompressor, so holding them in memory is cheap.
+    var pendingPhotos: [PlatformImageData] = []
+
     /// Whether any line item has an aftermarket quality tier
     var hasAftermarketItems: Bool {
         lineItems.contains { $0.qualityTier.lowercased().contains("aftermarket") }
@@ -134,7 +144,9 @@ struct BookingDeviceEntry: Identifiable, Equatable {
             workflowType: workflowType,
             accessories: [],
             lineItems: [],
-            aftermarketConsent: false
+            aftermarketConsent: false,
+            agreedPrice: "",
+            pendingPhotos: []
         )
     }
 }
