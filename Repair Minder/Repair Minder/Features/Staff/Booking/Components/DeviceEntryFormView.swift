@@ -17,6 +17,10 @@ struct DeviceEntryFormView: View {
     @State private var isLookingUp = false
     @State private var lookupError: String?
     @State private var lookupWarning: String?
+    /// Checks that did not come back. Distinct from a warning: nothing is known
+    /// to be wrong, but nothing was confirmed either, and for a purchase that
+    /// difference is the whole point.
+    @State private var lookupUnknowns: [String] = []
     @State private var isShowingCamera = false
 
     init(
@@ -317,11 +321,32 @@ struct DeviceEntryFormView: View {
             }
             .disabled(isLookingUp || lookupIdentifier.isEmpty)
 
+            // Red, not orange: this is a confirmed reason to stop, and it now
+            // sits beside an orange "could not confirm" box. Two orange boxes
+            // would flatten the difference between "this device is stolen" and
+            // "we did not manage to ask".
             if let lookupWarning {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.red)
                     Text(lookupWarning)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.red.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+
+            // Absence is not innocence. When SICKW withdrew the Apple service the
+            // lock field simply stopped arriving and every iPhone showed a clean
+            // check for nine days. Saying nothing here would repeat that.
+            if !lookupUnknowns.isEmpty {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "questionmark.circle.fill")
+                        .foregroundStyle(.orange)
+                    Text("Not confirmed: \(lookupUnknowns.joined(separator: ", ")). This is not a clean result, it is a missing one, so check the device by hand before paying.")
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
@@ -350,10 +375,19 @@ struct DeviceEntryFormView: View {
         isLookingUp = true
         lookupError = nil
         lookupWarning = nil
+        lookupUnknowns = []
         defer { isLookingUp = false }
 
+        // Buying, not repairing: also pay for the blacklist check. This is the
+        // only point at which we can find out that the device we are about to
+        // hand cash over for is reported lost or stolen.
+        let forBuyback = device.workflowType == .buyback
+
         do {
-            let result = try await RMCheckService().lookup(identifier: lookupIdentifier)
+            let result = try await RMCheckService().lookup(
+                identifier: lookupIdentifier,
+                forBuyback: forBuyback
+            )
             let found = result.device
 
             if (device.customModel ?? "").isEmpty, let model = found.model, !model.isEmpty {
@@ -380,6 +414,16 @@ struct DeviceEntryFormView: View {
 
             lookupWarning = found.warningSummary.map {
                 "Do not pay for this device yet: \($0). Get the customer to resolve it first."
+            }
+            // Only meaningful when we were actually buying - a repair intake
+            // never paid for the blacklist call, so listing it is noise.
+            if forBuyback {
+                var unknown = found.unconfirmedChecks
+                if result.blacklistError != nil {
+                    unknown.removeAll { $0.hasPrefix("blacklist") }
+                    unknown.append("blacklist (provider unavailable)")
+                }
+                lookupUnknowns = unknown
             }
         } catch {
             lookupError = "Could not check that IMEI or serial. Enter the details by hand."
