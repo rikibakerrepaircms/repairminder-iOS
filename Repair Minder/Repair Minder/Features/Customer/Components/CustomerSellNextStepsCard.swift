@@ -53,6 +53,10 @@ struct CustomerSellNextStepsCard: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
+            Text("We check Find My and run a blacklist check on every device the moment it arrives. If either one stops us, we cannot buy it and we will get in touch - so it is worth doing this properly now rather than having the device sent back to you.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
             VStack(alignment: .leading, spacing: 6) {
                 Link(destination: URL(string: "https://mendmyi.com/blog/how-to-wipe-your-phone-before-selling")!) {
                     Label("How to wipe your device", systemImage: "arrow.up.right.square")
@@ -120,6 +124,13 @@ struct CustomerSellNextStepsCard: View {
             Text(isVisit
                  ? "We check the device on the bench while you wait, then give you a firm offer there and then. If you accept it we pay you the same day. If you would rather not, you take the device home with you and there is nothing to pay."
                  : "We check the device on the bench, then email you a confirmed offer. You can accept it or reject it. If you accept, we pay out within one working day. If you reject it, we return the device to you free of charge.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            // Said here as well as in the wipe step, because the two land at different
+            // moments: up there it is a job to do before posting, here it is what will
+            // actually happen to the device.
+            Text("Every device gets a Find My check and a blacklist check on arrival. A device still locked to an account, or reported lost or stolen, is one we cannot buy.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
