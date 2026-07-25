@@ -1,9 +1,13 @@
 # Xcode build artifacts
 build/
 DerivedData/
-*.xcodeproj/xcuserdata/
-*.xcworkspace/xcuserdata/
-*.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+# A pattern containing a slash is anchored to this file's directory, and `*`
+# never matches `/`. So `*.xcodeproj/xcuserdata/` only ever matched a project at
+# the repo root - never `Repair Minder/Repair Minder.xcodeproj/`, which is where
+# ours actually lives. The `**/` prefix makes these match at any depth.
+**/*.xcodeproj/xcuserdata/
+**/*.xcworkspace/xcuserdata/
+**/*.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
 
 # macOS
 .DS_Store
