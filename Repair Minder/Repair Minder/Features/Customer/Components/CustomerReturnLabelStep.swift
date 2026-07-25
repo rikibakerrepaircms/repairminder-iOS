@@ -9,6 +9,9 @@ import SwiftUI
 #if os(macOS)
 import AppKit
 #endif
+#if os(iOS)
+import UIKit
+#endif
 
 /// The customer's postage label CTA: request, then track and download.
 ///
@@ -26,6 +29,9 @@ struct CustomerReturnLabelStep: View {
     /// The route they picked, so the pre-label prompt can state it rather than
     /// ask it. See `labelPrompt` below and its twin in `SellNextStepsCard.tsx`.
     private let fulfilment: String?
+
+    /// Momentary "Copied" confirmation on the tracking-number button.
+    @State private var copiedTracking = false
 
     init(ticketId: String, fulfilment: String? = nil) {
         _viewModel = StateObject(wrappedValue: CustomerReturnLabelViewModel(ticketId: ticketId))
@@ -93,11 +99,36 @@ struct CustomerReturnLabelStep: View {
 
     // MARK: - Expired
 
+    /// A seller looking at this has a ticket that is still open, so it has NOT gone
+    /// cold - a cold one is closed by the inactivity sweep and never renders here.
+    /// It outlived Royal Mail's own ceiling instead. Reissuing costs nothing, so
+    /// sending them off to email us was a dead end for someone already looking at
+    /// the thing they need.
     private var expiredView: some View {
         step(icon: "clock", title: "Your postage label has expired") {
-            Text("Reply to your confirmation email and we will sort out a new one.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Royal Mail labels only last so long. Get a fresh one now - it is free, and your offer is not affected.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                Button {
+                    Task { await viewModel.requestLabel() }
+                } label: {
+                    if viewModel.isRequesting {
+                        Label("Getting your label...", systemImage: "paperplane")
+                    } else {
+                        Label("Send me a new label", systemImage: "paperplane")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(viewModel.isRequesting)
+
+                if let requestError = viewModel.requestError {
+                    Text(requestError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
         }
     }
 
@@ -126,14 +157,41 @@ struct CustomerReturnLabelStep: View {
                     .foregroundStyle(.secondary)
                 }
 
-                Text("Drop it off at any Post Office, or book a free door collection using the tracking number above - Royal Mail will print the label and bring it with them, so you do not need a printer at all.")
+                Text("Print it and drop the parcel at any Post Office. Would rather not print? Book a free door collection using the tracking number above - Royal Mail will print the label and bring it with them, so you do not need a printer at all.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+
+                Link(destination: URL(string: "https://www.postoffice.co.uk/branch-finder")!) {
+                    Label("Find your nearest Post Office", systemImage: "arrow.up.right.square")
+                        .font(.footnote)
+                }
 
                 Link(destination: URL(string: "https://send.royalmail.com/collect/youritems")!) {
                     Label("Book a free door collection", systemImage: "arrow.up.right.square")
                         .font(.footnote)
                 }
+
+                // Booking that collection means typing the tracking number into Royal
+                // Mail's site, so make it one tap rather than a careful transcription.
+                Button {
+                    #if os(iOS)
+                    UIPasteboard.general.string = label.trackingNumber
+                    #elseif os(macOS)
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(label.trackingNumber, forType: .string)
+                    #endif
+                    copiedTracking = true
+                    Task {
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        copiedTracking = false
+                    }
+                } label: {
+                    Label(
+                        copiedTracking ? "Copied" : "Copy tracking number",
+                        systemImage: copiedTracking ? "checkmark" : "doc.on.doc"
+                    )
+                }
+                .buttonStyle(.bordered)
 
                 Button {
                     Task { await viewModel.downloadPdf() }
