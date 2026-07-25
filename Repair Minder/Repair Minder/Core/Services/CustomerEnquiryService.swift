@@ -108,6 +108,75 @@ struct CustomerEnquiryService {
         return apiResponse.data?.collectionSlot
     }
 
+    // MARK: - Return label
+
+    /// `GET /api/customer/enquiries/:ticketId/return-label`
+    ///
+    /// *** GET must never create ***. The portal link this backs travels by
+    /// email and SMS, and link scanners/prefetchers in Mail and Messages
+    /// issue GETs on it with nobody at the keyboard. If a GET could create a
+    /// label it would silently mint a real, chargeable Royal Mail shipment.
+    /// This call is a pure read: the endpoint 404s when no label exists yet,
+    /// which is not an error here, just "none yet". Safe to call on view
+    /// appear and on pull-to-refresh. The ONLY call that may create a label
+    /// is `requestReturnLabel` below, and only from a button action.
+    static func fetchReturnLabel(ticketId: String) async throws -> CustomerReturnLabel? {
+        do {
+            let response: APIResponse<CustomerReturnLabel> =
+                try await get("/api/customer/enquiries/\(ticketId)/return-label")
+            return response.success ? response.data : nil
+        } catch APIError.notFound {
+            return nil
+        }
+    }
+
+    /// `POST /api/customer/enquiries/:ticketId/return-label`
+    ///
+    /// Idempotent server-side (a second call returns the same row and makes
+    /// no Royal Mail request) and rate limited 5/hour per ticket - but this
+    /// client must not lean on either safety net. Call this ONLY from a
+    /// button's action, guarded so a fast double-tap cannot start two
+    /// requests (see `CustomerReturnLabelViewModel.requestLabel` in
+    /// `CustomerSellNextStepsCard.swift`). Never call this from `.task`,
+    /// `.onAppear`, or `refreshable`.
+    static func requestReturnLabel(ticketId: String) async throws -> CustomerReturnLabel {
+        guard let token = customerAuth.accessToken else { throw APIError.unauthorized }
+
+        let url = URL(string: "\(baseURL)/api/customer/enquiries/\(ticketId)/return-label")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkStatus(response)
+
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let apiResponse = try decoder.decode(APIResponse<CustomerReturnLabel>.self, from: data)
+        guard apiResponse.success, let label = apiResponse.data else {
+            throw APIError.serverError(
+                message: apiResponse.error ?? "Failed to request the postage label", code: nil)
+        }
+        return label
+    }
+
+    /// `GET /api/customer/enquiries/:ticketId/return-label?format=pdf` - the
+    /// stored label as raw PDF bytes. Read-only, same "GET never creates"
+    /// contract as `fetchReturnLabel` above.
+    static func fetchReturnLabelPdfData(ticketId: String) async throws -> Data {
+        guard let token = customerAuth.accessToken else { throw APIError.unauthorized }
+
+        let url = URL(string: "\(baseURL)/api/customer/enquiries/\(ticketId)/return-label?format=pdf")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkStatus(response)
+        return data
+    }
+
     // MARK: - Transport
 
     private static func get<T: Decodable>(_ path: String) async throws -> APIResponse<T> {
@@ -135,5 +204,6 @@ struct CustomerEnquiryService {
         }
         if http.statusCode == 401 { throw APIError.unauthorized }
         if http.statusCode == 404 { throw APIError.notFound }
+        if http.statusCode == 429 { throw APIError.rateLimited }
     }
 }

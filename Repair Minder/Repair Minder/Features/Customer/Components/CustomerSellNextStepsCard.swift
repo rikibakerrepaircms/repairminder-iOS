@@ -20,6 +20,8 @@ import SwiftUI
 /// portal. Change the wording in one, change it in the other.
 struct CustomerSellNextStepsCard: View {
 
+    let ticketId: String
+
     /// 'visit' | 'collection' | nil. Nil means the customer never chose a route.
     let fulfilment: String?
 
@@ -30,14 +32,8 @@ struct CustomerSellNextStepsCard: View {
 
             wipeStep
             fulfilmentStep
+            CustomerReturnLabelStep(ticketId: ticketId)
             arrivalStep
-
-            // LABEL CTA SLOT. When postage labels exist, the "download your label"
-            // button goes here, beside the collection and visit routes above.
-            // Nothing in the schema carries a label URL or a tracking number today,
-            // so there is deliberately no button - a dead button in front of a
-            // paying customer is worse than no button. See labelRequestUrl in
-            // worker/src/storefront_handlers.js, still null for the same reason.
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -136,13 +132,13 @@ struct CustomerSellNextStepsCard: View {
 // MARK: - Preview
 
 #Preview("Collection") {
-    CustomerSellNextStepsCard(fulfilment: "collection").padding()
+    CustomerSellNextStepsCard(ticketId: "preview-ticket-id", fulfilment: "collection").padding()
 }
 
 #Preview("Visit") {
-    CustomerSellNextStepsCard(fulfilment: "visit").padding()
+    CustomerSellNextStepsCard(ticketId: "preview-ticket-id", fulfilment: "visit").padding()
 }
 
 #Preview("Unknown") {
-    CustomerSellNextStepsCard(fulfilment: nil).padding()
+    CustomerSellNextStepsCard(ticketId: "preview-ticket-id", fulfilment: nil).padding()
 }

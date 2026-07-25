@@ -72,7 +72,7 @@ struct CustomerEnquiryDetailView: View {
                 }
 
                 if viewModel.showsSellNextSteps {
-                    CustomerSellNextStepsCard(fulfilment: enquiry.fulfilment)
+                    CustomerSellNextStepsCard(ticketId: viewModel.ticketId, fulfilment: enquiry.fulfilment)
                 }
 
                 messagesSection(enquiry)
