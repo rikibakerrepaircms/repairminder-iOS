@@ -80,8 +80,9 @@ final class BookingViewModel {
     // MARK: - Navigation
 
     /// Steps the wizard actually walks through given the current intake method.
-    /// walk_in keeps the full 5-step flow; mail_in / courier drop Devices and
-    /// Signature since the order is created in awaiting_device with neither.
+    /// walk_in / collection keep the full 5-step flow; mail_in / courier drop
+    /// Devices and Signature since the order is created in awaiting_device
+    /// with neither.
     var visibleSteps: [BookingStep] {
         if formData.intakeMethod.collectsDevicesAndSignature {
             return BookingStep.allCases
@@ -90,8 +91,8 @@ final class BookingViewModel {
     }
 
     /// Key of the last data-collection step (i.e. the step whose primary
-    /// button submits the booking). For walk_in this is .signature; for
-    /// mail_in / courier this collapses to .summary.
+    /// button submits the booking). For walk_in / collection this is
+    /// .signature; for mail_in / courier this collapses to .summary.
     var submitStepKey: BookingStep {
         visibleSteps.dropLast().last ?? .client
     }
@@ -291,6 +292,55 @@ final class BookingViewModel {
         }
     }
 
+    /// Seed the form from an existing enquiry so converting it to an order
+    /// doesn't retype what the ticket already knows. Sets `existingTicketId`,
+    /// which makes POST /api/orders adopt the ticket rather than create a new
+    /// one. Address fields arrive with the background client fetch, the same
+    /// way `selectClient` fills them.
+    func prefill(fromTicket ticket: Ticket) {
+        formData.existingTicketId = ticket.id
+
+        if let location = ticket.locationId, !location.isEmpty {
+            formData.locationId = location
+        }
+
+        guard let client = ticket.client else { return }
+
+        formData.existingClientId = client.id
+        formData.email = client.email
+        formData.phone = client.phone ?? ""
+
+        // Tickets carry one display name; split it the way the web convert
+        // modal does — first word is the forename, the rest is the surname.
+        let parts = (client.name ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(separator: " ", omittingEmptySubsequences: true)
+            .map(String.init)
+        formData.firstName = parts.first ?? ""
+        formData.lastName = parts.dropFirst().joined(separator: " ")
+
+        Task {
+            do {
+                let fullClient: Client = try await APIClient.shared.request(.client(id: client.id))
+                formData.existingClient = fullClient
+                if let first = fullClient.firstName, !first.isEmpty { formData.firstName = first }
+                if let last = fullClient.lastName, !last.isEmpty { formData.lastName = last }
+                formData.addressLine1 = fullClient.addressLine1 ?? ""
+                formData.addressLine2 = fullClient.addressLine2 ?? ""
+                formData.city = fullClient.city ?? ""
+                formData.county = fullClient.county ?? ""
+                formData.postcode = fullClient.postcode ?? ""
+                formData.country = fullClient.country ?? defaultCountryName
+                if let cc = fullClient.countryCode, !cc.isEmpty {
+                    formData.countryCode = cc
+                }
+            } catch {
+                logger.error("Failed to prefill client from ticket: \(error)")
+                // Non-fatal — staff can still complete the fields by hand.
+            }
+        }
+    }
+
     func clearSelectedClient() {
         formData.existingClientId = nil
         formData.existingClient = nil
@@ -374,10 +424,10 @@ final class BookingViewModel {
             }
 
             // 4. Map service type + intake method to backend intake_method.
-            // Backend INTAKE_METHODS: walk_in, mail_in, courier, counter_sale,
-            // accessories_in_store. Accessories and device-sale always have
-            // fixed backend values; repair/buyback honour the staff's pick of
-            // walk_in / mail_in / courier on the Customer step.
+            // Backend INTAKE_METHODS: walk_in, collection, mail_in, courier,
+            // counter_sale, accessories_in_store, kiosk_sale. Accessories and
+            // device-sale always have fixed backend values; repair/buyback
+            // honour the staff's pick on the Customer step.
             let intakeMethod: String
             switch formData.serviceType {
             case .accessories:

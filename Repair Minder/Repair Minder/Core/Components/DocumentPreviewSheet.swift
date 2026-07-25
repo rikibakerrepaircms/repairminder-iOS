@@ -16,6 +16,11 @@ struct DocumentPreviewSheet: View {
     let orderId: String
     let orderNumber: Int
     let documentType: DocumentType
+    /// Called once the document has actually reached the customer — after the
+    /// share sheet reports success on iOS, or the file is written on macOS.
+    /// Lets the caller record that it went out.
+    var onShared: (() -> Void)?
+
     @Environment(\.dismiss) private var dismiss
 
     @State private var htmlString: String?
@@ -139,6 +144,9 @@ struct DocumentPreviewSheet: View {
                         activityItems: [tempURL],
                         applicationActivities: nil
                     )
+                    activityVC.completionWithItemsHandler = { _, completed, _, _ in
+                        if completed { onShared?() }
+                    }
                     if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                        let rootVC = windowScene.windows.first?.rootViewController {
                         var presenter = rootVC
@@ -161,7 +169,13 @@ struct DocumentPreviewSheet: View {
                     savePanel.allowedContentTypes = [.pdf]
                     savePanel.begin { response in
                         if response == .OK, let url = savePanel.url {
-                            try? pdfData.write(to: url)
+                            do {
+                                try pdfData.write(to: url)
+                                onShared?()
+                            } catch {
+                                // Nothing more to do — the panel is gone and the
+                                // user can retry from the toolbar.
+                            }
                         }
                     }
                     #endif

@@ -10,10 +10,17 @@ struct BookingWizardView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var sizeClass
     let onComplete: () -> Void
+    private let title: String
 
-    init(viewModel: BookingViewModel, serviceType: ServiceType, onComplete: @escaping () -> Void) {
+    init(
+        viewModel: BookingViewModel,
+        serviceType: ServiceType,
+        title: String = "New Booking",
+        onComplete: @escaping () -> Void
+    ) {
         self._viewModel = State(initialValue: viewModel)
         viewModel.formData.serviceType = serviceType
+        self.title = title
         self.onComplete = onComplete
     }
 
@@ -88,7 +95,7 @@ struct BookingWizardView: View {
                 footerNavigation
             }
         }
-        .navigationTitle("New Booking")
+        .navigationTitle(title)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
