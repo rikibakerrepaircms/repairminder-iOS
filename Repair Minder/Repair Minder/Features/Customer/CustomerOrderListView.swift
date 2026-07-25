@@ -274,6 +274,17 @@ struct CustomerOrderListView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
+
+            // Not a dead end. Someone who has agreed to sell us a device holds an
+            // enquiry, not an order - there is no order or device record until
+            // staff convert it - so without this they land here and see nothing.
+            NavigationLink {
+                CustomerEnquiryListView()
+            } label: {
+                Label("View My Enquiries", systemImage: "bubble.left.and.bubble.right")
+            }
+            .buttonStyle(.borderedProminent)
+            .padding(.top, 4)
         }
         .padding()
     }
@@ -297,6 +308,10 @@ struct CustomerOrderListView: View {
             }
 
             Divider()
+
+            NavigationLink("My Enquiries") {
+                CustomerEnquiryListView()
+            }
 
             NavigationLink("My Competition Entries") {
                 CustomerCompetitionEntriesView()
