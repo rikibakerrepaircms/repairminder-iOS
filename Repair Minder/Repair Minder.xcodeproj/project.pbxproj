@@ -474,7 +474,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Repair Minder/Repair Minder.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 003;
+				CURRENT_PROJECT_VERSION = 006;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = T578MBWLM2;
 				ENABLE_APP_SANDBOX = YES;
@@ -488,11 +488,11 @@
 				INFOPLIST_KEY_NFCReaderUsageDescription = "Repair Minder uses NFC during a hardware diagnostic to confirm this device can read an NFC tag. No personal data is read, stored, or transmitted.";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Repair Minder uses Bluetooth during a hardware diagnostic to confirm the device's Bluetooth radio powers on and can scan for nearby devices. No data is collected or shared.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Camera access is required to scan QR codes and barcodes for quick device lookup.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Photo library access lets you attach existing photos of a device when the camera is unavailable.";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Repair Minder uses Face ID to unlock the app securely.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Repair Minder uses your location once during a diagnostic to confirm the GPS sensor can obtain a fix. Your location is not stored or transmitted.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Microphone access is used for audio (speaker and mic) diagnostics.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "Motion sensors are used to test the accelerometer, gyroscope and compass.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Photo library access lets you attach existing photos of a device when the camera is unavailable.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -532,7 +532,7 @@
 				BRAND_ID = repairminder;
 				CODE_SIGN_ENTITLEMENTS = "Repair Minder/Repair MinderRelease.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 003;
+				CURRENT_PROJECT_VERSION = 006;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = T578MBWLM2;
 				ENABLE_APP_SANDBOX = YES;
@@ -546,11 +546,11 @@
 				INFOPLIST_KEY_NFCReaderUsageDescription = "Repair Minder uses NFC during a hardware diagnostic to confirm this device can read an NFC tag. No personal data is read, stored, or transmitted.";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Repair Minder uses Bluetooth during a hardware diagnostic to confirm the device's Bluetooth radio powers on and can scan for nearby devices. No data is collected or shared.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Camera access is required to scan QR codes and barcodes for quick device lookup.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Photo library access lets you attach existing photos of a device when the camera is unavailable.";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Repair Minder uses Face ID to unlock the app securely.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Repair Minder uses your location once during a diagnostic to confirm the GPS sensor can obtain a fix. Your location is not stored or transmitted.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Microphone access is used for audio (speaker and mic) diagnostics.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "Motion sensors are used to test the accelerometer, gyroscope and compass.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Photo library access lets you attach existing photos of a device when the camera is unavailable.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

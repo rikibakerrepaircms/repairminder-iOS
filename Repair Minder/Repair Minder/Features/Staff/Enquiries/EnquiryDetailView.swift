@@ -154,9 +154,12 @@ struct EnquiryDetailView: View {
                 workflowSection
             }
 
-            // Doorstep collection. Above the messages, not inside them: a collection
-            // waiting on a window is an action, and burying it in a thread is how it
-            // gets missed. Renders nothing when no collection is in play.
+            // Messages
+            messagesList
+
+            // Doorstep collection, with the composer rather than above the thread.
+            // Offering a window IS a reply - the thing you do after reading the
+            // conversation. Renders nothing when no collection is in play.
             if let slot = viewModel.collectionSlot {
                 CollectionSlotOfferCard(
                     slot: slot,
@@ -169,9 +172,6 @@ struct EnquiryDetailView: View {
                 .padding(.horizontal)
                 .padding(.bottom, 8)
             }
-
-            // Messages
-            messagesList
 
             // Reply composer
             if ticket.canReply {

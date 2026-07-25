@@ -53,12 +53,45 @@ struct CollectionSlotOfferCard: View {
                 Text(errorMessage).font(.footnote).foregroundStyle(.red)
             }
 
-            DatePicker("Day", selection: $chosenDay, in: dayRange, displayedComponents: .date)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("DAY")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.secondary)
+                DatePicker("", selection: $chosenDay, in: dayRange, displayedComponents: .date)
+                    .labelsHidden()
+                    .datePickerStyle(.compact)
+                if isSunday(chosenDay) {
+                    Text("We are closed on Sundays. Pick another day.")
+                        .font(.caption).foregroundStyle(.red)
+                } else if isSaturday(chosenDay) {
+                    Text("Saturday is a half day, mornings only.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
 
-            Picker("Two-hour window", selection: $chosenStart) {
-                Text("Pick a time...").tag("")
-                ForEach(Self.startTimes, id: \.self) { time in
-                    Text("\(time) to \(Self.endOf(time))").tag(time)
+            // A grid of windows rather than a dropdown. Seven options is few enough to
+            // show, and "Pick a time..." hides the very thing being chosen.
+            VStack(alignment: .leading, spacing: 6) {
+                Text("TWO-HOUR WINDOW")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.secondary)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                    ForEach(Self.startTimes, id: \.self) { time in
+                        let closed = isSaturday(chosenDay) && (Int(time.prefix(2)) ?? 0) >= 12
+                        Button {
+                            chosenStart = time
+                        } label: {
+                            VStack(spacing: 1) {
+                                Text(time).font(.subheadline.weight(.semibold))
+                                Text("to \(Self.endOf(time))").font(.caption2)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 46)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(chosenStart == time ? .accentColor : .secondary)
+                        .disabled(closed || isBusy)
+                        .opacity(closed ? 0.35 : 1)
+                    }
                 }
             }
 
@@ -73,7 +106,7 @@ struct CollectionSlotOfferCard: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .disabled(chosenStart.isEmpty || isBusy)
+            .disabled(chosenStart.isEmpty || isBusy || isSunday(chosenDay))
 
             Text("Emails the customer a link to confirm it or ask for another day. Nothing is reserved: no availability is tracked, so check the diary yourself first.")
                 .font(.caption)
@@ -114,6 +147,15 @@ struct CollectionSlotOfferCard: View {
             .padding(.vertical, 3)
             .background(colour.opacity(0.15), in: Capsule())
             .foregroundStyle(colour)
+    }
+
+    private func isSaturday(_ date: Date) -> Bool {
+        Calendar.current.component(.weekday, from: date) == 7
+    }
+
+    /// The shop is shut, so a window on one cannot be offered at all.
+    private func isSunday(_ date: Date) -> Bool {
+        Calendar.current.component(.weekday, from: date) == 1
     }
 
     private static func endOf(_ start: String) -> String {
