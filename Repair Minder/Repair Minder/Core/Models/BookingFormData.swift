@@ -175,12 +175,13 @@ struct BookingAccessoryItem: Identifiable, Equatable {
     }
 }
 
-/// Drop-off vs mail-in vs courier collection, matching the same options as
-/// the web booking wizard and the ticket→order conversion modal. Drives
-/// whether the wizard collects devices + a drop-off signature or creates the
-/// order in awaiting_device with neither.
+/// Drop-off vs doorstep collection vs mail-in vs courier, matching the same
+/// options as the web booking wizard and the ticket→order conversion modal.
+/// Drives whether the wizard collects devices + a drop-off signature or
+/// creates the order in awaiting_device with neither.
 enum BookingIntakeMethod: String, CaseIterable, Identifiable, Sendable {
     case walkIn = "walk_in"
+    case collection = "collection"
     case mailIn = "mail_in"
     case courier = "courier"
 
@@ -189,6 +190,7 @@ enum BookingIntakeMethod: String, CaseIterable, Identifiable, Sendable {
     var label: String {
         switch self {
         case .walkIn: return "Walk-in"
+        case .collection: return "Collection"
         case .mailIn: return "Mail-in"
         case .courier: return "Courier"
         }
@@ -197,16 +199,18 @@ enum BookingIntakeMethod: String, CaseIterable, Identifiable, Sendable {
     var description: String {
         switch self {
         case .walkIn: return "Customer is present"
+        case .collection: return "We collect from the customer"
         case .mailIn: return "Device will be posted"
         case .courier: return "Courier will collect"
         }
     }
 
     /// Whether the wizard should collect devices + a drop-off signature.
-    /// walk_in does; mail_in / courier skip both — the order is created in
-    /// awaiting_device status with no devices yet.
+    /// walk_in and collection do — the customer is standing there either way,
+    /// and the backend requires a signature for both. mail_in / courier skip
+    /// both; the order is created in awaiting_device status with no devices.
     var collectsDevicesAndSignature: Bool {
-        self == .walkIn
+        self == .walkIn || self == .collection
     }
 }
 

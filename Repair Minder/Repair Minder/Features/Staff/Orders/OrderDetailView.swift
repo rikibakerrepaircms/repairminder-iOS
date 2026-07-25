@@ -275,7 +275,15 @@ struct OrderDetailView: View {
         // MARK: - Document Sheet
         .sheet(isPresented: $showDocumentSheet) {
             if let type = selectedDocumentType, let order = viewModel.order {
-                DocumentPreviewSheet(orderId: order.id, orderNumber: order.orderNumber, documentType: type)
+                DocumentPreviewSheet(
+                    orderId: order.id,
+                    orderNumber: order.orderNumber,
+                    documentType: type,
+                    // Log the handover on the ticket so there's a record even if
+                    // the customer loses the copy we AirDropped them. Only the
+                    // booking receipt matters here — it's the intake evidence.
+                    onShared: type == .bookingReceipt ? { logBookingReceiptShared(order) } : nil
+                )
             }
         }
         // MARK: - Close-out Sheets
@@ -1567,6 +1575,18 @@ struct OrderDetailView: View {
                 }
             }
         }
+    }
+
+    /// Record on the ticket that the customer was given their intake receipt.
+    /// Best-effort — a failed note must never look like a failed handover, so
+    /// nothing is surfaced to the user beyond the view model's own error state.
+    private func logBookingReceiptShared(_ order: Order) {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMMM yyyy 'at' HH:mm"
+        formatter.locale = Locale(identifier: "en_GB")
+        let note = "Booking receipt for order #\(order.orderNumber) shared with the customer on \(formatter.string(from: Date()))."
+
+        Task { _ = await viewModel.addNote(CreateTicketNoteRequest(body: note, deviceId: nil)) }
     }
 
     private func documentButton(_ type: DocumentType) -> some View {

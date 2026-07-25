@@ -14,6 +14,7 @@ struct EnquiryDetailView: View {
     @StateObject private var viewModel: EnquiryDetailViewModel
     @FocusState private var isReplyFocused: Bool
     @State private var isReplyExpanded = false
+    @State private var isConvertingToOrder = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(ticketId: String) {
@@ -44,6 +45,7 @@ struct EnquiryDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
+                    convertToOrderMenu
                     statusMenu
                     Divider()
                     macroMenu
@@ -70,6 +72,15 @@ struct EnquiryDetailView: View {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                     isReplyExpanded = false
                     isReplyFocused = false
+                }
+            }
+        }
+        .sheet(isPresented: $isConvertingToOrder) {
+            if let ticket = viewModel.ticket {
+                ConvertEnquiryToOrderSheet(ticket: ticket) {
+                    // The ticket is now type 'order' with a linked order —
+                    // reload so the header and the menu reflect that.
+                    Task { await viewModel.refresh() }
                 }
             }
         }
@@ -628,6 +639,21 @@ struct EnquiryDetailView: View {
     }
 
     // MARK: - Menus
+
+    /// Only offered while the ticket is still an enquiry. The backend rejects a
+    /// second order on the same ticket with a 409, so hide the action once one
+    /// exists rather than let staff walk the whole wizard into an error.
+    @ViewBuilder
+    private var convertToOrderMenu: some View {
+        if let ticket = viewModel.ticket, ticket.order == nil, ticket.ticketType != .order {
+            Button {
+                isConvertingToOrder = true
+            } label: {
+                Label("Convert to Order", systemImage: "bag.badge.plus")
+            }
+            Divider()
+        }
+    }
 
     @ViewBuilder
     private var statusMenu: some View {
