@@ -14,6 +14,10 @@ struct DeviceEntryFormView: View {
 
     @State private var device: BookingDeviceEntry
     @State private var deviceSearchQuery: String = ""
+    @State private var isLookingUp = false
+    @State private var lookupError: String?
+    @State private var lookupWarning: String?
+    @State private var isShowingCamera = false
 
     init(
         viewModel: BookingViewModel,
@@ -110,6 +114,11 @@ struct DeviceEntryFormView: View {
                     )
                 }
 
+                // One lookup fills the model, colour and storage, and tells us
+                // whether the device is locked or reported stolen before any
+                // money changes hands.
+                deviceCheckRow
+
                 HStack(spacing: 12) {
                     FormTextField(
                         label: "Colour",
@@ -123,6 +132,17 @@ struct DeviceEntryFormView: View {
                         placeholder: "256GB"
                     )
                 }
+
+                if device.workflowType == .buyback {
+                    FormTextField(
+                        label: "Agreed price",
+                        text: $device.agreedPrice,
+                        placeholder: "297.00",
+                        keyboardType: .decimalPad
+                    )
+                }
+
+                devicePhotosSection
             }
 
             // Security
@@ -275,6 +295,135 @@ struct DeviceEntryFormView: View {
         let hasDisplayName = !device.displayName.trimmingCharacters(in: .whitespaces).isEmpty
         let hasBrandOrCustomBrand = device.brandId != nil || !(device.customBrand ?? "").trimmingCharacters(in: .whitespaces).isEmpty
         return hasDisplayName && hasBrandOrCustomBrand
+    }
+
+    // MARK: - Device Check
+
+    @ViewBuilder
+    private var deviceCheckRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                Task { await runLookup() }
+            } label: {
+                HStack(spacing: 6) {
+                    if isLookingUp {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "magnifyingglass")
+                    }
+                    Text(isLookingUp ? "Checking..." : "Check device")
+                }
+                .font(.subheadline)
+            }
+            .disabled(isLookingUp || lookupIdentifier.isEmpty)
+
+            if let lookupWarning {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text(lookupWarning)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.orange.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+
+            if let lookupError {
+                Text(lookupError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    private var lookupIdentifier: String {
+        let imei = device.imei.trimmingCharacters(in: .whitespaces)
+        return imei.isEmpty ? device.serialNumber.trimmingCharacters(in: .whitespaces) : imei
+    }
+
+    /// Fill what we can from the lookup without clobbering anything already
+    /// typed - staff correcting a wrong auto-fill must not be overwritten.
+    private func runLookup() async {
+        isLookingUp = true
+        lookupError = nil
+        lookupWarning = nil
+        defer { isLookingUp = false }
+
+        do {
+            let result = try await RMCheckService().lookup(identifier: lookupIdentifier)
+            let found = result.device
+
+            if (device.customModel ?? "").isEmpty, let model = found.model, !model.isEmpty {
+                device.customModel = model
+            }
+            if (device.customBrand ?? "").isEmpty, let brand = found.brand, !brand.isEmpty {
+                device.customBrand = brand
+            }
+            if device.displayName.trimmingCharacters(in: .whitespaces).isEmpty {
+                let composed = [found.brand, found.model].compactMap { $0 }.joined(separator: " ")
+                if !composed.isEmpty { device.displayName = composed }
+            }
+            if device.colour.isEmpty, let colour = found.colour { device.colour = colour }
+            if device.storageCapacity.isEmpty, let storage = found.storageCapacity { device.storageCapacity = storage }
+            if device.serialNumber.isEmpty, let serial = found.serialNumber { device.serialNumber = serial }
+            if device.imei.isEmpty, let imei = found.imei { device.imei = imei }
+
+            // Find My drives whether the device is worth buying at all, so let
+            // the lookup set it even if the form already guessed.
+            if let fmi = found.findMyStatus?.trimmingCharacters(in: .whitespaces).uppercased() {
+                if fmi == "ON" { device.findMyStatus = .enabled }
+                else if fmi == "OFF" { device.findMyStatus = .disabled }
+            }
+
+            lookupWarning = found.warningSummary.map {
+                "Do not pay for this device yet: \($0). Get the customer to resolve it first."
+            }
+        } catch {
+            lookupError = "Could not check that IMEI or serial. Enter the details by hand."
+        }
+    }
+
+    // MARK: - Photos
+
+    @ViewBuilder
+    private var devicePhotosSection: some View {
+        #if os(iOS)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label("Photos", systemImage: "camera")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    isShowingCamera = true
+                } label: {
+                    Label("Take photo", systemImage: "plus.circle")
+                        .font(.subheadline)
+                }
+            }
+
+            if device.pendingPhotos.isEmpty {
+                Text("Photograph the device now, before the customer signs. These go on their receipt.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("\(device.pendingPhotos.count) photo\(device.pendingPhotos.count == 1 ? "" : "s") ready to upload")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .sheet(isPresented: $isShowingCamera) {
+            CameraPicker { image in
+                if let encoded = PickedImageEncoder.encode(image) {
+                    device.pendingPhotos.append(encoded)
+                }
+            }
+        }
+        #endif
     }
 }
 

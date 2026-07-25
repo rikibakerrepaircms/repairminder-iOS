@@ -537,6 +537,26 @@ final class BookingViewModel {
                         body: deviceRequest
                     )
                     deviceIdMap.append((device: device, apiId: response.id))
+
+                    // Upload the photos taken during booking. The device lands at
+                    // device_received, which is in DeviceImageService.preAuthorisedStatuses,
+                    // so these are tagged pre_repair and appear on the booking receipt.
+                    if !device.pendingPhotos.isEmpty {
+                        let imageService = DeviceImageService()
+                        for photo in device.pendingPhotos {
+                            do {
+                                _ = try await imageService.upload(
+                                    image: photo,
+                                    imageType: "pre_repair",
+                                    orderId: orderId,
+                                    deviceId: response.id
+                                )
+                            } catch {
+                                logger.error("Failed to upload booking photo for device \(response.id): \(error)")
+                                deviceWarnings.append("A photo could not be uploaded - add it from the device screen.")
+                            }
+                        }
+                    }
                 } catch {
                     // Non-fatal — log and collect. Staff can add the device from Order Detail.
                     let name = [device.customBrand, device.customModel].compactMap { $0 }.joined(separator: " ")
@@ -545,7 +565,36 @@ final class BookingViewModel {
                 }
             }
 
-            // 7. Create line items per device (best-effort — order still valid if items fail)
+            // 7a. A buyback device carries one implicit line item: what we agreed
+            // to pay. Emitting it here means the booking receipt always shows a
+            // price, rather than only when staff itemised it by hand.
+            for (device, apiDeviceId) in deviceIdMap {
+                guard device.workflowType == .buyback,
+                      let agreed = Double(device.agreedPrice.trimmingCharacters(in: .whitespaces)),
+                      agreed > 0 else { continue }
+                do {
+                    let itemRequest = OrderItemRequest(
+                        itemType: "device_purchase",
+                        description: "\(device.displayName) - agreed purchase price",
+                        quantity: 1,
+                        unitPrice: agreed,
+                        priceIncVat: agreed,
+                        vatRate: 0,
+                        deviceId: apiDeviceId,
+                        isWarrantyItem: nil,
+                        warrantyNotes: nil,
+                        productTypeId: nil,
+                        qualityTier: nil
+                    )
+                    try await APIClient.shared.requestVoid(
+                        .createOrderItem(orderId: orderId), body: itemRequest
+                    )
+                } catch {
+                    logger.error("Failed to record agreed price for device \(apiDeviceId): \(error)")
+                }
+            }
+
+            // 7b. Create line items per device (best-effort — order still valid if items fail)
             for (device, apiDeviceId) in deviceIdMap {
                 for item in device.lineItems {
                     do {

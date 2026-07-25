@@ -51,7 +51,7 @@ struct DeviceImageService {
 }
 
 /// A ready-to-upload JPEG. Constructed on iOS from a UIImage via ImageCompressor.
-struct PlatformImageData: Sendable {
+struct PlatformImageData: Sendable, Equatable {
     let jpegData: Data
     let fileName: String
 }
