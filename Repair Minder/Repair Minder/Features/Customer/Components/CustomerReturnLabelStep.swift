@@ -157,7 +157,12 @@ struct CustomerReturnLabelStep: View {
                     .foregroundStyle(.secondary)
                 }
 
-                Text("Print it and drop the parcel at any Post Office. Would rather not print? Book a free door collection using the tracking number above - Royal Mail will print the label and bring it with them, so you do not need a printer at all.")
+                // PRINT THE LABEL EITHER WAY. This used to say Royal Mail bring a
+                // printed label to a door collection and that no printer is needed -
+                // they do not, and it is. Someone who believed it would have booked a
+                // collection, answered the door with nothing to hand over, and wasted
+                // the trip. Same correction as the web card.
+                Text("Print the label and tape it to the parcel first - you need to do that whichever way you send it. Then either drop the parcel at a Post Office, or book a free collection and Royal Mail will come to your door for it.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
