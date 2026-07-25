@@ -24,9 +24,17 @@ enum CustomerEnquiryKind {
 
 /// How the customer asked to get the device to us. Null when they never chose,
 /// which is every enquiry that is not a sell order.
+///
+/// Mirrors `KNOWN_FULFILMENTS` in `worker/src/storefront_enquiry_kind.js`.
+/// `doorstep` is a distinct route, not a flavour of `collection`: `collection`
+/// is the POSTAL route where we send a pre-paid label, and `doorstep` is the one
+/// where we come to their door and there is a slot to agree. The two were a
+/// single value until 2026-07-25, so any code that reads `collection` and talks
+/// about a slot, a van or a two-hour window is a leftover from that conflation.
 enum CustomerFulfilment {
     static let visit = "visit"
     static let collection = "collection"
+    static let doorstep = "doorstep"
 }
 
 // MARK: - Enquiry Summary

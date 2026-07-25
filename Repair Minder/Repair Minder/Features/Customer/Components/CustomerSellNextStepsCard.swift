@@ -22,7 +22,9 @@ struct CustomerSellNextStepsCard: View {
 
     let ticketId: String
 
-    /// 'visit' | 'collection' | nil. Nil means the customer never chose a route.
+    /// 'visit' | 'collection' | 'doorstep' | nil, where 'collection' is the POSTAL
+    /// route and 'doorstep' is the one where we come to them. Nil means the
+    /// customer never chose a route.
     let fulfilment: String?
 
     var body: some View {
@@ -32,7 +34,7 @@ struct CustomerSellNextStepsCard: View {
 
             wipeStep
             fulfilmentStep
-            CustomerReturnLabelStep(ticketId: ticketId)
+            CustomerReturnLabelStep(ticketId: ticketId, fulfilment: fulfilment)
             arrivalStep
         }
         .padding()
@@ -69,12 +71,21 @@ struct CustomerSellNextStepsCard: View {
     @ViewBuilder
     private var fulfilmentStep: some View {
         switch fulfilment {
-        case CustomerFulfilment.collection:
+        case CustomerFulfilment.doorstep:
             step(icon: "shippingbox", title: "Your collection slot is a request, not a booking") {
                 Text("The day and two-hour window you chose is a request. We will email you to confirm it, or to offer the nearest slot we can make. If the time no longer suits you, just reply to that email and we will rearrange it. Rearranging is free and there is no limit on how many times you can do it. We collect within 5 miles of the shop.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
+
+        case CustomerFulfilment.collection:
+            // The POSTAL route renders nothing here on purpose. The return-label
+            // step immediately below IS the postal step - it says the same thing
+            // and carries the button that does it, so a block here only made the
+            // customer read the same instruction twice in a row. This case used to
+            // render the doorstep copy above, promising a van to someone who had
+            // asked for a postage label.
+            EmptyView()
 
         case CustomerFulfilment.visit:
             step(icon: "storefront", title: "Bring it into the shop") {
@@ -96,9 +107,18 @@ struct CustomerSellNextStepsCard: View {
 
     // MARK: - Step 3: On arrival
 
+    // A walk-in is tested at the counter while they wait - the step above promises
+    // exactly that - so emailing them a confirmed offer and returning the device by
+    // post describes a visit that never happened. They are standing in front of us.
     private var arrivalStep: some View {
-        step(icon: "checkmark.seal", title: "What happens when it reaches us") {
-            Text("We check the device on the bench, then email you a confirmed offer. You can accept it or reject it. If you accept, we pay out within one working day. If you reject it, we return the device to you free of charge.")
+        let isVisit = fulfilment == CustomerFulfilment.visit
+        return step(
+            icon: "checkmark.seal",
+            title: isVisit ? "What happens at the counter" : "What happens when it reaches us"
+        ) {
+            Text(isVisit
+                 ? "We check the device on the bench while you wait, then give you a firm offer there and then. If you accept it we pay you the same day. If you would rather not, you take the device home with you and there is nothing to pay."
+                 : "We check the device on the bench, then email you a confirmed offer. You can accept it or reject it. If you accept, we pay out within one working day. If you reject it, we return the device to you free of charge.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -131,8 +151,12 @@ struct CustomerSellNextStepsCard: View {
 
 // MARK: - Preview
 
-#Preview("Collection") {
+#Preview("Collection (postal)") {
     CustomerSellNextStepsCard(ticketId: "preview-ticket-id", fulfilment: "collection").padding()
+}
+
+#Preview("Doorstep") {
+    CustomerSellNextStepsCard(ticketId: "preview-ticket-id", fulfilment: "doorstep").padding()
 }
 
 #Preview("Visit") {

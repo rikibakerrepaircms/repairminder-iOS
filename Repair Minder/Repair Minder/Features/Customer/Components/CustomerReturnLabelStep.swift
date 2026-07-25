@@ -23,8 +23,13 @@ import AppKit
 struct CustomerReturnLabelStep: View {
     @StateObject private var viewModel: CustomerReturnLabelViewModel
 
-    init(ticketId: String) {
+    /// The route they picked, so the pre-label prompt can state it rather than
+    /// ask it. See `labelPrompt` below and its twin in `SellNextStepsCard.tsx`.
+    private let fulfilment: String?
+
+    init(ticketId: String, fulfilment: String? = nil) {
         _viewModel = StateObject(wrappedValue: CustomerReturnLabelViewModel(ticketId: ticketId))
+        self.fulfilment = fulfilment
     }
 
     var body: some View {
@@ -154,10 +159,36 @@ struct CustomerReturnLabelStep: View {
 
     // MARK: - Request
 
+    /// How the pre-label prompt reads depends on the route they picked.
+    ///
+    /// For `collection` this IS their route, so it states it rather than asking.
+    /// For `visit` and `doorstep` the label is a genuine alternative and is
+    /// offered as one - asking "Posting it to us?" of someone who booked a
+    /// doorstep pickup reads as though the form threw their answer away. Nil
+    /// never chose a route, so the plain question is the honest one.
+    ///
+    /// Twin of `labelPrompt` in `src/components/customer/SellNextStepsCard.tsx`.
+    private var labelPrompt: (title: String, body: String) {
+        switch fulfilment {
+        case CustomerFulfilment.collection:
+            return ("We send you a postage label",
+                    "Press the button below and we will email your free, pre-paid Royal Mail label with a tracking number. There is nothing to pay and nothing to arrange with us first.")
+        case CustomerFulfilment.visit:
+            return ("Rather not come in?",
+                    "You do not have to. We can send you a free, pre-paid Royal Mail label instead, so posting it costs you nothing.")
+        case CustomerFulfilment.doorstep:
+            return ("Rather post it instead?",
+                    "If waiting in for us does not suit, we can send you a free, pre-paid Royal Mail label instead and cancel the collection.")
+        default:
+            return ("Posting it to us?",
+                    "We can send you a free, pre-paid Royal Mail label so posting it costs you nothing.")
+        }
+    }
+
     private var requestView: some View {
-        step(icon: "paperplane", title: "Posting it to us?") {
+        step(icon: "paperplane", title: labelPrompt.title) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("We can send you a free, pre-paid Royal Mail label so posting it costs you nothing.")
+                Text(labelPrompt.body)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
