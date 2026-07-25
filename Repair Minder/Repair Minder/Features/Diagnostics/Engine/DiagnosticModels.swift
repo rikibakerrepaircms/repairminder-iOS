@@ -29,11 +29,23 @@ struct CreateSessionRequest: Codable, Sendable {
     /// Run verdict ("pass"/"partial"/"fail") computed by the runner; sent as `overall_result`.
     /// Additive — older Workers ignore it.
     let overallResult: String?
+    /// Number of checks selected for this run, known at run start; sent as `total_tests` so the
+    /// dashboard's live board can render "N of M" before any result exists. Additive/nullable —
+    /// older Workers ignore it.
+    let totalTests: Int?
+    /// ISO-8601 timestamp of when the run started (client clock); sent as `started_at`.
+    /// Additive/nullable — older Workers ignore it.
+    let startedAt: String?
+    /// Ordered list of test ids selected for this run (ids equal the `test_name` sent in results),
+    /// so the dashboard's live board can render the full checklist before any result exists.
+    /// Sent as `selected_tests` via `.convertToSnakeCase`. Additive/nullable — older Workers ignore it.
+    let selectedTests: [String]?
 
     init(shopCode: String? = nil, pairingToken: String? = nil, platform: String = "ios",
          deviceIdentifier: String? = nil, deviceDescription: String? = nil,
          imei: String? = nil, serial: String? = nil, reportID: String? = nil,
-         overallResult: String? = nil) {
+         overallResult: String? = nil, totalTests: Int? = nil, startedAt: String? = nil,
+         selectedTests: [String]? = nil) {
         self.shopCode = shopCode
         self.pairingToken = pairingToken
         self.platform = platform
@@ -43,6 +55,9 @@ struct CreateSessionRequest: Codable, Sendable {
         self.serial = serial
         self.reportID = reportID
         self.overallResult = overallResult
+        self.totalTests = totalTests
+        self.startedAt = startedAt
+        self.selectedTests = selectedTests
     }
 }
 
@@ -63,6 +78,12 @@ struct DiagnosticResultPayload: Codable, Sendable {
     let testName: String
     let status: TestStatus
     let details: [String: String]?
+    /// Signals to the Worker that this client can honour a `409 session_closed` by prompting the
+    /// operator to Resume vs Start again (rather than silently reopening). Additive; the encoder
+    /// uses `.convertToSnakeCase`, so it serialises as `resume_capable`.
+    /// `var` (not `let`) so it stays in the synthesised memberwise initializer — call sites pass
+    /// `resumeCapable: true` explicitly, and a `let` with a default is excluded from that init.
+    var resumeCapable: Bool = true
 }
 
 /// Local outcome of a single test run (UI + buffering use this).
@@ -71,4 +92,23 @@ struct TestOutcome: Identifiable, Sendable {
     let name: String        // display name
     var status: TestStatus
     var details: [String: String]?
+}
+
+/// One previously-recorded result row on a persisted session, as returned by
+/// `GET /api/diagnostics/session/:id`. Used only to rehydrate `DiagnosticRunner.outcomes` when the
+/// operator chooses "Continue" on the resume prompt (see `DiagnosticsResumeStore`).
+struct DiagnosticSessionTestEntry: Decodable, Sendable {
+    let testName: String
+    let status: String
+    let details: [String: String]?
+}
+
+/// Server state for a persisted session, fetched via `GET /api/diagnostics/session/:id?token=` to
+/// decide whether a session saved by `DiagnosticsResumeStore` is still resumable. Deliberately
+/// decodes only the fields the resume flow needs (additive/decode-safe — the endpoint returns more).
+struct DiagnosticSessionState: Decodable, Sendable {
+    let sessionId: String
+    let status: String
+    let selectedTests: [String]?
+    let tests: [DiagnosticSessionTestEntry]?
 }

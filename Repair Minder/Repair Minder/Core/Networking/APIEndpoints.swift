@@ -351,6 +351,14 @@ enum APIEndpoint {
     case diagnosticsPublicCreate
     case diagnosticsSubmitResult
     case diagnosticsComplete(sessionId: String)
+    case diagnosticsResume(sessionId: String)
+    /// Server-rendered HTML report for a session (single source for the PDF report — see
+    /// `DiagnosticReportShare`). Raw text, not JSON — fetched via `APIClient.requestRawText`.
+    case diagnosticsReport(sessionId: String, token: String)
+    /// Session status + results (dual-auth: session token here, or staff JWT elsewhere) — used to
+    /// check whether a session persisted by `DiagnosticsResumeStore` is still resumable after an
+    /// app relaunch. JSON envelope (not raw text, unlike `diagnosticsReport`).
+    case diagnosticsGetSession(sessionId: String, token: String)
 
     // MARK: - Path
 
@@ -363,6 +371,14 @@ enum APIEndpoint {
             return "/api/diagnostics/results"
         case .diagnosticsComplete(let sessionId):
             return "/api/diagnostics/session/\(sessionId)/complete"
+        case .diagnosticsResume(let sessionId):
+            return "/api/diagnostics/session/\(sessionId)/resume"
+        case .diagnosticsReport(let sessionId, let token):
+            let encodedToken = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? token
+            return "/api/diagnostics/session/\(sessionId)/report?token=\(encodedToken)"
+        case .diagnosticsGetSession(let sessionId, let token):
+            let encodedToken = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? token
+            return "/api/diagnostics/session/\(sessionId)?token=\(encodedToken)"
         // Auth
         case .login:
             return "/api/auth/login"
@@ -839,7 +855,8 @@ enum APIEndpoint {
              .stockSummary, .assetHierarchy, .lowStock,
              .supplierOrders, .supplierOrder, .supplierMappingsSuppliers,
              .customerOrders, .customerOrder, .customerOrderInvoice, .customerDeviceImage,
-             .customerCompetitionEntries, .customerMarketingPreferences:
+             .customerCompetitionEntries, .customerMarketingPreferences,
+             .diagnosticsReport, .diagnosticsGetSession:
             return .get
 
         // POST endpoints
@@ -864,7 +881,7 @@ enum APIEndpoint {
              .createPaymentLink, .cancelPaymentLink, .resendPaymentLinkEmail,
              .customerApproveQuote, .customerOrderReply,
              .quickCreateProductType,
-             .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete,
+             .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete, .diagnosticsResume,
              .moveAsset, .allocateAsset, .deployExternalAsset,
              .returnExternalAsset, .returnToSupplierAsset, .resolveSupplierReturn,
              .addMembership, .bulkAssignGroups, .promoteGroup, .createProductType,
@@ -1232,10 +1249,30 @@ enum APIEndpoint {
              .magicLinkRequest, .magicLinkVerifyCode, .refreshToken,
              .customerMagicLinkRequest, .customerVerifyCode,
              .createEnquiry,
-             .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete:
+             .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete, .diagnosticsResume,
+             .diagnosticsReport, .diagnosticsGetSession:
             return false
         default:
             return true
+        }
+    }
+
+    // MARK: - Masked-proxy routing
+
+    /// Whether this endpoint is routed through the masked `api.kimrelay.com` proxy (`/w/<path>`,
+    /// leading `/api/` stripped) instead of hitting `api.repairminder.com` directly — Bridge
+    /// secrecy Layer 1 (spec 2026-07-10). Only the diagnostics session endpoints are proxy-routed
+    /// today; everything else is unaffected. The relay-edge `/w/` route + `webproxy.ts`
+    /// allow-list already cover `/api/public/diagnostics/session` and the `/api/diagnostics/*`
+    /// family (deployed — see `docs/superpowers/plans/2026-07-10-live-diagnostics-progress.md`
+    /// Task 5), so no backend change is required alongside this iOS change.
+    var isDiagnosticsProxyRouted: Bool {
+        switch self {
+        case .diagnosticsPublicCreate, .diagnosticsSubmitResult, .diagnosticsComplete, .diagnosticsResume,
+             .diagnosticsReport, .diagnosticsGetSession:
+            return true
+        default:
+            return false
         }
     }
 }

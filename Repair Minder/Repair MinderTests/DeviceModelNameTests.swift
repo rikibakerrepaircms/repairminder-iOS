@@ -19,4 +19,19 @@ struct DeviceModelNameTests {
         #expect(DeviceModelName.name(for: "iPhone99,9") == nil)
         #expect(DeviceModelName.name(for: "") == nil)
     }
+
+    /// A4: the diagnostics device_description the app sends is ALWAYS built from the
+    /// marketing name (never the raw hw.machine identifier). marketingName itself is
+    /// device-dependent (falls back to UIDevice.current.model on the test host), so
+    /// this asserts the COMPOSITION behaviour rather than a literal device name.
+    @Test func diagnosticsDescriptionCombinesMarketingNameAndOSVersion() {
+        let withOS = DeviceModelName.diagnosticsDescription(osVersion: "17.5")
+        #expect(withOS == "\(DeviceModelName.marketingName) 17.5")
+
+        let withoutOS = DeviceModelName.diagnosticsDescription(osVersion: nil)
+        #expect(withoutOS == DeviceModelName.marketingName)
+
+        let blankOS = DeviceModelName.diagnosticsDescription(osVersion: "")
+        #expect(blankOS == DeviceModelName.marketingName)
+    }
 }

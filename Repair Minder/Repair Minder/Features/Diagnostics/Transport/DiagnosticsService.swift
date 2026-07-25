@@ -13,6 +13,9 @@ enum DiagnosticsSessionID {
 
 enum DiagnosticsError: Error, Equatable {
     case malformedSessionId(String)
+    /// `DiagnosticRunner.ensureSession()` couldn't reach a transport (e.g. running inside the
+    /// unit-test host, where live network calls are deliberately suppressed — see `liveService`).
+    case sessionUnavailable
 }
 
 /// How the UI should react to a failed transmit.
@@ -39,6 +42,36 @@ protocol DiagnosticsAPI: Sendable {
     func createSession(_ req: CreateSessionRequest) async throws -> DiagnosticSessionResponse
     func submitResult(_ p: DiagnosticResultPayload) async throws
     func complete(sessionId: String, token: String) async throws
+    /// Reopen a session the Worker had closed on inactivity, so its results can keep streaming.
+    func resume(sessionId: String, token: String) async throws
+    /// Fetch the server-rendered HTML report for a session — the SINGLE source for the PDF report
+    /// (see `DiagnosticReportShare`). Raw text (HTML), not a JSON envelope.
+    func fetchReport(sessionId: String, token: String) async throws -> String
+    /// Fetch a persisted session's current status + results — used to decide whether a session
+    /// saved by `DiagnosticsResumeStore` is still resumable (Start-screen "continue?" prompt).
+    /// Defaulted below so existing test stubs don't all need an explicit implementation.
+    func getSession(sessionId: String, token: String) async throws -> DiagnosticSessionState
+}
+
+extension DiagnosticsAPI {
+    /// Default: unavailable. Only `LiveDiagnosticsAPI` overrides this with a real network call;
+    /// test/stub conformers that don't exercise the resume flow inherit this no-op.
+    func getSession(sessionId: String, token: String) async throws -> DiagnosticSessionState {
+        throw DiagnosticsError.sessionUnavailable
+    }
+}
+
+/// True when the worker rejected a result because the session already closed on inactivity —
+/// the app should offer Resume vs Start again (not silently reopen). Matches only a
+/// `409` whose message carries `session_closed`.
+enum DiagnosticsResumeSignal {
+    static func isSessionClosed(_ error: Error) -> Bool {
+        guard let api = error as? APIError else { return false }
+        if case let .httpError(statusCode, message) = api {
+            return statusCode == 409 && (message?.contains("session_closed") ?? false)
+        }
+        return false
+    }
 }
 
 /// Live implementation backed by APIClient. Endpoints are the ones shipped + verified
@@ -57,6 +90,21 @@ struct LiveDiagnosticsAPI: DiagnosticsAPI {
         }
         let _: EmptyResponse = try await APIClient.shared.request(.diagnosticsComplete(sessionId: sessionId), body: CompleteBody(token: token))
     }
+    func resume(sessionId: String, token: String) async throws {
+        guard DiagnosticsSessionID.isValid(sessionId) else {
+            throw DiagnosticsError.malformedSessionId(sessionId)
+        }
+        let _: EmptyResponse = try await APIClient.shared.request(.diagnosticsResume(sessionId: sessionId), body: CompleteBody(token: token))
+    }
+    func fetchReport(sessionId: String, token: String) async throws -> String {
+        try await APIClient.shared.requestRawText(.diagnosticsReport(sessionId: sessionId, token: token))
+    }
+    func getSession(sessionId: String, token: String) async throws -> DiagnosticSessionState {
+        guard DiagnosticsSessionID.isValid(sessionId) else {
+            throw DiagnosticsError.malformedSessionId(sessionId)
+        }
+        return try await APIClient.shared.request(.diagnosticsGetSession(sessionId: sessionId, token: token))
+    }
     private struct CompleteBody: Encodable { let token: String }
 }
 
@@ -68,6 +116,8 @@ struct StubDiagnosticsAPI: DiagnosticsAPI {
     }
     func submitResult(_ p: DiagnosticResultPayload) async throws {}
     func complete(sessionId: String, token: String) async throws {}
+    func resume(sessionId: String, token: String) async throws {}
+    func fetchReport(sessionId: String, token: String) async throws -> String { "<html></html>" }
 }
 #endif
 
@@ -94,10 +144,71 @@ struct DiagnosticsService: Sendable {
         for o in outcomes {
             try await api.submitResult(DiagnosticResultPayload(
                 sessionId: session.sessionId, token: session.sessionToken,
-                testName: o.id, status: o.status, details: o.details))
+                testName: o.id, status: o.status, details: o.details, resumeCapable: true))
         }
         try await api.complete(sessionId: session.sessionId, token: session.sessionToken)
         return session.companyName
+    }
+
+    // MARK: - Live (incremental) reporting
+    //
+    // Split of `transmit` for the live-diagnostics flow: `begin` opens the session at the START
+    // of a run (before any result exists, so the dashboard shows it `in_progress` immediately);
+    // `submitOne` posts a single check's result as it completes (or re-completes, on retest —
+    // the Worker UPSERTs by (session, test_name)); `finish` fires ONLY on the operator's explicit
+    // Submit/Finish tap. `transmit`/`flushPending` above are untouched and remain the batch path
+    // used for the offline-buffer replay and for a never-paired (consumer) run.
+
+    /// Create the backend session at the start of a run. Only meaningful once a company can be
+    /// resolved (`shopCode` or `pairingToken` set) — callers gate on `DiagnosticsShopPairing.isPaired`
+    /// before calling this; a fully-unpaired consumer run stays batch-at-end via `transmit`.
+    func begin(shopCode: String?, pairingToken: String? = nil, platform: String,
+               imei: String?, serial: String?, deviceDescription: String?,
+               reportID: String?, totalTests: Int?, startedAt: String?,
+               selectedTests: [String]? = nil) async throws -> DiagnosticSessionResponse {
+        try await api.createSession(CreateSessionRequest(
+            shopCode: shopCode, pairingToken: pairingToken, platform: platform, deviceIdentifier: nil,
+            deviceDescription: deviceDescription, imei: imei, serial: serial, reportID: reportID,
+            overallResult: nil, totalTests: totalTests, startedAt: startedAt,
+            selectedTests: selectedTests))
+    }
+
+    /// Submit one completed check's result against a session already opened with `begin`.
+    func submitOne(session: DiagnosticSessionResponse, outcome: TestOutcome) async throws {
+        try await api.submitResult(DiagnosticResultPayload(
+            sessionId: session.sessionId, token: session.sessionToken,
+            testName: outcome.id, status: outcome.status, details: outcome.details, resumeCapable: true))
+    }
+
+    /// Reopen a session the Worker had closed on inactivity, so its results can keep streaming.
+    func resume(sessionId: String, token: String) async throws {
+        try await api.resume(sessionId: sessionId, token: token)
+    }
+
+    /// Fetch a persisted session's current status + results (see `DiagnosticsResumeStore`).
+    func getSession(sessionId: String, token: String) async throws -> DiagnosticSessionState {
+        try await api.getSession(sessionId: sessionId, token: token)
+    }
+
+    /// Finalise a live session on explicit Submit/Finish. `/complete` has no field for the final
+    /// verdict, so the verdict travels the same way it always has — via `createSession` — which
+    /// is idempotent by `report_id`: calling it again for the same (company, report_id) updates
+    /// `overall_result` on the existing row instead of creating a duplicate (see
+    /// `handlePublicCreateDiagnosticSession`). `outcomes` is the FULL current set (not just
+    /// deltas) so this also covers any check whose live `submitOne` failed transiently — the
+    /// Worker UPSERTs, so re-sending an already-live result is a cheap no-op.
+    @discardableResult
+    func finish(session: DiagnosticSessionResponse, shopCode: String?, pairingToken: String? = nil,
+                platform: String, reportID: String?, overallResult: String?,
+                outcomes: [TestOutcome]) async throws -> String? {
+        for o in outcomes {
+            try await submitOne(session: session, outcome: o)
+        }
+        let refreshed = try await api.createSession(CreateSessionRequest(
+            shopCode: shopCode, pairingToken: pairingToken, platform: platform, reportID: reportID,
+            overallResult: overallResult))
+        try await api.complete(sessionId: session.sessionId, token: session.sessionToken)
+        return refreshed.companyName
     }
 
     /// Best-effort replay of any buffered (offline) sessions. Each is re-sent through `transmit`

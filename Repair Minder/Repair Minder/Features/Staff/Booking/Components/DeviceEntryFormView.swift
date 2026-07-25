@@ -17,6 +17,18 @@ struct DeviceEntryFormView: View {
     @State private var isLookingUp = false
     @State private var lookupError: String?
     @State private var lookupWarning: String?
+    /// Checks that did not come back. Distinct from a warning: nothing is known
+    /// to be wrong, but nothing was confirmed either, and for a purchase that
+    /// difference is the whole point.
+    @State private var lookupUnknowns: [String] = []
+    /// Set when the lookup CONFIRMED the device is reported lost or stolen.
+    /// Separate from lookupWarning because this one blocks: we will not buy a
+    /// stolen handset, whereas Find My being on is the customer's to resolve.
+    @State private var lookupBlocked = false
+    /// The identifier the last completed check ran against. Guards against
+    /// re-billing the same device: the blacklist service is $0.10 a call, so it
+    /// must never fire twice for one identifier, nor on every keystroke.
+    @State private var lastCheckedIdentifier: String?
     @State private var isShowingCamera = false
 
     init(
@@ -294,6 +306,15 @@ struct DeviceEntryFormView: View {
     private var isValid: Bool {
         let hasDisplayName = !device.displayName.trimmingCharacters(in: .whitespaces).isEmpty
         let hasBrandOrCustomBrand = device.brandId != nil || !(device.customBrand ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+        // A device confirmed as reported lost or stolen cannot be added to a
+        // buyback at all. Warning and carrying on is not a gate.
+        if lookupBlocked { return false }
+        // And a buyback device may not be added without the check having
+        // actually run against the identifier now in the form. Otherwise the
+        // gate is optional, which is the same as not having one.
+        if device.workflowType == .buyback && lastCheckedIdentifier != lookupIdentifier {
+            return false
+        }
         return hasDisplayName && hasBrandOrCustomBrand
     }
 
@@ -316,12 +337,53 @@ struct DeviceEntryFormView: View {
                 .font(.subheadline)
             }
             .disabled(isLookingUp || lookupIdentifier.isEmpty)
+            // Buying: run the check as soon as a complete IMEI or serial is in,
+            // rather than waiting for someone to remember the button. Debounced
+            // and keyed on the identifier so a $0.10 blacklist call cannot fire
+            // per keystroke or twice for the same device.
+            .task(id: autoCheckKey) {
+                guard device.workflowType == .buyback else { return }
+                guard identifierLooksComplete else { return }
+                guard lookupIdentifier != lastCheckedIdentifier else { return }
+                try? await Task.sleep(nanoseconds: 700_000_000)
+                guard !Task.isCancelled else { return }
+                await runLookup()
+            }
 
+            // Red, not orange: this is a confirmed reason to stop, and it now
+            // sits beside an orange "could not confirm" box. Two orange boxes
+            // would flatten the difference between "this device is stolen" and
+            // "we did not manage to ask".
             if let lookupWarning {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(lookupWarning)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                        if lookupBlocked {
+                            Text("This device cannot be added to a buyback.")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.red)
+                        }
+                    }
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.red.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+
+            // Absence is not innocence. When SICKW withdrew the Apple service the
+            // lock field simply stopped arriving and every iPhone showed a clean
+            // check for nine days. Saying nothing here would repeat that.
+            if !lookupUnknowns.isEmpty {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "questionmark.circle.fill")
                         .foregroundStyle(.orange)
-                    Text(lookupWarning)
+                    Text("Not confirmed: \(lookupUnknowns.joined(separator: ", ")). This is not a clean result, it is a missing one, so check the device by hand before paying.")
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
@@ -336,7 +398,35 @@ struct DeviceEntryFormView: View {
                     .font(.caption)
                     .foregroundStyle(.red)
             }
+
+            // A disabled Add button with no explanation reads as a broken app.
+            // Say what is missing.
+            if device.workflowType == .buyback,
+               lastCheckedIdentifier != lookupIdentifier,
+               !isLookingUp {
+                Text(lookupIdentifier.isEmpty
+                     ? "Enter the IMEI or serial. We check Find My and the lost/stolen register before buying."
+                     : (identifierLooksComplete
+                        ? "Checking Find My and the lost/stolen register..."
+                        : "Keep going - we check Find My and the lost/stolen register once the full IMEI or serial is in."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
+    }
+
+    /// Changes only when the thing we would look up changes, so the debounce
+    /// task restarts on a real edit and not on unrelated form state.
+    private var autoCheckKey: String {
+        "\(device.workflowType == .buyback)|\(lookupIdentifier)"
+    }
+
+    /// Is this worth spending a lookup on yet? A part-typed IMEI is not.
+    /// IMEIs are 15 digits; Apple serials are 10 to 12 alphanumerics.
+    private var identifierLooksComplete: Bool {
+        let id = lookupIdentifier
+        if id.allSatisfy(\.isNumber) { return id.count == 15 }
+        return id.count >= 10
     }
 
     private var lookupIdentifier: String {
@@ -350,10 +440,20 @@ struct DeviceEntryFormView: View {
         isLookingUp = true
         lookupError = nil
         lookupWarning = nil
+        lookupUnknowns = []
+        lookupBlocked = false
         defer { isLookingUp = false }
 
+        // Buying, not repairing: also pay for the blacklist check. This is the
+        // only point at which we can find out that the device we are about to
+        // hand cash over for is reported lost or stolen.
+        let forBuyback = device.workflowType == .buyback
+
         do {
-            let result = try await RMCheckService().lookup(identifier: lookupIdentifier)
+            let result = try await RMCheckService().lookup(
+                identifier: lookupIdentifier,
+                forBuyback: forBuyback
+            )
             let found = result.device
 
             if (device.customModel ?? "").isEmpty, let model = found.model, !model.isEmpty {
@@ -380,6 +480,21 @@ struct DeviceEntryFormView: View {
 
             lookupWarning = found.warningSummary.map {
                 "Do not pay for this device yet: \($0). Get the customer to resolve it first."
+            }
+            // Only meaningful when we were actually buying - a repair intake
+            // never paid for the blacklist call, so listing it is noise.
+            // A confirmed blacklist hit stops the purchase outright. Find My
+            // stays a warning: the customer can clear it and come back.
+            lookupBlocked = forBuyback && found.isBlacklisted
+            lastCheckedIdentifier = lookupIdentifier
+
+            if forBuyback {
+                var unknown = found.unconfirmedChecks
+                if result.blacklistError != nil {
+                    unknown.removeAll { $0.hasPrefix("blacklist") }
+                    unknown.append("blacklist (provider unavailable)")
+                }
+                lookupUnknowns = unknown
             }
         } catch {
             lookupError = "Could not check that IMEI or serial. Enter the details by hand."

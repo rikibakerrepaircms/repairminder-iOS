@@ -32,10 +32,12 @@ enum ResultTilePresentation {
 /// Every tile is tappable to retest — pass, fail, or skip alike.
 struct SummaryView: View {
     @ObservedObject var runner: DiagnosticRunner
+    private let service: DiagnosticsService
     @State private var showTransmit = false
     @State private var retestTest: RetestBox?
     @State private var isGeneratingPDF = false
     @State private var autoSend: AutoSend = .idle
+    @State private var reportError: String?
     @Namespace private var resultGlass
 
     /// Auto-send state for a shop-paired device (idle until the run is sent on appear / retest).
@@ -43,6 +45,19 @@ struct SummaryView: View {
 
     /// Identifiable wrapper so we can drive a sheet with the chosen interactive test.
     struct RetestBox: Identifiable { let id: String; let test: any DiagnosticTest }
+
+    init(runner: DiagnosticRunner) {
+        self.runner = runner
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-uiTestStubTransmit") {
+            service = DiagnosticsService(api: StubDiagnosticsAPI())
+        } else {
+            service = DiagnosticsService()
+        }
+        #else
+        service = DiagnosticsService()
+        #endif
+    }
 
     // MARK: - Filtered outcome lists
 
@@ -128,6 +143,14 @@ struct SummaryView: View {
         .sheet(item: $retestTest) { box in
             interactiveRetestSheet(box.test)
         }
+        .alert("Couldn't Generate Report", isPresented: Binding(
+            get: { reportError != nil },
+            set: { if !$0 { reportError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(reportError ?? "Please check your connection and try again.")
+        }
     }
 
     // MARK: - Bottom bar (auto-send when paired, manual otherwise)
@@ -186,49 +209,31 @@ struct SummaryView: View {
 
     // MARK: - Auto-send (shop-paired devices)
 
-    private var deviceDescription: String? {
-        let os = runner.outcome(for: "device_info")?.details?["os_version"]
-        let parts = [DeviceModelName.marketingName, os].compactMap { $0 }.filter { !$0.isEmpty }
-        return parts.isEmpty ? nil : parts.joined(separator: " ")
-    }
-
-    private func makeService() -> DiagnosticsService {
-        #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-uiTestStubTransmit") {
-            return DiagnosticsService(api: StubDiagnosticsAPI())
-        }
-        #endif
-        return DiagnosticsService()
-    }
-
-    /// On a shop-paired device, send (or re-send) the run to the paired shop. Safe to call
-    /// repeatedly — the Worker reuses one session per run (report_id) and upserts each test.
+    /// Reflects/catches-up the live-send status on a shop-paired device. The actual submission
+    /// already happened per-check as the run progressed (`DiagnosticRunner.record` →
+    /// `submitLive`, and again on every retest); this just (re)opens the live session if it
+    /// never got created — e.g. a transient failure at run start — so nothing is silently stuck
+    /// at "not sent" once connectivity recovers. This NEVER completes the session: completion
+    /// only happens from the operator's explicit Submit tap in `TransmitView`, so retesting here
+    /// stays possible right up to that tap.
     private func autoSendIfPaired() {
         guard DiagnosticsShopPairing.isPaired, !runner.orderedOutcomes.isEmpty else { return }
+        if runner.liveSession != nil { autoSend = .sent; return }
         autoSend = .sending
-        let service = makeService()
-        let outcomes = runner.orderedOutcomes
-        let reportID = runner.reportID
-        let overall = runner.overallResult
-        let desc = deviceDescription
-        let code = DiagnosticsShopPairing.shopCode       // one of these is set (token preferred)
-        let token = DiagnosticsShopPairing.token
+        let wasToken = DiagnosticsShopPairing.token != nil
         Task {
             do {
-                let companyName = try await service.transmit(
-                    shopCode: code, pairingToken: token, platform: "ios", imei: nil, serial: nil,
-                    deviceDescription: desc, reportID: reportID, overallResult: overall, outcomes: outcomes)
-                DiagnosticsShopPairing.setName(companyName)   // refresh "Welcome back …" name from server
-                autoSend = .sent
+                _ = try await runner.beginLiveSessionIfPaired()
+                autoSend = (runner.liveSession != nil) ? .sent : .failed
             } catch {
-                switch DiagnosticsTransmitOutcome.classify(error, wasTokenPairing: token != nil) {
+                switch DiagnosticsTransmitOutcome.classify(error, wasTokenPairing: wasToken) {
                 case .revokedPairing:
                     DiagnosticsShopPairing.unpair()   // device no longer linked — stop auto-sending
                     autoSend = .unlinked
                 case .transient:
-                    DiagnosticsBuffer.save(shopCode: code, pairingToken: token, deviceDescription: desc,
-                                           imei: nil, serial: nil, reportID: reportID,
-                                           overallResult: overall, outcomes: outcomes)
+                    // Not a hard failure: the run isn't finished. The eventual explicit Submit
+                    // (TransmitView) still performs the full create → results → complete and
+                    // buffers on failure exactly as before.
                     autoSend = .failed
                 }
             }
@@ -400,21 +405,46 @@ struct SummaryView: View {
         .accessibilityIdentifier("generate-pdf")
     }
 
-    /// Top-right arrow: build the report and present the system share sheet.
+    /// Top-right arrow: ensure a server session (anon if never paired — see
+    /// `DiagnosticRunner.ensureSession()`), fetch the server-rendered report, and present the
+    /// system share sheet. Online-only: a fetch failure surfaces an alert, no local HTML fallback.
     private func sharePDF() {
         guard !isGeneratingPDF else { return }
         isGeneratingPDF = true
-        DiagnosticReportShare.presentShareSheet(for: runner) { _ in
-            isGeneratingPDF = false
+        Task {
+            do {
+                let session = try await runner.ensureSession()
+                DiagnosticReportShare.presentShareSheet(
+                    sessionId: session.sessionId, token: session.sessionToken,
+                    reportID: runner.reportID, service: service.api
+                ) { _ in
+                    isGeneratingPDF = false
+                }
+            } catch {
+                isGeneratingPDF = false
+                reportError = error.localizedDescription
+            }
         }
     }
 
-    /// "Generate PDF" row: build the same report and preview it on-device (Quick Look).
+    /// "Generate PDF" row: ensure a server session, fetch the same report and preview it
+    /// on-device (Quick Look).
     private func previewPDF() {
         guard !isGeneratingPDF else { return }
         isGeneratingPDF = true
-        DiagnosticReportShare.presentPreview(for: runner) { _ in
-            isGeneratingPDF = false
+        Task {
+            do {
+                let session = try await runner.ensureSession()
+                DiagnosticReportShare.presentPreview(
+                    sessionId: session.sessionId, token: session.sessionToken,
+                    reportID: runner.reportID, service: service.api
+                ) { _ in
+                    isGeneratingPDF = false
+                }
+            } catch {
+                isGeneratingPDF = false
+                reportError = error.localizedDescription
+            }
         }
     }
     #endif

@@ -74,45 +74,41 @@ final class DiagnosticReportPDFRenderer: NSObject, WKNavigationDelegate {
     }
 }
 
-/// Builds report data, renders the PDF and presents the share sheet. One entry point for the UI.
+/// Fetches the server-rendered report HTML and renders/presents the PDF. One entry point for the
+/// UI. SINGLE SOURCE OF TRUTH: the Worker's `GET /api/diagnostics/session/:id/report` HTML is the
+/// only report source — there is no local HTML fallback (online-only). Callers must have a real
+/// server session first (`DiagnosticRunner.ensureSession()` — anonymous when the device was never
+/// paired to a shop) since the report is fetched by session id + token.
 enum DiagnosticReportShare {
-    /// Load a logo imageset as a base64 PNG `data:` URI, forcing the light-appearance variant
-    /// (the PDF is always on a white background).
-    private static func dataURI(asset name: String) -> String? {
-        guard let base = UIImage(named: name) else { return nil }
-        let image = base.imageAsset?.image(with: UITraitCollection(userInterfaceStyle: .light)) ?? base
-        guard let png = image.pngData() else { return nil }
-        return "data:image/png;base64,\(png.base64EncodedString())"
-    }
-
-    static func assets() -> DiagnosticReportAssets {
-        DiagnosticReportAssets(
-            repairMinderLogoDataURI: dataURI(asset: "repairminder_logo"),
-            mendmyiLogoDataURI: dataURI(asset: "mendmyi_logo")
-        )
-    }
-
-    /// Build the branded PDF for `runner` and call `completion` (main thread) with the file URL.
-    /// SINGLE SOURCE OF TRUTH for generating the report — both Share (top-right arrow) and Preview
-    /// (the "Generate PDF" row) go through this, so the render pipeline changes in one place.
+    /// Fetch the server HTML for `sessionId`/`token`, render it to a PDF named for `reportID`, and
+    /// call `completion` (main thread) with the file URL. SINGLE SOURCE OF TRUTH for generating
+    /// the report — both Share (top-right arrow) and Preview (the "Generate PDF" row) go through
+    /// this, so the render pipeline changes in one place.
     @MainActor
-    static func generatePDF(for runner: DiagnosticRunner,
+    static func generatePDF(forSession sessionId: String, token: String, reportID: String,
+                            service: DiagnosticsAPI,
                             completion: @escaping (Result<URL, Error>) -> Void) {
-        let data = DiagnosticReportData.from(runner: runner,
-                                             deviceName: DeviceModelName.marketingName)
-        let html = DiagnosticReportHTML.render(data, assets: assets())
-        let fileName = DiagnosticReportHTML.fileName(reportID: data.reportID)
-
-        let renderer = DiagnosticReportPDFRenderer()
-        renderer.render(html: html, fileName: fileName, completion: completion)
+        Task {
+            do {
+                let html = try await service.fetchReport(sessionId: sessionId, token: token)
+                let fileName = DiagnosticReportHTML.fileName(reportID: reportID)
+                await MainActor.run {
+                    let renderer = DiagnosticReportPDFRenderer()
+                    renderer.render(html: html, fileName: fileName, completion: completion)
+                }
+            } catch {
+                await MainActor.run { completion(.failure(error)) }
+            }
+        }
     }
 
     /// Generate the PDF and present the system share sheet (the top-right arrow). Calls `onComplete`
     /// (main thread) so the caller can clear any progress state.
     @MainActor
-    static func presentShareSheet(for runner: DiagnosticRunner,
+    static func presentShareSheet(sessionId: String, token: String, reportID: String,
+                                  service: DiagnosticsAPI,
                                   onComplete: @escaping (Bool) -> Void) {
-        generatePDF(for: runner) { result in
+        generatePDF(forSession: sessionId, token: token, reportID: reportID, service: service) { result in
             switch result {
             case .success(let url): present(url: url); onComplete(true)
             case .failure:          onComplete(false)
@@ -123,9 +119,10 @@ enum DiagnosticReportShare {
     /// Generate the SAME PDF and preview it on-device via Quick Look (the "Generate PDF" row).
     /// Quick Look includes its own Share/Print, so the user can still send from the preview.
     @MainActor
-    static func presentPreview(for runner: DiagnosticRunner,
+    static func presentPreview(sessionId: String, token: String, reportID: String,
+                               service: DiagnosticsAPI,
                                onComplete: @escaping (Bool) -> Void) {
-        generatePDF(for: runner) { result in
+        generatePDF(forSession: sessionId, token: token, reportID: reportID, service: service) { result in
             switch result {
             case .success(let url): presentQuickLook(url: url); onComplete(true)
             case .failure:          onComplete(false)

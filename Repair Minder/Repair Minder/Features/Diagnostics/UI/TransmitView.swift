@@ -18,6 +18,7 @@ struct TransmitView: View {
     @State private var remember: Bool
     @State private var phase: Phase = .idle
     @State private var isGeneratingPDF = false
+    @State private var reportError: String?
 
     enum Phase: Equatable { case idle, sending, success, failed, unlinked }
 
@@ -38,11 +39,11 @@ struct TransmitView: View {
     }
 
     private var deviceDescription: String? {
-        // Prefer the precise marketing name (e.g. "iPhone 15 Pro"), matching the PDF banner,
-        // rather than UIDevice's generic "iPhone". os_version comes from the device_info test.
-        let os = runner.outcome(for: "device_info")?.details?["os_version"]
-        let parts = [DeviceModelName.marketingName, os].compactMap { $0 }.filter { !$0.isEmpty }
-        return parts.isEmpty ? nil : parts.joined(separator: " ")
+        // Same composition as DiagnosticRunner.currentDeviceDescription — DRY'd into
+        // DeviceModelName.diagnosticsDescription (A4): the precise marketing name
+        // (e.g. "iPhone 15 Pro"), matching the PDF banner, never the raw hw.machine
+        // identifier. os_version comes from the device_info test.
+        DeviceModelName.diagnosticsDescription(osVersion: runner.outcome(for: "device_info")?.details?["os_version"])
     }
 
     private var codeIsValid: Bool { shopCode.count == 6 && shopCode.allSatisfy(\.isNumber) }
@@ -123,7 +124,7 @@ struct TransmitView: View {
                     if phase == .sending {
                         ProgressView()
                     } else {
-                        Text("Submit")
+                        Text("Save and Sync")
                             .font(.headline)
                     }
                 }
@@ -135,6 +136,14 @@ struct TransmitView: View {
             .padding()
             .accessibilityIdentifier("submit-results")
         }
+        .alert("Couldn't Generate Report", isPresented: Binding(
+            get: { reportError != nil },
+            set: { if !$0 { reportError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(reportError ?? "Please check your connection and try again.")
+        }
     }
 
     private func submit() {
@@ -142,13 +151,27 @@ struct TransmitView: View {
         let token = DiagnosticsShopPairing.token
         let code = shopCode
         let overall = runner.overallResult
+        let outcomes = runner.orderedOutcomes
+        let reportID = runner.reportID
+        let desc = deviceDescription
+        let liveSession = runner.liveSession
         Task {
             do {
-                let companyName = try await service.transmit(
-                    shopCode: codeIsValid ? code : nil, pairingToken: token, platform: "ios",
-                    imei: nil, serial: nil, deviceDescription: deviceDescription,
-                    reportID: runner.reportID, overallResult: runner.overallResult,
-                    outcomes: runner.orderedOutcomes)
+                // A live session (paired device, opened at run start) is already `in_progress`
+                // with most/all checks posted — `finish` submits anything not yet confirmed live,
+                // refreshes the final verdict, then completes. Otherwise (never paired until
+                // now, or the live session never opened) fall back to the batch path, unchanged.
+                let companyName: String?
+                if let liveSession {
+                    companyName = try await service.finish(
+                        session: liveSession, shopCode: codeIsValid ? code : nil, pairingToken: token,
+                        platform: "ios", reportID: reportID, overallResult: overall, outcomes: outcomes)
+                } else {
+                    companyName = try await service.transmit(
+                        shopCode: codeIsValid ? code : nil, pairingToken: token, platform: "ios",
+                        imei: nil, serial: nil, deviceDescription: desc,
+                        reportID: reportID, overallResult: overall, outcomes: outcomes)
+                }
                 // Persist pairing per the toggle. Only a freshly-typed valid code re-pairs by code;
                 // a token pairing is preserved (do NOT downgrade it to a shop code). If the user
                 // turned "remember" off, forget entirely.
@@ -158,6 +181,7 @@ struct TransmitView: View {
                 } else {
                     DiagnosticsShopPairing.unpair()
                 }
+                DiagnosticsResumeStore.clear()   // session genuinely completed — nothing left to resume
                 phase = .success
             } catch {
                 let wasToken = token != nil && !codeIsValid
@@ -176,12 +200,26 @@ struct TransmitView: View {
     }
 
     #if os(iOS)
-    /// Build the branded PDF report and present a share sheet (see DiagnosticReportShare).
+    /// Ensure a server session exists (anon if this device was never paired — see
+    /// `DiagnosticRunner.ensureSession()`), fetch the server-rendered report, and present a share
+    /// sheet (see DiagnosticReportShare). Online-only: a fetch failure surfaces an alert, no local
+    /// HTML fallback.
     private func sharePDF() {
         guard !isGeneratingPDF else { return }
         isGeneratingPDF = true
-        DiagnosticReportShare.presentShareSheet(for: runner) { _ in
-            isGeneratingPDF = false
+        Task {
+            do {
+                let session = try await runner.ensureSession()
+                DiagnosticReportShare.presentShareSheet(
+                    sessionId: session.sessionId, token: session.sessionToken,
+                    reportID: runner.reportID, service: service.api
+                ) { _ in
+                    isGeneratingPDF = false
+                }
+            } catch {
+                isGeneratingPDF = false
+                reportError = error.localizedDescription
+            }
         }
     }
     #endif

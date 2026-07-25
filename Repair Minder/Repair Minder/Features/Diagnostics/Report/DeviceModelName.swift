@@ -41,6 +41,17 @@ enum DeviceModelName {
         #endif
     }
 
+    /// Builds the diagnostics `device_description` sent to the Worker: the marketing
+    /// name plus OS version (e.g. "iPhone 15 Pro Max 17.5") — NEVER the raw
+    /// `hw.machine` identifier ("iPhone16,2"). Used by both the live-session `begin`
+    /// path (`DiagnosticRunner.currentDeviceDescription`) and the batch
+    /// `transmit`/buffered-replay path (`TransmitView.deviceDescription`) so every
+    /// device_description the app ever sends is composed the same way (A4).
+    static func diagnosticsDescription(osVersion: String?) -> String? {
+        let parts = [marketingName, osVersion].compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+
     /// Identifier → marketing name. Covers current iPhone lines (and a few iPads); unknown
     /// identifiers fall back to the generic model, so the map need not be exhaustive.
     private static let map: [String: String] = [

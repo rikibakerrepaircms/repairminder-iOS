@@ -18,9 +18,18 @@ actor StubAPI: DiagnosticsAPI {
     }
     func submitResult(_ p: DiagnosticResultPayload) async throws { results.append(p) }
     func complete(sessionId: String, token: String) async throws { completed += 1 }
+    func resume(sessionId: String, token: String) async throws {}
+    func fetchReport(sessionId: String, token: String) async throws -> String { "<html></html>" }
 }
 
 struct DiagnosticsServiceTests {
+    @Test func resultPayloadEncodesResumeCapableSnakeCase() throws {
+        let p = DiagnosticResultPayload(sessionId: "a", token: "t", testName: "wifi", status: .pass, details: nil, resumeCapable: true)
+        let enc = JSONEncoder(); enc.keyEncodingStrategy = .convertToSnakeCase
+        let json = String(decoding: try enc.encode(p), as: UTF8.self)
+        #expect(json.contains("\"resume_capable\":true"))
+    }
+
     @Test func transmitCreatesSessionSubmitsEachResultThenCompletes() async throws {
         let api = StubAPI()
         let svc = DiagnosticsService(api: api)
@@ -48,6 +57,58 @@ struct DiagnosticsServiceTests {
                                    overallResult: "partial",
                                    outcomes: [TestOutcome(id: "a", name: "A", status: .pass, details: nil)])
         #expect(await api.lastCreate?.overallResult == "partial")
+    }
+}
+
+struct DiagnosticsLiveServiceTests {
+    @Test func beginCreatesSessionWithTotalTestsAndStartedAtBeforeAnyResult() async throws {
+        let api = StubAPI()
+        let svc = DiagnosticsService(api: api)
+        let session = try await svc.begin(shopCode: "123456", platform: "ios", imei: nil, serial: nil,
+                                          deviceDescription: "iPhone 15", reportID: "RM-1",
+                                          totalTests: 22, startedAt: "2026-07-11T09:00:00Z")
+        #expect(session.sessionId == "sid")
+        #expect(await api.created == 1)
+        #expect(await api.results.isEmpty)     // no result posted yet — begin() precedes every check
+        #expect(await api.completed == 0)
+        #expect(await api.lastCreate?.totalTests == 22)
+        #expect(await api.lastCreate?.startedAt == "2026-07-11T09:00:00Z")
+    }
+
+    @Test func submitOnePostsASingleResultAgainstAnOpenSession() async throws {
+        let api = StubAPI()
+        let svc = DiagnosticsService(api: api)
+        let session = DiagnosticSessionResponse(sessionId: "sid", sessionToken: "tok", expiresAt: nil, companyName: nil)
+        try await svc.submitOne(session: session, outcome: TestOutcome(id: "a", name: "A", status: .pass, details: nil))
+        #expect(await api.results.count == 1)
+        #expect(await api.results.first?.testName == "a")
+        #expect(await api.completed == 0)   // submitOne never completes
+    }
+
+    @Test func retestSubmitsAgainUnderTheSameTestName() async throws {
+        let api = StubAPI()
+        let svc = DiagnosticsService(api: api)
+        let session = DiagnosticSessionResponse(sessionId: "sid", sessionToken: "tok", expiresAt: nil, companyName: nil)
+        try await svc.submitOne(session: session, outcome: TestOutcome(id: "a", name: "A", status: .fail, details: nil))
+        try await svc.submitOne(session: session, outcome: TestOutcome(id: "a", name: "A", status: .pass, details: nil))
+        #expect(await api.results.count == 2)
+        #expect(await api.results.map(\.testName) == ["a", "a"])
+        #expect(await api.results.last?.status == .pass)
+    }
+
+    @Test func finishSubmitsOutcomesRefreshesVerdictThenCompletesOnce() async throws {
+        let api = StubAPI()
+        let svc = DiagnosticsService(api: api)
+        let session = DiagnosticSessionResponse(sessionId: "sid", sessionToken: "tok", expiresAt: nil, companyName: "Mendmyi")
+        let companyName = try await svc.finish(
+            session: session, shopCode: "123456", platform: "ios", reportID: "RM-1", overallResult: "pass",
+            outcomes: [TestOutcome(id: "a", name: "A", status: .pass, details: nil),
+                       TestOutcome(id: "b", name: "B", status: .pass, details: nil)])
+        #expect(companyName == "Mendmyi")
+        #expect(await api.results.count == 2)
+        #expect(await api.created == 1)                       // the overall_result-refresh create
+        #expect(await api.lastCreate?.overallResult == "pass")
+        #expect(await api.completed == 1)                     // completes exactly once
     }
 }
 
@@ -85,6 +146,17 @@ actor FlushStubAPI: DiagnosticsAPI {
     }
     func submitResult(_ p: DiagnosticResultPayload) async throws { results.append(p) }
     func complete(sessionId: String, token: String) async throws { completed += 1 }
+    func resume(sessionId: String, token: String) async throws {}
+    func fetchReport(sessionId: String, token: String) async throws -> String { "<html></html>" }
+}
+
+struct DiagnosticsResumeSignalTests {
+    @Test func detectsSessionClosed() {
+        #expect(DiagnosticsResumeSignal.isSessionClosed(APIError.httpError(statusCode: 409, message: "session_closed")))
+        #expect(!DiagnosticsResumeSignal.isSessionClosed(APIError.httpError(statusCode: 410, message: "expired")))
+        #expect(!DiagnosticsResumeSignal.isSessionClosed(APIError.httpError(statusCode: 409, message: nil)))
+        #expect(!DiagnosticsResumeSignal.isSessionClosed(APIError.notFound))
+    }
 }
 
 struct DiagnosticsFlushTests {

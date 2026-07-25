@@ -61,6 +61,16 @@ struct TestRunnerView: View {
         } message: {
             Text("Your progress so far is kept — you can resume from where you left off.")
         }
+        .confirmationDialog("This run timed out", isPresented: Binding(
+            get: { runner.resumePrompt },
+            set: { if !$0 { runner.dismissResumePrompt() } }
+        ), titleVisibility: .visible) {
+            Button("Resume diagnostics") { Task { await runner.resumeLive() } }
+            Button("Start a new run") { Task { await runner.startNewRunFromPrompt() } }
+            Button("Cancel", role: .cancel) { runner.dismissResumePrompt() }
+        } message: {
+            Text("You were away for a while. Resume this run or start a new one?")
+        }
     }
 
     /// Preparing finished → move to the first remaining interactive test, or straight to summary.

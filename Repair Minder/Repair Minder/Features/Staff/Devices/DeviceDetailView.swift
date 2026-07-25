@@ -806,7 +806,11 @@ struct DeviceDetailView: View {
                 }
 
                 if let health = device.batteryHealthPercent {
-                    LabeledContent("Battery Health", value: "\(health)%")
+                    // Health is (nominal / DESIGN capacity), so a brand-new cell can
+                    // legitimately read 102–103%. Clamp for display only — iOS itself
+                    // never shows above 100%, and "103%" reads as a bug. Mirrors the
+                    // web dashboard's displayBatteryHealth().
+                    LabeledContent("Battery Health", value: "\(min(health, 100))%")
                 }
 
                 if let cycles = device.batteryCycleCount {

@@ -9,6 +9,10 @@ struct DiagnosticsFlowView: View {
         NavigationStack {
             TestSelectionView()
         }
+        // Transient "Connected to <shop>" confirmation, driven by ShopPairingBanner.shared and
+        // fired when the Bridge USB handshake pairs this device. Mounted here (the diagnostics
+        // root) as a top overlay so it appears regardless of which screen is on top.
+        .overlay(alignment: .top) { ShopConnectedBanner() }
         // Best-effort, non-blocking: replay any sessions buffered offline so they complete
         // (create → results → complete) instead of stranding `in_progress`. The flow opening
         // means we likely have network now.
