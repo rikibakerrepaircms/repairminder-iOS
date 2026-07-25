@@ -27,6 +27,10 @@ struct BookingDeviceEntry: Identifiable, Equatable {
     var accessories: [BookingAccessoryItem]
     var lineItems: [BookingLineItem]
     var aftermarketConsent: Bool
+    /// What the device check found, carried through so it lands on the device
+    /// row rather than living only in the lookup history.
+    var rmcheckLookupId: String?
+    var blacklistStatus: String?
 
     /// What we agreed to pay for a buyback device, as typed. Kept as a String
     /// because it is bound to a text field; parsed once on submit.
@@ -429,6 +433,8 @@ struct CreateOrderDeviceRequest: Encodable {
     let workflowType: String
     let accessories: [AccessoryPayload]?
     let aftermarketConsent: Int?
+    let rmcheckLookupId: String?
+    let blacklistStatus: String?
 }
 
 struct AccessoryPayload: Encodable {

@@ -86,6 +86,9 @@ struct RMCheckDevice: Decodable, Sendable {
 struct RMCheckLookupResult: Decodable, Sendable {
     let device: RMCheckDevice
     let cached: Bool?
+    /// Id of the stored lookup, recorded against the device so the order shows
+    /// which check it was based on.
+    let rmcheckLookupId: String?
     /// Present when the blacklist provider could not be reached, in which case
     /// the device object carries no status rather than a misleading clean one.
     let blacklistError: String?

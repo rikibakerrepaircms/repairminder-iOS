@@ -529,7 +529,9 @@ final class BookingViewModel {
                         accessories: device.accessories.isEmpty ? nil : device.accessories.map {
                             AccessoryPayload(accessoryType: $0.accessoryType, description: $0.description)
                         },
-                        aftermarketConsent: device.aftermarketConsent ? 1 : 0
+                        aftermarketConsent: device.aftermarketConsent ? 1 : 0,
+                        rmcheckLookupId: device.rmcheckLookupId,
+                        blacklistStatus: device.blacklistStatus
                     )
 
                     let response: DeviceCreateResponse = try await APIClient.shared.request(

@@ -110,6 +110,7 @@ enum APIEndpoint {
     case orderItems(orderId: String)
     case createOrderItem(orderId: String)
     case rmcheckLookup
+    case rmcheckFmi
     case updateOrderItem(orderId: String, itemId: String)
     case deleteOrderItem(orderId: String, itemId: String)
     case orderPayments(orderId: String)
@@ -523,6 +524,8 @@ enum APIEndpoint {
             return "/api/orders/\(orderId)/items"
         case .rmcheckLookup:
             return "/api/rmcheck/lookup"
+        case .rmcheckFmi:
+            return "/api/rmcheck/fmi"
         case .updateOrderItem(let orderId, let itemId), .deleteOrderItem(let orderId, let itemId):
             return "/api/orders/\(orderId)/items/\(itemId)"
         case .orderPayments(let orderId), .createOrderPayment(let orderId):
@@ -869,6 +872,7 @@ enum APIEndpoint {
              .createOrderDevice, .executeDeviceAction, .uploadDeviceImage,
              .createOrder, .createOrderItem, .createOrderPayment, .createOrderSignature,
              .rmcheckLookup,
+             .rmcheckFmi,
              .sendQuote, .authorizeOrder, .despatchOrder, .collectOrder,
              .createOrderRefund, .createTicketNote, .recreateOrder,
              .createClient, .clientsImport,

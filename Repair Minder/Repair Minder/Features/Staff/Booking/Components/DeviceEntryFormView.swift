@@ -29,6 +29,13 @@ struct DeviceEntryFormView: View {
     /// re-billing the same device: the blacklist service is $0.10 a call, so it
     /// must never fire twice for one identifier, nor on every keystroke.
     @State private var lastCheckedIdentifier: String?
+    /// Seconds left before the Find My re-check can be pressed again. A lock only
+    /// changes when the customer actually signs out, which is not instant, and
+    /// every press is a real charge - so the button goes quiet for 30s and counts
+    /// down rather than silently swallowing taps.
+    @State private var fmiCooldown = 0
+    @State private var isRecheckingFmi = false
+    @State private var fmiRecheckNote: String?
     @State private var isShowingCamera = false
 
     init(
@@ -462,6 +469,46 @@ struct DeviceEntryFormView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             }
 
+            // Find My is the one problem the customer can fix on the spot, so it
+            // gets its own retry. Shown only when the lock is actually on or was
+            // never established - nothing to re-check on a device already OFF.
+            if device.workflowType == .buyback,
+               lastCheckedIdentifier == lookupIdentifier,
+               device.findMyStatus == .enabled || lookupUnknowns.contains(where: { $0.hasPrefix("Find My") }) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Button {
+                        Task { await recheckFindMy() }
+                    } label: {
+                        HStack(spacing: 6) {
+                            if isRecheckingFmi {
+                                ProgressView()
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                            }
+                            Text(isRecheckingFmi
+                                 ? "Checking Find My..."
+                                 : (fmiCooldown > 0
+                                    ? "Check Find My again (\(fmiCooldown)s)"
+                                    : "Check Find My again"))
+                        }
+                        .font(.subheadline)
+                    }
+                    .disabled(isRecheckingFmi || fmiCooldown > 0)
+
+                    if let fmiRecheckNote {
+                        Text(fmiRecheckNote)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .task(id: fmiCooldown) {
+                    guard fmiCooldown > 0 else { return }
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    guard !Task.isCancelled else { return }
+                    fmiCooldown -= 1
+                }
+            }
+
             if let lookupError {
                 Text(lookupError)
                     .font(.caption)
@@ -501,6 +548,37 @@ struct DeviceEntryFormView: View {
     private var lookupIdentifier: String {
         let imei = device.imei.trimmingCharacters(in: .whitespaces)
         return imei.isEmpty ? device.serialNumber.trimmingCharacters(in: .whitespaces) : imei
+    }
+
+    /// Re-read the activation lock on its own, without re-running identity.
+    private func recheckFindMy() async {
+        guard !isRecheckingFmi, fmiCooldown == 0, !lookupIdentifier.isEmpty else { return }
+        isRecheckingFmi = true
+        fmiRecheckNote = nil
+        defer {
+            isRecheckingFmi = false
+            fmiCooldown = 30
+        }
+
+        do {
+            let result = try await RMCheckService().recheckFindMy(identifier: lookupIdentifier)
+            switch result.findMyStatus?.uppercased() {
+            case "ON":
+                device.findMyStatus = .enabled
+                lookupWarning = "Do not pay for this device yet: Find My is still on. Get the customer to resolve it first."
+                fmiRecheckNote = "Still on. Ask the customer to sign out of iCloud, then check again."
+            case "OFF":
+                device.findMyStatus = .disabled
+                lookupWarning = nil
+                lookupUnknowns.removeAll { $0.hasPrefix("Find My") }
+                fmiRecheckNote = "Find My is off. Good to go."
+            default:
+                // Never write a guess. Unresolved stays unresolved.
+                fmiRecheckNote = "Still could not read the lock status. Check the device by hand."
+            }
+        } catch {
+            fmiRecheckNote = "Could not reach the Find My check. Try again shortly."
+        }
     }
 
     /// Fill what we can from the lookup without clobbering anything already
@@ -556,6 +634,9 @@ struct DeviceEntryFormView: View {
             // stays a warning: the customer can clear it and come back.
             lookupBlocked = forBuyback && found.isBlacklisted
             lastCheckedIdentifier = lookupIdentifier
+            // Carry the result onto the device so it reaches the order row.
+            device.rmcheckLookupId = result.rmcheckLookupId ?? device.rmcheckLookupId
+            device.blacklistStatus = found.blacklistStatus ?? device.blacklistStatus
 
             if forBuyback {
                 var unknown = found.unconfirmedChecks

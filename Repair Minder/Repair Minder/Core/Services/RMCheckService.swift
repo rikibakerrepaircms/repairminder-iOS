@@ -32,6 +32,29 @@ struct RMCheckService {
             checkBlacklist: forBuyback
         ))
     }
+
+    /// Re-read the activation lock on its own.
+    ///
+    /// Service 3 is the one check a customer can fix while standing at the
+    /// counter - they sign out of iCloud and we ask again. Uncached server-side,
+    /// because the whole point is to see whether the answer changed, and $0.015
+    /// rather than re-running the $0.037 identity pair.
+    func recheckFindMy(identifier: String) async throws -> FmiRecheckResult {
+        try await client.request(.rmcheckFmi, body: FmiRecheckRequest(imeiOrSerial: identifier))
+    }
+}
+
+/// Outcome of a standalone Find My re-read. `findMyStatus` is nil when the
+/// provider could not give a definitive ON or OFF - which must never be written
+/// to the device as "off".
+struct FmiRecheckResult: Decodable, Sendable {
+    let findMyStatus: String?
+    let resolved: Bool?
+    let rmcheckLookupId: String?
+}
+
+private struct FmiRecheckRequest: Encodable {
+    let imeiOrSerial: String
 }
 
 private struct RMCheckLookupRequest: Encodable {
