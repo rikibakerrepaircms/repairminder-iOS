@@ -19,6 +19,11 @@ struct CollectionSlotOfferCard: View {
 
     @State private var chosenDay = Date()
     @State private var chosenStart: String = ""
+    /// Once a window is out there the picker folds away. An identical form sitting
+    /// under "waiting on the customer" reads as though the offer never sent.
+    @State private var isEditing = false
+
+    private var showsPicker: Bool { slot.isRequested || isEditing }
 
     private static let startTimes = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00"]
     private static let maxDaysAhead = 56
@@ -53,6 +58,25 @@ struct CollectionSlotOfferCard: View {
                 Text(errorMessage).font(.footnote).foregroundStyle(.red)
             }
 
+            if !showsPicker {
+                HStack(spacing: 10) {
+                    Label(slot.offeredDescription ?? "", systemImage: "checkmark.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.tint)
+                    Spacer()
+                    Button("Change") { isEditing = true }
+                        .font(.subheadline.weight(.semibold))
+                        .disabled(isBusy)
+                }
+
+                Text(slot.isConfirmed
+                     ? "The customer has agreed to this window. They can still change it in their portal."
+                     : "Emailed to the customer with a link to confirm it or ask for another day. Nothing is reserved.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if showsPicker {
             VStack(alignment: .leading, spacing: 6) {
                 Text("DAY")
                     .font(.caption2.weight(.bold))
@@ -111,6 +135,11 @@ struct CollectionSlotOfferCard: View {
             Text("Emails the customer a link to confirm it or ask for another day. Nothing is reserved: no availability is tracked, so check the diary yourself first.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            }
+        }
+        .onChange(of: slot) { _, _ in
+            // A fresh offer, or a customer changing their mind, arrives as a new slot.
+            isEditing = false
         }
         .padding()
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
