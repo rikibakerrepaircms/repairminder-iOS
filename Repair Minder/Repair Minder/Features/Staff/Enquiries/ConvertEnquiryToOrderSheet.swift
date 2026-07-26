@@ -67,6 +67,13 @@ struct ConvertEnquiryToOrderSheet: View {
             // country defaults while existingClientId is still nil.
             viewModel.prefill(fromTicket: ticket)
             viewModel.formData.intakeMethod = .collection
+            // A sell lead converts to a buyback order and a repair lead to a
+            // repair order. Staff can still change it on the next screen.
+            if ticket.enquiryKind == CustomerEnquiryKind.sell {
+                selectedServiceType = viewModel.buybackEnabled ? .buyback : .repair
+            } else if ticket.enquiryKind == CustomerEnquiryKind.repairOrder {
+                selectedServiceType = .repair
+            }
             await viewModel.loadInitialData()
         }
     }
