@@ -73,6 +73,14 @@ struct CustomerCollectionPrepChecklist: View {
     // A repair device must NOT be reset, and the passcode must survive: we power
     // it on and test it after the repair. Stolen Device Protection blocks the
     // diagnostic that records what was working before we started.
+    //
+    // Shape and wording are the portal's `REPAIR_TASKS` exactly: the
+    // checklist-only charge reminder first, then the canonical four prep steps
+    // in order, each one's `title`/`detail` taken verbatim from the `title`/
+    // `body` of `REPAIR_PREP_STEPS` in `src/lib/repairPrep.ts`. The charge
+    // reminder is checklist-only because it matters when we are about to
+    // arrive, and does not belong in the four-step instruction the emails
+    // carry. Change the wording in the canonical steps, change it here.
     private static let repairTasks: [Task] = [
         Task(
             id: "charge",
@@ -84,21 +92,28 @@ struct CustomerCollectionPrepChecklist: View {
         Task(
             id: "sdp",
             title: "Turn off Stolen Device Protection",
-            detail: "Settings, then Face ID and Passcode. With it on we cannot complete the diagnostic that records what was working before we start.",
+            detail: "We run a full diagnostic that tests every feature before the repair and again once it is finished, so you can see what was working when it reached us. This feature blocks that diagnostic from completing. You will find it in Settings, then Face ID and Passcode.",
             linkLabel: "Apple: Stolen Device Protection",
             linkUrl: "https://support.apple.com/en-gb/120340"
         ),
         Task(
             id: "passcode",
-            title: "Leave your passcode on, and tell us what it is",
-            detail: "Or take it off. We have to power the device on and test it after the repair. Please do not factory reset it - we are repairing it, not buying it.",
+            title: "Leave the passcode switched on, and tell us what it is",
+            detail: "Taking it off works just as well. Either way we need to be able to get in, because we power the device on and test it after the repair.",
+            linkLabel: nil,
+            linkUrl: nil
+        ),
+        Task(
+            id: "noreset",
+            title: "Please do not factory reset it",
+            detail: "We are repairing it, not buying it, so a reset only loses you your data.",
             linkLabel: nil,
             linkUrl: nil
         ),
         Task(
             id: "backup",
-            title: "Back it up, and take the SIM out",
-            detail: "Back up anything you would miss before it comes to us. Take out the SIM and any memory card, and keep the case, the cable and the charger.",
+            title: "Back up anything you would miss, and take the SIM out",
+            detail: "Take any memory card out too, and keep hold of the case, the cable and the charger: we do not need them.",
             linkLabel: nil,
             linkUrl: nil
         ),
