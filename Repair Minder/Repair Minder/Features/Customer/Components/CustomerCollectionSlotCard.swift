@@ -3,9 +3,14 @@ import SwiftUI
 /// The customer's half of agreeing a doorstep collection window, on iPhone, iPad
 /// and Mac.
 ///
-/// Nothing here is a booking. The portal has always told sellers "the day and
-/// two-hour window you chose is a request", so this card must never say a slot is
-/// held - only what was asked for, what has been offered, and what is agreed.
+/// Nothing here is a booking. The portal tells sellers "the day and half day you
+/// chose is a request, not a booking", so this card must never say a slot is held -
+/// only what was asked for, what has been offered, and what is agreed.
+///
+/// Note the two grains, which are easy to conflate: the SELLER picks a day and a
+/// half day (SLOT_WINDOWS is ['morning', 'afternoon']), and WE offer back a
+/// two-hour window they then confirm. Copy telling the seller they picked a
+/// two-hour window is wrong.
 ///
 /// Deliberately no UIKit: this compiles into the Mac target too, and an
 /// iOS-simulator build passing would not prove that.
@@ -14,6 +19,9 @@ struct CustomerCollectionSlotCard: View {
     let slot: CollectionSlot
     let isBusy: Bool
     let errorMessage: String?
+    /// Keys the prep checklist's saved ticks. Nil renders no checklist rather than
+    /// sharing one set of ticks across every collection the seller has.
+    var ticketId: String? = nil
     let onConfirm: () -> Void
     let onRequest: (String, String) -> Void
 
@@ -32,10 +40,39 @@ struct CustomerCollectionSlotCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Your collection", systemImage: "calendar.badge.clock")
-                .font(.headline)
+            // An offered window is the one thing on this screen waiting on the
+            // customer, so it says so. Every other state stays unadorned: 'requested'
+            // is waiting on US and 'confirmed' is settled, so a chip on either would
+            // ask for an action that does not exist. Twin of the "Waiting on you"
+            // chip in CollectionSlotCard.tsx.
+            HStack {
+                Label("Your collection", systemImage: "calendar.badge.clock")
+                    .font(.headline)
+
+                if slot.isOffered {
+                    Spacer()
+                    Text("Waiting on you")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.blue.opacity(0.15))
+                        .foregroundStyle(Color.blue)
+                        .clipShape(Capsule())
+                }
+            }
 
             statusText
+
+            // Only on an AGREED collection. An offered window is not a promise yet,
+            // so counting down to it would invent a commitment.
+            if slot.isConfirmed {
+                CustomerCollectionCountdown(
+                    date: slot.offeredDate,
+                    start: slot.offeredStart,
+                    end: slot.offeredEnd
+                )
+            }
 
             if let errorMessage {
                 Text(errorMessage)
@@ -61,6 +98,14 @@ struct CustomerCollectionSlotCard: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(isBusy)
+            }
+
+            // Below the actions, not above: someone opening this card with a date
+            // agreed wants the countdown and the way to change it first, and the jobs
+            // second. Hidden while the picker is open so the card has one focus.
+            if slot.isConfirmed, let ticketId, !isChanging {
+                Divider()
+                CustomerCollectionPrepChecklist(ticketId: ticketId)
             }
 
             if isChanging {

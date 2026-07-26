@@ -26,6 +26,49 @@ struct CollectionSlotOfferCard: View {
     private var showsPicker: Bool { slot.isRequested || isEditing }
 
     private static let startTimes = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00"]
+
+    // MUST MATCH resolveOfferOutcome in worker/src/collection_slot.js, and the same
+    // block in CollectionSlotPanel.tsx. The server decides between four outcomes and
+    // the button has to say which one it will cause - this card previously only ever
+    // said "Offer", so it could not tell a staff member that a press would book a van
+    // outright or take away a window the customer had personally agreed.
+    //
+    // The boundary is the START of the window, at noon.
+    private func halfDayOfStart(_ t: String) -> String {
+        (Int(t.prefix(2)) ?? 0) < 12 ? "morning" : "afternoon"
+    }
+
+    /// The offer is exactly the day and half day they asked for.
+    private var matchesRequest: Bool {
+        guard let reqDate = slot.requestedDate, let reqWindow = slot.requestedWindow,
+              !chosenStart.isEmpty else { return false }
+        return Self.isoDay(chosenDay) == reqDate && halfDayOfStart(chosenStart) == reqWindow
+    }
+
+    /// Changing a window the customer confirmed. Never a booking, however well it fits
+    /// the original request - they pressed "That time works" for the old one.
+    private var movesAgreedWindow: Bool {
+        guard slot.isConfirmed, !chosenStart.isEmpty else { return false }
+        return !(Self.isoDay(chosenDay) == slot.offeredDate && chosenStart == slot.offeredStart)
+    }
+
+    private var booksOutright: Bool { !slot.isConfirmed && matchesRequest }
+
+    private var helperText: String {
+        if movesAgreedWindow {
+            return "Emails the customer an apology with the new time and a link to confirm it, and puts the collection back to waiting on them. Nothing is reserved: no availability is tracked, so check the diary yourself first."
+        }
+        if booksOutright {
+            return "This is the day and half day they asked for, so it books straight away - they are told it is agreed rather than asked to confirm. Nothing is reserved: no availability is tracked, so check the diary yourself first."
+        }
+        return "Emails the customer a link to confirm it or ask for another day. Nothing is reserved: no availability is tracked, so check the diary yourself first."
+    }
+
+    private var actionTitle: String {
+        if booksOutright { return "Book this window" }
+        if movesAgreedWindow { return "Move their collection" }
+        return slot.isRequested ? "Offer this window" : "Offer a new window"
+    }
     private static let maxDaysAhead = 56
 
     private var dayRange: ClosedRange<Date> {
@@ -125,14 +168,24 @@ struct CollectionSlotOfferCard: View {
                 if isBusy {
                     ProgressView().controlSize(.small)
                 } else {
-                    Label(slot.isRequested ? "Offer this window" : "Offer a new window",
-                          systemImage: "paperplane")
+                    Label(actionTitle, systemImage: "paperplane")
                 }
             }
             .buttonStyle(.borderedProminent)
             .disabled(chosenStart.isEmpty || isBusy || isSunday(chosenDay))
 
-            Text("Emails the customer a link to confirm it or ask for another day. Nothing is reserved: no availability is tracked, so check the diary yourself first.")
+            // Taking away a window the customer personally agreed is the one action
+            // here with a cost attached, so it says so before the press.
+            if movesAgreedWindow, let start = slot.offeredStart, let end = slot.offeredEnd {
+                Label(
+                    "They have already agreed \(start) to \(end). Moving it now asks them to confirm all over again, and they get an email apologising for the change - so only do this if the agreed window really cannot happen.",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.caption)
+                .foregroundStyle(.orange)
+            }
+
+            Text(helperText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }

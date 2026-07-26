@@ -52,18 +52,17 @@ struct CustomerEnquiryDetailView: View {
             VStack(spacing: 16) {
                 header(enquiry)
 
-                // Sell orders only. Directly under the header and above the
-                // messages, because it is the first thing someone who has just
-                // agreed to sell a device needs to read. A nil enquiry_kind is an
-                // ordinary enquiry and renders nothing here.
-                // Above the next steps: someone with a window waiting on them should
-                // not have to read four generic steps first. Renders nothing when no
-                // collection is in play.
+                // FIRST of the three cards, because it holds the only pending action
+                // on the screen: an offered window is not booked until the seller
+                // taps "That time works". Renders nothing when no collection is in
+                // play, which is most enquiries.
                 if let slot = viewModel.collectionSlot {
                     CustomerCollectionSlotCard(
                         slot: slot,
                         isBusy: viewModel.isUpdatingSlot,
                         errorMessage: viewModel.slotError,
+                        // Keys the prep checklist's ticks to this collection.
+                        ticketId: viewModel.ticketId,
                         onConfirm: { Task { await viewModel.confirmCollectionSlot() } },
                         onRequest: { date, window in
                             Task { await viewModel.requestCollectionSlot(date: date, window: window) }
@@ -71,8 +70,33 @@ struct CustomerEnquiryDetailView: View {
                     )
                 }
 
+                // EVERY SELL ORDER, not just a walk-in.
+                //
+                // This was gated on `fulfilment == "visit"`, which made the apps the
+                // odd one out: buildSellOrderConfirmationEmail already puts
+                // `dropOffText` - address, hours and the order ID to quote - on EVERY
+                // branch, because the address is not an alternative route, it is
+                // where we are, and a seller who finds themselves passing should not
+                // have to hunt for it. The only condition left is a location on file;
+                // the card renders nothing without one.
+                //
+                // BELOW the collection card on purpose - that card holds the only
+                // pending action on the screen. A walk-in has no slot, so this is
+                // still the first card they see. The endpoint orders locations by
+                // is_primary DESC, so the first entry is the ticket's own shop, or
+                // the primary one when it is assigned to none.
                 if viewModel.showsSellNextSteps {
-                    CustomerSellNextStepsCard(ticketId: viewModel.ticketId, fulfilment: enquiry.fulfilment)
+                    CustomerShopVisitCard(
+                        location: enquiry.company?.locations?.first,
+                        ticketNumber: enquiry.ticketNumber
+                    )
+                }
+
+                if viewModel.showsSellNextSteps {
+                    CustomerSellNextStepsCard(
+                        ticketId: viewModel.ticketId,
+                        fulfilment: enquiry.fulfilment
+                    )
                 }
 
                 messagesSection(enquiry)
@@ -100,6 +124,33 @@ struct CustomerEnquiryDetailView: View {
             Text(subtitle(enquiry))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+
+            // ORDERS ONLY. This is the reference staff ask for on the phone about an
+            // open order, so on an order it has to be findable without hunting and
+            // readable out loud - it used to be a footnote sharing a line with the date.
+            //
+            // An ordinary enquiry gets none of this and keeps the line it always had:
+            // someone who asked us a question has no order, and does not need a
+            // reference set in title type. Twin of the block in
+            // CustomerEnquiryDetailPage.tsx.
+            if enquiry.isOrder {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("ORDER ID")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.secondary)
+                    Text("\(enquiry.ticketNumber)")
+                        .font(.system(.title, design: .rounded, weight: .bold))
+                        .monospacedDigit()
+                        .textSelection(.enabled)
+                    Text("Quote this if you get in touch with us.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+            }
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -108,11 +159,12 @@ struct CustomerEnquiryDetailView: View {
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
 
+    /// On an ORDER the reference has its own block below, so this is just the date.
+    /// An ordinary enquiry keeps the reference here, where it has always been.
     private func subtitle(_ enquiry: CustomerEnquiryDetail) -> String {
-        var parts = ["Enquiry #\(enquiry.ticketNumber)"]
-        if let created = enquiry.createdAt {
-            parts.append(DateFormatters.formatHumanDate(created))
-        }
+        var parts: [String] = []
+        if !enquiry.isOrder { parts.append("Enquiry #\(enquiry.ticketNumber)") }
+        if let created = enquiry.createdAt { parts.append(DateFormatters.formatHumanDate(created)) }
         return parts.joined(separator: " · ")
     }
 

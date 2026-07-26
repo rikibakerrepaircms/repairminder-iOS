@@ -33,9 +33,16 @@ struct CustomerReturnLabelStep: View {
     /// Momentary "Copied" confirmation on the tracking-number button.
     @State private var copiedTracking = false
 
-    init(ticketId: String, fulfilment: String? = nil) {
+    /// Reported up to `CustomerSellNextStepsCard`, which withholds the packaging
+    /// step until posting is actually in play. Written here rather than fetched
+    /// twice: this view already knows the answer, and a second GET for the same row
+    /// would be a wasted request on a customer's mobile connection.
+    private let hasLabel: Binding<Bool>?
+
+    init(ticketId: String, fulfilment: String? = nil, hasLabel: Binding<Bool>? = nil) {
         _viewModel = StateObject(wrappedValue: CustomerReturnLabelViewModel(ticketId: ticketId))
         self.fulfilment = fulfilment
+        self.hasLabel = hasLabel
     }
 
     var body: some View {
@@ -71,6 +78,12 @@ struct CustomerReturnLabelStep: View {
         // call into this `.task`, an `.onAppear`, or `.refreshable`.
         .task {
             await viewModel.load()
+        }
+        // Covers both the initial load and a label the customer creates while the
+        // screen is open, so the packaging step appears the moment posting becomes
+        // the route they are on.
+        .onChange(of: viewModel.label == nil) { _, isNil in
+            hasLabel?.wrappedValue = !isNil
         }
     }
 
@@ -163,6 +176,23 @@ struct CustomerReturnLabelStep: View {
                 // collection, answered the door with nothing to hand over, and wasted
                 // the trip. Same correction as the web card.
                 Text("Print the label and tape it to the parcel first - you need to do that whichever way you send it. Then either drop the parcel at a Post Office, or book a free collection and Royal Mail will come to your door for it.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                // THE COVER CAP, AND THE TWO WAYS OUT OF IT.
+                // The label is Royal Mail Tracked, and cover in transit is £50 -
+                // less than most devices we buy. The confirmation email has said
+                // this since it was written; the screen where someone is actually
+                // holding the parcel did not. This is the honest reason to put
+                // walking in front of someone who already has a label.
+                //
+                // IT MUST NOT NAME WHAT THEIR DEVICE IS WORTH. The enquiry endpoint
+                // returns no quoted price - only the subject string carries one, and
+                // parsing a price back out of a subject line would eventually print
+                // a wrong number at a customer. So the cap is stated and the
+                // comparison is left to them, exactly as the email does it. Twin of
+                // the block in SellNextStepsCard.tsx.
+                Text("Cover in transit is £50, which is plenty for most handsets. Worth more than that? You can bring it into the shop instead, or tell us before it moves, quoting your order ID, and we will arrange a service with higher cover.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 

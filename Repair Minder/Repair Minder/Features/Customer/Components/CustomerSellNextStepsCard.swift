@@ -16,6 +16,20 @@ import SwiftUI
 /// minus), "device" rather than "phone" because we also buy tablets, consoles,
 /// laptops and watches, and "shop" rather than "workshop".
 ///
+/// Finding the shop is NOT this card's job. The address, opening hours,
+/// open/closed countdown and directions live in `CustomerShopVisitCard` above this
+/// one, on EVERY sell route rather than only on a walk-in - the confirmation email
+/// has always given the address to everyone, and this card's job is what happens
+/// next, not where we are.
+///
+/// So both ways of getting the device to us are permanently on the screen: the shop
+/// card above, and the return-label step below. The one exception is the POSTAL
+/// route, where the label is their primary route and is minted at order time -
+/// there the "rather post it?" prompt is never reached, because offering it to
+/// someone already posting reads as not having taken in what they picked.
+/// buildSellOrderConfirmationEmail withholds the same line for the same reason
+/// (`stepOneIsPostal`).
+///
 /// This is the twin of `src/components/customer/SellNextStepsCard.tsx` in the web
 /// portal. Change the wording in one, change it in the other.
 struct CustomerSellNextStepsCard: View {
@@ -27,6 +41,27 @@ struct CustomerSellNextStepsCard: View {
     /// customer never chose a route.
     let fulfilment: String?
 
+    /// Set by the label step once it knows whether a label exists, so the packaging
+    /// step below can be withheld until posting is actually in play. See
+    /// `packagingApplies`.
+    @State private var hasLabel = false
+
+    /// PACKAGING IS A POSTAL CONCEPT.
+    ///
+    /// The jiffy bag exists to carry a device to us in the post, and asking for one
+    /// puts a chargeable Tracked 24 parcel in front of a staff member to fulfil.
+    /// Offering it to someone who told us they are walking into the shop asks about
+    /// a journey they are not making, and can end with us posting packaging to a
+    /// seller who turns up at the counter anyway.
+    ///
+    /// So it shows on the POSTAL route, and on any route where a label now exists -
+    /// a walk-in who pressed "Send me a postage label" HAS moved to posting it, and
+    /// at that point the question is a fair one. Twin of `packagingApplies` in
+    /// `SellNextStepsCard.tsx`.
+    private var packagingApplies: Bool {
+        fulfilment == CustomerFulfilment.collection || hasLabel
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("What happens next")
@@ -34,8 +69,10 @@ struct CustomerSellNextStepsCard: View {
 
             wipeStep
             fulfilmentStep
-            CustomerReturnLabelStep(ticketId: ticketId, fulfilment: fulfilment)
-            CustomerPackagingStep(ticketId: ticketId)
+            CustomerReturnLabelStep(ticketId: ticketId, fulfilment: fulfilment, hasLabel: $hasLabel)
+            if packagingApplies {
+                CustomerPackagingStep(ticketId: ticketId)
+            }
             arrivalStep
         }
         .padding()
@@ -78,7 +115,11 @@ struct CustomerSellNextStepsCard: View {
         switch fulfilment {
         case CustomerFulfilment.doorstep:
             step(icon: "shippingbox", title: "Your collection slot is a request, not a booking") {
-                Text("The day and two-hour window you chose is a request. We will email you to confirm it, or to offer the nearest slot we can make. If the time no longer suits you, just reply to that email and we will rearrange it. Rearranging is free and there is no limit on how many times you can do it. We collect within 5 miles of the shop.")
+                // The seller picks a DAY and a HALF DAY - the storefront asks
+                // "Morning or afternoon?" and the enum is SLOT_WINDOWS =
+                // ['morning', 'afternoon']. The two-hour window is what WE offer
+                // back, and this used to tell them they had chosen one.
+                Text("The day and half day you chose is a request, not a booking. We will email you a two-hour window to confirm it, or offer the nearest one we can make. If it no longer suits you, just reply to that email and we will rearrange it. Rearranging is free and there is no limit on how many times you can do it. We collect within 5 miles of the shop.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -94,6 +135,12 @@ struct CustomerSellNextStepsCard: View {
 
         case CustomerFulfilment.visit:
             step(icon: "storefront", title: "Bring it into the shop") {
+                // The address, the hours and the directions are NOT here any
+                // more. They are the "Visit us" card at the top of the screen
+                // (CustomerShopVisitCard), so that a walk-in sees where we are and
+                // whether we are open before they read an activation-lock warning -
+                // the same slot the doorstep route's own card occupies. This step
+                // keeps only what it is for: what to do when you get here.
                 Text("Come in during our opening hours. You do not need an appointment, and we will test the device while you wait. Please bring photo ID with you, because we record ID on every device we buy.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)

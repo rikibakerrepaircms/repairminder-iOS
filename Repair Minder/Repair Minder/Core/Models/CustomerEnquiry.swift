@@ -118,6 +118,14 @@ struct CustomerEnquiryDetail: Decodable, Sendable {
 
     var isSell: Bool { enquiryKind == CustomerEnquiryKind.sell }
 
+    /// Whether this is an ORDER, and so has an order ID to quote, rather than an
+    /// ordinary enquiry - someone who asked us a question has no order. Keyed on
+    /// enquiryKind, never ticketType: that is the staff workflow lane and stays
+    /// 'lead' even on a sell order.
+    var isOrder: Bool {
+        enquiryKind == CustomerEnquiryKind.sell || enquiryKind == CustomerEnquiryKind.repairOrder
+    }
+
     var displaySubject: String {
         let trimmed = subject?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return trimmed.isEmpty ? "Enquiry #\(ticketNumber)" : trimmed
@@ -130,6 +138,43 @@ struct CustomerEnquiryCompany: Decodable, Sendable {
     let name: String?
     let logoUrl: String?
     let faviconUrl: String?
+    /// The shop, or every shop when the ticket is assigned to none. Ordered by
+    /// `is_primary DESC` server side, so the first entry is the one to show.
+    /// Additive: this has always been in the response, it simply was not decoded.
+    let locations: [CustomerEnquiryLocation]?
+}
+
+/// A shop as `GET /api/customer/enquiries/:ticketId` returns it.
+///
+/// Everything is Optional because everything genuinely can be null in D1, and each
+/// field drops its own element rather than rendering a placeholder. `googleMapsUrl`
+/// is built server side from `google_place_id`; `appleMapsUrl` is the column
+/// verbatim. Twin of `SellStepsLocation` in `SellNextStepsCard.tsx`.
+struct CustomerEnquiryLocation: Decodable, Sendable {
+    let name: String?
+    let phone: String?
+    let email: String?
+    let addressLine1: String?
+    let addressLine2: String?
+    let city: String?
+    let postcode: String?
+    let openingHours: [String: CustomerEnquiryDayHours?]?
+    let googleMapsUrl: String?
+    let appleMapsUrl: String?
+
+    /// "3 Queen Street, Haverhill, CB9 9DZ", with absent parts simply left out.
+    var oneLineAddress: String {
+        [addressLine1, addressLine2, city, postcode]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .joined(separator: ", ")
+    }
+}
+
+/// One day's hours. A day that is absent, or null, is a day we are closed.
+struct CustomerEnquiryDayHours: Decodable, Sendable {
+    let open: String
+    let close: String
 }
 
 // MARK: - Status Display
