@@ -54,6 +54,18 @@ struct CustomerEnquiryListView: View {
                 }
             }
 
+            if !viewModel.repairEnquiries.isEmpty {
+                Section {
+                    ForEach(viewModel.repairEnquiries) { enquiry in
+                        NavigationLink(destination: CustomerEnquiryDetailView(ticketId: enquiry.id)) {
+                            CustomerEnquiryRow(enquiry: enquiry)
+                        }
+                    }
+                } header: {
+                    Text("Devices Being Repaired")
+                }
+            }
+
             if !viewModel.otherEnquiries.isEmpty {
                 Section {
                     ForEach(viewModel.otherEnquiries) { enquiry in
@@ -125,7 +137,7 @@ struct CustomerEnquiryRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("Enquiry #\(enquiry.ticketNumber)")
+                Text(titleText)
                     .font(.headline)
 
                 Spacer()
@@ -145,6 +157,13 @@ struct CustomerEnquiryRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    /// A repair order reads as an order, matching its confirmation email and the
+    /// web portal's "Repair order #..." wording. Sell and plain-enquiry titles
+    /// are untouched.
+    private var titleText: String {
+        enquiry.isRepairOrder ? "Repair order #\(enquiry.ticketNumber)" : "Enquiry #\(enquiry.ticketNumber)"
     }
 
     private var statusBadge: some View {
