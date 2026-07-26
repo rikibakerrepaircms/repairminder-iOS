@@ -254,18 +254,28 @@ struct CustomerReturnLabelStep: View {
 
     /// How the pre-label prompt reads depends on the route they picked.
     ///
-    /// For `collection` this IS their route, so it states it rather than asking.
-    /// For `visit` and `doorstep` the label is a genuine alternative and is
-    /// offered as one - asking "Posting it to us?" of someone who booked a
-    /// doorstep pickup reads as though the form threw their answer away. Nil
-    /// never chose a route, so the plain question is the honest one.
+    /// A postal customer's label is minted when the order is placed, so they land
+    /// on the "your postage label is ready" state above and never read a word of
+    /// this. They only get here if the mint failed - Royal Mail down, or an
+    /// address we could not use - so the `collection` wording below says that
+    /// plainly instead of presenting a button press as the normal route.
+    ///
+    /// For `visit` and `doorstep` nothing is minted up front and the label IS a
+    /// genuine alternative, so it is offered as one - asking "Posting it to us?"
+    /// of someone who booked a doorstep pickup reads as though the form threw
+    /// their answer away. Nil never chose a route, so the plain question is the
+    /// honest one.
     ///
     /// Twin of `labelPrompt` in `src/components/customer/SellNextStepsCard.tsx`.
     private var labelPrompt: (title: String, body: String) {
         switch fulfilment {
         case CustomerFulfilment.collection:
-            return ("We send you a postage label",
-                    "Press the button below and we will email your free, pre-paid Royal Mail label with a tracking number. There is nothing to pay and nothing to arrange with us first.")
+            // Was "press the button and we will EMAIL your label", which was wrong
+            // twice over: the label appears here in the portal rather than by
+            // email, and a postal customer is not meant to be pressing anything
+            // at all.
+            return ("Get your postage label",
+                    "Your label is usually ready and waiting here the moment you order. This one did not come through, which is on us - press below and we will get it now. It is free and there is nothing to arrange.")
         case CustomerFulfilment.visit:
             return ("Rather not come in?",
                     "You do not have to. We can send you a free, pre-paid Royal Mail label instead, so posting it costs you nothing.")
