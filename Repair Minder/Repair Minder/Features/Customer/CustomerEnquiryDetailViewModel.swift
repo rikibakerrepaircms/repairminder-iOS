@@ -129,9 +129,12 @@ final class CustomerEnquiryDetailViewModel: ObservableObject {
         isSendingReply = false
     }
 
-    /// Whether to show the sell-specific next-steps card.
-    var showsSellNextSteps: Bool {
-        enquiry?.isSell == true
+    /// Whether to show a next-steps card, sell or repair. Stands down once the
+    /// device is with us, so it stops offering a label for a parcel that has
+    /// already arrived.
+    var showsNextSteps: Bool {
+        guard let enquiry else { return false }
+        return enquiry.expectsDevice && !enquiry.deviceIsWithUs
     }
 
     /// A closed or resolved enquiry hides the reply box, matching the web portal.

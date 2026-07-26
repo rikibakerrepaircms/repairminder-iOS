@@ -72,6 +72,14 @@ struct CustomerEnquirySummary: Decodable, Identifiable, Sendable {
     /// Whether this enquiry is a device we have agreed to buy.
     var isSell: Bool { enquiryKind == CustomerEnquiryKind.sell }
 
+    /// Whether this is a repair we have agreed to do.
+    var isRepairOrder: Bool { enquiryKind == CustomerEnquiryKind.repairOrder }
+
+    /// Whether a device is on its way to us, so a label, packaging and a
+    /// collection slot all apply. The Swift twin of `expectsDevice` in
+    /// worker/src/storefront_enquiry_kind.js - change one, change both.
+    var expectsDevice: Bool { isSell || isRepairOrder }
+
     var displaySubject: String {
         let trimmed = subject?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return trimmed.isEmpty ? "Enquiry #\(ticketNumber)" : trimmed
@@ -117,6 +125,20 @@ struct CustomerEnquiryDetail: Decodable, Sendable {
     }
 
     var isSell: Bool { enquiryKind == CustomerEnquiryKind.sell }
+
+    /// Whether this is a repair we have agreed to do.
+    var isRepairOrder: Bool { enquiryKind == CustomerEnquiryKind.repairOrder }
+
+    /// Whether a device is on its way to us, so a label, packaging and a
+    /// collection slot all apply. The Swift twin of `expectsDevice` in
+    /// worker/src/storefront_enquiry_kind.js - change one, change both.
+    var expectsDevice: Bool { isSell || isRepairOrder }
+
+    /// The device has been booked in. `handleCreateOrder` flips ticket_type to
+    /// 'order' at conversion, so this needs no new field. Once true, the
+    /// next-steps card stands down: it would otherwise keep offering a postage
+    /// label for a parcel that has already reached us.
+    var deviceIsWithUs: Bool { ticketType == "order" }
 
     /// Whether this is an ORDER, and so has an order ID to quote, rather than an
     /// ordinary enquiry - someone who asked us a question has no order. Keyed on

@@ -63,6 +63,9 @@ struct CustomerEnquiryDetailView: View {
                         errorMessage: viewModel.slotError,
                         // Keys the prep checklist's ticks to this collection.
                         ticketId: viewModel.ticketId,
+                        // Forks the prep checklist between the sell and repair
+                        // task lists.
+                        kind: enquiry.enquiryKind,
                         onConfirm: { Task { await viewModel.confirmCollectionSlot() } },
                         onRequest: { date, window in
                             Task { await viewModel.requestCollectionSlot(date: date, window: window) }
@@ -85,18 +88,25 @@ struct CustomerEnquiryDetailView: View {
                 // still the first card they see. The endpoint orders locations by
                 // is_primary DESC, so the first entry is the ticket's own shop, or
                 // the primary one when it is assigned to none.
-                if viewModel.showsSellNextSteps {
+                if viewModel.showsNextSteps {
                     CustomerShopVisitCard(
                         location: enquiry.company?.locations?.first,
                         ticketNumber: enquiry.ticketNumber
                     )
                 }
 
-                if viewModel.showsSellNextSteps {
-                    CustomerSellNextStepsCard(
-                        ticketId: viewModel.ticketId,
-                        fulfilment: enquiry.fulfilment
-                    )
+                if viewModel.showsNextSteps {
+                    if enquiry.isRepairOrder {
+                        CustomerRepairNextStepsCard(
+                            ticketId: viewModel.ticketId,
+                            fulfilment: enquiry.fulfilment
+                        )
+                    } else {
+                        CustomerSellNextStepsCard(
+                            ticketId: viewModel.ticketId,
+                            fulfilment: enquiry.fulfilment
+                        )
+                    }
                 }
 
                 messagesSection(enquiry)

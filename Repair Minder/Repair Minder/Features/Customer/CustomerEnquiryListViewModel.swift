@@ -50,7 +50,14 @@ final class CustomerEnquiryListViewModel: ObservableObject {
         enquiries.filter { $0.isSell }
     }
 
+    /// A repair we have agreed to do - also something to act on (a label to
+    /// fetch, a collection to arrange), so it gets its own section rather than
+    /// falling into the plain "Enquiries" bucket.
+    var repairEnquiries: [CustomerEnquirySummary] {
+        enquiries.filter { $0.isRepairOrder }
+    }
+
     var otherEnquiries: [CustomerEnquirySummary] {
-        enquiries.filter { !$0.isSell }
+        enquiries.filter { !$0.isSell && !$0.isRepairOrder }
     }
 }

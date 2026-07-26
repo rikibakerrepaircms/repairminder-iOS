@@ -7,30 +7,34 @@
 
 import SwiftUI
 
-/// What the seller needs to do to the device before we arrive.
+/// What the customer needs to do to the device before we arrive.
 ///
-/// Twin of `CollectionPrepChecklist.tsx` in the web portal - same three jobs, same
-/// order, same links, same wording. The three things that actually stop a collection:
-///
-///  1. SOME CHARGE, so it can be powered on when it reaches the bench. First because
-///     it is the one nobody thinks of.
-///  2. NOT RESET - their data is still on it.
-///  3. FIND MY still on - an activation lock only they can clear, and the single most
-///     common reason a sale stalls.
+/// Twin of `CollectionPrepChecklist.tsx` in the web portal - same two task
+/// lists, same order, same links, same wording. `kind` forks the list: a sell
+/// device gets the three things that actually stop a collection (some charge,
+/// a factory reset, Find My removed); a repair device gets the inverse (some
+/// charge, Stolen Device Protection off, passcode kept on, backed up but NOT
+/// reset) because it comes back to the same owner working.
 ///
 /// DO NOT say the device is tested "on the spot" here. This card is only ever shown
 /// for a DOORSTEP collection, where the device is taken away and checked at the shop.
-/// Testing while the seller waits is the VISIT route, and that wording was wrongly
+/// Testing while the customer waits is the VISIT route, and that wording was wrongly
 /// copied onto this card in the first draft.
 ///
-/// The ticks are the seller's own reminder, kept in UserDefaults per ticket. They are
-/// NOT sent anywhere and must never be read as us knowing the device is ready - only
-/// the bench can tell us that. Nothing here gates anything.
+/// The ticks are the customer's own reminder, kept in UserDefaults per ticket. They
+/// are NOT sent anywhere and must never be read as us knowing the device is ready -
+/// only the bench can tell us that. Nothing here gates anything.
 ///
 /// Copy rules: UK English, hyphens only, "device" rather than "phone".
 struct CustomerCollectionPrepChecklist: View {
 
     let ticketId: String
+
+    /// `enquiry_kind` off the enquiry. 'repair_order' gets the inverse checklist:
+    /// a repair device must NOT be reset and must keep its passcode, because it
+    /// comes back to the same owner working. Anything else (sell, or an absent
+    /// kind on old data) keeps the sell list.
+    var kind: String? = nil
 
     private struct Task: Identifiable {
         let id: String
@@ -40,7 +44,7 @@ struct CustomerCollectionPrepChecklist: View {
         let linkUrl: String?
     }
 
-    private static let tasks: [Task] = [
+    private static let sellTasks: [Task] = [
         Task(
             id: "charge",
             title: "Give it some charge",
@@ -66,11 +70,49 @@ struct CustomerCollectionPrepChecklist: View {
         ),
     ]
 
+    // A repair device must NOT be reset, and the passcode must survive: we power
+    // it on and test it after the repair. Stolen Device Protection blocks the
+    // diagnostic that records what was working before we started.
+    private static let repairTasks: [Task] = [
+        Task(
+            id: "charge",
+            title: "Give it some charge",
+            detail: "Try to leave it with some charge if you can. We need to power it on to test it, so a flat one holds the repair up.",
+            linkLabel: nil,
+            linkUrl: nil
+        ),
+        Task(
+            id: "sdp",
+            title: "Turn off Stolen Device Protection",
+            detail: "Settings, then Face ID and Passcode. With it on we cannot complete the diagnostic that records what was working before we start.",
+            linkLabel: "Apple: Stolen Device Protection",
+            linkUrl: "https://support.apple.com/en-gb/120340"
+        ),
+        Task(
+            id: "passcode",
+            title: "Leave your passcode on, and tell us what it is",
+            detail: "Or take it off. We have to power the device on and test it after the repair. Please do not factory reset it - we are repairing it, not buying it.",
+            linkLabel: nil,
+            linkUrl: nil
+        ),
+        Task(
+            id: "backup",
+            title: "Back it up, and take the SIM out",
+            detail: "Back up anything you would miss before it comes to us. Take out the SIM and any memory card, and keep the case, the cable and the charger.",
+            linkLabel: nil,
+            linkUrl: nil
+        ),
+    ]
+
+    private var tasks: [Task] {
+        kind == CustomerEnquiryKind.repairOrder ? Self.repairTasks : Self.sellTasks
+    }
+
     private var storageKey: String { "rm_collection_prep_\(ticketId)" }
 
     @State private var done: Set<String> = []
 
-    private var remaining: Int { Self.tasks.count - Self.tasks.filter { done.contains($0.id) }.count }
+    private var remaining: Int { tasks.count - tasks.filter { done.contains($0.id) }.count }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -78,12 +120,12 @@ struct CustomerCollectionPrepChecklist: View {
                 Text("Before we arrive")
                     .font(.headline)
                 Spacer()
-                Text(remaining == 0 ? "All done" : "\(remaining) of \(Self.tasks.count) left")
+                Text(remaining == 0 ? "All done" : "\(remaining) of \(tasks.count) left")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            ForEach(Self.tasks) { task in
+            ForEach(tasks) { task in
                 VStack(alignment: .leading, spacing: 6) {
                     // The whole row is the control, so a thumb has the full width to
                     // aim at rather than a small checkbox.

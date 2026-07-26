@@ -22,6 +22,9 @@ struct CustomerCollectionSlotCard: View {
     /// Keys the prep checklist's saved ticks. Nil renders no checklist rather than
     /// sharing one set of ticks across every collection the seller has.
     var ticketId: String? = nil
+    /// `enquiry_kind` off the enquiry, passed straight down to the prep
+    /// checklist so it can fork between the sell and repair task lists.
+    var kind: String? = nil
     let onConfirm: () -> Void
     let onRequest: (String, String) -> Void
 
@@ -105,7 +108,7 @@ struct CustomerCollectionSlotCard: View {
             // second. Hidden while the picker is open so the card has one focus.
             if slot.isConfirmed, let ticketId, !isChanging {
                 Divider()
-                CustomerCollectionPrepChecklist(ticketId: ticketId)
+                CustomerCollectionPrepChecklist(ticketId: ticketId, kind: kind)
             }
 
             if isChanging {
