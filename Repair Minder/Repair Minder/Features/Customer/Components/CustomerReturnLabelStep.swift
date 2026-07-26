@@ -33,6 +33,14 @@ struct CustomerReturnLabelStep: View {
     /// Momentary "Copied" confirmation on the tracking-number button.
     @State private var copiedTracking = false
 
+    /// The address form's fields, shown in place of the create button once
+    /// `viewModel.needsAddress` is set. Twin of the web card's inline form in
+    /// `LabelStep.tsx` - same fields, same explanatory line, same wording.
+    @State private var addressLine1 = ""
+    @State private var addressLine2 = ""
+    @State private var city = ""
+    @State private var postcode = ""
+
     /// Reported up to `CustomerSellNextStepsCard`, which withholds the packaging
     /// step until posting is actually in play. Written here rather than fetched
     /// twice: this view already knows the answer, and a second GET for the same row
@@ -124,23 +132,7 @@ struct CustomerReturnLabelStep: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                Button {
-                    Task { await viewModel.requestLabel() }
-                } label: {
-                    if viewModel.isRequesting {
-                        Label("Getting your label...", systemImage: "paperplane")
-                    } else {
-                        Label("Send me a new label", systemImage: "paperplane")
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(viewModel.isRequesting)
-
-                if let requestError = viewModel.requestError {
-                    Text(requestError)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
+                createControls(idleLabel: "Send me a new label", loadingLabel: "Getting your label...")
             }
         }
     }
@@ -295,15 +287,89 @@ struct CustomerReturnLabelStep: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                // The button that can never fire twice. See
+                // The button (or address form) that can never fire twice. See
                 // CustomerReturnLabelViewModel.requestLabel for the guard.
+                createControls(idleLabel: "Send me a postage label", loadingLabel: "Requesting...")
+            }
+        }
+    }
+
+    // MARK: - Create controls (button, or the address form in its place)
+
+    /// The create button, or - once `viewModel.needsAddress` is set - the
+    /// inline address form. Shared by `expiredView` and `requestView` so the
+    /// form, once shown, does not vanish depending on which button raised it.
+    ///
+    /// The form retries through `viewModel.requestLabel(address:)`, so it is
+    /// behind the SAME `isRequesting` guard as every other create here - see
+    /// that method's docstring. Twin of `createControls` in `LabelStep.tsx`.
+    @ViewBuilder
+    private func createControls(idleLabel: String, loadingLabel: String) -> some View {
+        if viewModel.needsAddress {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("We need an address to send this to, so please add one below.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                TextField("Address line 1", text: $addressLine1)
+                    .textFieldStyle(.roundedBorder)
+                #if os(iOS)
+                    .textContentType(.streetAddressLine1)
+                #endif
+                TextField("Address line 2 (optional)", text: $addressLine2)
+                    .textFieldStyle(.roundedBorder)
+                #if os(iOS)
+                    .textContentType(.streetAddressLine2)
+                #endif
+                TextField("Town or city", text: $city)
+                    .textFieldStyle(.roundedBorder)
+                #if os(iOS)
+                    .textContentType(.addressCity)
+                #endif
+                TextField("Postcode", text: $postcode)
+                    .textFieldStyle(.roundedBorder)
+                #if os(iOS)
+                    .textContentType(.postalCode)
+                    .autocapitalization(.allCharacters)
+                #endif
+
+                Button {
+                    Task {
+                        await viewModel.requestLabel(address: CustomerReturnLabelAddress(
+                            addressLine1: addressLine1.trimmingCharacters(in: .whitespaces),
+                            addressLine2: addressLine2.trimmingCharacters(in: .whitespaces),
+                            city: city.trimmingCharacters(in: .whitespaces),
+                            postcode: postcode.trimmingCharacters(in: .whitespaces)))
+                    }
+                } label: {
+                    if viewModel.isRequesting {
+                        Label(loadingLabel, systemImage: "paperplane")
+                    } else {
+                        Label(idleLabel, systemImage: "paperplane")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(
+                    viewModel.isRequesting
+                    || addressLine1.trimmingCharacters(in: .whitespaces).isEmpty
+                    || postcode.trimmingCharacters(in: .whitespaces).isEmpty
+                )
+
+                if let requestError = viewModel.requestError {
+                    Text(requestError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
                 Button {
                     Task { await viewModel.requestLabel() }
                 } label: {
                     if viewModel.isRequesting {
-                        Label("Requesting...", systemImage: "paperplane")
+                        Label(loadingLabel, systemImage: "paperplane")
                     } else {
-                        Label("Send me a postage label", systemImage: "paperplane")
+                        Label(idleLabel, systemImage: "paperplane")
                     }
                 }
                 .buttonStyle(.borderedProminent)
@@ -358,6 +424,12 @@ final class CustomerReturnLabelViewModel: ObservableObject {
     @Published private(set) var isRequesting = false
     @Published private(set) var requestError: String?
 
+    /// Set when a create attempt comes back `ADDRESS_REQUIRED` - only ever a
+    /// repair walk-in, who the storefront deliberately never asked for an
+    /// address (see `CustomerReturnLabelAddress`'s docstring). Swaps the plain
+    /// button for the inline address form in `requestView`/`expiredView`.
+    @Published private(set) var needsAddress = false
+
     @Published private(set) var isDownloading = false
     @Published private(set) var downloadError: String?
     @Published var showingPdf = false
@@ -392,15 +464,24 @@ final class CustomerReturnLabelViewModel: ObservableObject {
     /// second tap to land in.) Once this succeeds, `label` is non-nil and the
     /// view renders no create button at all - a second tap is then
     /// structurally impossible, not just discouraged.
-    func requestLabel() async {
+    /// `address` is only ever passed by the address form once a prior call has
+    /// already come back `ADDRESS_REQUIRED`. The retry goes through this SAME
+    /// guarded function rather than a second, unguarded path.
+    func requestLabel(address: CustomerReturnLabelAddress? = nil) async {
         guard !isRequesting else { return }
         isRequesting = true
         requestError = nil
         do {
-            label = try await CustomerEnquiryService.requestReturnLabel(ticketId: ticketId)
+            label = try await CustomerEnquiryService.requestReturnLabel(ticketId: ticketId, address: address)
+            needsAddress = false
         } catch APIError.rateLimited {
             requestError = "A postage label was already requested for this ticket recently. "
                 + "Please check your email - we may already have sent it."
+        } catch APIError.serverError(_, "ADDRESS_REQUIRED") {
+            // Swap to the address form rather than a dead-end error message. A
+            // seller never lands here - see CustomerSellNextStepsCard - so this
+            // is always a repair walk-in the storefront never asked for one.
+            needsAddress = true
         } catch let error as APIError {
             requestError = error.localizedDescription
         } catch {

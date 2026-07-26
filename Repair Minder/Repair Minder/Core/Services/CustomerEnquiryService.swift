@@ -137,9 +137,22 @@ struct CustomerEnquiryService {
     /// client must not lean on either safety net. Call this ONLY from a
     /// button's action, guarded so a fast double-tap cannot start two
     /// requests (see `CustomerReturnLabelViewModel.requestLabel` in
-    /// `CustomerSellNextStepsCard.swift`). Never call this from `.task`,
+    /// `CustomerReturnLabelStep.swift`). Never call this from `.task`,
     /// `.onAppear`, or `refreshable`.
-    static func requestReturnLabel(ticketId: String) async throws -> CustomerReturnLabel {
+    ///
+    /// `address` is optional and only ever needed by a repair walk-in: the
+    /// storefront never asked them for one (a repair only needs an address
+    /// where we are actually collecting, unlike a buyback, which always
+    /// records the seller's), so the server can 422 with
+    /// `code: "ADDRESS_REQUIRED"` - surfaced here as
+    /// `APIError.serverError(_, code: "ADDRESS_REQUIRED")`, which
+    /// `CustomerReturnLabelViewModel.requestLabel` matches on to show the
+    /// address form. Passing `address` retries with it in the body so the
+    /// server can write it, on a COALESCE guard that never overwrites an
+    /// address the client already has, before minting.
+    static func requestReturnLabel(
+        ticketId: String, address: CustomerReturnLabelAddress? = nil
+    ) async throws -> CustomerReturnLabel {
         guard let token = customerAuth.accessToken else { throw APIError.unauthorized }
 
         let url = URL(string: "\(baseURL)/api/customer/enquiries/\(ticketId)/return-label")!
@@ -147,6 +160,7 @@ struct CustomerEnquiryService {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONEncoder().encode(address ?? CustomerReturnLabelAddress())
 
         let (data, response) = try await URLSession.shared.data(for: request)
         try checkStatus(response)
@@ -156,7 +170,8 @@ struct CustomerEnquiryService {
         let apiResponse = try decoder.decode(APIResponse<CustomerReturnLabel>.self, from: data)
         guard apiResponse.success, let label = apiResponse.data else {
             throw APIError.serverError(
-                message: apiResponse.error ?? "Failed to request the postage label", code: nil)
+                message: apiResponse.error ?? "Failed to request the postage label",
+                code: apiResponse.code)
         }
         return label
     }

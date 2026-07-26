@@ -58,6 +58,31 @@ struct CustomerReturnLabel: Decodable, Equatable, Sendable {
     }
 }
 
+/// An address supplied on the return-label create, for the one client this
+/// endpoint can be missing one entirely: a repair walk-in, who is deliberately
+/// never asked for an address on the storefront (a repair only needs one
+/// where we are actually collecting, unlike a buyback, which always records
+/// the seller's - see `CustomerReturnLabelViewModel.requestLabel`).
+///
+/// Encoded, not decoded, so this uses explicit `CodingKeys` rather than
+/// `.convertFromSnakeCase` (that strategy only applies to the decoder the
+/// rest of this file's models share). `addressLine1`/`postcode` are what the
+/// server actually needs to address a parcel; `addressLine2`/`city` are
+/// optional on the wire, same as the web card's form.
+struct CustomerReturnLabelAddress: Encodable, Equatable, Sendable {
+    var addressLine1: String = ""
+    var addressLine2: String = ""
+    var city: String = ""
+    var postcode: String = ""
+
+    enum CodingKeys: String, CodingKey {
+        case addressLine1 = "address_line_1"
+        case addressLine2 = "address_line_2"
+        case city
+        case postcode
+    }
+}
+
 /// Whether the seller has asked us to post them packaging, and when.
 ///
 /// Backs `GET|POST /api/customer/enquiries/:ticketId/packaging-request`. This is
