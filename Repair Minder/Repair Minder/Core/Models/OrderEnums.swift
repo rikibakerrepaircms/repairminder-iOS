@@ -136,36 +136,59 @@ enum PaymentStatus: String, Codable, CaseIterable, UnknownDefaultable, Sendable 
 
 // MARK: - Intake Method
 
-enum IntakeMethod: String, Codable, CaseIterable, Sendable {
+/// How the device reached us on an ORDER. Decode-only - the booking wizard's
+/// picker is `BookingIntakeMethod`, which is a separate, narrower list.
+///
+/// `UnknownDefaultable` is not optional here, and the reason is expensive. The
+/// staff Orders page decodes `[Order]` in one pass, so a single row carrying a
+/// value this enum cannot read fails the WHOLE list and the page shows an
+/// error instead of the orders. That is exactly what happened: `collection`
+/// was missing, ConvertEnquiryToOrderSheet has always written it on a doorstep
+/// pickup, and one such order on 2026-07-25 took the page down for everyone.
+///
+/// The worker can add an intake method whenever it likes and ships without us.
+/// Anything it sends that we do not know must degrade to `.unknown`, never
+/// throw. Keep this list in step with `INTAKE_METHODS` in
+/// `worker/src/order_handlers.js`, and treat that as a courtesy rather than a
+/// guarantee - the fallback is what actually keeps the page up.
+enum IntakeMethod: String, Codable, CaseIterable, UnknownDefaultable, Sendable {
     case walkIn = "walk_in"
+    case collection
     case mailIn = "mail_in"
     case courier
     case counterSale = "counter_sale"
     case accessoriesInStore = "accessories_in_store"
     case kioskSale = "kiosk_sale"
     case online
+    case unknown
+
+    static var unknownFallback: IntakeMethod { .unknown }
 
     var label: String {
         switch self {
         case .walkIn: return "Walk-in"
+        case .collection: return "Collection"
         case .mailIn: return "Mail-in"
         case .courier: return "Courier"
         case .counterSale: return "Counter Sale"
         case .accessoriesInStore: return "Accessories In-Store"
         case .kioskSale: return "Kiosk Sale"
         case .online: return "Online"
+        case .unknown: return "Other"
         }
     }
 
     var icon: String {
         switch self {
         case .walkIn: return "figure.walk"
+        case .collection: return "car"
         case .mailIn: return "envelope"
         case .courier: return "shippingbox"
         case .counterSale: return "cart"
         case .accessoriesInStore: return "bag"
         case .kioskSale: return "cart"
         case .online: return "globe"
+        case .unknown: return "questionmark"
         }
     }
 }
