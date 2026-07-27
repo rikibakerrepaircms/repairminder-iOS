@@ -378,7 +378,7 @@
           "device_name": null
         },
         {
-          "body": "[Via Storefront] SELL ORDER (awaiting device check)\nDevice: iPhone 15 128GB\nCondition: Excellent (battery 90% or above)\nQuoted: £297.00\nPrice held: 14 days\nOwnership: CONFIRMED owned outright, not on contract or finance\nSeller confirmed: Flawless or near-flawless screen and casing; No iCloud / Google Account lock; All parts are original - aftermarket screens, batteries or cameras may reduce this price; No previous repairs - these may change the condition.\nFulfilment: Free collection\nAddress: 8 Mugford Close, Haverhill, CB97PP\nCustomer note: Please call after 1pm. Thank you.",
+          "body": "[Via Storefront] SELL ORDER (awaiting device check)\nDevice: iPhone 15 128GB\nCondition: Excellent (battery 90% or above)\nQuoted: £297.00\nPrice held: 14 days\nOwnership: CONFIRMED owned outright, not on contract or finance\nSeller confirmed: Flawless or near-flawless screen and casing; No iCloud / Google Account lock; All parts are original - aftermarket screens, batteries or cameras may reduce this price; No previous repairs - these may change the condition.\nFulfilment: Free collection\nAddress: 8 Mugford Close, Haverhill, AA1 1AA\nCustomer note: Please call after 1pm. Thank you.",
           "created_at": "2026-07-24 22:06:06",
           "created_by": "Jo Ellis",
           "device_id": null,
@@ -1966,7 +1966,7 @@
           "device_name": "Apple iPhone 13"
         },
         {
-          "body": "[Auto: Ready for Collection]\n\n[Email failed: postmark API error: You tried to send to recipient(s) that have been marked as inactive. Found inactive addresses: redacted@example.invalid. Inactive recipients are ones that have generated a hard bounce, a spam complaint, or a manual suppression.]\n\nGood Afternoon Morgan ,\n\nGreat news! Your device repair is complete and ready for collection.\n\nOrder: #100002536\nDevice: Apple iPhone 13\nStatus: Ready for Collection\n\nCollection Point: mendmyi\n3 Queen Street, Haverhill, CB99DZ\nTel: 07700900000\n\nOpening Hours:\nMon: 09:00 - 17:00\nTue: 09:00 - 17:00\nWed: 09:00 - 17:00\nThu: 09:00 - 17:00\nFri: 09:00 - 17:00\nSat: 10:00 - 13:00\nSun: Closed\n\nGet directions: https://www.google.com/maps/search/?api=1&query=Google&query_place_id=ChIJvQvKMote2EcRkNnbi1Zjx5w\n\nView your order: https://portal.mendmyi.com/s/KS5HL98b\n\nWe look forward to seeing you soon!\n\nBest regards,\nmendmyi",
+          "body": "[Auto: Ready for Collection]\n\n[Email failed: postmark API error: You tried to send to recipient(s) that have been marked as inactive. Found inactive addresses: redacted@example.invalid. Inactive recipients are ones that have generated a hard bounce, a spam complaint, or a manual suppression.]\n\nGood Afternoon Morgan ,\n\nGreat news! Your device repair is complete and ready for collection.\n\nOrder: #100002536\nDevice: Apple iPhone 13\nStatus: Ready for Collection\n\nCollection Point: mendmyi\n3 Queen Street, Haverhill, AA1 1AA\nTel: 07700900000\n\nOpening Hours:\nMon: 09:00 - 17:00\nTue: 09:00 - 17:00\nWed: 09:00 - 17:00\nThu: 09:00 - 17:00\nFri: 09:00 - 17:00\nSat: 10:00 - 13:00\nSun: Closed\n\nGet directions: https://www.google.com/maps/search/?api=1&query=Google&query_place_id=ChIJvQvKMote2EcRkNnbi1Zjx5w\n\nView your order: https://portal.mendmyi.com/s/KS5HL98b\n\nWe look forward to seeing you soon!\n\nBest regards,\nmendmyi",
           "created_at": "2026-07-21 12:33:12",
           "created_by": "Robin Chase",
           "device_id": "06254dec68124052aea4e39af2cc5e7c",

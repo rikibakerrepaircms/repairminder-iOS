@@ -164,11 +164,53 @@ function collect(node, seed, parentKey) {
  * map never sees them. Defend by shape, not by a list you remembered.
  */
 function redactByShape(s) {
-  return s
+  return redactPostcodes(s)
     .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, 'redacted@example.invalid')
     // Bounded on BOTH sides by a non-digit: a greedier version ate two 12-digit
     // device serial numbers that happened to start with a zero.
     .replace(/(?<!\d)(\+44\s?\d{10}|0\d{10})(?!\d)/g, '07700900000');
+}
+
+/**
+ * Every device model named anywhere in this payload, so a postcode-shaped
+ * token that is really a product name is left alone.
+ *
+ * This is not hypothetical: "S20FE" is a Samsung Galaxy S20 FE and parses
+ * perfectly as the postcode S2 0FE. A regex alone cannot tell them apart, so
+ * the document's own catalogue decides - if the token is a device name
+ * somewhere, it is a device name everywhere.
+ */
+
+/** Keys whose value names a THING - a device, a model, a location, a status. */
+function isThingNameKey(k) {
+  return NON_PERSONAL_NAME_KEYS.test(k) || /^(display_name|name)$/i.test(k);
+}
+
+const deviceWords = new Set();
+function collectDeviceWords(node) {
+  if (Array.isArray(node)) return node.forEach(collectDeviceWords);
+  if (!node || typeof node !== 'object') return;
+  for (const [k, v] of Object.entries(node)) {
+    // Every key that names a THING: the explicit device/model keys, and the
+    // bare `name`/`display_name` that sit under a catalogue parent. Missing
+    // the second group rewrote "Galaxy S20FE" to "Galaxy AA1 1AA", because
+    // S20FE parses as the postcode S2 0FE and nothing said it was a product.
+    if (typeof v === 'string' && isThingNameKey(k)) {
+      v.split(/[\s,()]+/).forEach((w) => w && deviceWords.add(w.toUpperCase()));
+    }
+    collectDeviceWords(v);
+  }
+}
+
+/**
+ * A postcode identifies a household, so it is personal data even without a
+ * name beside it - and ours were sitting in free-text note bodies, reachable
+ * by neither the key pass nor the name map, exactly like the emails and phone
+ * numbers before them.
+ */
+function redactPostcodes(s) {
+  return s.replace(/\b[A-Z]{1,2}[0-9][0-9A-Z]? ?[0-9][A-Z]{2}\b/g, (m) =>
+    deviceWords.has(m.replace(/\s+/g, '').toUpperCase()) ? m : 'AA1 1AA');
 }
 
 /** Longest real string first, so a full name is consumed before its parts. */
@@ -205,6 +247,10 @@ function emit(node, seed, parentKey) {
         if (kind === 'email') { out[k] = `${fakeFull(rowSeed).toLowerCase().replace(' ', '.')}@example.invalid`; continue; }
         if (kind === 'phone') { out[k] = '07700900000'; continue; }
         if (kind === 'address') { out[k] = 'Redacted'; continue; }
+        // A catalogue name is a THING and never mentions a person, so it does
+        // not go through the name map at all. It must not: a customer surnamed
+        // Gray put "Gray" in the map, and "Space Gray" became "Space Dale".
+        if (isThingNameKey(k)) { out[k] = v; continue; }
         out[k] = redactProse(v);
         continue;
       }
@@ -217,6 +263,7 @@ function emit(node, seed, parentKey) {
 }
 
 const raw = JSON.parse(await new Response(process.stdin).text());
+collectDeviceWords(raw);
 collect(raw, 'root', 'root');
 sortedNames = [...nameMap.entries()].sort((a, b) => b[0].length - a[0].length);
 process.stdout.write(JSON.stringify(emit(raw, 'root', 'root'), null, 2) + '\n');

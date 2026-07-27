@@ -61,6 +61,33 @@ struct FixturePrivacyTests {
         }
     }
 
+    /// A postcode identifies a household, so it is personal data even with no
+    /// name beside it.
+    ///
+    /// This assertion exists because the first three rounds of scrubbing all
+    /// missed them: they sat in free-text note bodies, reachable by neither the
+    /// key pass nor the name map, exactly like the emails and phone numbers
+    /// before them. Six real customer postcodes were in the fixtures and every
+    /// test was green.
+    ///
+    /// `S20FE` is allowed: it is a Samsung Galaxy S20 FE and parses perfectly
+    /// as the postcode S2 0FE. The scrubber resolves that ambiguity from the
+    /// payload's own device catalogue rather than from a regex.
+    @Test func noRealPostcodes() throws {
+        let pattern = try NSRegularExpression(pattern: #"\b[A-Z]{1,2}[0-9][0-9A-Z]? ?[0-9][A-Z]{2}\b"#)
+        let allowed: Set<String> = ["AA1 1AA", "S20FE"]
+        for name in Fixtures.all {
+            for s in try allStrings(name) {
+                let range = NSRange(s.startIndex..., in: s)
+                for m in pattern.matches(in: s, range: range) {
+                    let hit = String(s[Range(m.range, in: s)!])
+                    #expect(allowed.contains(hit),
+                            "\(name).json leaks a postcode: \(hit)")
+                }
+            }
+        }
+    }
+
     /// A fixture with no rows would pass every decode test in Task 4
     /// vacuously, which is worse than having no test at all.
     @Test func fixturesAreNotEmpty() throws {
