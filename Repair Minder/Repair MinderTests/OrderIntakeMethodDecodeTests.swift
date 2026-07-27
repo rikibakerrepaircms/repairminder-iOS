@@ -51,4 +51,17 @@ struct OrderIntakeMethodDecodeTests {
         struct Opt: Decodable { let v: IntakeMethod? }
         #expect(try RMDecode.decode(Opt.self, #"{"v":null}"#).v == nil)
     }
+
+    /// The sentinel must be one the worker cannot send. A plain "unknown"
+    /// would decode a real backend "unknown" as a known case, which is the
+    /// opposite of a fallback. Matches OrderStatus.
+    @Test func sentinelCannotCollideWithABackendValue() {
+        #expect(IntakeMethod.unknown.rawValue == "__unknown__")
+    }
+
+    /// allCases drives pickers. .unknown must never be offered as a choice.
+    @Test func allCasesOmitsTheFallback() {
+        #expect(!IntakeMethod.allCases.contains(.unknown))
+        #expect(IntakeMethod.allCases.count == 8)
+    }
 }

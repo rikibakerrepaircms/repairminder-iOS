@@ -160,9 +160,17 @@ enum IntakeMethod: String, Codable, CaseIterable, UnknownDefaultable, Sendable {
     case accessoriesInStore = "accessories_in_store"
     case kioskSale = "kiosk_sale"
     case online
-    case unknown
+    case unknown = "__unknown__"
 
     static var unknownFallback: IntakeMethod { .unknown }
+
+    /// Hand-written so `.unknown` never reaches a picker, matching OrderStatus.
+    /// IntakeMethod has no picker today - BookingIntakeMethod is the one the
+    /// booking wizard uses - but the two enums have drifted once already and
+    /// this removes the way it would happen again.
+    static var allCases: [IntakeMethod] {
+        [.walkIn, .collection, .mailIn, .courier, .counterSale, .accessoriesInStore, .kioskSale, .online]
+    }
 
     var label: String {
         switch self {
