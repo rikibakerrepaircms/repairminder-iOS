@@ -203,12 +203,15 @@ enum IntakeMethod: String, Codable, CaseIterable, UnknownDefaultable, Sendable {
 
 // MARK: - Authorisation Type
 
-enum AuthorisationType: String, Codable, CaseIterable, Sendable {
+enum AuthorisationType: String, Codable, CaseIterable, UnknownDefaultable, Sendable {
     case preAuthorised = "pre_authorised"
     case preApproved = "pre_approved"
     case phone
     case email
     case portal
+    case unknown = "__unknown__"
+
+    static var unknownFallback: AuthorisationType { .unknown }
 
     var label: String {
         switch self {
@@ -216,19 +219,29 @@ enum AuthorisationType: String, Codable, CaseIterable, Sendable {
         case .phone: return "Phone"
         case .email: return "Email"
         case .portal: return "Portal"
+        case .unknown: return "Unknown"
         }
     }
 }
 
 // MARK: - Payment Method
 
-enum PaymentMethod: String, Codable, CaseIterable, Sendable {
+enum PaymentMethod: String, Codable, CaseIterable, UnknownDefaultable, Sendable {
     case cash
     case card
     case bankTransfer = "bank_transfer"
     case paypal
     case invoice
     case other
+    case unknown = "__unknown__"
+
+    static var unknownFallback: PaymentMethod { .unknown }
+
+    /// Hand-written: OrderPaymentFormSheet drives its picker from allCases,
+    /// and "Unknown" is not a payment a staff member can take.
+    static var allCases: [PaymentMethod] {
+        [.cash, .card, .bankTransfer, .paypal, .invoice, .other]
+    }
 
     var label: String {
         switch self {
@@ -238,6 +251,7 @@ enum PaymentMethod: String, Codable, CaseIterable, Sendable {
         case .paypal: return "PayPal"
         case .invoice: return "Invoice"
         case .other: return "Other"
+        case .unknown: return "Unknown"
         }
     }
 
@@ -249,47 +263,63 @@ enum PaymentMethod: String, Codable, CaseIterable, Sendable {
         case .paypal: return "p.circle"
         case .invoice: return "doc.text"
         case .other: return "ellipsis.circle"
+        case .unknown: return "questionmark"
         }
     }
 }
 
 // MARK: - Signature Type
 
-enum SignatureType: String, Codable, CaseIterable, Sendable {
+enum SignatureType: String, Codable, CaseIterable, UnknownDefaultable, Sendable {
     case dropOff = "drop_off"
     case collection
     case authorization
+    case unknown = "__unknown__"
+
+    static var unknownFallback: SignatureType { .unknown }
+
+    /// Hand-written: CustomerSignatureView drives its picker from allCases.
+    static var allCases: [SignatureType] {
+        [.dropOff, .collection, .authorization]
+    }
 
     var label: String {
         switch self {
         case .dropOff: return "Drop-off"
         case .collection: return "Collection"
         case .authorization: return "Authorization"
+        case .unknown: return "Unknown"
         }
     }
 }
 
 // MARK: - Order Item Type
 
-enum OrderItemType: String, Codable, CaseIterable, Sendable {
+enum OrderItemType: String, Codable, CaseIterable, UnknownDefaultable, Sendable {
     case part
     case labour
     case labor
     case repair
+    case service
     case deviceSale = "device_sale"
     case accessory
     case devicePurchase = "device_purchase"
     case other
+    case unknown = "__unknown__"
+
+    static var unknownFallback: OrderItemType { .unknown }
 
     var label: String {
         switch self {
         case .part: return "Part"
         case .labour, .labor: return "Labour"
         case .repair: return "Repair"
+        case .service: return "Service"
         case .deviceSale: return "Device Sale"
         case .accessory: return "Accessory"
         case .devicePurchase: return "Device Purchase"
         case .other: return "Other"
+        case .unknown: return "Other"
         }
     }
 
@@ -298,10 +328,12 @@ enum OrderItemType: String, Codable, CaseIterable, Sendable {
         case .part: return "cpu"
         case .labour, .labor: return "wrench.and.screwdriver"
         case .repair: return "wrench.and.screwdriver"
+        case .service: return "wrench.and.screwdriver"
         case .deviceSale: return "iphone"
         case .accessory: return "bag"
         case .devicePurchase: return "cart"
         case .other: return "ellipsis.circle"
+        case .unknown: return "questionmark"
         }
     }
 }
