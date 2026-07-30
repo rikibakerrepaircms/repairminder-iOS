@@ -99,6 +99,10 @@ struct CustomerEnquiryDetail: Decodable, Sendable {
     let ticketType: String?
     let enquiryKind: String?
     let fulfilment: String?
+    /// True for a sell lead with no catalog price and no staff review yet (the
+    /// storefront's "not listed" / custom-quote flow). Gates
+    /// CustomerSellNextStepsCard off in favour of CustomerUnlistedItemLeadCard.
+    let isUnlistedItem: Bool
     let createdAt: Date?
     let messages: [CustomerMessage]
     let company: CustomerEnquiryCompany?
@@ -106,7 +110,7 @@ struct CustomerEnquiryDetail: Decodable, Sendable {
     let collectionSlot: CollectionSlot?
 
     enum CodingKeys: String, CodingKey {
-        case ticketNumber, subject, status, ticketType, enquiryKind, fulfilment, createdAt, messages, company
+        case ticketNumber, subject, status, ticketType, enquiryKind, fulfilment, isUnlistedItem, createdAt, messages, company
         case collectionSlot
     }
 
@@ -118,6 +122,10 @@ struct CustomerEnquiryDetail: Decodable, Sendable {
         ticketType = try c.decodeIfPresent(String.self, forKey: .ticketType)
         enquiryKind = try c.decodeIfPresent(String.self, forKey: .enquiryKind)
         fulfilment = try c.decodeIfPresent(String.self, forKey: .fulfilment)
+        // decodeIfPresent ?? false: every ticket predating this field, and every
+        // response from a not-yet-updated backend, reads as "not an unlisted
+        // lead" - the same fail-safe default the column itself uses.
+        isUnlistedItem = try c.decodeIfPresent(Bool.self, forKey: .isUnlistedItem) ?? false
         createdAt = MarketingDate.parse(try c.decodeIfPresent(String.self, forKey: .createdAt))
         messages = try c.decodeIfPresent([CustomerMessage].self, forKey: .messages) ?? []
         company = try c.decodeIfPresent(CustomerEnquiryCompany.self, forKey: .company)
