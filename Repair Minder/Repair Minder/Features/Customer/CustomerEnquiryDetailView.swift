@@ -96,7 +96,9 @@ struct CustomerEnquiryDetailView: View {
                 }
 
                 if viewModel.showsNextSteps {
-                    if enquiry.isRepairOrder {
+                    if enquiry.isUnlistedItem {
+                        CustomerUnlistedItemLeadCard()
+                    } else if enquiry.isRepairOrder {
                         CustomerRepairNextStepsCard(
                             ticketId: viewModel.ticketId,
                             fulfilment: enquiry.fulfilment

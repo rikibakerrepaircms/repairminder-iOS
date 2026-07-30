@@ -26,7 +26,7 @@ struct CustomerEnquiryDecodeTests {
         let json = #"""
         {"ticket_number":100000042,"subject":"Sell My Phone: iPhone 13 - £250.00","status":"open",
          "created_at":"2026-07-25 09:15:00","ticket_type":"lead","enquiry_kind":"sell",
-         "fulfilment":"collection",
+         "fulfilment":"collection","is_unlisted_item":false,
          "messages":[{"id":"m1","type":"outbound","from_name":"mendmyi","subject":"Your sale",
                       "body_text":"Thanks","body_html":"<p>Thanks</p>","source":"staff",
                       "created_at":"2026-07-25 09:15:01"}],
@@ -43,6 +43,7 @@ struct CustomerEnquiryDecodeTests {
         #expect(d.createdAt != nil)
         #expect(d.messages.count == 1)
         #expect(d.company?.name == "mendmyi")
+        #expect(!d.isUnlistedItem)
     }
 
     /// Every ticket created before migration 0383 reads null for both new fields,
@@ -68,12 +69,29 @@ struct CustomerEnquiryDecodeTests {
         #expect(d.ticketNumber == 7)
         #expect(d.enquiryKind == nil)
         #expect(!d.isSell)
+        #expect(!d.isUnlistedItem)
     }
 
     @Test func enquiryDetailFallsBackToNumberWhenSubjectIsBlank() throws {
         let json = #"{"ticket_number":42,"subject":"   ","status":"open","messages":[]}"#.data(using: .utf8)!
         let d = try decoder().decode(CustomerEnquiryDetail.self, from: json)
         #expect(d.displaySubject == "Enquiry #42")
+    }
+
+    /// A sell lead with is_unlisted_item=true decodes the flag correctly,
+    /// gating CustomerUnlistedItemLeadCard instead of CustomerSellNextStepsCard.
+    @Test func unlistedItemLeadDetailDecodes() throws {
+        let json = #"""
+        {"ticket_number":100000099,"subject":"Sell My Phone: Something Custom","status":"open",
+         "created_at":"2026-07-28 14:30:00","ticket_type":"lead","enquiry_kind":"sell",
+         "is_unlisted_item":true,
+         "messages":[],"company":{"name":"mendmyi"}}
+        """#.data(using: .utf8)!
+
+        let d = try decoder().decode(CustomerEnquiryDetail.self, from: json)
+        #expect(d.ticketNumber == 100000099)
+        #expect(d.isSell)
+        #expect(d.isUnlistedItem)
     }
 
     // MARK: - Summary
