@@ -21,6 +21,7 @@ enum NotificationType: String, Codable, CaseIterable {
     case enquiryReceived = "enquiry_received"
     case enquiryReply = "enquiry_reply"
     case ticketMessage = "ticket_message"
+    case marketplaceListingFound = "marketplace_listing_found"
 
     /// Human-readable description
     var displayName: String {
@@ -35,6 +36,7 @@ enum NotificationType: String, Codable, CaseIterable {
         case .enquiryReceived: return "New Enquiry"
         case .enquiryReply: return "Enquiry Reply"
         case .ticketMessage: return "Support Message"
+        case .marketplaceListingFound: return "New Marketplace Listing"
         }
     }
 }
@@ -56,6 +58,7 @@ struct NotificationPayload {
     let type: NotificationType?
     let entityType: NotificationEntityType?
     let entityId: String?
+    let deepLinkURL: URL?
 
     /// Initialize from push notification userInfo dictionary
     init(userInfo: [AnyHashable: Any]) {
@@ -72,11 +75,17 @@ struct NotificationPayload {
         }
 
         self.entityId = userInfo["entity_id"] as? String
+
+        if let urlString = userInfo["deep_link_url"] as? String {
+            self.deepLinkURL = URL(string: urlString)
+        } else {
+            self.deepLinkURL = nil
+        }
     }
 
     /// Whether this payload has enough information for deep linking
     var canDeepLink: Bool {
-        type != nil && entityId != nil
+        type != nil && (entityId != nil || deepLinkURL != nil)
     }
 }
 
@@ -89,25 +98,38 @@ enum DeepLinkDestination: Equatable {
     case enquiry(id: String)
     case ticket(id: String)
     case buyback(id: String)
+    case externalURL(url: URL)
 
     /// Create destination from notification payload
     static func from(payload: NotificationPayload) -> DeepLinkDestination? {
-        guard let type = payload.type, let entityId = payload.entityId else {
+        guard let type = payload.type else {
             return nil
         }
 
         switch type {
-        case .orderCreated, .orderStatusChanged, .quoteApproved, .quoteRejected, .paymentReceived:
-            return .order(id: entityId)
+        case .marketplaceListingFound:
+            guard let url = payload.deepLinkURL else { return nil }
+            return .externalURL(url: url)
 
-        case .deviceAssigned, .deviceStatusChanged:
-            return .device(id: entityId)
+        default:
+            guard let entityId = payload.entityId else { return nil }
 
-        case .enquiryReceived, .enquiryReply:
-            return .enquiry(id: entityId)
+            switch type {
+            case .orderCreated, .orderStatusChanged, .quoteApproved, .quoteRejected, .paymentReceived:
+                return .order(id: entityId)
 
-        case .ticketMessage:
-            return .ticket(id: entityId)
+            case .deviceAssigned, .deviceStatusChanged:
+                return .device(id: entityId)
+
+            case .enquiryReceived, .enquiryReply:
+                return .enquiry(id: entityId)
+
+            case .ticketMessage:
+                return .ticket(id: entityId)
+
+            case .marketplaceListingFound:
+                return nil // unreachable, handled above
+            }
         }
     }
 }

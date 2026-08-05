@@ -183,6 +183,9 @@ struct MacStaffMainView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                     deepLinkBuybackId = id
                 }
+
+            case .externalURL(let url):
+                platformOpenURL(url)
             }
 
             deepLinkHandler.clearPendingDestination()
