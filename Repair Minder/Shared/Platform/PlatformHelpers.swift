@@ -15,6 +15,37 @@ func platformOpenURL(_ url: URL) {
     #endif
 }
 
+/// Opens a Facebook Marketplace listing URL in the native Facebook app if
+/// installed (via the `fb://facewebmodal/f?href=` bridge -- Facebook has no
+/// documented per-item Marketplace deep link; this is the standard way
+/// third-party apps hand off an arbitrary facebook.com URL to the app), or
+/// falls back to the plain https URL via `platformOpenURL` (Safari, or
+/// whatever the OS resolves it to) if the Facebook app isn't installed.
+func platformOpenMarketplaceListing(_ listingURL: URL) {
+    var components = URLComponents()
+    components.scheme = "fb"
+    components.host = "facewebmodal"
+    components.path = "/f"
+    components.queryItems = [URLQueryItem(name: "href", value: listingURL.absoluteString)]
+
+    guard let fbURL = components.url else {
+        platformOpenURL(listingURL)
+        return
+    }
+
+    #if os(iOS)
+    if UIApplication.shared.canOpenURL(fbURL) {
+        platformOpenURL(fbURL)
+    } else {
+        platformOpenURL(listingURL)
+    }
+    #elseif os(macOS)
+    // No Facebook desktop app / fb:// handler convention on macOS -- always
+    // use the plain URL, which opens in the default browser via NSWorkspace.
+    platformOpenURL(listingURL)
+    #endif
+}
+
 /// Open system settings/preferences
 func platformOpenSystemSettings() {
     #if os(iOS)

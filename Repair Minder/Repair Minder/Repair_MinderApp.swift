@@ -548,7 +548,7 @@ private struct StaffMainView: View {
                 }
 
             case .externalURL(let url):
-                platformOpenURL(url)
+                platformOpenMarketplaceListing(url)
             }
 
             // Clear the pending destination

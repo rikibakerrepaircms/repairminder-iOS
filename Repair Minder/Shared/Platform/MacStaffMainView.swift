@@ -185,7 +185,7 @@ struct MacStaffMainView: View {
                 }
 
             case .externalURL(let url):
-                platformOpenURL(url)
+                platformOpenMarketplaceListing(url)
             }
 
             deepLinkHandler.clearPendingDestination()
