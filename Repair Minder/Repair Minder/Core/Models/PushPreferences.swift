@@ -22,6 +22,7 @@ struct PushPreferences: Codable, Equatable, Sendable {
     var paymentReceived: Bool
     var newEnquiry: Bool
     var enquiryReply: Bool
+    var marketplaceListingFound: Bool
 
     /// Default preferences - all enabled
     static let allEnabled = PushPreferences(
@@ -34,7 +35,8 @@ struct PushPreferences: Codable, Equatable, Sendable {
         quoteRejected: true,
         paymentReceived: true,
         newEnquiry: true,
-        enquiryReply: true
+        enquiryReply: true,
+        marketplaceListingFound: true
     )
 
     /// All preferences disabled
@@ -48,7 +50,8 @@ struct PushPreferences: Codable, Equatable, Sendable {
         quoteRejected: false,
         paymentReceived: false,
         newEnquiry: false,
-        enquiryReply: false
+        enquiryReply: false,
+        marketplaceListingFound: false
     )
 }
 
@@ -67,6 +70,7 @@ struct PushPreferencesUpdateRequest: Codable {
     var paymentReceived: Bool?
     var newEnquiry: Bool?
     var enquiryReply: Bool?
+    var marketplaceListingFound: Bool?
 
     /// Create a request to update a single preference
     static func single(key: WritableKeyPath<PushPreferencesUpdateRequest, Bool?>, value: Bool) -> PushPreferencesUpdateRequest {
@@ -87,7 +91,8 @@ struct PushPreferencesUpdateRequest: Codable {
             quoteRejected: false,
             paymentReceived: false,
             newEnquiry: false,
-            enquiryReply: false
+            enquiryReply: false,
+            marketplaceListingFound: false
         )
     }
 }
