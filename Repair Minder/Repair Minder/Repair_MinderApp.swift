@@ -546,6 +546,9 @@ private struct StaffMainView: View {
                 } else {
                     selectedTab = .more
                 }
+
+            case .externalURL(let url):
+                platformOpenURL(url)
             }
 
             // Clear the pending destination

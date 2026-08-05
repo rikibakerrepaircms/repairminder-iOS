@@ -28,6 +28,7 @@ struct NotificationSettingsView: View {
                     quotesPaymentsSection
                     devicesSection
                     enquiriesSection
+                    marketplaceSection
                 }
             }
         }
@@ -188,6 +189,19 @@ struct NotificationSettingsView: View {
                 subtitle: "Customer replied to an enquiry",
                 keyPath: \.enquiryReply,
                 updateKey: \.enquiryReply
+            )
+        }
+    }
+
+    // MARK: - Marketplace Section
+
+    private var marketplaceSection: some View {
+        Section("Marketplace") {
+            preferenceToggle(
+                title: "New Marketplace Listing",
+                subtitle: "A Facebook Marketplace search found a new listing",
+                keyPath: \.marketplaceListingFound,
+                updateKey: \.marketplaceListingFound
             )
         }
     }
