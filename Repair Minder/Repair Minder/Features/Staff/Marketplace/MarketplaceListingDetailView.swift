@@ -21,6 +21,7 @@ struct MarketplaceListingDetailView: View {
     @State private var isSaving = false
     @State private var error: String?
     @State private var saveTask: Task<Void, Never>?
+    @State private var didCopyLink = false
 
     private let service = MarketplaceService()
 
@@ -76,15 +77,31 @@ struct MarketplaceListingDetailView: View {
                 }
                 .padding(.horizontal)
 
-                Button {
-                    if let url = URL(string: listing.listingUrl) {
-                        platformOpenMarketplaceListing(url)
+                HStack(spacing: 8) {
+                    Button {
+                        if let url = URL(string: listing.listingUrl) {
+                            platformOpenMarketplaceListing(url)
+                        }
+                    } label: {
+                        Label("Open in Facebook", systemImage: "arrow.up.forward.app")
+                            .frame(maxWidth: .infinity)
                     }
-                } label: {
-                    Label("Open in Facebook", systemImage: "arrow.up.forward.app")
-                        .frame(maxWidth: .infinity)
+                    .buttonStyle(.borderedProminent)
+
+                    Button {
+                        platformCopyToClipboard(listing.listingUrl)
+                        didCopyLink = true
+                        Task {
+                            try? await Task.sleep(nanoseconds: 1_500_000_000)
+                            didCopyLink = false
+                        }
+                    } label: {
+                        Image(systemName: didCopyLink ? "checkmark" : "doc.on.doc")
+                            .frame(width: 20, height: 20)
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityLabel("Copy listing link")
                 }
-                .buttonStyle(.borderedProminent)
                 .padding(.horizontal)
 
                 statusButtons
