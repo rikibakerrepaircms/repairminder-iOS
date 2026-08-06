@@ -1,5 +1,6 @@
 # Xcode build artifacts
 build/
+build-derived-data/
 DerivedData/
 # A pattern containing a slash is anchored to this file's directory, and `*`
 # never matches `/`. So `*.xcodeproj/xcuserdata/` only ever matched a project at
