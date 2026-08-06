@@ -17,6 +17,11 @@ struct MarketplaceListing: Decodable, Identifiable, Equatable, Sendable {
     let priceFormatted: String?
     let priceAmount: String?
     let priceWasFormatted: String?
+    /// Most-recent price-drop timestamp (nullable -- no drop observed since
+    /// tracking began). Added by the "sold + price reduction" round; the
+    /// Worker itself may not populate this field yet -- see
+    /// docs/superpowers/specs/2026-08-06-buyback-marketplace-sold-and-price-reduction-design.md.
+    let priceReducedAt: String?
     let city: String?
     let listingUrl: String
     let photoUrl: String?
@@ -32,10 +37,26 @@ struct MarketplaceListing: Decodable, Identifiable, Equatable, Sendable {
     /// "ignored" | "contacted" | "purchased" | nil
     let status: String?
     let notes: String?
+    /// The Worker's own `COALESCE(fb_created_at, MIN(first_seen_at))` sort/cursor
+    /// key, returned directly on the response since the pagination-cursor fix
+    /// (round 1, item 4). Preferred over recomputing locally so this app can't
+    /// silently drift from the server's actual sort logic if it ever changes
+    /// (e.g. the MIN-across-memberships part).
+    let sortKey: String?
 
-    /// Best available "when was this listed" timestamp, matching the
-    /// backend's own `COALESCE(fb_created_at, first_seen_at)` sort key.
-    var sortTimestamp: String? { fbCreatedAt ?? firstSeenAt }
+    /// Best available "when was this listed" timestamp -- prefers the
+    /// server's own `sortKey`, falling back to the equivalent local
+    /// computation for a response that predates that field.
+    var sortTimestamp: String? { sortKey ?? fbCreatedAt ?? firstSeenAt }
+
+    /// Abbreviated relative time since the most recent price drop (e.g. "2d"),
+    /// or nil if there's no reduction to show.
+    var priceReducedRelativeTime: String? {
+        guard let priceReducedAt, let date = DateFormatters.parseDate(priceReducedAt) else { return nil }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
 }
 
 /// GET /api/buyback/marketplace/listings -> { success, data: { listings: [...] } }

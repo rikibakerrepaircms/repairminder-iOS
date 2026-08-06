@@ -56,6 +56,13 @@ struct MarketplaceFeedView: View {
                     Image(systemName: "ellipsis.circle")
                 }
             }
+            ToolbarItem(placement: .navigation) {
+                Picker("Show", selection: $viewModel.viewMode) {
+                    ForEach(MarketplaceViewMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+            }
             if viewModel.searches.count > 1 {
                 ToolbarItem(placement: .navigation) {
                     Picker("Search", selection: $viewModel.selectedSearchId) {
@@ -79,6 +86,9 @@ struct MarketplaceFeedView: View {
             await viewModel.refresh()
         }
         .onChange(of: viewModel.selectedSearchId) { _, _ in
+            Task { await viewModel.refresh() }
+        }
+        .onChange(of: viewModel.viewMode) { _, _ in
             Task { await viewModel.refresh() }
         }
         .alert("Error", isPresented: .constant(viewModel.error != nil)) {
@@ -137,6 +147,12 @@ private struct MarketplaceListingCard: View {
                     Text(listing.priceFormatted ?? "No price")
                         .font(.subheadline).fontWeight(.bold)
                         .foregroundStyle(.blue)
+                    if let wasPrice = listing.priceWasFormatted {
+                        Text(wasPrice)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .strikethrough()
+                    }
                     Spacer()
                     if let status = listing.status {
                         Text(status.capitalized)
