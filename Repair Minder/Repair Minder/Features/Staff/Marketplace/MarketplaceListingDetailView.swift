@@ -44,10 +44,25 @@ struct MarketplaceListingDetailView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(listing.title ?? "Untitled listing").font(.title3).fontWeight(.semibold)
-                    Text(listing.priceFormatted ?? "No price").font(.headline).foregroundStyle(.blue)
-                    if let city = listing.city {
-                        Label(city, systemImage: "location")
-                            .font(.subheadline).foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        Text(listing.priceFormatted ?? "No price").font(.headline).foregroundStyle(.blue)
+                        if let wasPrice = listing.priceWasFormatted {
+                            Text(wasPrice)
+                                .font(.subheadline).foregroundStyle(.secondary)
+                                .strikethrough()
+                        }
+                        if let reduced = listing.priceReducedRelativeTime {
+                            Text("· Reduced \(reduced) ago")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    if listing.city != nil || listing.deliveryType != nil {
+                        Label(
+                            [listing.city, MarketplaceDeliveryType.format(listing.deliveryType)]
+                                .compactMap { $0 }.joined(separator: " · "),
+                            systemImage: "location"
+                        )
+                        .font(.subheadline).foregroundStyle(.secondary)
                     }
                     if let condition = listing.condition {
                         Text("Condition: \(condition)").font(.subheadline).foregroundStyle(.secondary)

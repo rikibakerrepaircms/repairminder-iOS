@@ -10,6 +10,29 @@
 
 import Foundation
 
+/// Mirrors the web dashboard's "Show" select (active/ignored/sold) --
+/// derives the `status`/`show_sold` request params exactly the way
+/// BuybackMarketplaceFeedPage.tsx does. See
+/// docs/superpowers/specs/2026-08-06-buyback-marketplace-sold-and-price-reduction-design.md.
+enum MarketplaceViewMode: String, CaseIterable, Identifiable {
+    case active
+    case ignored
+    case sold
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .active: "Active"
+        case .ignored: "Ignored"
+        case .sold: "Sold"
+        }
+    }
+
+    var statusParam: String? { self == .ignored ? "ignored" : nil }
+    var showSoldParam: Bool { self == .sold }
+}
+
 @MainActor
 final class MarketplaceFeedViewModel: ObservableObject {
     @Published private(set) var listings: [MarketplaceListing] = []
@@ -19,6 +42,7 @@ final class MarketplaceFeedViewModel: ObservableObject {
     @Published private(set) var hasMore = true
     @Published var error: String?
     @Published var selectedSearchId: Int?
+    @Published var viewMode: MarketplaceViewMode = .active
 
     private let service: MarketplaceService
     private let pageSize = 25
@@ -44,7 +68,10 @@ final class MarketplaceFeedViewModel: ObservableObject {
         hasMore = true
 
         do {
-            let page = try await service.listListings(limit: pageSize, searchId: selectedSearchId)
+            let page = try await service.listListings(
+                limit: pageSize, searchId: selectedSearchId,
+                status: viewMode.statusParam, showSold: viewMode.showSoldParam
+            )
             listings = page
             hasMore = page.count == pageSize
         } catch {
@@ -62,7 +89,8 @@ final class MarketplaceFeedViewModel: ObservableObject {
 
         do {
             let page = try await service.listListings(
-                limit: pageSize, before: cursor, beforeId: last.id, searchId: selectedSearchId
+                limit: pageSize, before: cursor, beforeId: last.id, searchId: selectedSearchId,
+                status: viewMode.statusParam, showSold: viewMode.showSoldParam
             )
             listings.append(contentsOf: page)
             hasMore = page.count == pageSize
@@ -82,12 +110,14 @@ final class MarketplaceFeedViewModel: ObservableObject {
         listings[index] = MarketplaceListing(
             id: existing.id, title: existing.title, priceFormatted: existing.priceFormatted,
             priceAmount: existing.priceAmount, priceWasFormatted: existing.priceWasFormatted,
+            priceReducedAt: existing.priceReducedAt,
             city: existing.city, listingUrl: existing.listingUrl, photoUrl: existing.photoUrl,
             sellerName: existing.sellerName, sellerFbId: existing.sellerFbId,
             sellerAvatarUrl: existing.sellerAvatarUrl, deliveryType: existing.deliveryType,
             condition: existing.condition, description: existing.description,
             fbCreatedAt: existing.fbCreatedAt, firstSeenAt: existing.firstSeenAt,
-            lastSeenAt: existing.lastSeenAt, status: status.status, notes: status.notes
+            lastSeenAt: existing.lastSeenAt, status: status.status, notes: status.notes,
+            sortKey: existing.sortKey
         )
     }
 }

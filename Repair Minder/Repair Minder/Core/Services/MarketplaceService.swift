@@ -50,10 +50,11 @@ final class MarketplaceService {
         before: String? = nil,
         beforeId: String? = nil,
         searchId: Int? = nil,
-        status: String? = nil
+        status: String? = nil,
+        showSold: Bool = false
     ) async throws -> [MarketplaceListing] {
         let response: MarketplaceListingsResponse = try await api.request(
-            .marketplaceListings(limit: limit, before: before, beforeId: beforeId, searchId: searchId, status: status)
+            .marketplaceListings(limit: limit, before: before, beforeId: beforeId, searchId: searchId, status: status, showSold: showSold)
         )
         return response.listings
     }

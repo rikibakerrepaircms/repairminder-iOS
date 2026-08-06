@@ -322,7 +322,7 @@ enum APIEndpoint {
     case createMarketplaceSearch
     case updateMarketplaceSearch(id: Int)
     case deleteMarketplaceSearch(id: Int)
-    case marketplaceListings(limit: Int, before: String?, beforeId: String?, searchId: Int?, status: String?)
+    case marketplaceListings(limit: Int, before: String?, beforeId: String?, searchId: Int?, status: String?, showSold: Bool)
     case setMarketplaceListingStatus(id: String)
     case marketplaceBlockedSellers
     case blockMarketplaceSeller
@@ -1272,12 +1272,13 @@ enum APIEndpoint {
             if let search, !search.isEmpty { items.append(URLQueryItem(name: "search", value: search)) }
             return items
 
-        case .marketplaceListings(let limit, let before, let beforeId, let searchId, let status):
+        case .marketplaceListings(let limit, let before, let beforeId, let searchId, let status, let showSold):
             var items = [URLQueryItem(name: "limit", value: String(limit))]
             if let before, !before.isEmpty { items.append(URLQueryItem(name: "before", value: before)) }
             if let beforeId, !beforeId.isEmpty { items.append(URLQueryItem(name: "before_id", value: beforeId)) }
             if let searchId { items.append(URLQueryItem(name: "search_ids", value: String(searchId))) }
             if let status, !status.isEmpty { items.append(URLQueryItem(name: "status", value: status)) }
+            if showSold { items.append(URLQueryItem(name: "show_sold", value: "1")) }
             return items
 
         default:
