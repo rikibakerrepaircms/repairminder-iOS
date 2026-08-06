@@ -316,6 +316,18 @@ enum APIEndpoint {
     case salvageBuyback(id: String)
     case deleteSalvageItem(buybackId: String, assetId: String)
 
+    // MARK: - Buyback Marketplace
+
+    case marketplaceSearches
+    case createMarketplaceSearch
+    case updateMarketplaceSearch(id: Int)
+    case deleteMarketplaceSearch(id: Int)
+    case marketplaceListings(limit: Int, before: String?, beforeId: String?, searchId: Int?, status: String?)
+    case setMarketplaceListingStatus(id: String)
+    case marketplaceBlockedSellers
+    case blockMarketplaceSeller
+    case unblockMarketplaceSeller(sellerFbId: String)
+
     // MARK: - Board Config
 
     case boardColumns(scope: String)
@@ -772,6 +784,20 @@ enum APIEndpoint {
         case .salvageBuyback(let id): return "/api/buyback/\(id)/salvage"
         case .deleteSalvageItem(let buybackId, let assetId): return "/api/buyback/\(buybackId)/salvage/\(assetId)"
 
+        // Buyback Marketplace
+        case .marketplaceSearches, .createMarketplaceSearch:
+            return "/api/buyback/marketplace/searches"
+        case .updateMarketplaceSearch(let id), .deleteMarketplaceSearch(let id):
+            return "/api/buyback/marketplace/searches/\(id)"
+        case .marketplaceListings:
+            return "/api/buyback/marketplace/listings"
+        case .setMarketplaceListingStatus(let id):
+            return "/api/buyback/marketplace/listings/\(id)/status"
+        case .marketplaceBlockedSellers, .blockMarketplaceSeller:
+            return "/api/buyback/marketplace/blocked-sellers"
+        case .unblockMarketplaceSeller(let sellerFbId):
+            return "/api/buyback/marketplace/blocked-sellers/\(sellerFbId)"
+
         // Board Config
         case .boardColumns:
             return "/api/board/columns"
@@ -863,6 +889,7 @@ enum APIEndpoint {
              .supplierOrders, .supplierOrder, .supplierMappingsSuppliers,
              .customerOrders, .customerOrder, .customerOrderInvoice, .customerDeviceImage,
              .customerCompetitionEntries, .customerMarketingPreferences,
+             .marketplaceSearches, .marketplaceListings, .marketplaceBlockedSellers,
              .diagnosticsReport, .diagnosticsGetSession:
             return .get
 
@@ -901,7 +928,8 @@ enum APIEndpoint {
              .addRefurbishmentItem, .generateBuybackListing,
              .uploadBuybackSourceImage, .generateBuybackProductPhotos, .setBuybackImageFinal,
              .collectDevice, .despatchDevice, .deviceReadyForCollection, .addDeviceAccessory,
-             .customerRequestWithdrawal:
+             .customerRequestWithdrawal,
+             .createMarketplaceSearch, .blockMarketplaceSeller:
             return .post
 
         // PATCH endpoints
@@ -914,7 +942,8 @@ enum APIEndpoint {
              .pauseMacroExecution, .resumeMacroExecution,
              .boardUpdateColumn, .boardReorderColumns,
              .boardUpdatePinnedPreference, .updateScheduleItem,
-             .updateSupplierOrder, .updateRefurbishmentItem:
+             .updateSupplierOrder, .updateRefurbishmentItem,
+             .updateMarketplaceSearch, .setMarketplaceListingStatus:
             return .patch
 
         // PUT endpoints
@@ -932,7 +961,8 @@ enum APIEndpoint {
              .deleteDeviceImage, .deleteAsset, .removeMembership,
              .deleteSupplierOrderLine, .deleteSalvageItem, .deleteSupplierOrder,
              .deleteOrderRefund, .cancelKioskOrder,
-             .deleteRefurbishmentItem, .deleteBuybackImage:
+             .deleteRefurbishmentItem, .deleteBuybackImage,
+             .deleteMarketplaceSearch, .unblockMarketplaceSeller:
             return .delete
         }
     }
@@ -1240,6 +1270,14 @@ enum APIEndpoint {
             if let productTypeId { items.append(URLQueryItem(name: "product_type_id", value: productTypeId)) }
             if let groupId { items.append(URLQueryItem(name: "group_id", value: groupId)) }
             if let search, !search.isEmpty { items.append(URLQueryItem(name: "search", value: search)) }
+            return items
+
+        case .marketplaceListings(let limit, let before, let beforeId, let searchId, let status):
+            var items = [URLQueryItem(name: "limit", value: String(limit))]
+            if let before, !before.isEmpty { items.append(URLQueryItem(name: "before", value: before)) }
+            if let beforeId, !beforeId.isEmpty { items.append(URLQueryItem(name: "before_id", value: beforeId)) }
+            if let searchId { items.append(URLQueryItem(name: "search_ids", value: String(searchId))) }
+            if let status, !status.isEmpty { items.append(URLQueryItem(name: "status", value: status)) }
             return items
 
         default:
