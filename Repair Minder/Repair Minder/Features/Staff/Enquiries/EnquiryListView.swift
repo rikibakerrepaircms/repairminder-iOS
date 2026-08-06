@@ -611,6 +611,9 @@ private struct TicketRow: View {
             // Header row: number + type + status
             headerRow
 
+            // Kind, route and label chips
+            kindRow
+
             // Subject
             Text(ticket.subject)
                 .font(.headline)
@@ -716,6 +719,24 @@ private struct TicketRow: View {
         }
     }
 
+    /// Kind, route and label state, below the header. The header already uses
+    /// ViewThatFits because it is tight on a narrow screen; these go on their
+    /// own line rather than making that worse.
+    @ViewBuilder
+    private var kindRow: some View {
+        let hasAny = EnquiryKindBadge.for(ticket.enquiryKind) != nil
+            || EnquiryRouteChip.for(kind: ticket.enquiryKind, fulfilment: ticket.fulfilment) != nil
+            || ticket.buybackLabels != nil
+        if hasAny {
+            HStack(spacing: 4) {
+                KindBadgeView(kind: ticket.enquiryKind)
+                RouteChipView(kind: ticket.enquiryKind, fulfilment: ticket.fulfilment)
+                LabelChipsView(labels: ticket.buybackLabels)
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
     private var statusBadge: some View {
         HStack(spacing: 4) {
             Image(systemName: ticket.status.icon)
@@ -767,6 +788,78 @@ private struct TypeBadge: View {
         .padding(.vertical, 3)
         .background(type.color.opacity(0.15))
         .foregroundColor(type.color)
+        .clipShape(Capsule())
+    }
+}
+
+// MARK: - Enquiry Kind and Route Chips
+
+private struct KindBadgeView: View {
+    let kind: String?
+
+    var body: some View {
+        if let badge = EnquiryKindBadge.for(kind) {
+            Text(badge.label)
+                .font(.caption2)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(badge.color.opacity(0.15))
+                .foregroundColor(badge.color)
+                .clipShape(Capsule())
+        }
+    }
+}
+
+private struct RouteChipView: View {
+    let kind: String?
+    let fulfilment: String?
+
+    var body: some View {
+        if let chip = EnquiryRouteChip.for(kind: kind, fulfilment: fulfilment) {
+            Text(chip.label)
+                .font(.caption2)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(chip.isOutlined ? Color.clear : chip.color.opacity(0.15))
+                .foregroundColor(chip.color)
+                .overlay(
+                    Capsule().strokeBorder(chip.color.opacity(chip.isOutlined ? 0.7 : 0), lineWidth: 1)
+                )
+                .clipShape(Capsule())
+                .accessibilityLabel(chip.hint)
+        }
+    }
+}
+
+private struct LabelChipsView: View {
+    let labels: TicketBuybackLabels?
+
+    var body: some View {
+        if let labels {
+            if labels.hasReturnLabel == true {
+                chip("Label", "paperplane", .blue)
+            }
+            if labels.hasOutboundLabel == true {
+                chip("Packaging", "shippingbox", .green)
+            }
+            // Asked for and not sent is the only one that needs a human, so it
+            // is the only amber one - it reads as an outstanding action.
+            if labels.packagingPending {
+                chip("Packaging asked", "clock", .orange)
+            }
+        }
+    }
+
+    private func chip(_ text: String, _ icon: String, _ color: Color) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon)
+            Text(text)
+        }
+        .font(.caption2)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(color.opacity(0.15))
+        .foregroundColor(color)
         .clipShape(Capsule())
     }
 }

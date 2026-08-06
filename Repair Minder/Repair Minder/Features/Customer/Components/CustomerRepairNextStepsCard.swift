@@ -62,16 +62,41 @@ struct CustomerRepairNextStepsCard: View {
 
     // MARK: - Step 1: Prep
 
+    /// The canonical four prep steps, rendered exactly as the portal card does.
+    ///
+    /// Step 1's title IS the card heading, so its body stands alone underneath.
+    /// Steps 2 to 4 lead with their own title in semibold followed by a full
+    /// stop, which is how the four read as four things rather than as one
+    /// flowing paragraph. Each title/body pair is written so it reads naturally
+    /// BOTH concatenated like this and stacked as a heading over a body - the
+    /// confirmation email uses the concatenated form for all four.
+    ///
+    /// Word-for-word from `REPAIR_PREP_STEPS` in `src/lib/repairPrep.ts`
+    /// (portal), `worker/src/repair_prep.js` and the storefront's copy. Change
+    /// the wording in one, change it in all of them.
     private var prepStep: some View {
         step(icon: "checkmark.shield", title: "Turn off Stolen Device Protection") {
-            Text("We run a full diagnostic that tests every feature before the repair and again once it is finished, so you can see what was working when it reached us. This feature blocks that diagnostic from completing, so please turn it off before the device comes to us: Settings, then Face ID and Passcode.")
+            Text("We run a full diagnostic that tests every feature before the repair and again once it is finished, so you can see what was working when it reached us. This feature blocks that diagnostic from completing. You will find it in Settings, then Face ID and Passcode.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
             (
-                Text("Leave the passcode switched on and tell us what it is, or take it off. We have to power the device on and test it after the repair. ")
-                + Text("Please do not factory reset it").fontWeight(.semibold)
-                + Text(" - we are repairing it, not buying it, so a reset only loses you your data. Back up anything you would miss, take out the SIM and any memory card, and keep the case, the cable and the charger.")
+                Text("Leave the passcode switched on, and tell us what it is.").fontWeight(.semibold)
+                + Text(" Taking it off works just as well. Either way we need to be able to get in, because we power the device on and test it after the repair.")
+            )
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+
+            (
+                Text("Please do not factory reset it.").fontWeight(.semibold)
+                + Text(" We are repairing it, not buying it, so a reset only loses you your data.")
+            )
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+
+            (
+                Text("Back up anything you would miss, and take the SIM out.").fontWeight(.semibold)
+                + Text(" Take any memory card out too, and keep hold of the case, the cable and the charger: we do not need them.")
             )
             .font(.subheadline)
             .foregroundStyle(.secondary)

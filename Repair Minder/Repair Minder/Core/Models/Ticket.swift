@@ -36,10 +36,14 @@ struct Ticket: Codable, Identifiable, Sendable, Equatable, Hashable {
     let smsAlreadySent: Bool?
     /// 'sell' | 'repair_order' | 'enquiry', or nil on anything not from the storefront.
     let enquiryKind: String?
-    /// 'visit' | 'collection', or nil when the customer was never asked.
+    /// 'visit' | 'collection' | 'doorstep', or nil when the customer was never asked.
     let fulfilment: String?
     /// Nil on every ticket with no doorstep collection in play, which is most.
     let collectionSlot: CollectionSlot?
+    /// Label state for a device-inbound ticket, so the row can show at a
+    /// glance whether a postal ticket actually has its label. Absent on most
+    /// tickets - the key is omitted, not null - so every field is optional.
+    let buybackLabels: TicketBuybackLabels?
 
     // MARK: - Computed Properties
 
@@ -247,5 +251,21 @@ struct CompanyLocation: Codable, Identifiable, Equatable, Sendable {
     let id: String
     let name: String
     let isPrimary: Bool?
+}
+
+// MARK: - Ticket Buyback Labels
+
+/// Mirrors the `buyback_labels` block the tickets list already returns, and
+/// the web's BuybackLabelChips. Named for the endpoint that produces it; it
+/// covers repair tickets too, which is why the chips say "customer".
+struct TicketBuybackLabels: Codable, Equatable, Hashable, Sendable {
+    let hasReturnLabel: Bool?
+    let hasOutboundLabel: Bool?
+    let packagingRequestedAt: String?
+
+    /// Asked for and not yet sent - the one that needs a human.
+    var packagingPending: Bool {
+        packagingRequestedAt != nil && hasOutboundLabel != true
+    }
 }
 

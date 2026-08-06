@@ -134,7 +134,8 @@ struct ConvertEnquiryToOrderSheet: View {
             smsAlreadySent: nil,
             enquiryKind: "sell",
             fulfilment: "collection",
-            collectionSlot: nil
+            collectionSlot: nil,
+            buybackLabels: nil
         ),
         onComplete: {}
     )
