@@ -20,6 +20,7 @@ struct MarketplaceListingDetailView: View {
     @State private var currentStatus: String?
     @State private var isSaving = false
     @State private var error: String?
+    @State private var saveTask: Task<Void, Never>?
 
     private let service = MarketplaceService()
 
@@ -130,11 +131,17 @@ struct MarketplaceListingDetailView: View {
         isSaving = false
     }
 
-    /// Notes are saved on every edit via TextEditor's onChange -- debouncing
-    /// isn't implemented here (YAGNI: notes edits are infrequent, and every
-    /// existing PATCH is idempotent), a save simply re-sends the current
-    /// status alongside the latest notes text.
+    /// Notes are saved on every edit via TextEditor's onChange, debounced by
+    /// 600ms: each keystroke cancels the pending save task and schedules a
+    /// new one, so a burst of typing results in at most one in-flight PATCH.
+    /// This avoids out-of-order network completions overwriting the
+    /// server's notes with stale (shorter) text from an earlier keystroke.
     private func scheduleSave() {
-        Task { await setStatus(currentStatus) }
+        saveTask?.cancel()
+        saveTask = Task {
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            guard !Task.isCancelled else { return }
+            await setStatus(currentStatus)
+        }
     }
 }
