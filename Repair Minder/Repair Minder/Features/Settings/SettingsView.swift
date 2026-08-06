@@ -383,6 +383,14 @@ struct SettingsView: View {
             Link(destination: URL(string: "https://repairminder.com/terms")!) {
                 Label("Terms of Service", systemImage: "doc.text")
             }
+
+            #if DEBUG
+            NavigationLink {
+                MarketplaceDeepLinkTestView()
+            } label: {
+                Label("Marketplace Deep Link Test", systemImage: "link.badge.plus")
+            }
+            #endif
         }
     }
 

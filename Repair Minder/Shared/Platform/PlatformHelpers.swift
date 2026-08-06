@@ -15,35 +15,20 @@ func platformOpenURL(_ url: URL) {
     #endif
 }
 
-/// Opens a Facebook Marketplace listing URL in the native Facebook app if
-/// installed (via the `fb://facewebmodal/f?href=` bridge -- Facebook has no
-/// documented per-item Marketplace deep link; this is the standard way
-/// third-party apps hand off an arbitrary facebook.com URL to the app), or
-/// falls back to the plain https URL via `platformOpenURL` (Safari, or
-/// whatever the OS resolves it to) if the Facebook app isn't installed.
+/// Opens a Facebook Marketplace listing URL.
+///
+/// Previously wrapped the URL as `fb://facewebmodal/f?href=<url>` to hand off
+/// to the native Facebook app. That only opens a generic in-app web-view tab,
+/// not the native Marketplace item screen -- which is why it appeared to land
+/// "somewhere generic" instead of the listing. Facebook does not expose a
+/// documented (or discoverable) per-item Marketplace `fb://` scheme, and its
+/// `apple-app-site-association` file explicitly excludes `/commerce/listing/*`
+/// and `/commerce/products/*` from Universal Links with no `/marketplace/*`
+/// entries at all, so there is no reliable native deep link to the item
+/// screen. Opening the plain https URL lets the OS/browser (and, if present,
+/// Facebook's own in-page "Open in app" banner) handle it instead.
 func platformOpenMarketplaceListing(_ listingURL: URL) {
-    var components = URLComponents()
-    components.scheme = "fb"
-    components.host = "facewebmodal"
-    components.path = "/f"
-    components.queryItems = [URLQueryItem(name: "href", value: listingURL.absoluteString)]
-
-    guard let fbURL = components.url else {
-        platformOpenURL(listingURL)
-        return
-    }
-
-    #if os(iOS)
-    if UIApplication.shared.canOpenURL(fbURL) {
-        platformOpenURL(fbURL)
-    } else {
-        platformOpenURL(listingURL)
-    }
-    #elseif os(macOS)
-    // No Facebook desktop app / fb:// handler convention on macOS -- always
-    // use the plain URL, which opens in the default browser via NSWorkspace.
     platformOpenURL(listingURL)
-    #endif
 }
 
 /// Open system settings/preferences

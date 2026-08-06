@@ -18,9 +18,7 @@ struct MarketplaceListing: Decodable, Identifiable, Equatable, Sendable {
     let priceAmount: String?
     let priceWasFormatted: String?
     /// Most-recent price-drop timestamp (nullable -- no drop observed since
-    /// tracking began). Added by the "sold + price reduction" round; the
-    /// Worker itself may not populate this field yet -- see
-    /// docs/superpowers/specs/2026-08-06-buyback-marketplace-sold-and-price-reduction-design.md.
+    /// tracking began).
     let priceReducedAt: String?
     let city: String?
     let listingUrl: String
