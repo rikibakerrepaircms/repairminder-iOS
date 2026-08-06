@@ -159,16 +159,14 @@ extension StatCard {
     /// Create a stat card for revenue
     static func revenue(
         _ total: Double,
-        currencySymbol: String = "£",
         change: Double? = nil,
         changePercent: Double? = nil
     ) -> StatCard {
         StatCard(
             title: "Revenue",
-            value: formatCurrency(total),
+            value: CurrencyFormatter.format(total),
             change: change,
             changePercent: changePercent,
-            prefix: currencySymbol,
             icon: "banknote",
             iconColor: .green
         )

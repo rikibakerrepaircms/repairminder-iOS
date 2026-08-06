@@ -14,14 +14,14 @@ import Foundation
 struct ActiveWorkItem: Decodable, Equatable, Sendable, Identifiable {
     let id: String
     let orderId: String?  // Made optional - might not be present for all items
-    let orderNumber: Int  // Backend returns as Int
+    let orderNumber: Int?  // nullable: backend maps from t.ticket_number which can be null
     let status: String
     let displayName: String
     let workType: String
     let startedAt: String
 
-    /// Order number as String
-    var orderNumberString: String { String(orderNumber) }
+    /// Order number as String ("-" when absent)
+    var orderNumberString: String { orderNumber.map(String.init) ?? "-" }
 
     /// Type of work being performed
     var activeWorkType: WorkType {

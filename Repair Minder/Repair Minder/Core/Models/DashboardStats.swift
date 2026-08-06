@@ -30,6 +30,17 @@ struct DashboardStats: Decodable, Equatable, Sendable {
     let unpaidCollected: UnpaidCollectedMetrics?
     let paymentMismatch: PaymentMismatchMetrics?
     let revenueBreakdown: RevenueCategoryBreakdown?
+
+    /// Average order value - company scope only
+    let avgOrderValue: StatMetric<RevenueCurrent>?
+
+    /// Repeat client rate - both scopes
+    let repeatRate: RepeatRate?
+}
+
+/// Repeat client rate (percentage)
+struct RepeatRate: Decodable, Equatable, Sendable {
+    let current: Double
 }
 
 // MARK: - Generic Metric Types

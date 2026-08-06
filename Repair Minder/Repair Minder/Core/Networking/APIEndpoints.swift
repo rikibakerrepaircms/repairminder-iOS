@@ -53,13 +53,13 @@ enum APIEndpoint {
 
     // MARK: - Dashboard
 
-    case dashboardStats(scope: String?, period: String?)
+    case dashboardStats(scope: String?, period: String?, comparePeriods: Int?)
     case commissionEstimate(scope: String?, period: String?)
     case enquiryStats(scope: String?, includeBreakdown: Bool?)
-    case lifecycle
-    case categoryBreakdown
+    case lifecycle(scope: String?, groupBy: String?)
+    case categoryBreakdown(scope: String?, period: String?)
     case activityLog
-    case bookingHeatmap
+    case bookingHeatmap(period: String?)
     case buybackStats
     case bookingsByTime
 
@@ -972,13 +972,16 @@ enum APIEndpoint {
     /// Query parameters for GET requests
     var queryItems: [URLQueryItem]? {
         switch self {
-        case .dashboardStats(let scope, let period):
+        case .dashboardStats(let scope, let period, let comparePeriods):
             var items: [URLQueryItem] = []
             if let scope = scope {
                 items.append(URLQueryItem(name: "scope", value: scope))
             }
             if let period = period {
                 items.append(URLQueryItem(name: "period", value: period))
+            }
+            if let comparePeriods {
+                items.append(URLQueryItem(name: "compare_periods", value: String(comparePeriods)))
             }
             return items.isEmpty ? nil : items
 
@@ -1280,6 +1283,22 @@ enum APIEndpoint {
             if let status, !status.isEmpty { items.append(URLQueryItem(name: "status", value: status)) }
             if showSold { items.append(URLQueryItem(name: "show_sold", value: "1")) }
             return items
+
+        case .lifecycle(let scope, let groupBy):
+            var items: [URLQueryItem] = []
+            if let scope { items.append(URLQueryItem(name: "scope", value: scope)) }
+            if let groupBy { items.append(URLQueryItem(name: "group_by", value: groupBy)) }
+            return items.isEmpty ? nil : items
+
+        case .categoryBreakdown(let scope, let period):
+            var items: [URLQueryItem] = []
+            if let scope { items.append(URLQueryItem(name: "scope", value: scope)) }
+            if let period { items.append(URLQueryItem(name: "period", value: period)) }
+            return items.isEmpty ? nil : items
+
+        case .bookingHeatmap(let period):
+            if let period { return [URLQueryItem(name: "period", value: period)] }
+            return nil
 
         default:
             return nil

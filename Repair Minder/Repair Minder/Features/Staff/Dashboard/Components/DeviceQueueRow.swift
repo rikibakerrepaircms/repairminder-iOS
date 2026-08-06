@@ -272,7 +272,7 @@ struct ActiveWorkRow: View {
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.blue)
 
-                    Text("#\(String(item.orderNumber))")
+                    Text("#\(item.orderNumberString)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -315,7 +315,7 @@ struct ActiveWorkRow: View {
                 .lineLimit(1)
                 .frame(minWidth: 140, alignment: .leading)
 
-            Text("#\(String(item.orderNumber))")
+            Text("#\(item.orderNumberString)")
                 .font(.subheadline.monospacedDigit())
                 .foregroundStyle(.secondary)
 
