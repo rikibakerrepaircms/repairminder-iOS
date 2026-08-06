@@ -11,6 +11,7 @@ import SwiftUI
 
 enum SettingsDestination: Hashable {
     case buyback
+    case marketplace
     case clients
     case devices
     case queue
@@ -30,6 +31,7 @@ extension SettingsDestination {
         case .queue: .queue
         case .orders: .orders
         case .buyback: .buyback
+        case .marketplace: .marketplace
         case .enquiries: .enquiries
         case .clients: .clients
         case .devices: .devices
@@ -166,6 +168,8 @@ struct SettingsView: View {
         switch dest {
         case .buyback:
             BuybackListView(isEmbedded: true)
+        case .marketplace:
+            MarketplaceFeedView()
         case .clients:
             ClientListView(isEmbedded: true)
         case .devices:

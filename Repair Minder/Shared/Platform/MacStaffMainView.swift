@@ -35,6 +35,7 @@ struct MacStaffMainView: View {
         case clients = "Clients"
         case devices = "Devices"
         case buyback = "Buyback"
+        case marketplace = "Marketplace"
     }
 
     var body: some View {
@@ -89,6 +90,8 @@ struct MacStaffMainView: View {
                     .tag(MacSection.devices)
                 Label("Buyback", systemImage: "arrow.triangle.2.circlepath")
                     .tag(MacSection.buyback)
+                Label("Marketplace", systemImage: "cart.badge.plus")
+                    .tag(MacSection.marketplace)
             }
         }
         .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 280)
@@ -145,6 +148,8 @@ struct MacStaffMainView: View {
                         BuybackDetailView(buybackId: buybackId)
                     }
             }
+        case .marketplace:
+            NavigationStack { MarketplaceFeedView() }
         case .none:
             Text("Select a section")
                 .font(.title2)

@@ -15,6 +15,7 @@ enum FeatureTab: String, CaseIterable, Identifiable, Codable {
     case queue
     case orders
     case buyback
+    case marketplace
     case enquiries
     case clients
     case devices
@@ -28,6 +29,7 @@ enum FeatureTab: String, CaseIterable, Identifiable, Codable {
         case .queue: "My Queue"
         case .orders: "Orders"
         case .buyback: "Buyback"
+        case .marketplace: "Marketplace"
         case .enquiries: "Enquiries"
         case .clients: "Clients"
         case .devices: "Devices"
@@ -41,6 +43,7 @@ enum FeatureTab: String, CaseIterable, Identifiable, Codable {
         case .queue: "tray.full.fill"
         case .orders: "doc.text.fill"
         case .buyback: "arrow.triangle.2.circlepath"
+        case .marketplace: "cart.badge.plus"
         case .enquiries: "envelope.fill"
         case .clients: "person.2.fill"
         case .devices: "magnifyingglass"
@@ -55,10 +58,11 @@ enum FeatureTab: String, CaseIterable, Identifiable, Codable {
         case .queue: 1
         case .orders: 2
         case .buyback: 3
-        case .enquiries: 4
-        case .clients: 5
-        case .devices: 6
-        case .inventory: 7
+        case .marketplace: 4
+        case .enquiries: 5
+        case .clients: 6
+        case .devices: 7
+        case .inventory: 8
         }
     }
 }

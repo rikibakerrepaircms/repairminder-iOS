@@ -476,6 +476,11 @@ private struct StaffMainView: View {
                     }
             }
 
+        case .marketplace:
+            NavigationStack {
+                MarketplaceFeedView()
+            }
+
         case .enquiries:
             NavigationStack {
                 EnquiryListView()
