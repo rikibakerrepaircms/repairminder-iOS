@@ -1276,7 +1276,7 @@ enum APIEndpoint {
             var items = [URLQueryItem(name: "limit", value: String(limit))]
             if let before, !before.isEmpty { items.append(URLQueryItem(name: "before", value: before)) }
             if let beforeId, !beforeId.isEmpty { items.append(URLQueryItem(name: "before_id", value: beforeId)) }
-            if let searchId { items.append(URLQueryItem(name: "search_id", value: String(searchId))) }
+            if let searchId { items.append(URLQueryItem(name: "search_ids", value: String(searchId))) }
             if let status, !status.isEmpty { items.append(URLQueryItem(name: "status", value: status)) }
             return items
 

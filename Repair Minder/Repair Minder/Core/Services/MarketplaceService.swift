@@ -63,6 +63,21 @@ final class MarketplaceService {
         struct Body: Encodable {
             let status: String?
             let notes: String?
+
+            // Swift's synthesized Encodable omits `nil` Optional properties
+            // entirely, so a plain `encode(status)` would silently drop the
+            // "clear this status" case (the worker treats an absent `status`
+            // key as "leave it unchanged"). Always emit `status`, even as
+            // JSON `null`, so clearing a status actually clears it server-side.
+            enum CodingKeys: String, CodingKey {
+                case status, notes
+            }
+
+            func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encode(status, forKey: .status)
+                try container.encodeIfPresent(notes, forKey: .notes)
+            }
         }
         let response: MarketplaceListingStatusResponse = try await api.request(
             .setMarketplaceListingStatus(id: id),

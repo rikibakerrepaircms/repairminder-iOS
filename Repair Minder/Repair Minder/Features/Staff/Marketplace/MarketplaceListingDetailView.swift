@@ -34,7 +34,7 @@ struct MarketplaceListingDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                AsyncImage(url: listing.photoURL.flatMap(URL.init(string:))) { image in
+                AsyncImage(url: listing.photoUrl.flatMap(URL.init(string:))) { image in
                     image.resizable().aspectRatio(contentMode: .fit)
                 } placeholder: {
                     Color.gray.opacity(0.15).frame(height: 220)
@@ -62,7 +62,7 @@ struct MarketplaceListingDetailView: View {
                 .padding(.horizontal)
 
                 Button {
-                    if let url = URL(string: listing.listingURL) {
+                    if let url = URL(string: listing.listingUrl) {
                         platformOpenMarketplaceListing(url)
                     }
                 } label: {

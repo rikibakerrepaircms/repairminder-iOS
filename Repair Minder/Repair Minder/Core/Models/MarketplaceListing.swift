@@ -18,11 +18,11 @@ struct MarketplaceListing: Decodable, Identifiable, Equatable, Sendable {
     let priceAmount: String?
     let priceWasFormatted: String?
     let city: String?
-    let listingURL: String
-    let photoURL: String?
+    let listingUrl: String
+    let photoUrl: String?
     let sellerName: String?
     let sellerFbId: String?
-    let sellerAvatarURL: String?
+    let sellerAvatarUrl: String?
     let deliveryType: String?
     let condition: String?
     let description: String?

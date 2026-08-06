@@ -108,7 +108,7 @@ private struct MarketplaceListingCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .topLeading) {
-                AsyncImage(url: listing.photoURL.flatMap(URL.init(string:))) { image in
+                AsyncImage(url: listing.photoUrl.flatMap(URL.init(string:))) { image in
                     image.resizable().aspectRatio(contentMode: .fill)
                 } placeholder: {
                     Color.gray.opacity(0.15)

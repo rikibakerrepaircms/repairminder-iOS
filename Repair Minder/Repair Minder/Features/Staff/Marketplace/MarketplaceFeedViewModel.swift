@@ -82,9 +82,9 @@ final class MarketplaceFeedViewModel: ObservableObject {
         listings[index] = MarketplaceListing(
             id: existing.id, title: existing.title, priceFormatted: existing.priceFormatted,
             priceAmount: existing.priceAmount, priceWasFormatted: existing.priceWasFormatted,
-            city: existing.city, listingURL: existing.listingURL, photoURL: existing.photoURL,
+            city: existing.city, listingUrl: existing.listingUrl, photoUrl: existing.photoUrl,
             sellerName: existing.sellerName, sellerFbId: existing.sellerFbId,
-            sellerAvatarURL: existing.sellerAvatarURL, deliveryType: existing.deliveryType,
+            sellerAvatarUrl: existing.sellerAvatarUrl, deliveryType: existing.deliveryType,
             condition: existing.condition, description: existing.description,
             fbCreatedAt: existing.fbCreatedAt, firstSeenAt: existing.firstSeenAt,
             lastSeenAt: existing.lastSeenAt, status: status.status, notes: status.notes
