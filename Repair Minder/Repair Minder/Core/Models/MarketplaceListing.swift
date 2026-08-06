@@ -55,6 +55,15 @@ struct MarketplaceListing: Decodable, Identifiable, Equatable, Sendable {
         formatter.unitsStyle = .abbreviated
         return formatter.localizedString(for: date, relativeTo: Date())
     }
+
+    /// Abbreviated relative time since the listing was first posted (e.g. "3d"),
+    /// derived from `sortTimestamp`, or nil if no timestamp is available.
+    var listedRelativeTime: String? {
+        guard let sortTimestamp, let date = DateFormatters.parseDate(sortTimestamp) else { return nil }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
 }
 
 /// GET /api/buyback/marketplace/listings -> { success, data: { listings: [...] } }

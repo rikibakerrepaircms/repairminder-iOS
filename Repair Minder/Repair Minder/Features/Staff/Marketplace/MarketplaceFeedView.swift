@@ -140,9 +140,15 @@ private struct MarketplaceListingCard: View {
                 Text(listing.title ?? "Untitled listing")
                     .font(.caption).fontWeight(.semibold)
                     .lineLimit(2)
-                Text(listing.city ?? "Unknown location")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Text(listing.city ?? "Unknown location")
+                    if let listedRelativeTime = listing.listedRelativeTime {
+                        Text("· \(listedRelativeTime) ago")
+                    }
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
                 HStack {
                     Text(listing.priceFormatted ?? "No price")
                         .font(.subheadline).fontWeight(.bold)
