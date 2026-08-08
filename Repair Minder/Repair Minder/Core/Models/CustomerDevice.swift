@@ -339,6 +339,11 @@ struct DeviceImage: Codable, Identifiable, Sendable {
     var isDiagnostic: Bool {
         imageType == "diagnostic"
     }
+
+    /// Whether this is a post-repair (post-test) image
+    var isPostRepair: Bool {
+        imageType == "post_repair"
+    }
 }
 
 // MARK: - Device Payment (Buyback)

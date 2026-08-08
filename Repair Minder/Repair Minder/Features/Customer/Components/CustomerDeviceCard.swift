@@ -16,7 +16,8 @@ struct CustomerDeviceCard: View {
 
     @State private var showDiagnostics: Bool = false
     @State private var showChecklist: Bool = false
-    @State private var showImages: Bool = false
+    @State private var showPreTestImages: Bool = false
+    @State private var showPostTestImages: Bool = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
@@ -70,8 +71,12 @@ struct CustomerDeviceCard: View {
                 diagnosticSection
             }
 
-            // Pre-Repair Images (when awaiting authorization)
-            if device.isAwaitingAuthorization && device.hasImages {
+            // Device Photos. Shown from the moment they exist, not only while awaiting
+            // authorization: a customer waiting on an assessment wants to see we have
+            // their device, and a customer whose repair is done wants to see the
+            // post-test photos — both matter well outside the awaiting-authorization
+            // window. Mirrors the web customer portal's CustomerDeviceCard.tsx.
+            if device.hasImages {
                 imagesSection
             }
 
@@ -379,31 +384,48 @@ struct CustomerDeviceCard: View {
 
     // MARK: - Images Section
 
+    /// Pre-test and post-test photos as two separate, independently collapsible
+    /// cards — mirroring the web customer portal, each card is entirely absent
+    /// (not just empty) when there are no photos of that type yet.
     private var imagesSection: some View {
+        let preTestImages = (device.images ?? []).filter { $0.isPreRepair || $0.isDiagnostic }
+        let postTestImages = (device.images ?? []).filter { $0.isPostRepair }
+
+        return VStack(alignment: .leading, spacing: 12) {
+            if !preTestImages.isEmpty {
+                imageGalleryCard(title: "Pre-Test Photos", images: preTestImages, isExpanded: $showPreTestImages)
+            }
+            if !postTestImages.isEmpty {
+                imageGalleryCard(title: "Post-Test Photos", images: postTestImages, isExpanded: $showPostTestImages)
+            }
+        }
+    }
+
+    private func imageGalleryCard(title: String, images: [DeviceImage], isExpanded: Binding<Bool>) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Button {
                 withAnimation {
-                    showImages.toggle()
+                    isExpanded.wrappedValue.toggle()
                 }
             } label: {
                 HStack {
-                    Text("Device Photos")
+                    Text(title)
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundStyle(.primary)
 
                     Spacer()
 
-                    Text("\(device.images?.count ?? 0)")
+                    Text("\(images.count)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    Image(systemName: showImages ? "chevron.up" : "chevron.down")
+                    Image(systemName: isExpanded.wrappedValue ? "chevron.up" : "chevron.down")
                         .foregroundStyle(.secondary)
                 }
             }
 
-            if showImages, let images = device.images {
+            if isExpanded.wrappedValue {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(images) { image in
