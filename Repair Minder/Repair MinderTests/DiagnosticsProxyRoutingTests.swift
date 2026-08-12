@@ -15,7 +15,7 @@ struct DiagnosticsProxyRoutingTests {
 
     @Test func unrelatedEndpointsAreNotProxyRouted() {
         #expect(!APIEndpoint.login.isDiagnosticsProxyRouted)
-        #expect(!APIEndpoint.dashboardStats(scope: nil, period: nil).isDiagnosticsProxyRouted)
+        #expect(!APIEndpoint.dashboardStats(scope: nil, period: nil, comparePeriods: nil).isDiagnosticsProxyRouted)
     }
 
     @Test func resolvesPublicCreateToProxyHostWithApiPrefixStripped() {
