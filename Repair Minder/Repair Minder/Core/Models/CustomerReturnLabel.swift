@@ -122,3 +122,33 @@ struct PackagingRequest: Decodable, Equatable, Sendable {
         self.hasAsked = packagingRequestedAt != nil
     }
 }
+
+/// State of a customer's return-label request: minted, awaiting a staff
+/// decision, declined, or never asked for. Backs
+/// `GET`/`POST /api/customer/enquiries/:ticketId/return-label`, which used
+/// to be a plain 404-or-200 read; staging a mint behind staff approval added
+/// two more states (202 pending, 409 rejected) - see label_requests on the
+/// backend and docs/superpowers/specs/2026-08-11-label-request-staging-design.md.
+enum ReturnLabelStatus: Equatable, Sendable {
+    case ready(CustomerReturnLabel)
+    case pending
+    case rejected
+    case none
+
+    /// Pure mapping from an HTTP status + decoded envelope to a state. A
+    /// dedicated function rather than inline branching in the two network
+    /// calls below, so this exact mapping is unit-testable against real
+    /// JSON without standing up network mocks - see ReturnLabelStatusTests.
+    static func resolve(httpStatus: Int, response: APIResponse<CustomerReturnLabel>) throws -> ReturnLabelStatus {
+        if httpStatus == 404 { return .none }
+        if httpStatus == 202 { return .pending }
+        if httpStatus == 409 {
+            if response.code == "LABEL_REQUEST_REJECTED" { return .rejected }
+            throw APIError.serverError(message: response.error ?? "Failed to check for a postage label", code: response.code)
+        }
+        guard response.success, let label = response.data else {
+            throw APIError.serverError(message: response.error ?? "Failed to request the postage label", code: response.code)
+        }
+        return .ready(label)
+    }
+}
