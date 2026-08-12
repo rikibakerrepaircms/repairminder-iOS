@@ -836,6 +836,12 @@ private struct LabelChipsView: View {
 
     var body: some View {
         if let labels {
+            // The one that needs a human RIGHT NOW, so it leads - approve/reject
+            // stays web-only (see the design spec), but staff working from this
+            // app should not be blind to a request sitting unapproved.
+            if labels.hasPendingLabelRequest == true {
+                chip("Awaiting approval", "paperplane", .orange)
+            }
             if labels.hasReturnLabel == true {
                 chip("Label", "paperplane", .blue)
             }

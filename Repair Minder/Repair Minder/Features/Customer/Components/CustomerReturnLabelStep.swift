@@ -16,10 +16,10 @@ import UIKit
 /// The customer's postage label CTA: request, then track and download.
 ///
 /// Twin of `LabelStep` in `src/components/customer/SellNextStepsCard.tsx` -
-/// same three states (no label yet / label ready / expired), same copy where
-/// it says the same thing. Mounted inside `CustomerSellNextStepsCard`,
-/// between the fulfilment step and the arrival step, matching the web
-/// layout order.
+/// same five states (no label yet / request pending staff review / request
+/// declined / label ready / expired), same copy where it says the same
+/// thing. Mounted inside `CustomerSellNextStepsCard`, between the fulfilment
+/// step and the arrival step, matching the web layout order.
 ///
 /// Copy rules: UK English, hyphens only (no en dash, em dash or minus), and
 /// "shop" rather than "workshop".
@@ -59,12 +59,19 @@ struct CustomerReturnLabelStep: View {
                 checkingView
             } else if let loadError = viewModel.loadError {
                 errorView(loadError)
-            } else if let label = viewModel.label, label.isExpired {
-                expiredView
-            } else if let label = viewModel.label {
-                readyView(label)
             } else {
-                requestView
+                switch viewModel.status {
+                case .ready(let label) where label.isExpired:
+                    expiredView
+                case .ready(let label):
+                    readyView(label)
+                case .pending:
+                    pendingView
+                case .rejected:
+                    rejectedView
+                case .none:
+                    requestView
+                }
             }
         }
         #if os(iOS)
@@ -90,8 +97,12 @@ struct CustomerReturnLabelStep: View {
         // Covers both the initial load and a label the customer creates while the
         // screen is open, so the packaging step appears the moment posting becomes
         // the route they are on.
-        .onChange(of: viewModel.label == nil) { _, isNil in
-            hasLabel?.wrappedValue = !isNil
+        .onChange(of: viewModel.status) { _, newStatus in
+            if case .ready = newStatus {
+                hasLabel?.wrappedValue = true
+            } else {
+                hasLabel?.wrappedValue = false
+            }
         }
     }
 
@@ -115,6 +126,34 @@ struct CustomerReturnLabelStep: View {
             Text(message)
                 .font(.subheadline)
                 .foregroundStyle(.red)
+        }
+    }
+
+    // MARK: - Pending
+
+    /// A request that has been made but not yet minted - staged behind staff
+    /// approval so a bot or fake storefront submission cannot get a real,
+    /// billable Royal Mail label before a human looks at it. No button here:
+    /// the customer has nothing left to do but wait.
+    private var pendingView: some View {
+        step(icon: "paperplane", title: "Your postage label") {
+            Text("We're reviewing your order and will email you your free pre-paid postage label as soon as it's ready. There is nothing you need to do in the meantime.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Rejected
+
+    /// A dead end by design: staff declined to mint a label for this
+    /// request, so re-showing the request button would just start the same
+    /// cycle again. Points the customer at a human via the message thread
+    /// rather than offering a retry.
+    private var rejectedView: some View {
+        step(icon: "exclamationmark.circle", title: "Your postage label") {
+            Text("We're unable to send a label for this order automatically. Please message us to continue.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -418,7 +457,7 @@ final class CustomerReturnLabelViewModel: ObservableObject {
     let ticketId: String
 
     @Published private(set) var checking = true
-    @Published private(set) var label: CustomerReturnLabel?
+    @Published private(set) var status: ReturnLabelStatus = .none
     @Published private(set) var loadError: String?
 
     @Published private(set) var isRequesting = false
@@ -445,7 +484,7 @@ final class CustomerReturnLabelViewModel: ObservableObject {
         checking = true
         loadError = nil
         do {
-            label = try await CustomerEnquiryService.fetchReturnLabel(ticketId: ticketId)
+            status = try await CustomerEnquiryService.fetchReturnLabel(ticketId: ticketId)
         } catch {
             loadError = "Could not check for a postage label. Please try again."
         }
@@ -461,9 +500,14 @@ final class CustomerReturnLabelViewModel: ObservableObject {
     /// asynchronously and a double-click can fire both handlers in the same
     /// tick before either state update lands; Swift's actor isolation already
     /// gives that same guarantee with a single flag - there is no gap for a
-    /// second tap to land in.) Once this succeeds, `label` is non-nil and the
-    /// view renders no create button at all - a second tap is then
-    /// structurally impossible, not just discouraged.
+    /// second tap to land in.) Once this succeeds, `status` has moved off
+    /// `.none` - to `.pending` (awaiting a staff decision), `.rejected` (a
+    /// prior request on this ticket was already declined - see the
+    /// `LABEL_REQUEST_REJECTED` catch below), or `.ready` (the old
+    /// behaviour, a minted label) - and in every one of those cases `body`
+    /// switches away from `requestView`, so no create button is rendered at
+    /// all - a second tap is then structurally impossible, not just
+    /// discouraged.
     /// `address` is only ever passed by the address form once a prior call has
     /// already come back `ADDRESS_REQUIRED`. The retry goes through this SAME
     /// guarded function rather than a second, unguarded path.
@@ -472,11 +516,17 @@ final class CustomerReturnLabelViewModel: ObservableObject {
         isRequesting = true
         requestError = nil
         do {
-            label = try await CustomerEnquiryService.requestReturnLabel(ticketId: ticketId, address: address)
+            status = try await CustomerEnquiryService.requestReturnLabel(ticketId: ticketId, address: address)
             needsAddress = false
         } catch APIError.rateLimited {
             requestError = "A postage label was already requested for this ticket recently. "
                 + "Please check your email - we may already have sent it."
+        } catch APIError.serverError(_, "LABEL_REQUEST_REJECTED") {
+            // A prior request on this ticket was already declined - e.g. this
+            // call raced a staff decision landing while the button was
+            // pressed. Land on the same dead-end messaging `load()` shows
+            // when it finds a rejected request, not a generic error string.
+            status = .rejected
         } catch APIError.serverError(_, "ADDRESS_REQUIRED") {
             // Swap to the address form rather than a dead-end error message. A
             // seller never lands here - see CustomerSellNextStepsCard - so this

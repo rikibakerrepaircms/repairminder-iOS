@@ -120,14 +120,53 @@ struct CustomerEnquiryService {
     /// which is not an error here, just "none yet". Safe to call on view
     /// appear and on pull-to-refresh. The ONLY call that may create a label
     /// is `requestReturnLabel` below, and only from a button action.
-    static func fetchReturnLabel(ticketId: String) async throws -> CustomerReturnLabel? {
-        do {
-            let response: APIResponse<CustomerReturnLabel> =
-                try await get("/api/customer/enquiries/\(ticketId)/return-label")
-            return response.success ? response.data : nil
-        } catch APIError.notFound {
-            return nil
-        }
+    ///
+    /// Returns a `ReturnLabelStatus` rather than `CustomerReturnLabel?`
+    /// because minting was staged behind staff approval: a request can now
+    /// also be sitting unreviewed (202, `.pending`) or have been declined
+    /// (409 with `code: "LABEL_REQUEST_REJECTED"`, `.rejected`), and those
+    /// are distinct states from "never asked" (404, `.none`) that the view
+    /// renders differently - see `ReturnLabelStatus` and
+    /// docs/superpowers/specs/2026-08-11-label-request-staging-design.md.
+    /// Bypasses the shared `get`/`checkStatus` helpers, which treat any
+    /// non-2xx/404/429/401 as silently ignorable, because 202 and 409 here
+    /// are meaningful states to resolve rather than errors to swallow.
+    ///
+    /// The 404 check below is hoisted above the JSON decode deliberately.
+    /// This is a GET behind a link that travels by email/SMS, so it gets hit
+    /// by link scanners and prefetchers with nobody at the keyboard - and,
+    /// same as any GET, by Cloudflare edge/WAF interstitials on a bad day.
+    /// Those don't return our JSON envelope. If a 404 fell through to the
+    /// decode below like every other status does, an edge error page, a WAF
+    /// challenge, or an empty body would throw a decode error and surface a
+    /// generic "Could not check for a postage label" error card instead of
+    /// the normal "no label yet" screen - a regression from the pre-staging
+    /// behaviour, where `checkStatus` threw `APIError.notFound` for 404
+    /// without ever attempting to parse a body, and the caller mapped that
+    /// straight to "no label yet". Checking the status code first restores
+    /// that exact fast path for 404 specifically. This does not apply to
+    /// `requestReturnLabel` below: a POST hitting 404 never meant "no label
+    /// yet" even before staging - it meant the ticket itself wasn't found -
+    /// so its decode ordering is unchanged.
+    static func fetchReturnLabel(ticketId: String) async throws -> ReturnLabelStatus {
+        guard let token = customerAuth.accessToken else { throw APIError.unauthorized }
+
+        let url = URL(string: "\(baseURL)/api/customer/enquiries/\(ticketId)/return-label")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw APIError.networkError(URLError(.badServerResponse)) }
+        if http.statusCode == 401 { throw APIError.unauthorized }
+        if http.statusCode == 429 { throw APIError.rateLimited }
+        if http.statusCode == 404 { return .none }
+
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let apiResponse = try decoder.decode(APIResponse<CustomerReturnLabel>.self, from: data)
+        return try ReturnLabelStatus.resolve(httpStatus: http.statusCode, response: apiResponse)
     }
 
     /// `POST /api/customer/enquiries/:ticketId/return-label`
@@ -150,9 +189,21 @@ struct CustomerEnquiryService {
     /// address form. Passing `address` retries with it in the body so the
     /// server can write it, on a COALESCE guard that never overwrites an
     /// address the client already has, before minting.
+    ///
+    /// Returns a `ReturnLabelStatus` rather than a bare `CustomerReturnLabel`
+    /// because a request no longer mints immediately - it now sits behind
+    /// staff approval, so a successful call can come back 202 (`.pending`,
+    /// awaiting a decision) as well as the old 200 (`.ready`). A 409 with
+    /// `code: "LABEL_REQUEST_REJECTED"` means a PRIOR request on this ticket
+    /// was already declined (e.g. this call raced a staff decision) and
+    /// resolves to `.rejected` - `CustomerReturnLabelViewModel.requestLabel`
+    /// catches that as a distinct `APIError.serverError` case, same as
+    /// `ADDRESS_REQUIRED`, rather than falling into the generic error
+    /// message. Bypasses `checkStatus`, which would throw a generic error on
+    /// 202/409 instead of letting `ReturnLabelStatus.resolve` interpret them.
     static func requestReturnLabel(
         ticketId: String, address: CustomerReturnLabelAddress? = nil
-    ) async throws -> CustomerReturnLabel {
+    ) async throws -> ReturnLabelStatus {
         guard let token = customerAuth.accessToken else { throw APIError.unauthorized }
 
         let url = URL(string: "\(baseURL)/api/customer/enquiries/\(ticketId)/return-label")!
@@ -163,17 +214,14 @@ struct CustomerEnquiryService {
         request.httpBody = try JSONEncoder().encode(address ?? CustomerReturnLabelAddress())
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        try checkStatus(response)
+        guard let http = response as? HTTPURLResponse else { throw APIError.networkError(URLError(.badServerResponse)) }
+        if http.statusCode == 401 { throw APIError.unauthorized }
+        if http.statusCode == 429 { throw APIError.rateLimited }
 
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         let apiResponse = try decoder.decode(APIResponse<CustomerReturnLabel>.self, from: data)
-        guard apiResponse.success, let label = apiResponse.data else {
-            throw APIError.serverError(
-                message: apiResponse.error ?? "Failed to request the postage label",
-                code: apiResponse.code)
-        }
-        return label
+        return try ReturnLabelStatus.resolve(httpStatus: http.statusCode, response: apiResponse)
     }
 
     /// `GET /api/customer/enquiries/:ticketId/return-label?format=pdf` - the
