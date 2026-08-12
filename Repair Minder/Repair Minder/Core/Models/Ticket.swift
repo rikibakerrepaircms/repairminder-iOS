@@ -262,6 +262,10 @@ struct TicketBuybackLabels: Codable, Equatable, Hashable, Sendable {
     let hasReturnLabel: Bool?
     let hasOutboundLabel: Bool?
     let packagingRequestedAt: String?
+    /// A return-label request staged by a storefront submission or the
+    /// customer's own portal press, awaiting staff approve/reject. See
+    /// label_requests and docs/superpowers/specs/2026-08-11-label-request-staging-design.md.
+    let hasPendingLabelRequest: Bool?
 
     /// Asked for and not yet sent - the one that needs a human.
     var packagingPending: Bool {
