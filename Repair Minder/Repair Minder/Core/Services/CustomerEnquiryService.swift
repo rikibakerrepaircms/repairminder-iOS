@@ -131,6 +131,23 @@ struct CustomerEnquiryService {
     /// Bypasses the shared `get`/`checkStatus` helpers, which treat any
     /// non-2xx/404/429/401 as silently ignorable, because 202 and 409 here
     /// are meaningful states to resolve rather than errors to swallow.
+    ///
+    /// The 404 check below is hoisted above the JSON decode deliberately.
+    /// This is a GET behind a link that travels by email/SMS, so it gets hit
+    /// by link scanners and prefetchers with nobody at the keyboard - and,
+    /// same as any GET, by Cloudflare edge/WAF interstitials on a bad day.
+    /// Those don't return our JSON envelope. If a 404 fell through to the
+    /// decode below like every other status does, an edge error page, a WAF
+    /// challenge, or an empty body would throw a decode error and surface a
+    /// generic "Could not check for a postage label" error card instead of
+    /// the normal "no label yet" screen - a regression from the pre-staging
+    /// behaviour, where `checkStatus` threw `APIError.notFound` for 404
+    /// without ever attempting to parse a body, and the caller mapped that
+    /// straight to "no label yet". Checking the status code first restores
+    /// that exact fast path for 404 specifically. This does not apply to
+    /// `requestReturnLabel` below: a POST hitting 404 never meant "no label
+    /// yet" even before staging - it meant the ticket itself wasn't found -
+    /// so its decode ordering is unchanged.
     static func fetchReturnLabel(ticketId: String) async throws -> ReturnLabelStatus {
         guard let token = customerAuth.accessToken else { throw APIError.unauthorized }
 
@@ -144,6 +161,7 @@ struct CustomerEnquiryService {
         guard let http = response as? HTTPURLResponse else { throw APIError.networkError(URLError(.badServerResponse)) }
         if http.statusCode == 401 { throw APIError.unauthorized }
         if http.statusCode == 429 { throw APIError.rateLimited }
+        if http.statusCode == 404 { return .none }
 
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
