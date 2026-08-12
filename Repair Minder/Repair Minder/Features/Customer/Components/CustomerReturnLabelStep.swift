@@ -16,10 +16,10 @@ import UIKit
 /// The customer's postage label CTA: request, then track and download.
 ///
 /// Twin of `LabelStep` in `src/components/customer/SellNextStepsCard.tsx` -
-/// same three states (no label yet / label ready / expired), same copy where
-/// it says the same thing. Mounted inside `CustomerSellNextStepsCard`,
-/// between the fulfilment step and the arrival step, matching the web
-/// layout order.
+/// same five states (no label yet / request pending staff review / request
+/// declined / label ready / expired), same copy where it says the same
+/// thing. Mounted inside `CustomerSellNextStepsCard`, between the fulfilment
+/// step and the arrival step, matching the web layout order.
 ///
 /// Copy rules: UK English, hyphens only (no en dash, em dash or minus), and
 /// "shop" rather than "workshop".
@@ -500,9 +500,14 @@ final class CustomerReturnLabelViewModel: ObservableObject {
     /// asynchronously and a double-click can fire both handlers in the same
     /// tick before either state update lands; Swift's actor isolation already
     /// gives that same guarantee with a single flag - there is no gap for a
-    /// second tap to land in.) Once this succeeds, `label` is non-nil and the
-    /// view renders no create button at all - a second tap is then
-    /// structurally impossible, not just discouraged.
+    /// second tap to land in.) Once this succeeds, `status` has moved off
+    /// `.none` - to `.pending` (awaiting a staff decision), `.rejected` (a
+    /// prior request on this ticket was already declined - see the
+    /// `LABEL_REQUEST_REJECTED` catch below), or `.ready` (the old
+    /// behaviour, a minted label) - and in every one of those cases `body`
+    /// switches away from `requestView`, so no create button is rendered at
+    /// all - a second tap is then structurally impossible, not just
+    /// discouraged.
     /// `address` is only ever passed by the address form once a prior call has
     /// already come back `ADDRESS_REQUIRED`. The retry goes through this SAME
     /// guarded function rather than a second, unguarded path.
