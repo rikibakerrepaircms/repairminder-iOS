@@ -458,9 +458,20 @@ struct EnquiryDetailView: View {
                 }
                 .disabled(viewModel.isGeneratingAI || viewModel.aiRepliesUnavailable)
 
-                // AI rewrite button
-                Button {
-                    Task { await viewModel.rewriteResponse() }
+                // AI rewrite button — tap rewrites with the last-picked
+                // provider; long-press (or the checkmark row) switches it.
+                Menu {
+                    ForEach(RewriteProvider.allCases) { provider in
+                        Button {
+                            Task { await viewModel.rewriteResponse(provider: provider) }
+                        } label: {
+                            if provider == viewModel.rewriteProvider {
+                                Label(provider.displayName, systemImage: "checkmark")
+                            } else {
+                                Text(provider.displayName)
+                            }
+                        }
+                    }
                 } label: {
                     if viewModel.isRewritingAI {
                         ProgressView()
@@ -469,6 +480,8 @@ struct EnquiryDetailView: View {
                         Image(systemName: "pencil.and.outline")
                             .font(.title3)
                     }
+                } primaryAction: {
+                    Task { await viewModel.rewriteResponse() }
                 }
                 .disabled(viewModel.isRewritingAI || viewModel.hasRewrittenAI || viewModel.replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.aiRepliesUnavailable)
             }

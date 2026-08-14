@@ -429,8 +429,27 @@ struct AIResponseRequest: Encodable {
     let locationId: String?
 }
 
+/// Providers offered by the AI Rewrite button's inline picker.
+enum RewriteProvider: String, CaseIterable, Identifiable {
+    case deepseek
+    case qwen
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .deepseek: return "DeepSeek"
+        case .qwen: return "Qwen"
+        }
+    }
+}
+
 /// Request body for AI rewrite
 struct AIRewriteRequest: Encodable {
     let text: String
     let locationId: String?
+    /// Per-call provider override ("deepseek" | "qwen") from the rewrite
+    /// provider picker. Unrecognized/omitted values fall back to the
+    /// admin-configured rewrite-settings provider server-side.
+    let provider: String?
 }

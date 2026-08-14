@@ -23,6 +23,8 @@ final class EnquiryDetailViewModel: ObservableObject {
     @Published private(set) var isRewritingAI = false
     @Published private(set) var isSuggestingQuote = false
     @Published private(set) var hasRewrittenAI = false
+    /// Provider picked in the AI Rewrite menu for the next rewrite call.
+    @Published var rewriteProvider: RewriteProvider = .deepseek
     /// Per-feature AI readiness. `nil` while loading/unknown — gating stays off
     /// until we have a definitive answer (the backend still fails safely).
     @Published private(set) var aiReadiness: AiReadiness?
@@ -313,16 +315,19 @@ final class EnquiryDetailViewModel: ObservableObject {
         isGeneratingAI = false
     }
 
-    /// Rewrite the current reply text using AI
-    func rewriteResponse() async {
+    /// Rewrite the current reply text using AI.
+    /// - Parameter provider: Overrides `rewriteProvider` for this call and
+    ///   remembers the choice for next time (used by the picker menu).
+    func rewriteResponse(provider: RewriteProvider? = nil) async {
         guard !isRewritingAI else { return }
         guard !replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
 
+        if let provider { rewriteProvider = provider }
         isRewritingAI = true
         error = nil
 
         do {
-            let request = AIRewriteRequest(text: replyText, locationId: ticket?.locationId)
+            let request = AIRewriteRequest(text: replyText, locationId: ticket?.locationId, provider: rewriteProvider.rawValue)
             let start: AIJobStart = try await APIClient.shared.request(
                 .ticketRewriteResponse(id: ticketId), body: request
             )
