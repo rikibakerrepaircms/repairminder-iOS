@@ -36,9 +36,13 @@ struct PortalStageTests {
         #expect(e.deviceIsWithUs == false)
     }
 
-    @Test("the card stands down once we have the device")
+    @Test("the card stands down once we have the device and the ticket agrees")
     func hidesAfterArrival() throws {
-        let e = try enquiry(deviceWithUs: true, ticketType: "lead")
+        // The fourth corner of the matrix: both signals say the device is here. It used
+        // to duplicate arrivalIsNotFiling exactly, which is why removing the old
+        // implementation turned four tests red instead of the two that were really
+        // distinguishing anything.
+        let e = try enquiry(deviceWithUs: true, ticketType: "order")
         #expect(e.deviceIsWithUs == true)
     }
 
@@ -51,6 +55,9 @@ struct PortalStageTests {
 
     @Test("an unconverted ticket whose device HAS arrived stands the card down")
     func arrivalIsNotFiling() throws {
+        // The mirror of filingIsNotArrival: the parcel is on the bench and nobody has
+        // pressed Convert yet. Reading ticket_type here would keep telling them to post
+        // a device we are already holding.
         let e = try enquiry(deviceWithUs: true, ticketType: "lead")
         #expect(e.deviceIsWithUs == true)
     }

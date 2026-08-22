@@ -90,4 +90,40 @@ struct PortalStageDecodeTests {
         let order = try decoder.decode(CustomerOrderDetail.self, from: Data(json.utf8))
         #expect(order.sellDeclaration?.condition == "Good")
     }
+
+    @Test("an order with no declaration decodes, and claims nothing")
+    func orderToleratesAbsentSellDeclaration() throws {
+        // fulfilment's absence was covered; this one's was not. It matters more, because
+        // SellDeclaration is a nested object rather than a String - a decodeIfPresent
+        // that became a plain decode would throw on EVERY repair order, which carries no
+        // declaration at all, and take the whole order page down on iPhone, iPad and Mac.
+        let order = try decoder.decode(
+            CustomerOrderDetail.self, from: Data(orderJSON(fulfilment: nil).utf8))
+        #expect(order.sellDeclaration == nil)
+    }
+
+    @Test("an explicit null declaration decodes to nil rather than throwing")
+    func orderToleratesNullSellDeclaration() throws {
+        // The worker emits `sell_declaration: null` - readSellDeclaration(row) ?? null -
+        // rather than omitting the key, so the null case is the one production actually
+        // sends for every non-sell order.
+        let json = """
+        {
+          "id": "o1",
+          "ticket_number": 100002606,
+          "status": "in_progress",
+          "fulfilment": null,
+          "sell_declaration": null,
+          "devices": [],
+          "items": [],
+          "totals": {
+            "subtotal": 0, "vat_total": 0, "grand_total": 0
+          },
+          "messages": []
+        }
+        """
+        let order = try decoder.decode(CustomerOrderDetail.self, from: Data(json.utf8))
+        #expect(order.sellDeclaration == nil)
+        #expect(order.fulfilment == nil)
+    }
 }
