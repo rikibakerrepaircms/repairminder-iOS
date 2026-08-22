@@ -29,6 +29,13 @@ struct DeviceEntryFormView: View {
     /// re-billing the same device: the blacklist service is $0.10 a call, so it
     /// must never fire twice for one identifier, nor on every keystroke.
     @State private var lastCheckedIdentifier: String?
+    /// Identifiers whose check was run and came back as an error rather than a
+    /// result. SICKW blocks Cloudflare egress, so the lookup fails for reasons
+    /// that have nothing to do with the handset on the counter - and a provider
+    /// we cannot reach must not be able to stop the shop booking a purchase in.
+    /// The attempt satisfies the gate; the orange notice says nothing was
+    /// confirmed.
+    @State private var failedCheckIdentifiers: Set<String> = []
     /// Seconds left before the Find My re-check can be pressed again. A lock only
     /// changes when the customer actually signs out, which is not instant, and
     /// every press is a real charge - so the button goes quiet for 30s and counts
@@ -330,9 +337,11 @@ struct DeviceEntryFormView: View {
         // buyback at all. Warning and carrying on is not a gate.
         if lookupBlocked { return false }
         // And a buyback device may not be added without the check having
-        // actually run against the identifier now in the form. Otherwise the
-        // gate is optional, which is the same as not having one.
-        if device.workflowType == .buyback && lastCheckedIdentifier != lookupIdentifier {
+        // actually been RUN against the identifier now in the form. Otherwise
+        // the gate is optional, which is the same as not having one. A check
+        // that ran and errored counts as run: refusing the purchase because the
+        // provider is unreachable just stops the shop trading.
+        if device.workflowType == .buyback && !checkRunForCurrentIdentifier {
             return false
         }
         return hasDisplayName && hasBrandOrCustomBrand
@@ -413,18 +422,11 @@ struct DeviceEntryFormView: View {
             }
             .buttonStyle(.plain)
             .disabled(isLookingUp || lookupIdentifier.isEmpty)
-            // Buying: run the check as soon as a complete IMEI or serial is in,
-            // rather than waiting for someone to remember the button. Debounced
-            // and keyed on the identifier so a $0.10 blacklist call cannot fire
-            // per keystroke or twice for the same device.
-            .task(id: autoCheckKey) {
-                guard device.workflowType == .buyback else { return }
-                guard identifierLooksComplete else { return }
-                guard lookupIdentifier != lastCheckedIdentifier else { return }
-                try? await Task.sleep(nanoseconds: 700_000_000)
-                guard !Task.isCancelled else { return }
-                await runLookup()
-            }
+            // The check is deliberately manual. It used to fire itself once a
+            // complete identifier was typed, which meant a provider outage
+            // produced an error nobody asked for, on a form nobody had finished
+            // filling in. Pressing the button is one action, and it is the
+            // operator's.
 
             // Red, not orange: this is a confirmed reason to stop, and it now
             // sits beside an orange "could not confirm" box. Two orange boxes
@@ -509,32 +511,55 @@ struct DeviceEntryFormView: View {
                 }
             }
 
-            if let lookupError {
-                Text(lookupError)
-                    .font(.caption)
-                    .foregroundStyle(.red)
+            // Orange, not red: a provider we could not reach is the same class
+            // of answer as a check that came back blank - unconfirmed, not
+            // proven bad. Red is reserved above for "this device is stolen".
+            if let visibleLookupError {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text(visibleLookupError)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.orange.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
 
             // A disabled Add button with no explanation reads as a broken app.
             // Say what is missing.
             if device.workflowType == .buyback,
-               lastCheckedIdentifier != lookupIdentifier,
-               !isLookingUp {
+               !checkRunForCurrentIdentifier,
+               !isLookingUp,
+               visibleLookupError == nil {
                 Text(lookupIdentifier.isEmpty
-                     ? "Enter the IMEI or serial. We check Find My and the lost/stolen register before buying."
+                     ? "Enter the IMEI or serial, then run the check. We check Find My and the lost/stolen register before buying."
                      : (identifierLooksComplete
-                        ? "Checking Find My and the lost/stolen register..."
-                        : "Keep going - we check Find My and the lost/stolen register once the full IMEI or serial is in."))
+                        ? "Run the check to look at Find My and the lost/stolen register before adding this one."
+                        : "Keep going - run the check once the full IMEI or serial is in."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
     }
 
-    /// Changes only when the thing we would look up changes, so the debounce
-    /// task restarts on a real edit and not on unrelated form state.
-    private var autoCheckKey: String {
-        "\(device.workflowType == .buyback)|\(lookupIdentifier)"
+    /// Only show a failed check while it still describes what is in the form.
+    /// Once the operator edits the identifier the old error is about a different
+    /// device, and leaving it up would hide the prompt to check this one.
+    private var visibleLookupError: String? {
+        guard failedCheckIdentifiers.contains(lookupIdentifier) else { return nil }
+        return lookupError
+    }
+
+    /// Has the check actually been run against what is in the form now - either
+    /// coming back with a result, or coming back as a provider we could not
+    /// reach? Both count. Only "never asked" leaves the buyback gate shut.
+    private var checkRunForCurrentIdentifier: Bool {
+        guard !lookupIdentifier.isEmpty else { return false }
+        return lastCheckedIdentifier == lookupIdentifier
+            || failedCheckIdentifiers.contains(lookupIdentifier)
     }
 
     /// Is this worth spending a lookup on yet? A part-typed IMEI is not.
@@ -647,7 +672,14 @@ struct DeviceEntryFormView: View {
                 lookupUnknowns = unknown
             }
         } catch {
-            lookupError = "Could not check that IMEI or serial. Enter the details by hand."
+            // The provider is unreachable often enough (SICKW blocks Cloudflare)
+            // that treating it as a hard stop would just stop the shop trading.
+            // Record the attempt so the gate opens, and say plainly that nothing
+            // was confirmed.
+            lookupError = forBuyback
+                ? "Could not reach the device check. Nothing has been confirmed about this device, so check Find My and the lost or stolen status by hand before paying. You can still book it in."
+                : "Could not check that IMEI or serial. Enter the details by hand."
+            failedCheckIdentifiers.insert(lookupIdentifier)
         }
     }
 
