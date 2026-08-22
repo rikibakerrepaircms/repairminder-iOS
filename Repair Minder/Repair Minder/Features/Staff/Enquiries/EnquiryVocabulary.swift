@@ -36,13 +36,27 @@ struct EnquiryKindBadge {
     }
 }
 
-/// How the device gets to us. A closed set of three: 'visit' (they come in),
-/// 'collection' (POSTAL, we send a label) and 'doorstep' (we drive to them).
+/// How the device gets to us. A closed set of three, and the enum values are
+/// actively misleading, so never show one:
 ///
-/// "We collect" means OUR van, within the local radius, with a slot to agree.
-/// The postal route also ends with someone at the door, but that is Royal
-/// Mail's collection, booked by the customer with the tracking number. The
-/// labels here keep them apart and must not be blurred.
+///   'visit'      -> they walk into the shop
+///   'collection' -> POSTAL. They post it to us, on a label they print themselves
+///   'doorstep'   -> we drive to them
+///
+/// The labels were "Walk-in" / "Postal" / "Doorstep" until 2026-08-22. "Postal"
+/// said neither who posts it nor who makes the label, and the storefront's staff
+/// note called the same route "Free collection" - so a sell order where the seller
+/// had asked for a label was triaged as a van going out. Each label now names the
+/// physical act, and they must stay that way.
+///
+/// WE DO NOT POST A LABEL OUT. Approving one mints it, publishes it to the
+/// customer's own portal and emails them a LINK; they download and print it. The
+/// thing we really do post is packaging - a jiffy bag with the label already on -
+/// which is a separate request. Never blur the two.
+///
+/// The Swift twin of `src/components/tickets/deviceRoute.ts` on the web, which the
+/// enquiries list, the ticket header and the label panel all render from. Change
+/// one, change both.
 struct EnquiryRouteChip {
     let label: String
     let hint: String
@@ -63,17 +77,17 @@ struct EnquiryRouteChip {
         case "visit":
             return EnquiryRouteChip(
                 label: "Walk-in",
-                hint: "The \(who) is bringing the device into the shop",
+                hint: "The \(who) is bringing the device into the shop. Nothing to post and no label to issue.",
                 color: .purple, isOutlined: isRepair)
         case "collection":
             return EnquiryRouteChip(
-                label: "Postal",
-                hint: "The \(who) asked us to send a pre-paid postage label",
+                label: "Post to us",
+                hint: "The \(who) is posting the device to us. We issue a free pre-paid Royal Mail label, which they download and print from their own portal - we do not post a label out to them.",
                 color: .cyan, isOutlined: isRepair)
         case "doorstep":
             return EnquiryRouteChip(
-                label: "Doorstep",
-                hint: "We are collecting the device from the \(who)",
+                label: "We collect",
+                hint: "We are driving out to the \(who) to collect the device. Nothing is posted either way.",
                 color: .teal, isOutlined: isRepair)
         default:
             return nil

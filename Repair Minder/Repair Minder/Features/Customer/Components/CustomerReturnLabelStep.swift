@@ -137,7 +137,12 @@ struct CustomerReturnLabelStep: View {
     /// the customer has nothing left to do but wait.
     private var pendingView: some View {
         step(icon: "paperplane", title: "Your postage label") {
-            Text("We're reviewing your order and will email you your free pre-paid postage label as soon as it's ready. There is nothing you need to do in the meantime.")
+            // The label is PUBLISHED HERE and they print it - it is not put in the
+            // post, and the email we send is a link to this screen rather than the
+            // label itself. Telling someone a label is being sent leaves them
+            // waiting for an envelope that was never coming. Word for word with
+            // LabelStep.tsx on the web.
+            Text("We're reviewing your order. Your free pre-paid label will appear here for you to print as soon as it's ready, and we'll email you the moment it does. There is nothing you need to do in the meantime.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -285,11 +290,15 @@ struct CustomerReturnLabelStep: View {
 
     /// How the pre-label prompt reads depends on the route they picked.
     ///
-    /// A postal customer's label is minted when the order is placed, so they land
-    /// on the "your postage label is ready" state above and never read a word of
-    /// this. They only get here if the mint failed - Royal Mail down, or an
-    /// address we could not use - so the `collection` wording below says that
-    /// plainly instead of presenting a button press as the normal route.
+    /// A postal customer's label is STAGED when the order is placed, not minted:
+    /// the storefront records a pending `label_requests` row and a human approves
+    /// or rejects it (see storefront_handlers.js, which stopped minting on
+    /// submission after a bot order got a real billable label). So a postal
+    /// customer normally lands on `pendingView` and then on "your postage label is
+    /// ready", and never reads a word of this. They only get here if the mint
+    /// failed after approval - Royal Mail down, or an address we could not use -
+    /// so the `collection` wording below says that plainly instead of presenting a
+    /// button press as the normal route.
     ///
     /// For `visit` and `doorstep` nothing is minted up front and the label IS a
     /// genuine alternative, so it is offered as one - asking "Posting it to us?"

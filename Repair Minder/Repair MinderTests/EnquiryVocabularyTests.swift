@@ -37,10 +37,33 @@ struct EnquiryVocabularyTests {
         }
     }
 
+    /// Renamed 2026-08-22 to match the web's deviceRoute.ts. "Postal" did not say
+    /// who posts it or who makes the label, and "Doorstep" did not say who travels -
+    /// staff reading a postal sell order alongside the storefront note's old "Free
+    /// collection" line concluded a van was going out. Each label now names the
+    /// physical act.
     @Test func namesTheThreeRoutesAsTheWebDoes() {
         #expect(EnquiryRouteChip.for(kind: "sell", fulfilment: "visit")?.label == "Walk-in")
-        #expect(EnquiryRouteChip.for(kind: "sell", fulfilment: "collection")?.label == "Postal")
-        #expect(EnquiryRouteChip.for(kind: "sell", fulfilment: "doorstep")?.label == "Doorstep")
+        #expect(EnquiryRouteChip.for(kind: "sell", fulfilment: "collection")?.label == "Post to us")
+        #expect(EnquiryRouteChip.for(kind: "sell", fulfilment: "doorstep")?.label == "We collect")
+    }
+
+    /// WE DO NOT POST A LABEL OUT. Approval publishes it to the customer's own portal
+    /// and emails them a link; they download and print it. The thing we really do post
+    /// is packaging, which is a separate request. Pinned on the web by
+    /// deviceRoute.test.ts and by the storefront's labelInstructions.test.ts.
+    @Test func neverClaimsWePostALabelOut() {
+        let hint = EnquiryRouteChip.for(kind: "sell", fulfilment: "collection")?.hint ?? ""
+        #expect(hint.lowercased().contains("download"))
+        #expect(hint.lowercased().contains("print"))
+        #expect(!hint.lowercased().contains("asked us to send"))
+    }
+
+    /// The doorstep hint is the only one that may say we travel, and the postal hint
+    /// must never use the word - that overlap is the whole bug.
+    @Test func onlyTheDoorstepRouteSaysWeCollect() {
+        let postal = EnquiryRouteChip.for(kind: "sell", fulfilment: "collection")?.hint ?? ""
+        #expect(!postal.lowercased().contains("collect"))
     }
 
     /// Repair is outlined and sell is filled, so a postal buyback and a postal
