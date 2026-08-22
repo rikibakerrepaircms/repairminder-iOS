@@ -82,6 +82,21 @@ struct CustomerOrderDetailView: View {
     private func orderContent(_ order: CustomerOrderDetail) -> some View {
         ScrollView {
             LazyVStack(spacing: 16) {
+                // ACCEPTED, AND WE ARE STILL WAITING ON THEIR ID.
+                //
+                // ABOVE the header, which is the only thing on this screen that outranks
+                // the offer - and only in that window. Before acceptance the offer is
+                // what the screen is for. Riki: "when the offer is accepted but no id is
+                // provided the uploading of id should be the most prominent cta".
+                //
+                // `sellerIdOutstanding` already means "unsettled buyback device, no
+                // passing check, nothing uploaded", so it goes false the moment anything
+                // arrives. Acceptance is the extra condition, because before they accept
+                // there may be no purchase needing ID at all.
+                if order.sellerIdOutstanding == true, offerAccepted(order) {
+                    CustomerIdOutstandingBanner(viewModel: viewModel)
+                }
+
                 // Order Header
                 orderHeader(order)
 
@@ -698,6 +713,21 @@ struct CustomerOrderDetailView: View {
 
     /// True when the order is freshly-booked mail-in and we should prompt the
     /// customer to ship the device. Mirrors the web's gating exactly.
+    /// Has the seller said yes to the offer on any buyback device?
+    ///
+    /// Two signals, not one: `authorizationStatus` is what the accept flow writes, and
+    /// the device status moves past awaiting_authorisation on the same action. Staff
+    /// also advance devices on a customer's behalf at the counter, which either signal
+    /// alone would miss. Twin of `offerAccepted` in CustomerOrderDetailPage.tsx.
+    private func offerAccepted(_ order: CustomerOrderDetail) -> Bool {
+        let settledOrPaid = ["ready_to_pay", "payment_made", "added_to_buyback"]
+        return order.devices.contains { device in
+            guard device.workflowType == .buyback else { return false }
+            return device.authorizationStatus == "approved"
+                || settledOrPaid.contains(device.status)
+        }
+    }
+
     private func shouldShowMailInBanner(_ order: CustomerOrderDetail) -> Bool {
         guard order.status == "awaiting_device" else { return false }
         guard order.devices.isEmpty else { return false }

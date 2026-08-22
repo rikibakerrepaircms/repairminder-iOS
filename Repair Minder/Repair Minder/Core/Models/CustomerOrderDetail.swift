@@ -31,12 +31,22 @@ struct CustomerOrderDetail: Codable, Identifiable, Sendable {
     let messages: [CustomerMessage]
     let company: CustomerCompanyInfo?
 
+    /// True while we are still waiting on the seller's identity documents: an
+    /// unsettled buyback device, no passing check recorded, and nothing uploaded yet.
+    ///
+    /// ONE boolean by design. Whether staff recorded a check, what they saw and
+    /// whether it passed are internal findings - the seller only needs to know
+    /// whether we are waiting on them. Absent on every non-buyback order, and on any
+    /// response from a Worker predating it, so it decodes as nil rather than failing.
+    let sellerIdOutstanding: Bool?
+
     // Note: Using automatic snake_case conversion via decoder.keyDecodingStrategy
     enum CodingKeys: String, CodingKey {
         case id, ticketNumber, status, intakeMethod, createdAt, collectedAt
         case quoteSentAt, quoteApprovedAt, quoteApprovedMethod
         case rejectedAt, preAuthorization, reviewLinks
         case devices, items, totals, messages, company
+        case sellerIdOutstanding
     }
 
     /// Custom decoding to handle flexible date formats from API
@@ -55,6 +65,7 @@ struct CustomerOrderDetail: Codable, Identifiable, Sendable {
         totals = try container.decode(CustomerOrderTotals.self, forKey: .totals)
         messages = try container.decodeIfPresent([CustomerMessage].self, forKey: .messages) ?? []
         company = try container.decodeIfPresent(CustomerCompanyInfo.self, forKey: .company)
+        sellerIdOutstanding = try container.decodeIfPresent(Bool.self, forKey: .sellerIdOutstanding)
 
         // Decode dates with flexible format handling
         createdAt = Self.decodeDate(from: container, forKey: .createdAt) ?? Date()
@@ -370,4 +381,15 @@ struct CustomerCompanyInfo: Codable, Sendable {
         let parts = [addressLine1, addressLine2, city, postcode].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
+}
+
+/// `POST /api/customer/orders/:id/id-document`
+///
+/// Deliberately thin. The endpoint returns the filename and the kind the seller
+/// labelled it with, and nothing that identifies where the file was stored - no R2
+/// key, no attachment id - because a customer session must never be able to reach
+/// the document again. See worker/src/customer_id_upload.js.
+struct IdDocumentUploadResult: Decodable, Sendable {
+    let filename: String?
+    let documentKind: String?
 }

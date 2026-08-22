@@ -185,6 +185,77 @@ final class CustomerOrderDetailViewModel: ObservableObject {
 
     // MARK: - Private API Methods
 
+    // MARK: - Seller ID document
+
+    /// Set while an identity document is being sent, so the banner can show progress.
+    @Published var uploadingIdDocument = false
+    /// Non-nil after a failed upload. Cleared when another attempt starts.
+    @Published var idDocumentError: String?
+    /// Set once something has reached us in this session, so the banner can confirm it
+    /// before the order refetch comes back and hides the banner entirely.
+    @Published var idDocumentSent = false
+
+    /// POST /api/customer/orders/:id/id-document
+    ///
+    /// Identity documents go through the portal endpoint, never as an email
+    /// attachment: it lands in R2 behind a staff-only route rather than sitting on mail
+    /// servers. The Worker stores it against a ticket NOTE, which every customer
+    /// endpoint filters out, so the seller cannot retrieve it afterwards - not even
+    /// from this app.
+    ///
+    /// Written with URLSession directly rather than through APIClient, matching every
+    /// other call in this view model: the customer session is a different token from
+    /// the staff one and APIClient's tokenProvider carries the staff token.
+    func uploadIdDocument(data fileData: Data, fileName: String, mimeType: String) async {
+        guard let token = customerAuth.accessToken else {
+            idDocumentError = "Please open your order from the link we emailed you, then try again."
+            return
+        }
+
+        uploadingIdDocument = true
+        idDocumentError = nil
+        defer { uploadingIdDocument = false }
+
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var body = Data()
+        func append(_ text: String) { body.append(Data(text.utf8)) }
+
+        append("--\(boundary)\r\n")
+        append("Content-Disposition: form-data; name=\"document_kind\"\r\n\r\n")
+        append("\(fileName)\r\n")
+        append("--\(boundary)\r\n")
+        append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n")
+        append("Content-Type: \(mimeType)\r\n\r\n")
+        body.append(fileData)
+        append("\r\n--\(boundary)--\r\n")
+
+        let url = URL(string: "https://api.repairminder.com/api/customer/orders/\(orderId)/id-document")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = body
+
+        do {
+            let (responseData, response) = try await URLSession.shared.data(for: request)
+            let decoded = try? JSONDecoder().decode(APIResponse<IdDocumentUploadResult>.self, from: responseData)
+            let ok = (response as? HTTPURLResponse)?.statusCode == 200 && (decoded?.success ?? false)
+
+            if ok {
+                idDocumentSent = true
+                // Refetch: the Worker flips seller_id_outstanding to false once anything
+                // has arrived, which is what stands the banner down.
+                await loadOrder()
+            } else {
+                // The Worker's own wording where it gave one - it explains the 5MB cap
+                // and the accepted types far better than a generic failure would.
+                idDocumentError = decoded?.error ?? "That did not upload. Please try again."
+            }
+        } catch {
+            idDocumentError = "That did not upload. Please check your connection and try again."
+        }
+    }
+
     private func fetchOrderDetail() async throws -> CustomerOrderDetail {
         guard let token = customerAuth.accessToken else {
             throw APIError.unauthorized
