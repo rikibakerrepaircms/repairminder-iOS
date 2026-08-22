@@ -88,16 +88,18 @@ struct CustomerShopVisitCard: View {
         let status = ShopHours.status(location.openingHours, now: now)
         let today = ShopHours.today(location.openingHours, now: now)
 
+        let todayKey = ShopHours.todayKey(now)
+
         VStack(alignment: .leading, spacing: 10) {
-            // Title left, state chip right - laid out like CustomerCollectionSlotCard's
-            // header. That card puts "Waiting on you" there because an offered window
-            // genuinely is waiting on a tap. Nothing on a walk-in is waiting on a tap,
-            // so putting that chip here would invent a pending action; the open/closed
-            // state is the thing worth a glance instead.
-            HStack {
+            // CENTRED, title over chip rather than title-left/chip-right.
+            //
+            // The address is the payload of this card - it is what someone copies onto
+            // a parcel or into a satnav - and a left-aligned line of small text under a
+            // header bar reads as metadata. Centring the block makes the one thing you
+            // came for the thing in the middle of the card.
+            VStack(spacing: 8) {
                 Label("Where we are", systemImage: "storefront")
                     .font(.headline)
-                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let status {
                     Text(status.status)
@@ -114,11 +116,26 @@ struct CustomerShopVisitCard: View {
                         .foregroundStyle(status.state == .open ? Color.green : Color.secondary)
                 }
             }
+            .frame(maxWidth: .infinity)
 
+            // The shop name on its own line, not glued to the front of the address
+            // with a comma. "mendmyi, 3 Queen Street, Haverhill, CB9 9DZ" is four
+            // comma-separated fragments where only three are the address, which is
+            // exactly the thing that gets mis-copied onto a parcel.
             if !location.oneLineAddress.isEmpty {
-                Text(location.name.map { "\($0), \(location.oneLineAddress)" } ?? location.oneLineAddress)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                VStack(spacing: 2) {
+                    if let name = location.name {
+                        Text(name.uppercased())
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(location.oneLineAddress)
+                        .font(.title3.weight(.semibold))
+                        .multilineTextAlignment(.center)
+                        .textSelection(.enabled)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 4)
             }
 
             // The whole reason this card exists. "Closed today" on its own is nearly
@@ -127,51 +144,72 @@ struct CustomerShopVisitCard: View {
             // and this panel carries the countdown, rather than both saying the same
             // thing: each message stands on its own anyway.
             if let status {
-                Text(status.message)
-                    .font(.headline)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .padding(.horizontal, 12)
-                    .background(
-                        status.state == .open
-                            ? Color.green.opacity(0.10)
-                            : Color.secondary.opacity(0.10),
-                        in: RoundedRectangle(cornerRadius: 12)
-                    )
+                VStack(spacing: 4) {
+                    Text(status.message)
+                        .font(.headline)
+                        .multilineTextAlignment(.center)
+
+                    // Today's actual times INSIDE the countdown panel rather than as a
+                    // stray line under it. The two are one fact - "closing in 12
+                    // minutes" and "today 10:00 to 13:00" answer the same question -
+                    // and splitting them left the times looking like the start of the
+                    // week list below. Dropped on a day we are shut: the line above has
+                    // already said so and said when we are back.
+                    if let today {
+                        Text("Today \(today.open) to \(today.close)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .padding(.horizontal, 12)
+                .background(
+                    status.state == .open
+                        ? Color.green.opacity(0.10)
+                        : Color.secondary.opacity(0.10),
+                    in: RoundedRectangle(cornerRadius: 12)
+                )
             }
 
-            // Today's own row, so the closing time itself is on screen and not only
-            // as a countdown. Dropped on a day we are shut - the panel above has
-            // already said so, and said when we are back.
-            if let today {
-                Text("Today \(today.open) to \(today.close)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
+            // ALWAYS OPEN, never a disclosure, and TODAY IS MARKED.
+            //
+            // "Are you open when I can get there?" is the question this card exists to
+            // answer, and it was one tap away behind a summary that gave no hint the
+            // answer was underneath it. Seven short rows cost less height than the
+            // panel above them. Marking the shop's own day turns a table you have to
+            // read into one you can glance at. Matches ShopVisitCard.tsx.
             if let hours = location.openingHours, !hours.isEmpty {
-                DisclosureGroup("All opening hours") {
-                    VStack(alignment: .leading, spacing: 2) {
-                        ForEach(ShopHours.weekOrder, id: \.self) { day in
+                VStack(spacing: 6) {
+                    Text("All opening hours")
+                        .font(.subheadline.weight(.medium))
+
+                    VStack(spacing: 0) {
+                        ForEach(Array(ShopHours.weekOrder.enumerated()), id: \.element) { index, day in
+                            let isToday = day == todayKey
+                            if index > 0 { Divider() }
                             HStack {
                                 Text(ShopHours.dayLabels[day] ?? day)
-                                    .fontWeight(.medium)
-                                    .frame(width: 44, alignment: .leading)
-                                if let h = hours[day] ?? nil {
-                                    Text("\(h.open) - \(h.close)")
-                                } else {
-                                    Text("Closed")
-                                }
                                 Spacer()
+                                Text((hours[day] ?? nil).map { "\($0.open) - \($0.close)" } ?? "Closed")
+                                    .monospacedDigit()
                             }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(.subheadline)
+                            .fontWeight(isToday ? .semibold : .regular)
+                            .foregroundStyle(isToday ? Color.primary : Color.secondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(isToday ? Color.accentColor.opacity(0.10) : Color.clear)
                         }
                     }
-                    .padding(.top, 4)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .frame(maxWidth: 320)
                 }
-                .font(.subheadline)
+                .frame(maxWidth: .infinity)
             }
 
             // BOTH ways in, always, off the ONE address above.
@@ -364,6 +402,25 @@ enum ShopHours {
     /// this in Sydney is already into tomorrow, and showing them Tuesday's hours
     /// while Haverhill is still on Monday afternoon is the same class of mistake the
     /// status panel exists to avoid.
+    /// WHICH day to mark in the seven-row list, as a key into `weekOrder`.
+    ///
+    /// Distinct from `today(_:now:)`, which returns the shop's HOURS and is nil on a
+    /// day we are shut. A closed day still gets a marked row - "not today" is the
+    /// answer the reader came for - so this must keep naming a day when that one
+    /// returns nil.
+    ///
+    /// The SHOP's day. A seller reading this in Sydney is already into tomorrow, and
+    /// marking Tuesday while Haverhill is still on Monday afternoon is the same class
+    /// of mistake the status panel exists to avoid.
+    static func todayKey(
+        _ now: Date,
+        timeZoneIdentifier identifier: String = timeZoneIdentifier
+    ) -> String? {
+        guard let clock = clock(now, timeZoneIdentifier: identifier),
+              clock.day >= 0, clock.day < weekdayKeys.count else { return nil }
+        return weekdayKeys[clock.day]
+    }
+
     static func today(
         _ hours: [String: CustomerEnquiryDayHours?]?,
         now: Date,
