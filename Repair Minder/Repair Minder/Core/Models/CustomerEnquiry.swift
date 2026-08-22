@@ -108,10 +108,15 @@ struct CustomerEnquiryDetail: Decodable, Sendable {
     let company: CustomerEnquiryCompany?
     /// Nil on every enquiry with no doorstep collection in play, which is most.
     let collectionSlot: CollectionSlot?
+    /// What the seller told us at order time - grade, quoted figure, price hold and
+    /// the ownership/condition attestations. Nil on every kind but 'sell' and on
+    /// every ticket predating migration 0504; the card renders nothing then.
+    let sellDeclaration: SellDeclaration?
 
     enum CodingKeys: String, CodingKey {
         case ticketNumber, subject, status, ticketType, enquiryKind, fulfilment, isUnlistedItem, createdAt, messages, company
         case collectionSlot
+        case sellDeclaration
     }
 
     init(from decoder: Decoder) throws {
@@ -130,6 +135,7 @@ struct CustomerEnquiryDetail: Decodable, Sendable {
         messages = try c.decodeIfPresent([CustomerMessage].self, forKey: .messages) ?? []
         company = try c.decodeIfPresent(CustomerEnquiryCompany.self, forKey: .company)
         collectionSlot = try c.decodeIfPresent(CollectionSlot.self, forKey: .collectionSlot)
+        sellDeclaration = try c.decodeIfPresent(SellDeclaration.self, forKey: .sellDeclaration)
     }
 
     var isSell: Bool { enquiryKind == CustomerEnquiryKind.sell }

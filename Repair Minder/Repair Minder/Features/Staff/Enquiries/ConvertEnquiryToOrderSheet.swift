@@ -135,6 +135,7 @@ struct ConvertEnquiryToOrderSheet: View {
             enquiryKind: "sell",
             fulfilment: "collection",
             collectionSlot: nil,
+            sellDeclaration: nil,
             buybackLabels: nil
         ),
         onComplete: {}

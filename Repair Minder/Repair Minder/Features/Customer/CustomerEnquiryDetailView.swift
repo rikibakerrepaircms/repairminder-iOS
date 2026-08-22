@@ -95,6 +95,14 @@ struct CustomerEnquiryDetailView: View {
                     )
                 }
 
+                // Their own answers, ABOVE the next-steps card: the useful order is
+                // "check what you told us", then "here is what happens". Renders
+                // nothing when the ticket declared nothing, which is every kind but
+                // sell and everything predating migration 0504.
+                if let declaration = enquiry.sellDeclaration {
+                    CustomerSellDeclarationCard(declaration: declaration)
+                }
+
                 if viewModel.showsNextSteps {
                     if enquiry.isUnlistedItem {
                         CustomerUnlistedItemLeadCard()

@@ -40,6 +40,17 @@ struct Ticket: Codable, Identifiable, Sendable, Equatable, Hashable {
     let fulfilment: String?
     /// Nil on every ticket with no doorstep collection in play, which is most.
     let collectionSlot: CollectionSlot?
+    /// What the seller declared at order time. Staff need it as FIELDS, not as the
+    /// paragraph in the storefront note: the not-confirmed list is the bench
+    /// checklist, and a grade sitting next to the seller's own free-text note is what
+    /// makes a contradiction visible. Nil outside a sell order.
+    ///
+    /// NO DEFAULT VALUE. `let x: T? = nil` compiles and keeps the memberwise init
+    /// source-compatible, but Swift then omits the property from the synthesised
+    /// Decodable conformance entirely - so it stays nil forever whatever the API
+    /// sends, silently, with a green build. Pinned by
+    /// SellDeclarationDecodeTests.staffTicketCarriesTheDeclaration.
+    let sellDeclaration: SellDeclaration?
     /// Label state for a device-inbound ticket, so the row can show at a
     /// glance whether a postal ticket actually has its label. Absent on most
     /// tickets - the key is omitted, not null - so every field is optional.

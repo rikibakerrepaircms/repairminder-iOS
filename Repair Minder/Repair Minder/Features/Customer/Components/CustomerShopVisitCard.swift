@@ -50,6 +50,20 @@ struct CustomerShopVisitCard: View {
     /// Quoted at the counter, matching what the confirmation email tells them.
     var ticketNumber: Int?
 
+    @ViewBuilder
+    private func wayIn(title: String, body: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.subheadline.weight(.semibold))
+            Text(body).font(.subheadline).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+        )
+    }
+
     var body: some View {
         if let location, hasSomethingToShow(location) {
             // A minute is the finest unit shown, so a 30s cadence keeps it honest.
@@ -81,7 +95,7 @@ struct CustomerShopVisitCard: View {
             // so putting that chip here would invent a pending action; the open/closed
             // state is the thing worth a glance instead.
             HStack {
-                Label("Visit us", systemImage: "storefront")
+                Label("Where we are", systemImage: "storefront")
                     .font(.headline)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -160,13 +174,31 @@ struct CustomerShopVisitCard: View {
                 .font(.subheadline)
             }
 
-            // The confirmation email tells them to quote this at the counter, so
-            // the app has to carry it too. "Order ID" is the portal's word for the
-            // number; the email still says "reference".
-            if let ticketNumber {
-                Text("Quote order ID \(String(ticketNumber)) at the counter.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+            // BOTH ways in, always, off the ONE address above.
+            //
+            // The card used to offer the counter only. Our own confirmation email
+            // tells a seller "if your device is worth more than the cover on our
+            // label, send it by whichever service you prefer, quoting reference X" -
+            // and the app then gave them nowhere to send it, because the single
+            // address on screen was framed as a walk-in.
+            //
+            // Neither block repeats the address: they sit under the one rendered
+            // above, so there is never a second copy to keep in step. And neither is
+            // sell-specific - a repair customer posting a device in needs exactly the
+            // same two answers. Word for word with ShopVisitCard.tsx.
+            VStack(alignment: .leading, spacing: 10) {
+                wayIn(
+                    title: "Bring it in",
+                    body: ticketNumber.map {
+                        "Come to the address above during opening hours. Quote order ID \(String($0)) at the counter."
+                    } ?? "Come to the address above during opening hours."
+                )
+                wayIn(
+                    title: "Post it to us",
+                    body: ticketNumber.map {
+                        "Send it to the address above by any service you like. Put order ID \(String($0)) on a note inside the parcel so we know whose it is."
+                    } ?? "Send it to the address above by any service you like."
+                )
             }
 
             // Both map apps rather than one platform-guessed button. Apple Maps is

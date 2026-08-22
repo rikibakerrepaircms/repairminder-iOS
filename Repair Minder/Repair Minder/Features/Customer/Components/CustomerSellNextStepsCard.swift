@@ -77,6 +77,9 @@ struct CustomerSellNextStepsCard: View {
             // AFTER arrivalStep, which is the one promising "a confirmed offer" -
             // this is what that sentence leaves out.
             estimateStep
+            // LAST, next to being paid, because that is the moment it bites: we
+            // cannot complete the purchase without it. Shown on every route.
+            idStep
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -144,7 +147,13 @@ struct CustomerSellNextStepsCard: View {
                 // whether we are open before they read an activation-lock warning -
                 // the same slot the doorstep route's own card occupies. This step
                 // keeps only what it is for: what to do when you get here.
-                Text("Come in during our opening hours. You do not need an appointment, and we will test the device while you wait. Please bring photo ID with you, because we record ID on every device we buy.")
+                // The REASON is no longer given here. It is given in full, with the
+                // GOV.UK citation, by idStep below - and that step shows on EVERY
+                // route, where this line only ever reached a walk-in. Proof of
+                // address is now named too: the self-billed purchase invoice HMRC
+                // requires has to carry the seller's ADDRESS, and a passport does
+                // not have one on it. Twin of SellNextStepsCard.tsx.
+                Text("Come in during our opening hours. You do not need an appointment, and we will test the device while you wait. Bring photo ID and a proof of address with you - there is nothing to send us beforehand.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -232,6 +241,47 @@ struct CustomerSellNextStepsCard: View {
     ]
 
     // MARK: - Layout
+
+    // MARK: - Step 6: Name, address and ID
+
+    /// Why we will ask for a name, an address and ID, on EVERY route.
+    ///
+    /// Buyback order 100002862 is why this exists. A walk-in seller was quoted, then
+    /// asked - with no reason attached - to "send over a form of ID so we can complete
+    /// the purchase". They replied "Scam!!!", which was a fair reading: the only ask
+    /// anything had told them to expect was their bank details. The explanation existed
+    /// on mendmyi.com and in the visit branch of `fulfilmentStep`, and they had passed
+    /// through neither.
+    ///
+    /// WHAT WE MAY NOT SAY: no statute requires photo ID. Section 6.2 of the tertiary
+    /// legislation lists the seller's name and address - not identity documents - and a
+    /// seller who follows the link we just handed them will notice. ID is framed here as
+    /// how we verify what the law does require. Never as a requirement in its own right.
+    ///
+    /// Twin of `IdRequirementCard.tsx`, whose companion `idRequirement.ts` is the
+    /// canonical copy and carries the full reasoning. Change one, change both.
+    private var idStep: some View {
+        step(icon: "person.text.rectangle", title: "Have your ID ready") {
+            Text("Before we can pay you we have to record your name and address and check them against photo ID and a proof of address. HMRC requires it on every second-hand purchase a business makes from a private seller, so it applies whichever way your device reaches us.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            // Riki, 2026-08-22: "we are also happy for them to show us in store rather
+            // than sending an electronic copy." A walk-in must not be sent away to
+            // photograph a passport for a counter they are already standing at.
+            Text(fulfilment == CustomerFulfilment.visit
+                 ? "Just bring them with you and show us at the counter - there is nothing to send beforehand. A photocard driving licence showing your current address covers both on its own."
+                 : "Send a photo on your order, or reply to any of our emails with it attached. A phone photo is fine as long as the details are readable. A photocard driving licence showing your current address covers both on its own.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Link(destination: URL(string: "https://www.gov.uk/guidance/vat-tertiary-legislation/margin-schemes")!) {
+                Label("Why we have to: GOV.UK, VAT margin schemes, section 6.2", systemImage: "arrow.up.right.square")
+                    .font(.footnote)
+            }
+            .padding(.top, 2)
+        }
+    }
 
     private func step<Content: View>(
         icon: String,

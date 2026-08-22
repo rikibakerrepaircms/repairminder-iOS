@@ -149,6 +149,16 @@ struct EnquiryDetailView: View {
             // Header card
             ticketHeader(ticket)
 
+            // What the seller declared, ABOVE the thread - because the thing it has
+            // to be read next to is the storefront note IN that thread. On 100002861
+            // the grade and the "I've forgotten my pattern" note were three lines
+            // apart in one paragraph and nobody joined them up.
+            if let declaration = ticket.sellDeclaration {
+                StaffSellDeclarationPanel(declaration: declaration)
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+            }
+
             // Active workflows
             if !viewModel.activeExecutions.isEmpty {
                 workflowSection
