@@ -156,11 +156,20 @@ struct CustomerEnquiryDetail: Decodable, Sendable {
     /// worker/src/storefront_enquiry_kind.js - change one, change both.
     var expectsDevice: Bool { isSell || isRepairOrder }
 
-    /// The device has been booked in. `handleCreateOrder` flips ticket_type to
-    /// 'order' at conversion, so this needs no new field. Once true, the
-    /// next-steps card stands down: it would otherwise keep offering a postage
-    /// label for a parcel that has already reached us.
-    var deviceIsWithUs: Bool { ticketType == "order" }
+    /// Has the device actually reached us?
+    ///
+    /// Was `ticketType == "order"`, which is a staff filing action - someone pressing
+    /// Convert in the dashboard - standing in for a fact about where the device is. The
+    /// two are not the same event and can happen in either order, so a device that had
+    /// arrived still told its owner to send it in, and one booked in early lost its
+    /// postage label while it was still on their table.
+    ///
+    /// `device_with_us` is the server's answer to the real question. When it is absent -
+    /// an older server, or a lookup that failed - this reports false, which keeps the
+    /// getting-to-us cards showing. That is the safe direction: showing the label to
+    /// someone who has already posted is untidy, hiding it from someone who has not
+    /// leaves them unable to send their device.
+    var deviceIsWithUs: Bool { deviceWithUs ?? false }
 
     /// Whether this is an ORDER, and so has an order ID to quote, rather than an
     /// ordinary enquiry - someone who asked us a question has no order. Keyed on
