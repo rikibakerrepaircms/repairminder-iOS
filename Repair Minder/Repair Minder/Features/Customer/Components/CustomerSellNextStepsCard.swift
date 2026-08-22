@@ -74,6 +74,9 @@ struct CustomerSellNextStepsCard: View {
                 CustomerPackagingStep(ticketId: ticketId)
             }
             arrivalStep
+            // AFTER arrivalStep, which is the one promising "a confirmed offer" -
+            // this is what that sentence leaves out.
+            estimateStep
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -182,6 +185,51 @@ struct CustomerSellNextStepsCard: View {
                 .foregroundStyle(.secondary)
         }
     }
+
+    // MARK: - Step 5: The estimate is not the offer
+
+    /// Why the confirmed offer can land under the estimate.
+    ///
+    /// Deliberately BEFORE the device is sent. The same four points already exist on
+    /// the order screen's device card, but a postal seller does not reach that until
+    /// the handset is on our bench - long past the moment they could have checked it
+    /// against the grade they picked, or told us they had picked wrong. Sell order
+    /// 100002861 chose "Brand new - factory sealed, never activated" and then wrote in
+    /// the notes that they were locked out of the phone.
+    ///
+    /// Shown on every route: a walk-in can be told a different figure across the
+    /// counter just as easily as a postal seller can read one in an email.
+    ///
+    /// Word for word with `EstimateStep` in SellNextStepsCard.tsx and with
+    /// /sell-my-phone/how-it-works. Change one, change all three.
+    private var estimateStep: some View {
+        step(icon: "tag", title: "Your quote is an estimate until we test it") {
+            Text("If the device does not match the condition you picked, or it turns out to be locked to an account, the figure can move. Worth a second look before you send it - and if anything is different from what you chose, just tell us on this order and we will re-quote it now rather than after it has travelled.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(Self.estimatePoints, id: \.self) { point in
+                    HStack(alignment: .top, spacing: 8) {
+                        Circle()
+                            .fill(Color.accentColor)
+                            .frame(width: 5, height: 5)
+                            .padding(.top, 7)
+                        Text(point)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    static let estimatePoints = [
+        "The estimate came from a form. The offer comes from the device itself.",
+        "An aftermarket screen, a battery below 90 per cent, or a cheap repair from a year ago all change what the handset is worth to the next owner.",
+        "Grading is fine-grained. A small scratch or dent is sometimes enough to move a device from excellent to good.",
+        "If it changes, the email says what changed and by how much. We would rather hold a price than lose a sale over a few pounds.",
+    ]
 
     // MARK: - Layout
 

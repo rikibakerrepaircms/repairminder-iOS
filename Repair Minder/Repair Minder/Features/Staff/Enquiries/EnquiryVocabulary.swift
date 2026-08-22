@@ -49,6 +49,11 @@ struct EnquiryKindBadge {
 /// had asked for a label was triaged as a van going out. Each label now names the
 /// physical act, and they must stay that way.
 ///
+/// The postal chip says BOTH halves - that it is postal, and that the label is ours.
+/// It read "Post to us" for half a day and was taken to mean "they chose to post it
+/// themselves", i.e. that nothing was owed. The list is where triage happens and a
+/// tooltip does not exist on a touchscreen, so the chip carries both or neither.
+///
 /// WE DO NOT POST A LABEL OUT. Approving one mints it, publishes it to the
 /// customer's own portal and emails them a LINK; they download and print it. The
 /// thing we really do post is packaging - a jiffy bag with the label already on -
@@ -81,7 +86,7 @@ struct EnquiryRouteChip {
                 color: .purple, isOutlined: isRepair)
         case "collection":
             return EnquiryRouteChip(
-                label: "Post to us",
+                label: "Postal - our label",
                 hint: "The \(who) is posting the device to us. We issue a free pre-paid Royal Mail label, which they download and print from their own portal - we do not post a label out to them.",
                 color: .cyan, isOutlined: isRepair)
         case "doorstep":

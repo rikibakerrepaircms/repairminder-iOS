@@ -44,8 +44,15 @@ struct EnquiryVocabularyTests {
     /// physical act.
     @Test func namesTheThreeRoutesAsTheWebDoes() {
         #expect(EnquiryRouteChip.for(kind: "sell", fulfilment: "visit")?.label == "Walk-in")
-        #expect(EnquiryRouteChip.for(kind: "sell", fulfilment: "collection")?.label == "Post to us")
+        #expect(EnquiryRouteChip.for(kind: "sell", fulfilment: "collection")?.label == "Postal - our label")
         #expect(EnquiryRouteChip.for(kind: "sell", fulfilment: "doorstep")?.label == "We collect")
+    }
+
+    /// The chip alone has to say the label is ours - see the type's doc comment.
+    @Test func thePostalChipSaysTheLabelIsOurs() {
+        let label = EnquiryRouteChip.for(kind: "sell", fulfilment: "collection")?.label ?? ""
+        #expect(label.lowercased().contains("label"))
+        #expect(label.lowercased().contains("postal"))
     }
 
     /// WE DO NOT POST A LABEL OUT. Approval publishes it to the customer's own portal
