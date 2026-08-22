@@ -57,7 +57,9 @@ struct CustomerIdOutstandingBanner: View {
                     } else {
                         Image(systemName: "square.and.arrow.up")
                     }
-                    Text(viewModel.uploadingIdDocument ? "Sending..." : "Send us your ID")
+                    // UPLOAD, never "send" - a button called "Send us your ID" invites the email
+                    // attachment this whole route exists to avoid. Matches ID_UPLOAD_TITLE on web.
+                    Text(viewModel.uploadingIdDocument ? "Uploading..." : "Upload your ID")
                         .fontWeight(.semibold)
                 }
                 .frame(maxWidth: .infinity)
