@@ -251,6 +251,11 @@ enum APIEndpoint {
     case sellBuyback(id: String)
     case sellBuybackBulk
     case addDeviceToBuyback(deviceId: String)
+    /// The seller identity check for a buyback purchase. Order-scoped, not
+    /// device-scoped: one seller shows their licence once, however many handsets
+    /// are in the transaction.
+    case buybackIdCheck(orderId: String)
+    case recordBuybackIdCheck(orderId: String)
     // Refurbishment items
     case addRefurbishmentItem(id: String)
     case updateRefurbishmentItem(id: String, itemId: String)
@@ -722,6 +727,8 @@ enum APIEndpoint {
             return "/api/buyback/sell-bulk"
         case .addDeviceToBuyback(let deviceId):
             return "/api/devices/\(deviceId)/add-to-buyback"
+        case .buybackIdCheck(let orderId), .recordBuybackIdCheck(let orderId):
+            return "/api/orders/\(orderId)/id-check"
         case .addRefurbishmentItem(let id):
             return "/api/buyback/\(id)/refurbishment"
         case .updateRefurbishmentItem(let id, let itemId), .deleteRefurbishmentItem(let id, let itemId):
@@ -866,6 +873,7 @@ enum APIEndpoint {
              .devices, .myQueue, .myActiveWork, .orderDevices, .orderDevice, .deviceActions,
              .deviceChecklistTemplates, .deviceQCRequirements,
              .deviceCompletionData, .devicePendingItemsCount, .deviceReport,
+             .buybackIdCheck,
              .deviceImages, .deviceImageFile(_, _, _, _, _),
              .orders, .order, .orderItems, .orderPayments, .orderSignatures, .orderRefunds, .orderDocument,
              .clients, .client, .clientSearch, .clientsExport, .clientGroupsForClient,
@@ -949,7 +957,8 @@ enum APIEndpoint {
         // PUT endpoints
         case .togglePasscodeEnabled, .passcodeTimeout,
              .updatePushPreferences, .updateAsset, .updateProductType,
-             .updateSupplierOrderLine, .updatePurchaseOrder:
+             .updateSupplierOrderLine, .updatePurchaseOrder,
+             .recordBuybackIdCheck:
             return .put
 
         // DELETE endpoints

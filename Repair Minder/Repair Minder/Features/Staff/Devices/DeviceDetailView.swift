@@ -49,6 +49,7 @@ struct DeviceDetailView: View {
 
     // Collect / Despatch / Ready-for-collection / Add-accessory state
     @State private var showingDeviceCollectSheet = false
+    @State private var showingSellerIdCheckSheet = false
     @State private var showingDeviceDespatchSheet = false
     @State private var showingAddAccessorySheet = false
 
@@ -203,6 +204,11 @@ struct DeviceDetailView: View {
         .sheet(isPresented: $showingStaffAuthorizeSheet) {
             StaffAuthorizeSheet { request in
                 await viewModel.staffAuthorize(request)
+            }
+        }
+        .sheet(isPresented: $showingSellerIdCheckSheet) {
+            SellerIdCheckSheet(orderId: viewModel.orderId) {
+                Task { await viewModel.loadDevice() }
             }
         }
         .sheet(isPresented: $showingDeviceCollectSheet) {
@@ -651,6 +657,30 @@ struct DeviceDetailView: View {
                     }
                 }
                 .disabled(viewModel.isUpdating)
+            }
+
+            // Seller ID check — on any buyback device, whatever its stage.
+            //
+            // BEFORE "Add to buyback" in this menu, and available earlier than it,
+            // because the inventory step is now BLOCKED without a passing check
+            // (migration 0505). A staff member who meets the block and has no way to
+            // clear it from the device in their hand is the exact failure the
+            // cross-project sync rule exists to prevent.
+            //
+            // Not gated on paymentMade: the natural moment to look at a licence is when
+            // the seller is standing there, which is long before payout.
+            if device.workflow == .buyback {
+                Button {
+                    showingSellerIdCheckSheet = true
+                } label: {
+                    HStack {
+                        Text("Seller ID check")
+                        Spacer()
+                        Image(systemName: "person.text.rectangle")
+                    }
+                }
+                .disabled(viewModel.isUpdating)
+                .accessibilityIdentifier("seller-id-check-button")
             }
 
             // Add to buyback — only once payment has been made on a buyback device

@@ -43,8 +43,31 @@ final class BuybackService {
     }
 
     /// POST /api/devices/:deviceId/add-to-buyback
+    ///
+    /// Fails with `id_check_required` when the purchase has no PASSING seller
+    /// identity check recorded against it (migration 0505). That is not a
+    /// transient error and retrying will not clear it - record the check first
+    /// via `idCheck`/`recordIdCheck` below.
     func addDeviceToBuyback(deviceId: String) async throws -> AddToBuybackResponse {
         try await api.request(.addDeviceToBuyback(deviceId: deviceId))
+    }
+
+    // MARK: - Seller ID check
+
+    /// GET /api/orders/:orderId/id-check
+    func idCheck(orderId: String) async throws -> BuybackIdCheckResponse {
+        try await api.request(.buybackIdCheck(orderId: orderId))
+    }
+
+    /// PUT /api/orders/:orderId/id-check
+    ///
+    /// An UPSERT: re-recording replaces the finding rather than adding a second
+    /// contradictory check against the same sale.
+    func recordIdCheck(
+        orderId: String,
+        request: RecordBuybackIdCheckRequest
+    ) async throws -> RecordBuybackIdCheckResponse {
+        try await api.request(.recordBuybackIdCheck(orderId: orderId), body: request)
     }
 
     // MARK: - Refurbishment Items
