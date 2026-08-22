@@ -89,12 +89,14 @@ struct CustomerOrderDetailView: View {
                 // what the screen is for. Riki: "when the offer is accepted but no id is
                 // provided the uploading of id should be the most prominent cta".
                 //
-                // `sellerIdOutstanding` already means "unsettled buyback device, no
-                // passing check, nothing uploaded", so it goes false the moment anything
-                // arrives. Acceptance is the extra condition, because before they accept
-                // there may be no purchase needing ID at all.
-                if order.sellerIdOutstanding == true, offerAccepted(order) {
-                    CustomerIdOutstandingBanner(viewModel: viewModel)
+                // A STATUS, not a boolean. Uploading is not confirming: only staff
+                // recording a check opens this gate, so "in_review" still says payment
+                // is waiting - it just says we are the ones holding it up. Any other
+                // value, including one from a newer Worker, renders nothing.
+                if let idStatus = order.sellerIdStatus,
+                   idStatus == "awaiting_customer" || idStatus == "in_review",
+                   offerAccepted(order) {
+                    CustomerIdOutstandingBanner(viewModel: viewModel, status: idStatus)
                 }
 
                 // Order Header

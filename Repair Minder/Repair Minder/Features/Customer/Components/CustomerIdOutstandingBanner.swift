@@ -30,26 +30,42 @@ struct CustomerIdOutstandingBanner: View {
 
     @ObservedObject var viewModel: CustomerOrderDetailViewModel
 
+    /// "awaiting_customer" or "in_review". The caller renders nothing for anything else.
+    let status: String
+
+    private var waitingOnUs: Bool { status == "in_review" }
+
     @State private var pickedItem: PhotosPickerItem?
 
     private let sourceURL = URL(string: "https://www.gov.uk/guidance/vat-tertiary-legislation/margin-schemes")!
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("One thing left: we need to see your ID", systemImage: "person.text.rectangle")
-                .font(.headline)
-                .foregroundStyle(.primary)
+            Label(
+                "Payment is waiting for address confirmation",
+                systemImage: waitingOnUs ? "clock" : "person.text.rectangle"
+            )
+            .font(.headline)
+            .foregroundStyle(.primary)
 
-            Text("Your offer is accepted. We cannot pay you until we have checked your name and address against photo ID - HMRC requires it on every second-hand purchase from a private seller.")
+            Text(waitingOnUs
+                 ? "We have what you uploaded and are checking it against your order. There is nothing more for you to do - we will get your payment moving as soon as it clears."
+                 : "We check the name and address on every purchase against photo ID, because HMRC requires it on second-hand buying from a private seller. Upload yours here if you have not already, or bring it into the shop and we will look at it there.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            Text("Photo or PDF, up to 5MB. Add your proof of address too, unless your ID already shows it.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            if !waitingOnUs {
+                Text("Photo or PDF, up to 5MB. Add your proof of address too, unless your ID already shows it.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
 
+            // Nothing to press while it is with us: a button there would invite a second
+            // upload of a document we already hold, and imply a missed step.
+            //
             // PhotosPicker rather than a document picker: the overwhelming case is a
-            // phone photo of a licence, and it works on iOS, iPad and Mac alike.
+            // phone photo of a driving licence, and it works on iOS, iPad and Mac alike.
+            if !waitingOnUs {
             PhotosPicker(selection: $pickedItem, matching: .images, photoLibrary: .shared()) {
                 HStack(spacing: 8) {
                     if viewModel.uploadingIdDocument {
@@ -70,6 +86,7 @@ struct CustomerIdOutstandingBanner: View {
             }
             .disabled(viewModel.uploadingIdDocument)
             .accessibilityIdentifier("customer-id-upload-button")
+            }
 
             if viewModel.idDocumentSent && !viewModel.uploadingIdDocument {
                 Label("Got it. Add another if you need to.", systemImage: "checkmark.circle")
@@ -83,9 +100,11 @@ struct CustomerIdOutstandingBanner: View {
                     .foregroundStyle(.red)
             }
 
-            Text("Rather show us in person? Bring it into the shop and we keep no copy.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            if !waitingOnUs {
+                Text("Rather show us in person? Bring it into the shop and we keep no copy.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
 
             Link("Why we have to", destination: sourceURL)
                 .font(.footnote)

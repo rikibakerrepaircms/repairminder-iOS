@@ -31,14 +31,20 @@ struct CustomerOrderDetail: Codable, Identifiable, Sendable {
     let messages: [CustomerMessage]
     let company: CustomerCompanyInfo?
 
-    /// True while we are still waiting on the seller's identity documents: an
-    /// unsettled buyback device, no passing check recorded, and nothing uploaded yet.
+    /// Where the address-confirmation gate has got to. A SEPARATE gate from price
+    /// approval: the seller clears that one by accepting, staff clear this one by
+    /// recording a check, and payment needs both open.
     ///
-    /// ONE boolean by design. Whether staff recorded a check, what they saw and
-    /// whether it passed are internal findings - the seller only needs to know
-    /// whether we are waiting on them. Absent on every non-buyback order, and on any
-    /// response from a Worker predating it, so it decodes as nil rather than failing.
-    let sellerIdOutstanding: Bool?
+    /// "awaiting_customer" - nothing uploaded, or staff looked and it did not clear
+    /// "in_review"         - uploaded, staff have not confirmed. Waiting on US.
+    /// "confirmed"         - a passing check exists
+    /// "not_required"      - no unsettled buyback device; every repair order
+    ///
+    /// A plain String rather than an enum: an unrecognised value from a newer Worker
+    /// must render nothing, not crash the order screen. Never carries the finding
+    /// itself - whether a check passed and why is internal. Absent on any response
+    /// from a Worker predating it, so it decodes as nil.
+    let sellerIdStatus: String?
 
     // Note: Using automatic snake_case conversion via decoder.keyDecodingStrategy
     enum CodingKeys: String, CodingKey {
@@ -46,7 +52,7 @@ struct CustomerOrderDetail: Codable, Identifiable, Sendable {
         case quoteSentAt, quoteApprovedAt, quoteApprovedMethod
         case rejectedAt, preAuthorization, reviewLinks
         case devices, items, totals, messages, company
-        case sellerIdOutstanding
+        case sellerIdStatus
     }
 
     /// Custom decoding to handle flexible date formats from API
@@ -65,7 +71,7 @@ struct CustomerOrderDetail: Codable, Identifiable, Sendable {
         totals = try container.decode(CustomerOrderTotals.self, forKey: .totals)
         messages = try container.decodeIfPresent([CustomerMessage].self, forKey: .messages) ?? []
         company = try container.decodeIfPresent(CustomerCompanyInfo.self, forKey: .company)
-        sellerIdOutstanding = try container.decodeIfPresent(Bool.self, forKey: .sellerIdOutstanding)
+        sellerIdStatus = try container.decodeIfPresent(String.self, forKey: .sellerIdStatus)
 
         // Decode dates with flexible format handling
         createdAt = Self.decodeDate(from: container, forKey: .createdAt) ?? Date()
