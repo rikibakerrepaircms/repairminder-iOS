@@ -176,7 +176,7 @@ struct CustomerReturnLabelStep: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                createControls(idleLabel: "Send me a new label", loadingLabel: "Getting your label...")
+                createControls(idleLabel: "Ask for a new label", loadingLabel: "Requesting...")
             }
         }
     }
@@ -310,21 +310,28 @@ struct CustomerReturnLabelStep: View {
     private var labelPrompt: (title: String, body: String) {
         switch fulfilment {
         case CustomerFulfilment.collection:
-            // Was "press the button and we will EMAIL your label", which was wrong
-            // twice over: the label appears here in the portal rather than by
-            // email, and a postal customer is not meant to be pressing anything
-            // at all.
-            return ("Get your postage label",
-                    "Your label is usually ready and waiting here the moment you order. This one did not come through, which is on us - press below and we will get it now. It is free and there is nothing to arrange.")
+            // NOTHING HERE SENDS A LABEL. POST return-label stages a PENDING row in
+            // label_requests and returns 202 with data: null; a human approves it, and
+            // approval is what mints. So "ready the moment you order", "did not come
+            // through" and "we will get it now" all described a mechanism removed by
+            // the bot-order fix. A postal customer normally never reads this at all -
+            // their request is staged when they order, so the pending state renders
+            // instead - and reaches it only when that staging failed.
+            return ("Ask for your postage label",
+                    "We normally request your label the moment you order, and it appears here to print once we have checked the order over. That did not happen here, which is on us - ask for one below and we will sort it. It is free and there is nothing to arrange.")
         case CustomerFulfilment.visit:
             return ("Rather not come in?",
-                    "You do not have to. We can send you a free, pre-paid Royal Mail label instead, so posting it costs you nothing.")
+                    "You do not have to. Ask us for a free, pre-paid Royal Mail label - we check the order over and it appears on this page for you to print. Posting it costs you nothing.")
         case CustomerFulfilment.doorstep:
+            // NOT "and cancel the collection". Nothing in the label path touches
+            // collection_slot_* - grep collection_slot worker/src/buyback_labels.js
+            // returns nothing - so someone who believed that cancels nothing and waits
+            // in for a van that is still coming.
             return ("Rather post it instead?",
-                    "If waiting in for us does not suit, we can send you a free, pre-paid Royal Mail label instead and cancel the collection.")
+                    "If waiting in for us does not suit, ask us for a free, pre-paid Royal Mail label and it will appear on this page to print. Tell us on your order and we will cancel the collection for you.")
         default:
             return ("Posting it to us?",
-                    "We can send you a free, pre-paid Royal Mail label so posting it costs you nothing.")
+                    "Ask us for a free, pre-paid Royal Mail label and it will appear on this page for you to print, so posting it costs you nothing.")
         }
     }
 
@@ -337,7 +344,7 @@ struct CustomerReturnLabelStep: View {
 
                 // The button (or address form) that can never fire twice. See
                 // CustomerReturnLabelViewModel.requestLabel for the guard.
-                createControls(idleLabel: "Send me a postage label", loadingLabel: "Requesting...")
+                createControls(idleLabel: "Ask for a postage label", loadingLabel: "Requesting...")
             }
         }
     }

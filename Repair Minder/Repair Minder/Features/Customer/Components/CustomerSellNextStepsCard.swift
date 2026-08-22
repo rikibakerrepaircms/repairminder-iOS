@@ -55,7 +55,7 @@ struct CustomerSellNextStepsCard: View {
     /// seller who turns up at the counter anyway.
     ///
     /// So it shows on the POSTAL route, and on any route where a label now exists -
-    /// a walk-in who pressed "Send me a postage label" HAS moved to posting it, and
+    /// a walk-in who pressed "Ask for a postage label" HAS moved to posting it, and
     /// at that point the question is a fair one. Twin of `packagingApplies` in
     /// `SellNextStepsCard.tsx`.
     private var packagingApplies: Bool {
