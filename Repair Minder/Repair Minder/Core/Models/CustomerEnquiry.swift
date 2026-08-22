@@ -112,11 +112,18 @@ struct CustomerEnquiryDetail: Decodable, Sendable {
     /// the ownership/condition attestations. Nil on every kind but 'sell' and on
     /// every ticket predating migration 0504; the card renders nothing then.
     let sellDeclaration: SellDeclaration?
+    /// Whether the device has actually reached us. NOT the same question as the
+    /// ticket having become an order, which is a staff filing action.
+    ///
+    /// NO DEFAULT VALUE. `let x: Bool? = nil` compiles and is silently dropped from
+    /// the synthesised decoder - green build, nil forever.
+    let deviceWithUs: Bool?
 
     enum CodingKeys: String, CodingKey {
         case ticketNumber, subject, status, ticketType, enquiryKind, fulfilment, isUnlistedItem, createdAt, messages, company
         case collectionSlot
         case sellDeclaration
+        case deviceWithUs
     }
 
     init(from decoder: Decoder) throws {
@@ -136,6 +143,7 @@ struct CustomerEnquiryDetail: Decodable, Sendable {
         company = try c.decodeIfPresent(CustomerEnquiryCompany.self, forKey: .company)
         collectionSlot = try c.decodeIfPresent(CollectionSlot.self, forKey: .collectionSlot)
         sellDeclaration = try c.decodeIfPresent(SellDeclaration.self, forKey: .sellDeclaration)
+        deviceWithUs = try c.decodeIfPresent(Bool.self, forKey: .deviceWithUs)
     }
 
     var isSell: Bool { enquiryKind == CustomerEnquiryKind.sell }

@@ -46,6 +46,20 @@ struct CustomerOrderDetail: Codable, Identifiable, Sendable {
     /// from a Worker predating it, so it decodes as nil.
     let sellerIdStatus: String?
 
+    /// The route the CUSTOMER chose, which is not `intakeMethod` - that is what staff
+    /// picked at conversion, and it defaults a postal seller to a walk-in.
+    ///
+    /// Mind the word: "collection" here means POSTAL.
+    ///
+    /// NO DEFAULT VALUE. `let x: String? = nil` compiles and is silently dropped from
+    /// the synthesised decoder - green build, nil forever.
+    let fulfilment: String?
+
+    /// What the seller declared. A record, so it survives book-in.
+    ///
+    /// NO DEFAULT VALUE - see `fulfilment` above.
+    let sellDeclaration: SellDeclaration?
+
     // Note: Using automatic snake_case conversion via decoder.keyDecodingStrategy
     enum CodingKeys: String, CodingKey {
         case id, ticketNumber, status, intakeMethod, createdAt, collectedAt
@@ -53,6 +67,8 @@ struct CustomerOrderDetail: Codable, Identifiable, Sendable {
         case rejectedAt, preAuthorization, reviewLinks
         case devices, items, totals, messages, company
         case sellerIdStatus
+        case fulfilment
+        case sellDeclaration
     }
 
     /// Custom decoding to handle flexible date formats from API
@@ -72,6 +88,8 @@ struct CustomerOrderDetail: Codable, Identifiable, Sendable {
         messages = try container.decodeIfPresent([CustomerMessage].self, forKey: .messages) ?? []
         company = try container.decodeIfPresent(CustomerCompanyInfo.self, forKey: .company)
         sellerIdStatus = try container.decodeIfPresent(String.self, forKey: .sellerIdStatus)
+        fulfilment = try container.decodeIfPresent(String.self, forKey: .fulfilment)
+        sellDeclaration = try container.decodeIfPresent(SellDeclaration.self, forKey: .sellDeclaration)
 
         // Decode dates with flexible format handling
         createdAt = Self.decodeDate(from: container, forKey: .createdAt) ?? Date()
