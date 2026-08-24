@@ -36,6 +36,19 @@ struct DeviceEntryFormView: View {
     /// The attempt satisfies the gate; the orange notice says nothing was
     /// confirmed.
     @State private var failedCheckIdentifiers: Set<String> = []
+    /// Was the last completed check run in buyback mode? A repair-mode lookup
+    /// never paid for the blacklist call, so it cannot satisfy a purchase gate.
+    /// Nothing in this form changes the workflow type today, but the shared gate
+    /// takes the answer rather than assuming it, so it is tracked rather than
+    /// passed as a literal.
+    @State private var lastCheckedForBuyback = false
+    /// Identifiers the operator has deliberately chosen to book in without
+    /// checking. SICKW is blocked from Cloudflare's egress range often enough
+    /// that pressing the button and waiting for it to fail was the normal path
+    /// rather than the exception - a minute spent confirming nothing. A skip is
+    /// an EXPLICIT act against one identifier: never a default, and never
+    /// inherited by the next device typed into this form.
+    @State private var skippedCheckIdentifiers: Set<String> = []
     /// Seconds left before the Find My re-check can be pressed again. A lock only
     /// changes when the customer actually signs out, which is not instant, and
     /// every press is a real charge - so the button goes quiet for 30s and counts
@@ -336,14 +349,13 @@ struct DeviceEntryFormView: View {
         // A device confirmed as reported lost or stolen cannot be added to a
         // buyback at all. Warning and carrying on is not a gate.
         if lookupBlocked { return false }
-        // And a buyback device may not be added without the check having
-        // actually been RUN against the identifier now in the form. Otherwise
-        // the gate is optional, which is the same as not having one. A check
-        // that ran and errored counts as run: refusing the purchase because the
-        // provider is unreachable just stops the shop trading.
-        if device.workflowType == .buyback && !checkRunForCurrentIdentifier {
-            return false
-        }
+        // And a buyback device may not be added until the check has been dealt
+        // with against the identifier now in the form - run, or explicitly
+        // skipped. Otherwise the gate is optional, which is the same as not
+        // having one. A check that ran and errored counts as run: refusing the
+        // purchase because the provider is unreachable just stops the shop
+        // trading.
+        if awaitingRequiredCheck { return false }
         return hasDisplayName && hasBrandOrCustomBrand
     }
 
@@ -530,8 +542,7 @@ struct DeviceEntryFormView: View {
 
             // A disabled Add button with no explanation reads as a broken app.
             // Say what is missing.
-            if device.workflowType == .buyback,
-               !checkRunForCurrentIdentifier,
+            if awaitingRequiredCheck,
                !isLookingUp,
                visibleLookupError == nil {
                 Text(lookupIdentifier.isEmpty
@@ -541,6 +552,42 @@ struct DeviceEntryFormView: View {
                         : "Keep going - run the check once the full IMEI or serial is in."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            // Skip. The provider is blocked from Cloudflare's egress range often
+            // enough that requiring an ATTEMPT meant pressing the button and
+            // waiting for it to fail before the form would open - a minute spent
+            // confirming nothing. Only offered once there is a full identifier to
+            // skip against, so it cannot be pressed on a half-typed IMEI.
+            //
+            // Deliberately a plain link, not a second filled button beside "Check
+            // device": checking is still what should happen, and this is the way
+            // out when it cannot.
+            if awaitingRequiredCheck, !isLookingUp, identifierLooksComplete {
+                Button("Add it without checking") {
+                    skippedCheckIdentifiers.insert(lookupIdentifier)
+                }
+                .font(.caption)
+                .fontWeight(.medium)
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.accentColor)
+            }
+
+            // Absence is not innocence. The row goes on the order either way, so
+            // say plainly that nothing was confirmed rather than letting a quiet
+            // form imply a clean result.
+            if checkWasSkipped {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "questionmark.circle.fill")
+                        .foregroundStyle(.orange)
+                    Text("Adding without a device check. Nothing has been confirmed about this device, so check Find My and the lost or stolen status by hand before paying.")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.orange.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
     }
@@ -553,13 +600,28 @@ struct DeviceEntryFormView: View {
         return lookupError
     }
 
-    /// Has the check actually been run against what is in the form now - either
-    /// coming back with a result, or coming back as a provider we could not
-    /// reach? Both count. Only "never asked" leaves the buyback gate shut.
-    private var checkRunForCurrentIdentifier: Bool {
-        guard !lookupIdentifier.isEmpty else { return false }
-        return lastCheckedIdentifier == lookupIdentifier
-            || failedCheckIdentifiers.contains(lookupIdentifier)
+    /// Is the buyback gate still shut against what is in the form now?
+    ///
+    /// A check that came back with a result, a check that came back as a
+    /// provider we could not reach, and an explicit decision to add it without
+    /// checking all open it. Only "never asked" leaves it shut. The rule itself
+    /// lives in `awaitingBuybackCheck` so this and the web dashboard cannot
+    /// drift apart - see Core/Utilities/BuybackDeviceCheck.swift.
+    private var awaitingRequiredCheck: Bool {
+        awaitingBuybackCheck(
+            isBuybackDevice: device.workflowType == .buyback,
+            identifier: lookupIdentifier,
+            checkedIdentifiers: [lastCheckedIdentifier].compactMap { $0 },
+            checkedForBuyback: lastCheckedForBuyback,
+            failedIdentifiers: Array(failedCheckIdentifiers),
+            skippedIdentifiers: Array(skippedCheckIdentifiers)
+        )
+    }
+
+    /// True when this device is going on the order with nothing confirmed about
+    /// it. Absence is not innocence, so the form says so on the row.
+    private var checkWasSkipped: Bool {
+        skippedCheckIdentifiers.contains(lookupIdentifier)
     }
 
     /// Is this worth spending a lookup on yet? A part-typed IMEI is not.
@@ -659,6 +721,7 @@ struct DeviceEntryFormView: View {
             // stays a warning: the customer can clear it and come back.
             lookupBlocked = forBuyback && found.isBlacklisted
             lastCheckedIdentifier = lookupIdentifier
+            lastCheckedForBuyback = forBuyback
             // Carry the result onto the device so it reaches the order row.
             device.rmcheckLookupId = result.rmcheckLookupId ?? device.rmcheckLookupId
             device.blacklistStatus = found.blacklistStatus ?? device.blacklistStatus
