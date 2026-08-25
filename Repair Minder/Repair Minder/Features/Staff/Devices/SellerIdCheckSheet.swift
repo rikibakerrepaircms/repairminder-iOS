@@ -235,40 +235,55 @@ struct SellerIdCheckSheet: View {
                             .font(.footnote)
                             .foregroundStyle(.orange)
                     } else {
-                        Picker("Which file is the ID?", selection: $attachmentId) {
-                            Text("Choose the file...").tag("")
-                            ForEach(Array(attachments.enumerated()), id: \.element.id) { index, a in
-                                Text("\(index + 1). \(a.filename ?? "Unnamed file")").tag(a.id)
-                            }
-                        }
-                        Text("Recording which file holds the document is what lets it be found and deleted later.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-
                         /*
-                          EVERY document, not only the one picked above.
+                          THE DOCUMENT IS THE CONTROL.
 
-                          The picker answers one question - which file is the photo ID -
-                          and the toggles below ask two: does the NAME match, and does
-                          the ADDRESS match. Those are routinely on two different
-                          documents, so showing only the selected file would still leave
-                          the address unverifiable.
+                          This was a Picker of filenames with the previews below it, so
+                          choosing the ID meant looking at a document, working out which
+                          numbered row matched it, then picking that row from a separate
+                          list. Riki: "i should be able to select the actual upload from
+                          a grid, not have to view it then select from the dropdown" -
+                          and the step being easy to skip is what produced the save
+                          error "id_attachment_id is required when the documents were
+                          supplied as an image".
+
+                          Every upload is shown, because the toggles below ask about a
+                          name AND an address and those are routinely on two different
+                          documents. Tapping one marks it as the photo ID; tapping it
+                          again clears the choice.
                         */
                         ForEach(Array(attachments.enumerated()), id: \.element.id) { index, a in
+                            let selected = a.id == attachmentId
                             VStack(alignment: .leading, spacing: 6) {
-                                HStack(spacing: 6) {
-                                    Text("\(index + 1). \(a.filename ?? "Unnamed file")")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    if a.id == attachmentId {
-                                        Label("recorded as the ID", systemImage: "checkmark")
-                                            .font(.caption)
-                                            .foregroundStyle(.green)
+                                Button {
+                                    attachmentId = selected ? "" : a.id
+                                } label: {
+                                    HStack(alignment: .top, spacing: 8) {
+                                        Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                                            .foregroundStyle(selected ? Color.accentColor : .secondary)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("\(index + 1). \(a.filename ?? "Unnamed file")")
+                                                .font(.caption)
+                                                .foregroundStyle(.primary)
+                                            Text(selected ? "This is the photo ID" : a.createdAt)
+                                                .font(.caption2)
+                                                .foregroundStyle(selected ? Color.accentColor : .secondary)
+                                        }
+                                        Spacer(minLength: 0)
                                     }
                                 }
+                                // .plain, so the row does not paint itself as a link and
+                                // so the preview below is not swallowed by the button.
+                                .buttonStyle(.plain)
+
                                 IdDocumentPreview(attachment: a, service: service)
                             }
+                            .padding(.vertical, 4)
                         }
+
+                        Text("Tap the document that is the photo ID. Recording which file holds it is what lets it be found and deleted later.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
