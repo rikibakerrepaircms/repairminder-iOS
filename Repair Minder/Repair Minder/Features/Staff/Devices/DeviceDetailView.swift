@@ -835,12 +835,11 @@ struct DeviceDetailView: View {
                     LabeledContent("Passcode Type", value: passcodeType.capitalized)
                 }
 
-                if let health = device.batteryHealthPercent {
-                    // Health is (nominal / DESIGN capacity), so a brand-new cell can
-                    // legitimately read 102–103%. Clamp for display only — iOS itself
-                    // never shows above 100%, and "103%" reads as a bug. Mirrors the
-                    // web dashboard's displayBatteryHealth().
-                    LabeledContent("Battery Health", value: "\(min(health, 100))%")
+                // Clamping lives in BatteryHealth, not here. This read
+                // `min(health, 100)` inline while BuybackDetailView printed the same
+                // figure raw and unclamped - two versions of one rule, disagreeing.
+                if let health = BatteryHealth.display(device.batteryHealthPercent) {
+                    LabeledContent("Battery Health", value: "\(health)%")
                 }
 
                 if let cycles = device.batteryCycleCount {
