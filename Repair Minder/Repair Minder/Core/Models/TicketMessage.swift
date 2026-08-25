@@ -93,8 +93,12 @@ struct TicketMessage: Codable, Identifiable, Sendable, Equatable {
             return .unknown
         }
 
-        // Check for bounced/blocked first (error states)
-        if events.contains(where: { $0.eventType == "bounced" || $0.eventType == "blocked" }) {
+        // Check for error states first. "failed" is what the Voodoo SMS webhook
+        // records for a receipt the network refused (UNDELIVERED/EXPIRED/
+        // REJECTED); without it an undeliverable text reported as .sent.
+        if events.contains(where: {
+            $0.eventType == "bounced" || $0.eventType == "blocked" || $0.eventType == "failed"
+        }) {
             return .failed
         }
 
@@ -196,10 +200,24 @@ struct MessageEvent: Codable, Identifiable, Equatable, Sendable {
     let eventData: EventData?
     let createdAt: String
 
+    /// When the event actually happened, preferring the provider's own timestamp
+    /// over the moment we recorded the receipt.
+    ///
+    /// Normally seconds apart. In August 2026 Voodoo's delivery receipts ran up
+    /// to 15 hours behind, so `createdAt` dated a text most of a day late.
+    var displayTimestamp: String {
+        if let providerTimestamp = eventData?.timestamp,
+           DateFormatters.parseDate(providerTimestamp) != nil {
+            return providerTimestamp
+        }
+        return createdAt
+    }
+
     /// Formatted event date
     var formattedDate: String {
-        guard let date = DateFormatters.parseDate(createdAt) else {
-            return createdAt
+        let source = displayTimestamp
+        guard let date = DateFormatters.parseDate(source) else {
+            return source
         }
         let formatter = DateFormatter()
         formatter.dateStyle = .short
@@ -216,6 +234,8 @@ struct MessageEvent: Codable, Identifiable, Equatable, Sendable {
         case "clicked": return "Link Clicked"
         case "bounced": return "Bounced"
         case "blocked": return "Blocked"
+        case "failed": return "Not delivered"
+        case "unknown": return "Unknown status"
         default: return eventType.capitalized
         }
     }
@@ -227,7 +247,7 @@ struct MessageEvent: Codable, Identifiable, Equatable, Sendable {
         case "delivered": return "checkmark.circle"
         case "opened": return "envelope.open"
         case "clicked": return "hand.tap"
-        case "bounced": return "exclamationmark.triangle"
+        case "bounced", "failed": return "exclamationmark.triangle"
         case "blocked": return "xmark.shield"
         default: return "questionmark.circle"
         }
@@ -240,7 +260,7 @@ struct MessageEvent: Codable, Identifiable, Equatable, Sendable {
         case "delivered": return .green
         case "opened": return .blue
         case "clicked": return .purple
-        case "bounced", "blocked": return .red
+        case "bounced", "blocked", "failed": return .red
         default: return .secondary
         }
     }
@@ -255,6 +275,12 @@ struct EventData: Codable, Equatable, Sendable {
     let subject: String?
     let sentAt: String?
     let deliveredAt: String?
+    /// When the PROVIDER says the event happened. Both Postmark and Voodoo send
+    /// this; it is not the same as the event row's created_at, which is when we
+    /// recorded the receipt.
+    let timestamp: String?
+    /// Raw provider status, e.g. Voodoo's "DELIVERED" / "UNDELIVERED".
+    let status: String?
 
     // Flexible decoding for varying event data structures
     init(from decoder: Decoder) throws {
@@ -264,6 +290,8 @@ struct EventData: Codable, Equatable, Sendable {
         subject = try container.decodeIfPresent(String.self, forKey: .subject)
         sentAt = try container.decodeIfPresent(String.self, forKey: .sentAt)
         deliveredAt = try container.decodeIfPresent(String.self, forKey: .deliveredAt)
+        timestamp = try container.decodeIfPresent(String.self, forKey: .timestamp)
+        status = try container.decodeIfPresent(String.self, forKey: .status)
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -272,6 +300,8 @@ struct EventData: Codable, Equatable, Sendable {
         case subject
         case sentAt
         case deliveredAt
+        case timestamp
+        case status
     }
 }
 
