@@ -44,6 +44,7 @@ struct SellerIdCheckSheet: View {
     @State private var proofDated = Date()
     @State private var method: IdCheckMethod = .inPerson
     @State private var attachmentId = ""
+    @State private var attachments: [IdCheckAttachment] = []
     @State private var nameMatches = false
     @State private var addressMatches = false
     @State private var addressVerified = ""
@@ -61,6 +62,16 @@ struct SellerIdCheckSheet: View {
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()
+
+    /// How many documents the SELLER sent from their order page.
+    ///
+    /// Counted off `isIdUpload` rather than off the whole list: every attachment on the
+    /// ticket is offered to the picker, so a customer's photo of a cracked screen would
+    /// otherwise be announced as their ID, and a sheet that cries upload at a screen
+    /// photo is one people stop believing.
+    private var uploadedCount: Int {
+        attachments.filter { $0.isIdUpload == true }.count
+    }
 
     var body: some View {
         NavigationStack {
@@ -116,10 +127,48 @@ struct SellerIdCheckSheet: View {
                 }
             }
 
-            if let clientName {
+            if clientName != nil || clientAddress != nil {
                 Section {
-                    Text("Checking documents for \(clientName).")
-                        .font(.subheadline)
+                    if let clientName {
+                        Text("Checking documents for \(clientName).")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    // WHAT THE DOCUMENT IS BEING CHECKED AGAINST, on screen.
+                    //
+                    // The address was loaded and used only to pre-fill the field lower
+                    // down, so comparing a proof of address to what we hold meant
+                    // scrolling past the whole form to find it - or leaving for the
+                    // client record. Riki, of the web twin: "i cant see the address for
+                    // the client i have to go to the client page. it should show me the
+                    // clients address to check against here."
+                    if let clientAddress {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Address on the client record")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(clientAddress)
+                                .font(.subheadline)
+                                .textSelection(.enabled)
+                        }
+                    }
+                }
+            }
+
+            // The seller has done their part and is waiting on us. Until this existed
+            // the sheet looked identical whether they had sent nothing or three
+            // documents an hour ago.
+            if existing == nil && uploadedCount > 0 {
+                Section {
+                    Label(
+                        uploadedCount == 1
+                            ? "The seller has uploaded a document."
+                            : "The seller has uploaded \(uploadedCount) documents.",
+                        systemImage: "checkmark.seal"
+                    )
+                    .foregroundStyle(.green)
+                    Text("Nothing has been recorded against it yet.")
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -171,14 +220,56 @@ struct SellerIdCheckSheet: View {
                 .labelsHidden()
 
                 if method == .imageSupplied {
-                    TextField("Attachment id of the image", text: $attachmentId)
-                        #if os(iOS)
-                        .textInputAutocapitalization(.never)
-                        #endif
-                        .autocorrectionDisabled()
-                    Text("Recording which attachment holds the document is what lets it be found and deleted later.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    /*
+                      A PICKER AND THE DOCUMENTS THEMSELVES, not a box asking for an id.
+
+                      This was `TextField("Attachment id of the image")`. Nothing in the
+                      product surfaces an attachment id anywhere, so on an iPad at the
+                      counter it was a field nobody could fill - and the two toggles
+                      below, which are what opens the payment gate, were being answered
+                      about a document the sheet would not show. Same fault the web
+                      panel had; both were fixed together.
+                    */
+                    if attachments.isEmpty {
+                        Text("Nothing uploaded yet. The seller gets a link to their order page and uploads it there - it appears here straight away.")
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
+                    } else {
+                        Picker("Which file is the ID?", selection: $attachmentId) {
+                            Text("Choose the file...").tag("")
+                            ForEach(Array(attachments.enumerated()), id: \.element.id) { index, a in
+                                Text("\(index + 1). \(a.filename ?? "Unnamed file")").tag(a.id)
+                            }
+                        }
+                        Text("Recording which file holds the document is what lets it be found and deleted later.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+
+                        /*
+                          EVERY document, not only the one picked above.
+
+                          The picker answers one question - which file is the photo ID -
+                          and the toggles below ask two: does the NAME match, and does
+                          the ADDRESS match. Those are routinely on two different
+                          documents, so showing only the selected file would still leave
+                          the address unverifiable.
+                        */
+                        ForEach(Array(attachments.enumerated()), id: \.element.id) { index, a in
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(spacing: 6) {
+                                    Text("\(index + 1). \(a.filename ?? "Unnamed file")")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    if a.id == attachmentId {
+                                        Label("recorded as the ID", systemImage: "checkmark")
+                                            .font(.caption)
+                                            .foregroundStyle(.green)
+                                    }
+                                }
+                                IdDocumentPreview(attachment: a, service: service)
+                            }
+                        }
+                    }
                 }
             }
 
@@ -226,6 +317,7 @@ struct SellerIdCheckSheet: View {
             existing = response.idCheck
             clientName = response.clientName
             clientAddress = response.clientAddress
+            attachments = response.availableAttachments ?? []
             if let check = response.idCheck {
                 photoIdType = PhotoIdType(rawValue: check.photoIdType) ?? .drivingLicence
                 proofType = check.proofOfAddressType.flatMap { ProofOfAddressType(rawValue: $0) }

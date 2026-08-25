@@ -120,9 +120,52 @@ struct BuybackIdCheck: Decodable {
     }
 }
 
+/// A document already on this purchase's ticket, offered to the picker.
+///
+/// WHY THE APP NEEDS THESE AT ALL. The sheet used to ask staff to type an attachment
+/// id into a text field. Nothing in the product surfaces one, so on an iPad at the
+/// counter it was a box nobody could fill - and the sheet then asked whether the name
+/// and the address on a document matched, with no way to look at the document. The web
+/// panel had the same fault; Riki, on order 100002885: "i need to see the fucking
+/// upload to check the address do i not?!"
+///
+/// Web twin: the `TicketAttachment` interface in SellerIdCheckPanel.tsx.
+struct IdCheckAttachment: Decodable, Identifiable, Hashable {
+    let id: String
+    let filename: String?
+    let contentType: String?
+    let createdAt: String
+    let from: String?
+    /// Path on the API, not a full URL. Optional so an older response cannot break
+    /// decoding - a document that will not load is recoverable, a sheet that will not
+    /// open is not.
+    let downloadUrl: String?
+    /// True only for something the SELLER uploaded from their order page. Every other
+    /// attachment is still offered to the picker - an emailed photo ID is as valid as
+    /// an uploaded one - but only these may be counted as "the seller has sent it".
+    let isIdUpload: Bool?
+
+    var isPDF: Bool { (contentType ?? "").contains("pdf") }
+
+    /// `/api/tickets/:ticketId/attachments/:attachmentId/download` split back into the
+    /// two ids the endpoint case wants. Parsed rather than carried separately because
+    /// the API already assembles it, and one source beats two that can disagree.
+    var ticketId: String? {
+        guard let downloadUrl else { return nil }
+        let parts = downloadUrl.split(separator: "/")
+        guard let i = parts.firstIndex(of: "tickets"), parts.count > i + 1 else { return nil }
+        return String(parts[i + 1])
+    }
+}
+
 /// `GET /api/orders/:orderId/id-check`
 struct BuybackIdCheckResponse: Decodable {
     let idCheck: BuybackIdCheck?
+    /// Every attachment on this purchase's ticket, newest first.
+    ///
+    /// NO DEFAULT VALUE, and optional: `let x: [T] = []` compiles and is then silently
+    /// dropped by the synthesised decoder, so a populated list would never arrive.
+    let availableAttachments: [IdCheckAttachment]?
     /// The address currently on the client record, offered as the thing being
     /// verified so nobody retypes what is already there. It is also the line the
     /// self-billed purchase invoice will carry.

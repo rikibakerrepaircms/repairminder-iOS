@@ -70,6 +70,18 @@ final class BuybackService {
         try await api.request(.recordBuybackIdCheck(orderId: orderId), body: request)
     }
 
+    /// The bytes of one uploaded identity document.
+    ///
+    /// Raw data rather than a URL handed to `AsyncImage`: the endpoint is Bearer
+    /// authenticated, so a bare URL fetches without the header and comes back 401.
+    /// Nothing is written to disk - the sheet renders from memory and the bytes go
+    /// when it closes, which is the right handling for someone's passport.
+    func idDocumentData(ticketId: String, attachmentId: String) async throws -> Data {
+        try await api.requestRawData(
+            .ticketAttachmentDownload(ticketId: ticketId, attachmentId: attachmentId)
+        )
+    }
+
     // MARK: - Refurbishment Items
 
     /// POST /api/buyback/:id/refurbishment

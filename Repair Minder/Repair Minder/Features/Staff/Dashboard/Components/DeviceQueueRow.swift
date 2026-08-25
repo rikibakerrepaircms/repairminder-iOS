@@ -83,6 +83,19 @@ struct DeviceQueueRow: View {
                             .font(.caption2)
                             .foregroundStyle(.red)
                     }
+
+                    // THE SELLER HAS DONE THEIR PART AND IS WAITING ON US.
+                    //
+                    // Nothing in the queue changed when documents arrived, so an upload
+                    // sat unchecked while the seller's own portal already said "we are
+                    // checking it". The web devices list grew the same pill at the same
+                    // time. Amber, not green: this is a job, not a state.
+                    if device.sellerIdAwaitingCheck == true {
+                        Label("ID to check", systemImage: "person.text.rectangle")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                            .lineLimit(1)
+                    }
                 }
 
                 // Metadata row: received date, due date, sub-location, or notes
@@ -451,7 +464,8 @@ struct CategoryChip: View {
                 preTestPhotosCount: 3,
                 notes: [DeviceNote(body: "Customer reported screen flickering", createdAt: "2026-02-04T10:00:00Z", createdBy: "Staff", deviceId: nil)],
                 checklist: nil,
-                source: "order"
+                source: "order",
+                sellerIdAwaitingCheck: nil
             )
         ) {
             #if DEBUG
