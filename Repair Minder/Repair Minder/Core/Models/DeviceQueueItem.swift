@@ -91,13 +91,15 @@ struct DeviceQueueItem: Decodable, Equatable, Sendable, Identifiable {
     let notes: [DeviceNote]?  // Made optional - might be null or missing
     let checklist: FlexibleChecklist?  // Can be empty array [] or object
     let source: String?  // Made optional - might not be present
-    /// A buyback whose seller has uploaded their ID and where no PASSING check has been
-    /// recorded yet - the device is waiting on us, not on them.
+    /// Where the seller ID check has got to on a buyback: "uploaded" means documents
+    /// are waiting to be looked at, "outstanding" means nothing has been recorded at
+    /// all. Null once a passing check exists, and on every repair.
     ///
-    /// Optional because the buyback-inventory rows the API appends to this list never
-    /// pass through the mapper that sets it, and because an older Worker omits it
-    /// entirely. Read it as `== true`, never compare it to false.
-    let sellerIdAwaitingCheck: Bool?
+    /// A String rather than an enum, and optional: the buyback-inventory rows the API
+    /// appends to this list never pass through the mapper that sets it, an older Worker
+    /// omits it entirely, and a value from a newer one must render nothing rather than
+    /// fail the whole queue's decode.
+    let sellerIdCheckState: String?
 
     /// Parsed device status enum
     var deviceStatus: DeviceStatus {
