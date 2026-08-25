@@ -81,6 +81,9 @@ struct BuybackItem: Decodable, Identifiable, Equatable, Hashable, Sendable {
     let imei2: String?
     let storageCapacity: String?
     let colour: String?
+    /// TEXT holding a bare number like "100" - see BatteryHealth, which is the only
+    /// thing allowed to interpret it. Optional: 71 of mendmyi's 166 items have none.
+    let batteryHealth: String?
 
     // Status
     let status: String
@@ -136,6 +139,18 @@ struct BuybackItem: Decodable, Identifiable, Equatable, Hashable, Sendable {
             .compactMap { $0 }
             .filter { !$0.isEmpty }
             .joined(separator: " ")
+    }
+
+    /// "Purple · 128 GB", the line under the identifier.
+    ///
+    /// Colour is NOT in deviceDisplayName above, which is brand + model + capacity, so
+    /// without this the app never showed it at all - the web row has carried it for a
+    /// while.
+    var colourAndStorage: String? {
+        let parts = [colour, storageCapacity]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " \u{00B7} ")
     }
 
     /// Primary identifier to display (IMEI preferred, then serial)

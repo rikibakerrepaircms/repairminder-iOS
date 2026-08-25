@@ -416,8 +416,10 @@ struct BuybackDetailView: View {
                 detailRow("Storage", value: buyback.storageCapacity)
                 detailRow("Colour", value: buyback.colour)
 
-                if let battery = buyback.batteryHealth, !battery.isEmpty {
-                    detailRow("Battery", value: battery)
+                // Was the raw column: unclamped, and with no percent sign, so a
+                // buyback read "100" where the device screen read "100%".
+                if let battery = BatteryHealth.display(buyback.batteryHealth) {
+                    detailRow("Battery", value: "\(battery)%")
                 }
 
                 Divider()

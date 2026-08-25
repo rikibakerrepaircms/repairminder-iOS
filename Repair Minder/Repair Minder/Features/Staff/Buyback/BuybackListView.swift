@@ -435,6 +435,35 @@ struct BuybackListView: View {
                 BuybackStatusBadge(status: item.status)
             }
 
+            /*
+              Colour, capacity and battery - the three things that decide what a used
+              handset is worth to the next owner, and the ones someone pricing stock
+              wants without opening the item.
+
+              Colour was not shown anywhere on this row before; deviceDisplayName is
+              brand + model + capacity. Battery is a badge rather than another "·"
+              segment because when triaging a shelf the BAND is the useful part, and it
+              is the same banding the web row and the device card use, so a handset does
+              not change colour between screens.
+            */
+            if item.colourAndStorage != nil || BatteryHealth.display(item.batteryHealth) != nil {
+                HStack(spacing: 6) {
+                    if let line = item.colourAndStorage {
+                        Text(line)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    if let battery = BatteryHealth.display(item.batteryHealth) {
+                        Label("\(battery)%", systemImage: "battery.100")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(BatteryHealth.tint(for: battery))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(BatteryHealth.tint(for: battery).opacity(0.12), in: Capsule())
+                    }
+                }
+            }
+
             // Row 2: Financial summary
             HStack(spacing: 16) {
                 Button {
