@@ -84,16 +84,22 @@ struct DeviceQueueRow: View {
                             .foregroundStyle(.red)
                     }
 
-                    // THE SELLER HAS DONE THEIR PART AND IS WAITING ON US.
+                    // THIS BUYBACK CANNOT BE PAID OR SHELVED YET.
                     //
-                    // Nothing in the queue changed when documents arrived, so an upload
-                    // sat unchecked while the seller's own portal already said "we are
-                    // checking it". The web devices list grew the same pill at the same
-                    // time. Amber, not green: this is a job, not a state.
-                    if device.sellerIdAwaitingCheck == true {
+                    // Two wordings, because the states need different things from
+                    // whoever reads the row: "uploaded" means there is a document on
+                    // screen to look at now, "outstanding" means it was probably shown
+                    // at the counter and nobody wrote it down. Both block inventory.
+                    // The web devices list grew the same pair at the same time.
+                    if device.sellerIdCheckState == "uploaded" {
                         Label("ID to check", systemImage: "person.text.rectangle")
                             .font(.caption2)
                             .foregroundStyle(.orange)
+                            .lineLimit(1)
+                    } else if device.sellerIdCheckState == "outstanding" {
+                        Label("ID not checked", systemImage: "person.text.rectangle")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
                 }
@@ -465,7 +471,7 @@ struct CategoryChip: View {
                 notes: [DeviceNote(body: "Customer reported screen flickering", createdAt: "2026-02-04T10:00:00Z", createdBy: "Staff", deviceId: nil)],
                 checklist: nil,
                 source: "order",
-                sellerIdAwaitingCheck: nil
+                sellerIdCheckState: nil
             )
         ) {
             #if DEBUG
