@@ -91,6 +91,13 @@ struct DeviceQueueItem: Decodable, Equatable, Sendable, Identifiable {
     let notes: [DeviceNote]?  // Made optional - might be null or missing
     let checklist: FlexibleChecklist?  // Can be empty array [] or object
     let source: String?  // Made optional - might not be present
+    /// A buyback whose seller has uploaded their ID and where no PASSING check has been
+    /// recorded yet - the device is waiting on us, not on them.
+    ///
+    /// Optional because the buyback-inventory rows the API appends to this list never
+    /// pass through the mapper that sets it, and because an older Worker omits it
+    /// entirely. Read it as `== true`, never compare it to false.
+    let sellerIdAwaitingCheck: Bool?
 
     /// Parsed device status enum
     var deviceStatus: DeviceStatus {

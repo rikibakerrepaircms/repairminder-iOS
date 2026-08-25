@@ -254,6 +254,12 @@ enum APIEndpoint {
     /// The seller identity check for a buyback purchase. Order-scoped, not
     /// device-scoped: one seller shows their licence once, however many handsets
     /// are in the transaction.
+    /// `GET /api/tickets/:ticketId/attachments/:attachmentId/download`
+    ///
+    /// The bytes of a document a seller uploaded to their order page. Staff auth,
+    /// company-scoped, and it checks the attachment really is on that ticket - the
+    /// same route the web ID-check panel reads. Fetched with `requestRawData`.
+    case ticketAttachmentDownload(ticketId: String, attachmentId: String)
     case buybackIdCheck(orderId: String)
     case recordBuybackIdCheck(orderId: String)
     // Refurbishment items
@@ -727,6 +733,8 @@ enum APIEndpoint {
             return "/api/buyback/sell-bulk"
         case .addDeviceToBuyback(let deviceId):
             return "/api/devices/\(deviceId)/add-to-buyback"
+        case .ticketAttachmentDownload(let ticketId, let attachmentId):
+            return "/api/tickets/\(ticketId)/attachments/\(attachmentId)/download"
         case .buybackIdCheck(let orderId), .recordBuybackIdCheck(let orderId):
             return "/api/orders/\(orderId)/id-check"
         case .addRefurbishmentItem(let id):
@@ -898,7 +906,8 @@ enum APIEndpoint {
              .customerOrders, .customerOrder, .customerOrderInvoice, .customerDeviceImage,
              .customerCompetitionEntries, .customerMarketingPreferences,
              .marketplaceSearches, .marketplaceListings, .marketplaceBlockedSellers,
-             .diagnosticsReport, .diagnosticsGetSession:
+             .diagnosticsReport, .diagnosticsGetSession,
+             .ticketAttachmentDownload:
             return .get
 
         // POST endpoints
